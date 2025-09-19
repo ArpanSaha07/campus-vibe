@@ -2,6 +2,7 @@ import Navbar from "./components/Navbar";
 import BannerCarousel from "./components/BannerCarousel";
 import CategoriesSection from "./components/CategoriesSection";
 import EventsSection from "./components/EventsSection";
+import Footer from "./components/Footer";
 
 export default function Home() {
   return (
@@ -11,12 +12,9 @@ export default function Home() {
         <BannerCarousel />
         <CategoriesSection />
         <EventsSection />
-
-        {/* Banner, hero section, etc. will go here */}
       </main>
-      <footer className="">
-        
-      </footer>
+
+      <Footer />
     </>
   );
 }

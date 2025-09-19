@@ -4,7 +4,7 @@ import { Menu, X, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-// notes: bg-white redundant; change font; work on hover of mobile links; fix spacing of items in desktop view
+// notes: bg-white redundant; change font; work on hover of mobile links; fix spacing of items in desktop view; work on search functionality
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
