@@ -2,6 +2,7 @@ import Navbar from "./components/Navbar";
 import BannerCarousel from "./components/BannerCarousel";
 import CategoriesSection from "./components/CategoriesSection";
 import EventsSection from "./components/EventsSection";
+import DiscoverClubs from "./components/DiscoverClubs";
 import Footer from "./components/Footer";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
         <BannerCarousel />
         <CategoriesSection />
         <EventsSection />
+        <DiscoverClubs />
       </main>
 
       <Footer />
