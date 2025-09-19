@@ -1,4 +1,3 @@
-// components/BannerCarousel.tsx
 "use client";
 
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -32,7 +31,7 @@ export default function BannerCarousel() {
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto mt-4 p-5">
+    <div className="w-full max-w-7xl mx-auto mt-30 lg:mt-20 p-5">
       <Swiper
         spaceBetween={10}
         centeredSlides={true}
