@@ -1,7 +1,7 @@
 import { register } from "module";
 import Image from "next/image";
 
-// add links to the texts, images and buttons
+// add links to the texts, images and buttons; set card height to auto?; use this events section for other sections on the main page, do not copy code;
 
 const events = [
   {
@@ -120,8 +120,8 @@ const events = [
 
 export default function EventsSection() {
   return (
-    <section className="max-w-7xl mx-auto px-6 py-10">
-        <div className="flex flex-row justify-between">
+    <section className="max-w-7xl mx-auto px-6 py-10 border">
+        <div className="flex flex-row justify-between pr-4">
             <h2 className="text-xl font-semibold mb-6">Popular events at McGill</h2>
             <span><a href="#" className="text-sm text-gray-700 hover:text-indigo-600 hover:underline">Explore more events</a> &nbsp;&gt;</span>
         </div>
@@ -129,12 +129,12 @@ export default function EventsSection() {
       {/* Grid for xl screens, horizontal scroll for smaller */}
       <div className="
         flex space-x-4 overflow-x-auto pb-4 scrollbar-thin
-        xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-y-4 xl:overflow-hidden xl:justify-between group"
+        xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-y-4 xl:gap-x-6 xl:justify-between"
     >
         {events.map((event) => (
           <div
             key={event.id}
-            className="bg-transparent flex-shrink-0 w-75 rounded-2xl hover:shadow-lg transition-shadow cursor-pointer border"
+            className="bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow border group"
           >
             <div className="relative">
                 {/* Image */}
@@ -154,17 +154,17 @@ export default function EventsSection() {
                     className="absolute bottom-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2"
                 >
                     <span data-spec="icon-button">
-                        <button aria-label="Save" className="p-2 rounded-full bg-white">
+                        <button aria-label="Save" className="p-2 rounded-full bg-white cursor-pointer">
                             <svg fill="#444444" width="25px" height="25px" viewBox="0 0 24 24">
                                 <path id="heart-chunky_svg__eds-icon--heart-chunky_base" fill-rule="evenodd" clip-rule="evenodd" d="M18.8 6.2C18.1 5.4 17 5 16 5c-1 0-2 .4-2.8 1.2L12 7.4l-1.2-1.2C10 5.4 9 5 8 5c-1 0-2 .4-2.8 1.2-1.5 1.6-1.5 4.2 0 5.8l6.8 7 6.8-7c1.6-1.6 1.6-4.2 0-5.8zm-1.4 4.4L12 16.1l-5.4-5.5c-.8-.8-.8-2.2 0-3C7 7.2 7.5 7 8 7c.5 0 1 .2 1.4.6l2.6 2.7 2.7-2.7c.3-.4.8-.6 1.3-.6s1 .2 1.4.6c.8.8.8 2.2 0 3z"></path>
                             </svg>
                         </button>
                     </span>
                     <span data-spec="icon-button">
-                        <button aria-label="Share" className="p-2 rounded-full bg-white">
+                        <button aria-label="Share" className="p-2 rounded-full bg-white cursor-pointer">
                             <svg fill="#444444" width="25px" height="25px" viewBox="0 0 24 24">
-                                <path id="share-ios-chunky_svg__eds-icon--share-ios-chunky_base" fill-rule="evenodd" clip-rule="evenodd" d="M18 16v2H6v-2H4v4h16v-4z"></path>
-                                <path id="share-ios-chunky_svg__eds-icon--share-ios-chunky_arrow" fill-rule="evenodd" clip-rule="evenodd" d="M12 4L7 9l1.4 1.4L11 7.8V16h2V7.8l2.6 2.6L17 9l-5-5z"></path>
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M18 16v2H6v-2H4v4h16v-4z"></path>
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M12 4L7 9l1.4 1.4L11 7.8V16h2V7.8l2.6 2.6L17 9l-5-5z"></path>
                             </svg>
                         </button>
                     </span>
