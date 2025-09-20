@@ -1,6 +1,9 @@
- // Mock/static data (or fetch here if SSR/ISR)
+// Mock/static data (or fetch here if SSR/ISR)
 
- export const popularEvents = [
+import { EventInstance } from "./types";
+import { Club } from "./types";
+
+export const popularEvents: EventInstance[] = [
   {
     id: 1,
     title: "ReMode, Circular Fashion Festival | Festival de Mode...",
@@ -113,4 +116,82 @@
     registered: 120,
     dateTime: "2025-10-18T11:00:00",
   },
+];
+
+export const clubs: Club[] = [
+  {
+    id: "fashion-takes-action",
+    name: "Fashion Takes Action",
+    followers: 137,
+    logo: "/logos/fta.png",
+    banner: "/banners/fta.jpg",
+    description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
+    website: "",
+    email: "",
+    socialLinks: {
+        facebook: "",
+        instagram: "",
+    },
+    featured: true
+  },
+  {
+    id: "rib-entertainment",
+    name: "RIB ENTERTAINMENT",
+    followers: 380,
+    logo: "/logos/rib.png",
+     banner: "/banners/fta.jpg",
+    description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
+    website: "",
+    email: "",
+    socialLinks: {
+        facebook: "",
+        instagram: "",
+    },
+    featured: true
+  },
+  {
+    id: "making-waves-montreal",
+    name: "Making Waves Montreal",
+    followers: 174,
+    logo: "/logos/mwm.png",
+     banner: "/banners/fta.jpg",
+    description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
+    website: "",
+    email: "",
+    socialLinks: {
+        facebook: "",
+        instagram: "",
+    },
+    featured: false
+  },
+  {
+    id: "persian-events",
+    name: "PersianEvents",
+    followers: 128,
+    logo: "/logos/persian.png",
+     banner: "/banners/fta.jpg",
+    description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
+    website: "",
+    email: "",
+    socialLinks: {
+        facebook: "",
+        instagram: "",
+    },
+    featured: false
+  },
+  {
+    id: "glimmering-dolls",
+    name: "Glimmering Dolls",
+    followers: 341,
+    logo: "/logos/dolls.png",
+     banner: "/banners/fta.jpg",
+    description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
+    website: "",
+    email: "",
+    socialLinks: {
+        facebook: "",
+        instagram: "",
+    },
+    featured: true
+  }
 ];

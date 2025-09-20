@@ -1,7 +1,7 @@
 import EventCard from "./EventCard";
-import { Event } from "@/lib/types";
+import { EventInstance } from "@/lib/types";
 
-export default function EventSection({title, events}: {title: string, events: Event[]}) {
+export default function EventSection({title, events}: {title: string, events: EventInstance[]}) {
   return (
     <section className="max-w-7xl mx-auto px-6 py-10">
       <div className="flex flex-row justify-between pr-4">
