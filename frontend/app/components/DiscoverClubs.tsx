@@ -29,11 +29,11 @@ const organizers = [
     id: 5,
     name: "Glimmering Dolls",
     followers: 341,
-    logo: "/logos/dolls.png",
+    logo: "/logos/dolls.png"
   },
 ];
 
-// remove followers count for now, does scrollbar need to be customized for mobile view?
+// TODO: remove followers count for now, should I customise scrollbar for mobile view?
 
 export default function FeaturedOrganizers() {
   return (
@@ -48,7 +48,7 @@ export default function FeaturedOrganizers() {
       </p>
 
       {/* Scrollable container */}
-      <div className="flex space-x-4 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 pb-2 bg-gray-50">
+      <div className="flex space-x-4 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 p-8 bg-gray-50">
         {organizers.map((org) => (
           <div
             key={org.id}

@@ -14,3 +14,19 @@ export type Event = {
   registered: number;
   dateTime: string;
 };
+
+export type Club = {
+    id: number;
+    name: string;
+    description: string;
+    followers: number;
+    logo: string;
+    banner: string;
+    website: string;
+    email: string;
+    socialLinks: {
+        facebook: string;
+        instagram: string;
+    },
+    featured: boolean;
+};
