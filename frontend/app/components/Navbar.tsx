@@ -22,7 +22,7 @@ export default function Navbar() {
                 alt="Logo"
                 width={150}
                 height={60}
-                priority
+                priority={true}
               />
             </Link>
           </div>

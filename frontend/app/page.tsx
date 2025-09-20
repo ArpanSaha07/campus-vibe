@@ -1,9 +1,11 @@
 import Navbar from "./components/Navbar";
 import BannerCarousel from "./components/BannerCarousel";
 import CategoriesSection from "./components/CategoriesSection";
-import EventsSection from "./components/EventsSectionMainPage";
+import EventSection from "./components/events/EventSection";
 import DiscoverClubs from "./components/DiscoverClubs";
 import Footer from "./components/Footer";
+
+import { popularEvents } from "@/lib/data";
 
 export default function Home() {
   return (
@@ -12,7 +14,7 @@ export default function Home() {
         <Navbar />
         <BannerCarousel />
         <CategoriesSection />
-        <EventsSection />
+        <EventSection title="Popular this weekend" events={popularEvents} />
         <DiscoverClubs />
       </main>
 
