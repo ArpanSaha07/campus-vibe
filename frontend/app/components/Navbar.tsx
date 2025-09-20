@@ -4,7 +4,7 @@ import { Menu, X, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-// notes: bg-white redundant; change font; work on hover of mobile links; fix spacing of items in desktop view; work on search functionality
+// notes: fix spacing of items in desktop view; work on search functionality
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -64,14 +64,14 @@ export default function Navbar() {
           </div>
 
           {/* Mobile Right Side (Few items + Hamburger) */}
-          <div className="flex md:hidden items-center space-x-4 text-sm font-medium">
-            <Link href="/events" className="rounded-full">
+          <div className="flex md:hidden items-center space-x-2 text-sm font-medium">
+            <Link href="/events" className="p-3 rounded-full hover:bg-gray-100">
               Find events
             </Link>
-            <Link href="/login" className="rounded-full">
+            <Link href="/login" className="p-3 rounded-full hover:bg-gray-100">
               Log In
             </Link>
-            <Link href="/signup" className="rounded-full">
+            <Link href="/signup" className="p-3 rounded-full hover:bg-gray-100">
               Sign Up
             </Link>
             <button

@@ -1,7 +1,7 @@
 import Navbar from "./components/Navbar";
 import BannerCarousel from "./components/BannerCarousel";
 import CategoriesSection from "./components/CategoriesSection";
-import EventsSection from "./components/EventsSection";
+import EventsSection from "./components/EventsSectionMainPage";
 import DiscoverClubs from "./components/DiscoverClubs";
 import Footer from "./components/Footer";
 
