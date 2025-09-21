@@ -84,7 +84,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
             // event happening soon if within today (or one day?)
             event.date === new Date().toISOString().split("T")[0] && (
               <span className="text-xs text-gray-500 font-semibold bg-blue-300 rounded-lg p-2">
-                Happening Soon
+                Happening Now
               </span>
             )
           }

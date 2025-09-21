@@ -7,12 +7,7 @@ import EventSection from "@/app/components/events/EventSection";
 import { popularEvents, clubs } from "@/lib/data";
 import { Club } from "@/lib/types";
 import { getClubById, getTotalEventsForClub } from "@/lib/clubs";
-
-interface ClubPageProps {
-  params: Promise<{
-    clubId: string;
-  }>;
-}
+import type { ClubPageProps } from "@/lib/types";
 
 export default function ClubPage({ params }: ClubPageProps) {
 

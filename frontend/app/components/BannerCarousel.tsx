@@ -14,9 +14,9 @@ export default function BannerCarousel() {
   // Example banner data (replace with your own)
   const banners = [
     {
-      img: "/frosh1.jpeg",
-      link: "/event/1",
-      alt: "Event 1",
+      img: "/techfair-image.png",
+      link: "https://www.mcgill.ca/careers4engineers/techfair/students",
+      alt: "Tech Fair 2025",
     },
     {
       img: "/frosh2.jpeg",
@@ -48,7 +48,7 @@ export default function BannerCarousel() {
       >
         {banners.map((banner, index) => (
           <SwiperSlide key={index}>
-            <Link href={banner.link}>
+            <Link href={banner.link} target="_blank" rel="noopener noreferrer">
               <Image
                 src={banner.img}
                 alt={banner.alt}

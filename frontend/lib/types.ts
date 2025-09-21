@@ -1,5 +1,6 @@
+import type { ReactNode } from "react"
 
-
+// Data Types
 export type EventInstance = {
   id: number;
   title: string;
@@ -31,3 +32,20 @@ export type Club = {
     },
     featured: boolean;
 };
+
+// Page Types
+export type RootLayoutProps = Readonly<{
+  children: ReactNode;
+}>
+
+export type ClubPageProps = {
+  params: Promise<{
+    clubId: string;
+  }>;
+}
+
+// Components Types
+export type PillProps = {
+    children: ReactNode
+    className?: string
+}
