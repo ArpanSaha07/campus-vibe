@@ -13,6 +13,7 @@ export type EventInstance = {
   capacity: number;
   registered: number;
   dateTime: string;
+  categories: string[];
 };
 
 export type Club = {

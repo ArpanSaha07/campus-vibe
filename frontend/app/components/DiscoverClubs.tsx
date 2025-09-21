@@ -5,7 +5,7 @@ import { Club } from "@/lib/types";
 
 export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
   return (
-    <section className="max-w-7xl mx-auto px-6 py-10">
+    <section aria-label="Featured Clubs section on Main Page" className="max-w-7xl mx-auto px-6 py-10">
         <div className="flex flex-row justify-between">
             <h2 className="text-xl font-semibold">Featured Clubs</h2>
             <span><a href="#" className="text-sm text-gray-700 hover:text-indigo-600 hover:underline">See all clubs</a> &nbsp;&gt;</span>

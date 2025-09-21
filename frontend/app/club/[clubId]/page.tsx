@@ -1,21 +1,22 @@
 "use client";
-
+import { use } from 'react'
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import EventSection from "@/app/components/events/EventSection";
 
-import { popularEvents } from "@/lib/data";
+import { popularEvents, clubs } from "@/lib/data";
 import { Club } from "@/lib/types";
 import { getClubById, getTotalEventsForClub } from "@/lib/clubs";
 
 interface ClubPageProps {
-  params: {
-    slug: string;
-  };
+  params: Promise<{
+    clubId: string;
+  }>;
 }
 
 export default function ClubPage({ params }: ClubPageProps) {
-  const { slug } = params;
+
+  const { clubId } = use(params);
 
   const [club, setClub] = useState<Club | null>(null);
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
@@ -24,11 +25,11 @@ export default function ClubPage({ params }: ClubPageProps) {
   useEffect(() => {
     async function fetchClub() {
       // Example fetch, replace with your real API
-      const data: Promise<Club | null> = getClubById(slug);
+      const data: Promise<Club | null> = getClubById(clubs, clubId);
       setClub(await data);
     }
     fetchClub();
-  }, [slug]);
+  }, [clubId]);
 
   if (!club) return <p>Loading...</p>;
 

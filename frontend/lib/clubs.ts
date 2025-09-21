@@ -1,14 +1,13 @@
-import { Club } from "./types";
-import { clubs } from "./data";
+import { Club, EventInstance } from "./types";
+// import { clubs } from "./data";
 
 /**
  * Get a club by its id.
  * @param id The id of the club
  * @returns {Club} The club object or null if not found
  */
-export async function getClubById(id: string): Promise<Club | null> {
+export async function getClubById(clubs: Club[], id: string): Promise<Club | null> {
     // Simulate fetching a single club by id
-    // should I add clubs as param?
     const club = clubs.find(club => club.id === id);
     return club ?? null;
 }
@@ -25,4 +24,8 @@ function createClubID(name: string): string {
 export function getTotalEventsForClub(clubId: string): number {
     
     return Math.floor(Math.random() * 100); // Random number for demo
+}
+
+function getEventsByClubId(clubId: string): EventInstance[] {
+    return [];
 }

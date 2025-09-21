@@ -17,6 +17,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 200,
     registered: 100,
     dateTime: "2025-09-20T12:00:00",
+    categories: ["Dating", "Research", "Food"]
   },
   {
     id: 2,
@@ -31,6 +32,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 500,
     registered: 400,
     dateTime: "2025-10-06T09:00:00",
+    categories: ["Dating", "Research", "Food"]
   },
   {
     id: 3,
@@ -45,6 +47,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 300,
     registered: 100,
     dateTime: "2025-10-18T11:00:00",
+    categories: ["Dating", "Research", "Food"]
   },
   {
     id: 4,
@@ -59,6 +62,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 150,
     registered: 120,
     dateTime: "2025-10-18T11:00:00",
+    categories: ["Dating", "Research", "Food"]
   },
   {
     id: 5,
@@ -73,6 +77,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 150,
     registered: 120,
     dateTime: "2025-10-18T11:00:00",
+    categories: ["Dating", "Research", "Food"]
   },
   {
     id: 6,
@@ -87,6 +92,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 150,
     registered: 120,
     dateTime: "2025-10-18T11:00:00",
+    categories: ["Nightlife"]
   },
   {
     id: 7,
@@ -101,6 +107,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 150,
     registered: 120,
     dateTime: "2025-10-18T11:00:00",
+    categories: ["Tech", "Networking"]
   },
   {
     id: 8,
@@ -115,6 +122,7 @@ export const popularEvents: EventInstance[] = [
     capacity: 150,
     registered: 120,
     dateTime: "2025-10-18T11:00:00",
+    categories: ["Tech", "Networking"]
   },
 ];
 
@@ -122,7 +130,7 @@ export const clubs: Club[] = [
   {
     id: "fashion-takes-action",
     name: "Fashion Takes Action",
-    followers: 137,
+    followers: 130,
     logo: "/logos/fta.png",
     banner: "/banners/fta.jpg",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
@@ -138,7 +146,7 @@ export const clubs: Club[] = [
     id: "rib-entertainment",
     name: "RIB ENTERTAINMENT",
     followers: 380,
-    logo: "/logos/rib.png",
+    logo: "/frosh1.jpeg",
      banner: "/banners/fta.jpg",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     website: "",
