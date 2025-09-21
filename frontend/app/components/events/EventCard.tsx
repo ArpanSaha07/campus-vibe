@@ -1,9 +1,9 @@
 import Image from "next/image";
-import { Event } from "@/lib/types";
+import { EventInstance } from "@/lib/types";
 
 // TODO: add links to the texts, images and buttons; work on the status div section; set card height to auto?;
 
-export default function EventCard({ event }: { event: Event }) {
+export default function EventCard({ event }: { event: EventInstance }) {
   return (
     <div
         aria-label="event-card"

@@ -1,6 +1,6 @@
 
 
-export type Event = {
+export type EventInstance = {
   id: number;
   title: string;
   date: string;
@@ -13,10 +13,11 @@ export type Event = {
   capacity: number;
   registered: number;
   dateTime: string;
+  categories: string[];
 };
 
 export type Club = {
-    id: number;
+    id: string;
     name: string;
     description: string;
     followers: number;

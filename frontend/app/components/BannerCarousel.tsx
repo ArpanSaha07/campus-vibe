@@ -31,7 +31,7 @@ export default function BannerCarousel() {
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto mt-30 lg:mt-20 p-5">
+    <div aria-label="Banner Section" className="w-full max-w-7xl mx-auto mt-30 lg:mt-20 p-5">
       <Swiper
         spaceBetween={10}
         centeredSlides={true}
