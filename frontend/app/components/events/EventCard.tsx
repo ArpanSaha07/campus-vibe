@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { EventInstance } from "@/lib/types";
+import { EventInstance } from "@/app/types";
 
 // TODO: add links to the texts, images and buttons; work on the status div section; set card height to auto?;
 

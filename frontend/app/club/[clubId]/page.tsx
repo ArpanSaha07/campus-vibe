@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import EventSection from "@/app/components/events/EventSection";
 
-import { popularEvents, clubs } from "@/lib/data";
-import { Club } from "@/lib/types";
+import { popularEvents, clubs } from "@/app/data/data";
+import { Club } from "@/app/types";
+import type { ClubPageProps } from "@/app/types";
 import { getClubById, getTotalEventsForClub } from "@/lib/clubs";
-import type { ClubPageProps } from "@/lib/types";
 
 export default function ClubPage({ params }: ClubPageProps) {
 
