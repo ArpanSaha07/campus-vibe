@@ -34,11 +34,12 @@ jobs:
           npm run start &
           sleep 10
 
-      - name: Install Playwright
-        run: npx playwright install --with-deps
+      # No tests are defined for Playwright yet, but here are some ideas for future checks:
+      # - name: Install Playwright
+      #   run: npx playwright install --with-deps
 
-      - name: Run Playwright page checks
-        run: npx playwright test
+      # - name: Run Playwright page checks
+      #   run: npx playwright test
 
       # Optionally, you can use a simple crawler like linkinator for basic checks:
       # - name: Check all links with linkinator
