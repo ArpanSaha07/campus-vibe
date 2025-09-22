@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Club } from "@/lib/types";
+import { Club } from "@/app/types";
 
 // TODO: remove followers count for now, should I customise scrollbar for mobile view?
 
