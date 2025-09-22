@@ -7,7 +7,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
   return (
     <div
         aria-label="event-card"
-        className="bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow group"
+        className="bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow group duration-300"
     >
       <div className="relative">
         {/* Image */}
