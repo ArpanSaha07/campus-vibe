@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { EventInstance } from "@/lib/types";
+import { EventInstance } from "@/app/types";
 
 // TODO: add links to the texts, images and buttons; work on the status div section; set card height to auto?;
 
@@ -7,7 +7,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
   return (
     <div
         aria-label="event-card"
-        className="bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow group"
+        className="bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow group duration-300"
     >
       <div className="relative">
         {/* Image */}
@@ -84,7 +84,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
             // event happening soon if within today (or one day?)
             event.date === new Date().toISOString().split("T")[0] && (
               <span className="text-xs text-gray-500 font-semibold bg-blue-300 rounded-lg p-2">
-                Happening Soon
+                Happening Now
               </span>
             )
           }

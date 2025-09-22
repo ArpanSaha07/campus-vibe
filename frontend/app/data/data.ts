@@ -1,7 +1,7 @@
 // Mock/static data (or fetch here if SSR/ISR)
 
-import { EventInstance } from "./types";
-import { Club } from "./types";
+import { EventInstance } from "@/app/types";
+import { Club } from "@/app/types";
 
 export const popularEvents: EventInstance[] = [
   {
