@@ -44,6 +44,12 @@ export type ClubPageProps = {
   }>;
 }
 
+export type EventPageProps = {
+  params: Promise<{
+    eventId: string;
+  }>;
+}
+
 // Components Types
 export type PillProps = {
     children: ReactNode

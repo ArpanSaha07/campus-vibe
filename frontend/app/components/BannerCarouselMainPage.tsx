@@ -54,7 +54,7 @@ export default function BannerCarousel() {
                 alt={banner.alt}
                 width={1600}
                 height={500}
-                className="w-full h-[300px] sm:h-[400px] lg:h-[500px] object-cover cursor-pointer"
+                className="w-full h-[300px] lg:h-[400px] object-cover cursor-pointer"
                 priority={index === 0}
               />
             </Link>

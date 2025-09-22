@@ -1,5 +1,5 @@
 "use client";
-import { use } from 'react'
+import { use } from "react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import EventSection from "@/app/components/events/EventSection";
@@ -10,7 +10,6 @@ import type { ClubPageProps } from "@/app/types";
 import { getClubById, getTotalEventsForClub } from "@/app/lib/clubs";
 
 export default function ClubPage({ params }: ClubPageProps) {
-
   const { clubId } = use(params);
 
   const [club, setClub] = useState<Club | null>(null);
@@ -29,22 +28,25 @@ export default function ClubPage({ params }: ClubPageProps) {
   if (!club) return <p>Loading...</p>;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Logo + Info */}
       <div className="flex items-center gap-4">
         {club.logo && club.logo.trim() !== "" && (
+        <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
           <Image
             src={club.logo}
             alt={`${club.name} logo`}
             width={80}
             height={80}
-            className="rounded-full object-cover"
+            className="object-cover"
           />
+        </circle>
         )}
         <div>
           <h1 className="text-xl font-semibold">{club.name}</h1>
           <p className="text-sm text-gray-600">
-            {club.followers} Followers · {getTotalEventsForClub(club.id)} Total events
+            {club.followers} Followers · {getTotalEventsForClub(club.id)} Total
+            events
           </p>
           <div className="flex gap-2 mt-2">
             {club.socialLinks?.facebook && (
@@ -57,11 +59,7 @@ export default function ClubPage({ params }: ClubPageProps) {
               </a>
             )}
             {club.website && (
-              <a
-                href={club.website}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={club.website} target="_blank" rel="noopener noreferrer">
                 <span className="text-blue-600 hover:underline">Website</span>
               </a>
             )}
@@ -104,7 +102,7 @@ export default function ClubPage({ params }: ClubPageProps) {
         </div>
 
         {/* Event Cards */}
-        <div className="mt-6">
+        <div className="mt-1">
           <EventSection
             // clubSlug={slug}
             // type={tab} // "upcoming" or "past"

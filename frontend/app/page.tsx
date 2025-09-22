@@ -1,4 +1,4 @@
-import BannerCarousel from "./components/BannerCarousel";
+import BannerCarousel from "./components/BannerCarouselMainPage";
 import CategoriesSection from "./components/CategoriesSectionMainPage";
 import EventSection from "./components/events/EventSection";
 import DiscoverClubs from "./components/DiscoverClubs";
