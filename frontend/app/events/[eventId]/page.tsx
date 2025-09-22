@@ -1,7 +1,9 @@
+import { use } from "react";
 import Image from "next/image";
+import { EventPageProps } from "@/app/types";
 
-export default function EventPage({ params }: { params: { eventId: string } }) {
-  const { eventId } = params;
+export default function EventPage({ params }: EventPageProps) {
+  const { eventId } = use(params);
 
   // Example event data (replace with API or DB fetch)
   const event = {
@@ -31,7 +33,7 @@ export default function EventPage({ params }: { params: { eventId: string } }) {
     ],
     organizer: {
       name: "Glimmering Dolls",
-      logo: "/organizer-logo.png",
+      logo: "/frosh1.jpeg",
       followers: 343,
       events: 64,
       hosting: "2 years",
@@ -78,13 +80,15 @@ export default function EventPage({ params }: { params: { eventId: string } }) {
           {/* Organized By */}
           <section className="px-4 py-2 mr-20 bg-gray-50 rounded-xl flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Image
-                src={event.organizer.logo}
-                alt={event.organizer.name}
-                width={60}
-                height={60}
-                className="rounded-full"
-              />
+              <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                <Image
+                  src={event.organizer.logo}
+                  alt={event.organizer.name}
+                  width={80}
+                  height={80}
+                  className="object-cover"
+                />
+              </circle>
               <div className="">
                 <a href="#" className="font-bold pb-2 hover:underline">{event.organizer.name}</a>
                 <p className="text-sm text-gray-500">
