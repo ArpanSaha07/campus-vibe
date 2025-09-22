@@ -1,13 +1,13 @@
-// app/events/[slug]/page.tsx
 import Image from "next/image";
 
-export default function EventPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default function EventPage({ params }: { params: { eventId: string } }) {
+  const { eventId } = params;
 
   // Example event data (replace with API or DB fetch)
   const event = {
     title: "Taylor Swift Dance Party",
-    banner: "/event-banner.jpg",
+    eventId: "taylor-swift-dance-party",
+    banner: "/techfair-image.png",
     date: "Sunday, September 28, 2025 6:00 PM - 9:00 PM EDT",
     recurrence: "Every week on Sunday until March 25, 2026",
     location: {
@@ -39,19 +39,19 @@ export default function EventPage({ params }: { params: { slug: string } }) {
   };
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col max-w-6xl mx-auto my-10">
       {/* Banner */}
-      <div className="w-full h-64 relative">
+      <div className="w-full h-100 relative">
         <Image
           src={event.banner}
           alt={event.title}
           fill
-          className="object-cover"
+          className="object-cover rounded-3xl"
         />
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto grid grid-cols-3 gap-15 py-8">
+      <div className="mx-auto grid grid-cols-3 gap-15 py-8">
         {/* Left Column */}
         <div className="col-span-2 space-y-8 border">
           {/* Details */}
@@ -61,9 +61,9 @@ export default function EventPage({ params }: { params: { slug: string } }) {
           </section>
 
           {/* Tags */}
-          <section>
+          <section className="mr-20">
             <h2 className="text-xl font-semibold mb-3">Tags</h2>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 space-y-2">
               {event.tags.map((tag) => (
                 <span
                   key={tag}

@@ -1,4 +1,7 @@
 export default function Footer() {
+
+  const currentYear = new Date().getFullYear();
+  
   return (
     <footer className="z-0 bg-neutral-800 text-gray-400 text-sm pt-4">
       <div className="max-w-7xl mx-auto px-6 pt-3 pb-8">
@@ -46,7 +49,7 @@ export default function Footer() {
         {/* Copyright Section */}
         <div className="flex flex-col sm:flex-row sm:items-center mt-10 space-y-4 text-sm sm:space-y-0 sm:space-x-6">
           
-          <span className="text-white">© 2025 CampusVibe</span>
+          <span className="text-white">© {currentYear} CampusVibe</span>
           <a href="#" data-event-label="Terms of Service" className="hover:text-white">Terms of Service</a>
           <a href="#" data-event-label="Privacy Policy" className="hover:text-white">Privacy Policy</a>
           <a href="#" data-event-label="Cookie Settings" className="hover:text-white">Cookie Settings</a>

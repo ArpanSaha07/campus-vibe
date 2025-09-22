@@ -29,10 +29,12 @@ export default function RootLayout({ children }: RootLayoutProps) {
       </head>
 
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <Navbar />
-        {children}
+        <div className="flex-1 flex flex-col"> {/* Allows the main content area to grow and fill the available space between the navbar and footer */}
+          {children}
+        </div>
         <Footer />
       </body>
     </html>
