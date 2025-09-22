@@ -1,0 +1,45 @@
+name: CI - Check All Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - frontend/**
+
+jobs:
+  check-pages:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js app
+        run: npm run build
+
+      - name: Start Next.js app in background
+        run: |
+          npm run start &
+          sleep 10
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright page checks
+        run: npx playwright test
+
+      # Optionally, you can use a simple crawler like linkinator for basic checks:
+      # - name: Check all links with linkinator
+      #   run: npx linkinator http://localhost:3000 --silent
