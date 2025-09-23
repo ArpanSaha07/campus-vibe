@@ -25,15 +25,15 @@ export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
               className="flex-shrink-0 w-60 bg-white p-6 rounded-md hover:shadow-lg transition"
             >
               {/* Logo */}
-              <a href="#" className="flex justify-center">
+              <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mx-auto">
                 <Image
                   src={club.logo}
                   alt={club.name}
                   width={80}
                   height={80}
-                  className="rounded-full"
+                  className="object-cover"
                 />
-              </a>
+              </circle>
 
               {/* Name + Followers */}
               <div className="text-center mt-4 mb-10">
