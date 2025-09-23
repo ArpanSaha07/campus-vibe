@@ -14,7 +14,7 @@ export default function EmailForm({ onSubmit }: { onSubmit: (email: string) => v
   return (
     <form onSubmit={handleSubmit}>
       <h1 className="text-4xl font-bold mb-2">Welcome!</h1>
-      <p className="text-4xl font-bold mb-10">What's your email?</p>
+      <p className="text-4xl font-bold mb-10">What&apos;s your email?</p>
       <input
         type="email"
         placeholder="Email"
