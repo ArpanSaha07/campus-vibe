@@ -43,7 +43,7 @@ export default function Navbar() {
 
           {/* Desktop Links */}
           <div className="hidden md:flex space-x-2 items-center text-sm font-medium whitespace-nowrap">
-            <Link href="/find-events" className="p-3 rounded-full hover:bg-gray-100">
+            <Link href="/events" className="p-3 rounded-full hover:bg-gray-100">
               Find Events
             </Link>
             <Link href="/create" className="p-3 rounded-full hover:bg-gray-100">
