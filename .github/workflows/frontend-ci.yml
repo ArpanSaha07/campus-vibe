@@ -1,4 +1,4 @@
-name: CI - Check All Pages
+name: Frontend CI - Check All Pages
 
 on:
   workflow_dispatch:

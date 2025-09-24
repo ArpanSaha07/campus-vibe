@@ -1,4 +1,4 @@
-name: CD - Deploy NextJS Frontend
+name: Frontend CD - Deploy NextJS Frontend
 
 on:
   workflow_dispatch:
