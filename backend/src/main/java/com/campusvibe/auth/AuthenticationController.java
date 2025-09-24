@@ -2,6 +2,7 @@ package com.campusvibe.auth;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +24,20 @@ public class AuthenticationController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.AUTHORIZATION, response.token())
                 .body(response);
+    }
+
+    @PostMapping("register")
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        AuthenticationResponse response = authenticationService.register(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, response.token())
+                .body(response);
+    }
+
+    // Optional: Health check for auth
+    @GetMapping("/health")
+    public String health() {
+        return "ok";
     }
 
 }

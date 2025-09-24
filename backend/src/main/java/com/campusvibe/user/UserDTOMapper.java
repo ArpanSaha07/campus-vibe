@@ -1,12 +1,10 @@
 package com.campusvibe.user;
 
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
-@Service
+@Component
 public class UserDTOMapper implements Function<User, UserDTO> {
     @Override
     public UserDTO apply(User user) {
@@ -14,12 +12,9 @@ public class UserDTOMapper implements Function<User, UserDTO> {
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getAuthorities()
-                        .stream()
-                        .map(GrantedAuthority::getAuthority)
-                        .collect(Collectors.toList()),
-                user.getUsername(),
-                user.getProfileImageId()
+                user.getRole(),
+                user.getDateJoined(),
+                user.getManagedClub() != null ? user.getManagedClub().getId() : null
         );
     }
 }

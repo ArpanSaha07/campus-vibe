@@ -1,6 +1,7 @@
 package com.campusvibe.auth;
 
-public record AuthenticationRequest(
+public record RegisterRequest(
+        String name,
         String email,
         String password
 ) {}

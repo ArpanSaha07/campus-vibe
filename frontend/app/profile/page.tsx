@@ -2,10 +2,10 @@
 import { redirect } from "next/navigation";
 import Navbar from "@/app/components/user-profile-page-components/UserProfileNavbar";
 import EventList from "@/app/components/user-profile-page-components/UserProfileEventList";
-import { getCurrentUser } from "@/lib/auth"; // your custom auth check
+// import { getCurrentUser } from "@/lib/auth"; // your custom auth check
 
 export default async function ProfilePage() {
-  const user = await getCurrentUser();
+  const user = ""; /* await getCurrentUser(); */
   if (!user) {
     redirect("/login");
   }
