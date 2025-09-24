@@ -34,6 +34,14 @@ public class AuthenticationController {
                 .body(response);
     }
 
+    @PostMapping("google")
+    public ResponseEntity<?> google(@RequestBody GoogleSignInRequest request) {
+        AuthenticationResponse response = authenticationService.googleSignIn(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, response.token())
+                .body(response);
+    }
+
     // Optional: Health check for auth
     @GetMapping("/health")
     public String health() {

@@ -7,7 +7,7 @@ import EventSection from "@/app/components/events/EventSection";
 import { popularEvents, clubs } from "@/app/data/data";
 import { Club } from "@/app/types";
 import type { ClubPageProps } from "@/app/types";
-import { getClubById, getTotalEventsForClub } from "@/app/lib/clubs";
+import { getClubById, getTotalEventsForClub } from "@/app/lib/club";
 
 export default function ClubPage({ params }: ClubPageProps) {
   const { clubId } = use(params);
@@ -15,15 +15,29 @@ export default function ClubPage({ params }: ClubPageProps) {
   const [club, setClub] = useState<Club | null>(null);
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
-  // Simulated fetch (replace with real API call)
   useEffect(() => {
-    async function fetchClub() {
-      // Example fetch, replace with your real API
-      const data: Promise<Club | null> = getClubById(clubs, clubId);
-      setClub(await data);
+    function fetchClub() {
+      try {
+        const data: Club = getClubById(clubId);
+        setClub(data);
+      } catch (error) {
+        setClub(null);
+        // Optionally log or handle error
+        console.error(error);
+      }
     }
     fetchClub();
   }, [clubId]);
+
+  // Simulated fetch (replace with real API call)
+  // useEffect(() => {
+  //   async function fetchClub() {
+  //     // Example fetch, replace with your real API
+  //     const data: Promise<Club | null> = getClubById(clubId);
+  //     setClub(await data);
+  //   }
+  //   fetchClub();
+  // }, [clubId]);
 
   if (!club) return <p>Loading...</p>;
 

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { EventInstance } from "@/app/types";
-import { getClubById } from "@/app/lib/clubs";
+import { getClubById } from "@/app/lib/club";
 
 // TODO: add links to the texts, images and buttons; work on the status div section; set card height to auto?;
 

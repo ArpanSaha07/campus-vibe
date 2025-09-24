@@ -19,7 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 public class SecurityFilterChainConfig {
 
-    private final AuthenticationProvider authenticationProvider;
+        private final AuthenticationProvider authenticationProvider;
     private final JWTAuthenticationFilter jwtAuthenticationFilter;
     private final AuthenticationEntryPoint authenticationEntryPoint;
 
@@ -39,7 +39,9 @@ public class SecurityFilterChainConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login",
-                                "/api/v1/auth/register"
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/google",
+                                "/api/v1/admin/approvals/request"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
