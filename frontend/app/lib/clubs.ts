@@ -1,22 +1,22 @@
 import { Club, EventInstance } from "@/app/types";
-// import { clubs } from "./data";
+import { clubs } from "@/app/data/data";
 
 /**
  * Get a club by its id.
  * @param id The id of the club
  * @returns {Club} The club object or null if not found
  */
-export async function getClubById(clubs: Club[], id: string): Promise<Club | null> {
+export function getClubById(id: string): Club {
     // Simulate fetching a single club by id
     const club = clubs.find(club => club.id === id);
-    // if (!club) {
-    //     throw new Error(`Club with id ${id} not found`)
-    // }
+    if (!club) {
+        throw new Error(`Club with id ${id} not found`)
+    }
 
-    return club ?? null;
+    return club;
 }
 
-function createClubID(name: string): string {
+function createClubId(name: string): string {
     return name.trim().toLowerCase().replace(/\s+/g, '-');
 }
 

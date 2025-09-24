@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { EventInstance } from "@/app/types";
+import { getClubById } from "@/app/lib/clubs";
 
 // TODO: add links to the texts, images and buttons; work on the status div section; set card height to auto?;
 
@@ -98,7 +99,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
         <p className="text-xs font-medium">{event.price}</p>
 
         <div className="text-sm text-gray-700">
-          <p className="font-medium">{event.organizer.name}</p>
+          <p className="font-medium">{getClubById(event.organizer).name}</p>
         </div>
 
         <p className="text-xs text-gray-400 pt-1">
