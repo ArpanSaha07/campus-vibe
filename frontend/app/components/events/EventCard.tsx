@@ -17,7 +17,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
         >
           <div className="relative w-full h-full">
             <Image
-              src={event.image}
+              src={event.images[0]}
               alt={event.title}
               fill
               className="object-cover"

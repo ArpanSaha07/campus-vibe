@@ -9,7 +9,7 @@ export type EventInstance = {
   createdAt: Date;
   location: string;
   price: string;
-  organizer: Club;
+  organizer: Club["id"];
   followers: number;
   images: string[];
   promoted: boolean;
