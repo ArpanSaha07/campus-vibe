@@ -4,16 +4,17 @@ import type { ReactNode } from "react"
 export type EventInstance = {
   id: number;
   title: string;
-  date: string;
+  description: string;
+  dateTime: Date;
+  createdAt: Date;
   location: string;
   price: string;
-  organizer: string;
+  organizer: Club;
   followers: number;
-  image: string;
+  images: string[];
   promoted: boolean;
   capacity: number;
   registered: number;
-  dateTime: string;
   categories: string[];
 };
 
@@ -23,15 +24,43 @@ export type Club = {
     description: string;
     followers: number;
     logo: string;
-    banner: string;
-    website: string;
-    email: string;
     socialLinks: {
-        facebook: string;
-        instagram: string;
+      email: string;
+      website: string;
+      facebook: string;
+      instagram: string;
     },
     featured: boolean;
+    images: string[];
+    createdAt: Date;
+    // categories: string[];
+    // events: EventInstance[];
 };
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  password: string;
+  role: 'user' | 'clubAdmin' | 'admin';
+  dateJoined: Date;
+};
+
+export interface Admin extends User {
+  role: 'admin';
+}
+
+export interface ClubAdmin extends User {
+  role: 'clubAdmin';
+  managedClub: Club["id"];
+}
+
+export interface RegularUser extends User {
+  role: 'user';
+  savedEvents: EventInstance[];
+  followedClubs: Club[];
+  preferredCategories: string[]
+}
 
 // Page Types
 export type RootLayoutProps = Readonly<{

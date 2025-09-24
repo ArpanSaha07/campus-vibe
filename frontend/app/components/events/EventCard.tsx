@@ -82,7 +82,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
 
           {
             // event happening soon if within today (or one day?)
-            event.date === new Date().toISOString().split("T")[0] && (
+            event.dateTime.toISOString().split("T")[0] === new Date().toISOString().split("T")[0] && (
               <span className="text-xs text-gray-500 font-semibold bg-blue-300 rounded-lg p-2">
                 Happening Now
               </span>
@@ -93,12 +93,12 @@ export default function EventCard({ event }: { event: EventInstance }) {
         <h3 className="font-medium text-[15px] leading-snug line-clamp-2">
           {event.title}
         </h3>
-        <p className="text-xs text-gray-600 font-semibold">{event.date}</p>
+        <p className="text-xs text-gray-600 font-semibold">{event.dateTime.toISOString().split("T")[0]}</p>
         <p className="text-xs text-gray-600">{event.location}</p>
         <p className="text-xs font-medium">{event.price}</p>
 
         <div className="text-sm text-gray-700">
-          <p className="font-medium">{event.organizer}</p>
+          <p className="font-medium">{event.organizer.name}</p>
         </div>
 
         <p className="text-xs text-gray-400 pt-1">

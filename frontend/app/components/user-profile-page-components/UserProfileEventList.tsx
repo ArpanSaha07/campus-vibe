@@ -1,4 +1,3 @@
-// components/EventList.tsx
 "use client";
 import { useState } from "react";
 import EventFilterPopup from "./EventFilterPopup";
@@ -10,8 +9,8 @@ export default function EventList() {
 
   const events: EventInstance[] = []; // Replace with fetch from backend
   const filteredEvents = events.filter(e => {
-    if (filter === "upcoming") return new Date(e.date) > new Date();
-    if (filter === "past") return new Date(e.date) < new Date();
+    if (filter === "upcoming") return new Date(e.dateTime) > new Date();
+    if (filter === "past") return new Date(e.dateTime) < new Date();
     return true;
   });
 
@@ -40,7 +39,7 @@ export default function EventList() {
           {filteredEvents.map(event => (
             <div key={event.id} className="border p-4 rounded shadow">
               <h2 className="font-bold">{event.title}</h2>
-              <p>{event.date}</p>
+              <p>{event.dateTime.toISOString().split("T")[0]}</p>
             </div>
           ))}
         </div>

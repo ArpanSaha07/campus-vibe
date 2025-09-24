@@ -58,8 +58,8 @@ export default function ClubPage({ params }: ClubPageProps) {
                 <span className="text-blue-600 hover:underline">Facebook</span>
               </a>
             )}
-            {club.website && (
-              <a href={club.website} target="_blank" rel="noopener noreferrer">
+            {club.socialLinks?.website && (
+              <a href={club.socialLinks?.website} target="_blank" rel="noopener noreferrer">
                 <span className="text-blue-600 hover:underline">Website</span>
               </a>
             )}
