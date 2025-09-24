@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export default function OAuthButtons() {
   return (
     <div>
@@ -8,7 +10,7 @@ export default function OAuthButtons() {
       </div>
       <div className="flex justify-center gap-4">
         <button className="p-2 border rounded">
-          <img src="/google.svg" alt="Google" className="h-6 w-6" />
+          <Image src="/google.svg" alt="Google" className="h-6 w-6" />
         </button>
         {/* Add more social media as login options as needed */}
       </div>
