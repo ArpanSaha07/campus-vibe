@@ -1,3 +1,14 @@
+// import { apiFetch } from "./api";
+// import type { Club } from "@/app/types";
+
+// export async function listClubs(): Promise<Club[]> {
+//   return apiFetch<Club[]>(`/api/v1/clubs`);
+// }
+
+// export async function getClubById(id: string): Promise<Club> {
+//   return apiFetch<Club>(`/api/v1/clubs/${id}`);
+// }
+
 import { Club, EventInstance } from "@/app/types";
 import { clubs } from "@/app/data/data";
 

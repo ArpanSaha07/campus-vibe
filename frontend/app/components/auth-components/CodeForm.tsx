@@ -7,8 +7,8 @@ export default function CodeForm({ email, onBack }: { email: string, onBack: () 
 
   function handleVerify(e: React.FormEvent) {
     e.preventDefault();
-    // Call backend API to verify code here
-    console.log("Verifying", code);
+    // In this simplified flow, we've already set a token. Just redirect home.
+    window.location.href = "/";
   }
 
   return (

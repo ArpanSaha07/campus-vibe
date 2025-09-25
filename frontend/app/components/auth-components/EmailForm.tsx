@@ -1,14 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { login, register } from "@/app/lib/user";
 
 export default function EmailForm({ onSubmit }: { onSubmit: (email: string) => void }) {
   const [email, setEmail] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Call backend API to send code here
-    onSubmit(email);
+    // Simplified dev flow: try login, if fails, register, then go to next step
+    try {
+      await login(email, "password");
+      onSubmit(email);
+    } catch {
+      await register(email.split("@")[0], email, "password");
+      onSubmit(email);
+    }
   }
 
   return (
