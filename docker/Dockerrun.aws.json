@@ -1,0 +1,24 @@
+{
+  "AWSEBDockerrunVersion": 2,
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "<your-backend-image>:latest",
+      "essential": true,
+      "memory": 1024,
+      "portMappings": [
+        { "containerPort": 8080, "hostPort": 8080 }
+      ],
+      "environment": [
+        { "name": "SPRING_DATASOURCE_URL", "value": "jdbc:postgresql://<rds-endpoint>:5432/campusvibe" },
+        { "name": "SPRING_DATASOURCE_USERNAME", "value": "arpan" },
+        { "name": "SPRING_DATASOURCE_PASSWORD", "value": "password" },
+        { "name": "AWS_REGION", "value": "us-east-1" },
+        { "name": "AWS_S3_BUCKET_CLUBS", "value": "campusvibe-clubs" },
+        { "name": "AWS_S3_BUCKET_EVENTS", "value": "campusvibe-events" },
+        { "name": "AWS_S3_BUCKET_CUSTOMER", "value": "campusvibe-customer" },
+        { "name": "GOOGLE_CLIENT_ID", "value": "<your-google-client-id>" }
+      ]
+    }
+  ]
+}

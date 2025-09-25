@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - backend/**
+      - backend
     paths:
       - 'backend/**'
   pull_request:
@@ -29,4 +29,5 @@ jobs:
       - name: Build backend (skip tests)
         run: |
           cd backend
+          chmod +x mvnw
           ./mvnw -q -DskipTests package
