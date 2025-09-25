@@ -21,30 +21,30 @@ A campus events management app to allow campus clubs to post their events in a s
 
 ## High-Level Architecture Diagram
 
-                                          ┌─────────────────────┐
-                                          │   GitHub Actions    │
-                                          │  CI/CD Pipeline     │
-                                          │  - Run tests        │
-                                          │  - Build images     │
-                                          │  - Deploy frontend  │
-                                          │  - Deploy backend   │
-                                          └─────────┬───────────┘
-                                                    |
-                  ┌───────────────────────┐         │         ┌────────────────────────┐
-                  │      Vercel           │ <───────┘         │ AWS Elastic Beanstalk  │
-                  │  (Next.js + Tailwind) │                   │ (Spring Boot + Docker) │
-                  │  Serves Frontend      │───── API Calls ─▶ │  REST API Controllers  │
-                  └───────────────────────┘                   │      Services +        |
-                                                              |Security (JWT and OAuth)│
-                                                              └──────────┬─────────────┘
-                                                                          │
-                                                ┌────────────────────────┼────────────────────────┐
-                                                │                        │                        │
-                                                ▼                        ▼                        ▼
-                                      ┌───────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-                                      │ AWS RDS (Postgres)│     │ AWS S3 (Storage) │     │ Fake S3 (Testing)│
-                                      │ - Persistent DB   │     │ - File uploads   │     │ - Local Dev/Test │
-                                      │ - User/Event Data │     │ - Images, Docs   │     │ - S3 Mock        │
-                                      └───────────────────┘     └──────────────────┘     └──────────────────┘
+                          ┌─────────────────────┐
+                          │   GitHub Actions    │
+                          │  CI/CD Pipeline     │
+                          │  - Run tests        │
+                          │  - Build images     │
+                          │  - Deploy frontend  │
+                          │  - Deploy backend   │
+                          └─────────┬───────────┘
+                                    |
+  ┌───────────────────────┐         │         ┌────────────────────────┐
+  │      Vercel           │ <───────┘         │ AWS Elastic Beanstalk  │
+  │  (Next.js + Tailwind) │                   │ (Spring Boot + Docker) │
+  │  Serves Frontend      │───── API Calls ─▶ │  REST API Controllers  │
+  └───────────────────────┘                   │      Services +        |
+                                              |Security (JWT and OAuth)│
+                                              └──────────┬─────────────┘
+                                                          │
+                                ┌────────────────────────┼────────────────────────┐
+                                │                        │                        │
+                                ▼                        ▼                        ▼
+                      ┌───────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+                      │ AWS RDS (Postgres)│     │ AWS S3 (Storage) │     │ Fake S3 (Testing)│
+                      │ - Persistent DB   │     │ - File uploads   │     │ - Local Dev/Test │
+                      │ - User/Event Data │     │ - Images, Docs   │     │ - S3 Mock        │
+                      └───────────────────┘     └──────────────────┘     └──────────────────┘
 
 ###  Work in progress....

@@ -43,3 +43,6 @@ spring:
       max-request-size: 10MB
   codec:
     max-in-memory-size: 10MB
+
+google:
+  clientId: ${GOOGLE_CLIENT_ID:}

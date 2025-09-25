@@ -23,7 +23,7 @@ services:
     ports:
       - "9090:9090"
     environment:
-      - initialBuckets=campusvibe-clubs,campusvibe-events,campusvibe-customer
+      - initialBuckets=campusvibe-clubs,campusvibe-events,campusvibe-user
 
   backend:
     build:
@@ -35,11 +35,11 @@ services:
       SPRING_DATASOURCE_USERNAME: arpan
       SPRING_DATASOURCE_PASSWORD: password
       AWS_S3_MOCK: "true"
-      AWS_REGION: us-east-1
+      AWS_REGION: us-east-2
       AWS_S3_BUCKET_CLUBS: campusvibe-clubs
       AWS_S3_BUCKET_EVENTS: campusvibe-events
-      AWS_S3_BUCKET_CUSTOMER: campusvibe-customer
-      # Add GOOGLE_CLIENT_ID if needed
+      AWS_S3_BUCKET_USER: campusvibe-user
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "8080:8080"
     depends_on:
@@ -57,6 +57,7 @@ services:
     container_name: campusvibe-frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     ports:
       - "3000:3000"
     depends_on:
