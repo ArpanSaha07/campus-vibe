@@ -13,7 +13,6 @@ export default function Home() {
         <BannerCarousel />
         <CategoriesSection />
         <EventSection title="Popular this weekend" events={popularEvents} />
-        <EventSection title="Career Fairs" events={popularEvents} />
         <EventSection title="Workshops" events={popularEvents} />
         <EventSection title="Outdoors" events={popularEvents} />
         <DiscoverClubs clubs={clubs} />

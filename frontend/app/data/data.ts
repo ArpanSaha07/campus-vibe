@@ -168,7 +168,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "making-waves-montreal",
+    id: "startup-montreal",
     name: "Making Waves Montreal",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 174,
@@ -184,7 +184,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "persian-events",
+    id: "tech-montreal",
     name: "PersianEvents",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 128,
@@ -200,7 +200,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "glimmering-dolls",
+    id: "montreal-artists",
     name: "Glimmering Dolls",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 341,

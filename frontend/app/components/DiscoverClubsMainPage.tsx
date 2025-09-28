@@ -25,7 +25,7 @@ export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
               className="flex-shrink-0 w-60 bg-white p-6 rounded-md hover:shadow-lg transition"
             >
               {/* Logo */}
-              <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mx-auto">
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden mx-auto">
                 <Image
                   src={club.logo}
                   alt={club.name}
@@ -33,7 +33,7 @@ export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
                   height={80}
                   className="object-cover"
                 />
-              </circle>
+              </div>
 
               {/* Name + Followers */}
               <div className="text-center mt-4 mb-10">

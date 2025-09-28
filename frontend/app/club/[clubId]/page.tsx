@@ -46,7 +46,7 @@ export default function ClubPage({ params }: ClubPageProps) {
       {/* Logo + Info */}
       <div className="flex items-center gap-4">
         {club.logo && club.logo.trim() !== "" && (
-        <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+        <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
           <Image
             src={club.logo}
             alt={`${club.name} logo`}
@@ -54,7 +54,7 @@ export default function ClubPage({ params }: ClubPageProps) {
             height={80}
             className="object-cover"
           />
-        </circle>
+        </div>
         )}
         <div>
           <h1 className="text-xl font-semibold">{club.name}</h1>
