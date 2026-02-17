@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Club } from "@/app/types";
 
 // TODO: remove followers count for now, should I customise scrollbar for mobile view?
@@ -37,9 +38,9 @@ export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
 
               {/* Name + Followers */}
               <div className="text-center mt-4 mb-10">
-                <a href="#">
+                <Link href={`/club/${club.id}`}>
                   <h3 className="font-semibold">{club.name}</h3>
-                </a>
+                </Link>
                 {/* <p className="text-gray-500 text-sm">{club.followers} followers</p> */}
               </div>
 

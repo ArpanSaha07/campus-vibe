@@ -1,3 +1,4 @@
+import Link from "next/link";
 import EventCard from "./EventCard";
 import { EventInstance } from "@/app/types";
 
@@ -9,12 +10,12 @@ export default function EventSection({title, events}: {title: string, events: Ev
           <h2 className="text-2xl font-semibold mb-6">{title}</h2>
         </a>
         <span>
-          <a
-            href="#"
+          <Link
+            href="/events"
             className="text-sm text-gray-700 hover:text-indigo-600 hover:underline"
           >
             Explore more events
-          </a>{" "}
+          </Link>{" "}
           &nbsp;&gt;
         </span>
       </div>
@@ -26,7 +27,7 @@ export default function EventSection({title, events}: {title: string, events: Ev
         xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-y-6 xl:gap-x-6 xl:justify-between"
       >
         {events.map((event) => (
-          <EventCard key={event.id} event={event} />
+          <Link href={`/events/${event.id}`} > <EventCard key={event.id} event={event} /> </Link>
         ))}
       </div>
     </section>
