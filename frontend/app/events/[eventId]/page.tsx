@@ -32,7 +32,7 @@ export default function EventPage({ params }: EventPageProps) {
       "#lgbtq_friendly",
     ],
     organizer: {
-      name: "Glimmering Dolls",
+      name: "fashion-takes-action",
       logo: "/frosh1.jpeg",
       followers: 343,
       events: 64,
@@ -80,7 +80,7 @@ export default function EventPage({ params }: EventPageProps) {
           {/* Organized By */}
           <section className="px-4 py-2 mr-20 bg-gray-50 rounded-xl flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+              <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                 <Image
                   src={event.organizer.logo}
                   alt={event.organizer.name}
@@ -88,9 +88,9 @@ export default function EventPage({ params }: EventPageProps) {
                   height={80}
                   className="object-cover"
                 />
-              </circle>
+              </div>
               <div className="">
-                <a href="#" className="font-bold pb-2 hover:underline">{event.organizer.name}</a>
+                <a href={`/clubs/${event.organizer.name}`} className="font-bold pb-2 hover:underline">{event.organizer.name}</a>
                 <p className="text-sm text-gray-500">
                   Followers: {event.organizer.followers} · Events:{" "}
                   {event.organizer.events} · Hosting: {event.organizer.hosting}

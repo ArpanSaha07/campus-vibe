@@ -38,7 +38,7 @@ export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
 
               {/* Name + Followers */}
               <div className="text-center mt-4 mb-10">
-                <Link href={`/club/${club.id}`}>
+                <Link href={`/clubs/${club.id}`}>
                   <h3 className="font-semibold">{club.name}</h3>
                 </Link>
                 {/* <p className="text-gray-500 text-sm">{club.followers} followers</p> */}

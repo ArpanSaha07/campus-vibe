@@ -27,7 +27,7 @@ export default function EventSection({title, events}: {title: string, events: Ev
         xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-y-6 xl:gap-x-6 xl:justify-between"
       >
         {events.map((event) => (
-          <Link href={`/events/${event.id}`} > <EventCard key={event.id} event={event} /> </Link>
+          <Link key={event.eventId} href={`/events/${event.eventId}`} > <EventCard event={event} /> </Link>
         ))}
       </div>
     </section>
