@@ -12,8 +12,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
     >
       <div className="relative">
         {/* Image */}
-        <a
-          href="#"
+        <div
           className="block rounded-t-2xl rounded-b-md overflow-hidden h-35"
         >
           <div className="relative w-full h-full">
@@ -21,10 +20,11 @@ export default function EventCard({ event }: { event: EventInstance }) {
               src={event.images[0]}
               alt={event.title}
               fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover"
             />
           </div>
-        </a>
+        </div>
 
         {/* Hover Buttons */}
         <div

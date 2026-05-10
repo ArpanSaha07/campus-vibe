@@ -2,7 +2,7 @@
 import { use } from "react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import EventSection from "@/app/components/events/EventSection";
+import EventSection from "@/app/components/event/EventSection";
 
 import { popularEvents, clubs } from "@/app/data/data";
 import { Club } from "@/app/types";
@@ -39,14 +39,14 @@ export default function ClubPage({ params }: ClubPageProps) {
   //   fetchClub();
   // }, [clubId]);
 
-  if (!club) return <p>Loading...</p>;
+  if (!club) return <p>Club not found.</p>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto py-6 border-2">
       {/* Logo + Info */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 px-6">
         {club.logo && club.logo.trim() !== "" && (
-        <circle className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+        <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
           <Image
             src={club.logo}
             alt={`${club.name} logo`}
@@ -54,7 +54,7 @@ export default function ClubPage({ params }: ClubPageProps) {
             height={80}
             className="object-cover"
           />
-        </circle>
+        </div>
         )}
         <div>
           <h1 className="text-xl font-semibold">{club.name}</h1>

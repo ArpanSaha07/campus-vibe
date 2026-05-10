@@ -1,6 +1,6 @@
 import BannerCarousel from "./components/BannerCarouselMainPage";
 import CategoriesSection from "./components/CategoriesSectionMainPage";
-import EventSection from "./components/events/EventSection";
+import EventSection from "./components/event/EventSection";
 import DiscoverClubs from "./components/DiscoverClubsMainPage";
 
 import { popularEvents } from "@/app/data/data";
@@ -13,7 +13,6 @@ export default function Home() {
         <BannerCarousel />
         <CategoriesSection />
         <EventSection title="Popular this weekend" events={popularEvents} />
-        <EventSection title="Career Fairs" events={popularEvents} />
         <EventSection title="Workshops" events={popularEvents} />
         <EventSection title="Outdoors" events={popularEvents} />
         <DiscoverClubs clubs={clubs} />

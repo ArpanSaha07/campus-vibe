@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "@/app/globals.css";
 import type { RootLayoutProps } from "@/app/types";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
       </head>
 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        <GoogleProvider>
+        <GoogleProvider>  {/* what is this tag for?? */} 
           <Navbar />
           <div className="flex-1 flex flex-col"> {/* Allows the main content area to grow and fill the available space between the navbar and footer */}
             {children}

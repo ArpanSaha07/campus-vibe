@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 
 // Data Types
 export type EventInstance = {
-  id: number;
+  eventId: number;
   title: string;
   description: string;
   dateTime: Date;

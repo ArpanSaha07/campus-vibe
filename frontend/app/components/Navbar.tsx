@@ -3,11 +3,13 @@ import { useState } from "react";
 import { Menu, X, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+// import { useAuth } from "@/app/lib/auth";
 
 // notes: fix spacing of items in desktop view; work on search functionality
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  // const { isUserAuthenticated, login, logout } = useAuth();
 
   return (
     <nav className="w-full border-b border-gray-200 bg-white top-0 z-50">
@@ -49,18 +51,22 @@ export default function Navbar() {
             <Link href="/create" className="p-3 rounded-full hover:bg-gray-100">
               Create Events
             </Link>
-            <Link href="/my-events" className="p-3 rounded-full hover:bg-gray-100">
-              My Events
-            </Link>
-            <Link href="/login" className="p-3 rounded-full hover:bg-gray-100">
-              Log In
-            </Link>
-            <Link
-              href="/signup"
-              className="px-3 py-1 font-bold border-2 rounded-2xl border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white transition"
-            >
-              Sign Up
-            </Link>
+
+            {false ? (
+              <Link href="/my-events" className="p-3 rounded-full hover:bg-gray-100">
+                My Events
+              </Link>
+            ) : (
+              <>
+                <Link href="/login" className="p-3 rounded-full hover:bg-gray-100">Log In</Link>
+                <Link
+                  href="/signup"
+                  className="px-3 py-1 font-bold border-2 rounded-2xl border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white transition"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Right Side (Few items + Hamburger) */}
@@ -103,9 +109,11 @@ export default function Navbar() {
             <Link href="/create" className="block p-2 hover:text-orange-600 hover:bg-gray-100">
               Create Events
             </Link>
-            <Link href="/my-events" className="block p-2 hover:text-orange-600 hover:bg-gray-100">
-              My Events
-            </Link>
+            {false && (
+              <Link href="/my-events" className="block p-2 hover:text-orange-600 hover:bg-gray-100">
+                My Events
+              </Link>
+            )}
           </div>
         )}
       </div>

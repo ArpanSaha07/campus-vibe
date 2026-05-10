@@ -8,3 +8,8 @@ export async function listEvents(): Promise<EventInstance[]> {
 export async function getEvent(id: number): Promise<EventInstance> {
 	return apiFetch<EventInstance>(`/api/v1/events/${id}`);
 }
+
+export async function getUserEvents(): Promise<EventInstance[]> {
+	return apiFetch<EventInstance[]>(`/api/v1/users/me/events`, { auth: true });
+}
+

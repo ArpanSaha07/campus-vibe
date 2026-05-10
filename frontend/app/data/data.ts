@@ -5,7 +5,7 @@ import { Club } from "@/app/types";
 
 export const popularEvents: EventInstance[] = [
   {
-    id: 1,
+    eventId: 1,
     title: "ReMode, Circular Fashion Festival | Festival de Mode...",
     description: "A festival celebrating circular fashion and sustainability.",
     dateTime: new Date("2025-09-28T12:00:00"),
@@ -21,7 +21,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    id: 2,
+    eventId: 2,
     title: "Montreal Tech Summit 2025",
     description: "Annual summit for tech enthusiasts and professionals.",
     dateTime: new Date("2025-10-06T09:00:00"),
@@ -37,7 +37,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    id: 3,
+    eventId: 3,
     title: "Art Expo Montreal",
     description: "Showcase of local and international artists.",
     dateTime: new Date("2025-10-18T11:00:00"),
@@ -53,7 +53,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    id: 4,
+    eventId: 4,
     title: "Startup Pitch Night",
     description: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
@@ -69,7 +69,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    id: 5,
+    eventId: 5,
     title: "Startup Pitch Night",
     description: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
@@ -85,7 +85,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    id: 6,
+    eventId: 6,
     title: "Startup Pitch Night",
     description: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
@@ -101,7 +101,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Nightlife"]
   },
   {
-    id: 7,
+    eventId: 7,
     title: "Startup Pitch Night",
     description: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
@@ -117,7 +117,7 @@ export const popularEvents: EventInstance[] = [
     categories: ["Tech", "Networking"]
   },
   {
-    id: 8,
+    eventId: 8,
     title: "Startup Pitch Night",
     description: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
@@ -168,7 +168,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "making-waves-montreal",
+    id: "startup-montreal",
     name: "Making Waves Montreal",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 174,
@@ -179,12 +179,12 @@ export const clubs: Club[] = [
       facebook: "",
       instagram: "",
     },
-    featured: false,
+    featured: true,
     images: ["/logos/mwm.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "persian-events",
+    id: "tech-montreal",
     name: "PersianEvents",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 128,
@@ -195,12 +195,12 @@ export const clubs: Club[] = [
       facebook: "",
       instagram: "",
     },
-    featured: false,
+    featured: true,
     images: ["/logos/persian.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "glimmering-dolls",
+    id: "montreal-artists",
     name: "Glimmering Dolls",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 341,
