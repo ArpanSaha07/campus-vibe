@@ -7,8 +7,6 @@ import OAuthButtons from "@/app/components/auth-components/OAuthButtons";
 import AuthCard from "@/app/components/auth-components/AuthCard";
 
 
-// TODO: remove navbar and footer from auth pages
-
 export default function LoginPage() {
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");

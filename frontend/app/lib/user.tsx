@@ -3,6 +3,22 @@ import type { User } from "@/app/types";
 
 type AuthResponse = { token: string; user: User };
 
+export async function sendVerificationCode(email: string): Promise<void> {
+	await apiFetch(`/api/v1/auth/send-code`, {
+		method: "POST",
+		body: JSON.stringify({ email }),
+	});
+}
+
+export async function verifyCode(email: string, code: string): Promise<User> {
+	const res = await apiFetch<AuthResponse>(`/api/v1/auth/verify-code`, {
+		method: "POST",
+		body: JSON.stringify({ email, code }),
+	});
+	setToken(res.token);
+	return res.user;
+}
+
 export async function login(email: string, password: string): Promise<User> {
 	const res = await apiFetch<AuthResponse>(`/api/v1/auth/login`, {
 		method: "POST",
