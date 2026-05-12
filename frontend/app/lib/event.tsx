@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "@/app/lib/api";
 import type { EventInstance } from "@/app/types";
 
 export async function listEvents(): Promise<EventInstance[]> {

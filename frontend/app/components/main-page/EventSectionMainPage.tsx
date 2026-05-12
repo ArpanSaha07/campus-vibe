@@ -1,5 +1,5 @@
 import Link from "next/link";
-import EventCard from "./EventCard";
+import EventCard from "../event/EventCard";
 import { EventInstance } from "@/app/types";
 
 export default function EventSection({title, events}: {title: string, events: EventInstance[]}) {

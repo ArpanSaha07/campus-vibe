@@ -1,7 +1,7 @@
-import BannerCarousel from "@/app/components/BannerCarouselMainPage";
-import CategoriesSection from "@/app/components/CategoriesSectionMainPage";
-import EventSection from "@/app/components/event/EventSection";
-import DiscoverClubs from "@/app/components/DiscoverClubsMainPage";
+import BannerCarousel from "@/app/components/main-page/BannerCarouselMainPage";
+import CategoriesSection from "@/app/components/main-page/CategoriesSectionMainPage";
+import EventSection from "@/app/components/main-page/EventSectionMainPage";
+import DiscoverClubs from "@/app/components/main-page/DiscoverClubsMainPage";
 
 import { popularEvents } from "@/app/data/data";
 import { clubs } from "@/app/data/data";

@@ -2,7 +2,7 @@
 import { use } from "react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import EventSection from "@/app/components/event/EventSection";
+import EventSection from "@/app/components/main-page/EventSectionMainPage";
 
 import { popularEvents, clubs } from "@/app/data/data";
 import { Club } from "@/app/types";

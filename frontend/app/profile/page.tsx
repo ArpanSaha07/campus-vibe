@@ -1,4 +1,3 @@
-// app/profile/page.tsx
 import { redirect } from "next/navigation";
 import Navbar from "@/app/components/user-profile-page-components/UserProfileNavbar";
 import EventList from "@/app/components/user-profile-page-components/UserProfileEventList";
