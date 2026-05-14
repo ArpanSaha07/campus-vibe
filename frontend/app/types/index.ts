@@ -84,3 +84,44 @@ export type PillProps = {
     children: ReactNode
     className?: string
 }
+
+export interface ClubFormData {
+  name: string;
+  description: string;
+  logo: File | null;
+  images: File[];
+  socialLinks: {
+    email: string;
+    website: string;
+    facebook: string;
+    instagram: string;
+  };
+}
+
+export interface LogoPreviewProps {
+  logoPreview: string | null;
+  onRemove: () => void;
+  onUploadClick: () => void;
+  isDisabled?: boolean;
+  error?: string;
+}
+
+export interface ImageGalleryProps {
+  imagePreviews: string[];
+  imageCount: number;
+  maxImages: number;
+  onRemove: (index: number) => void;
+  onUploadClick: () => void;
+  isDisabled?: boolean;
+  error?: string;
+}
+
+// Error Types
+export interface FormErrors {
+  name?: string;
+  description?: string;
+  logo?: string;
+  images?: string;
+  social?: string;
+  general?: string;
+}
