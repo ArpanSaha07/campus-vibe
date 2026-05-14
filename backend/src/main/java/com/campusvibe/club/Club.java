@@ -29,6 +29,8 @@ public class Club {
 
     private String logo; // s3 key or url
 
+    private String socialLinks; // JSON string of { email, website, facebook, instagram }
+
     @Column(nullable = false)
     private Boolean featured = false;
 

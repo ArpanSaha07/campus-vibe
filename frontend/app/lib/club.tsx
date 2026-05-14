@@ -30,8 +30,9 @@ export function getClubById(id: string): Club {
     return club;
 }
 
-function createClubId(name: string): string {
+function createClub(name: string): string {
     return name.trim().toLowerCase().replace(/\s+/g, '-');
+    
 }
 
 /** 

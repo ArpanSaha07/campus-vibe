@@ -26,9 +26,9 @@ export type Club = {
     logo: string;
     socialLinks: {
       email: string;
-      website: string;
-      facebook: string;
-      instagram: string;
+      website?: string;
+      facebook?: string;
+      instagram?: string;
     },
     featured: boolean;
     images: string[];
