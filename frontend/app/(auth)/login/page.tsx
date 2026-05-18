@@ -12,8 +12,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 
-      lg:bg-[url('/frosh1.jpeg')] bg-cover bg-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-300 
+      bg-[url('/frosh1.jpeg')] bg-cover bg-center">
       <AuthCard>
         {step === "email" && (
           <EmailForm

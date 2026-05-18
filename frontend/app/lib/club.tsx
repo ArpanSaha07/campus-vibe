@@ -1,8 +1,9 @@
 import { apiFetch } from "@/app/lib/api";
-import { Club, EventInstance } from "@/app/types";
+import { Club, EventInstance, RegularUser } from "@/app/types";
 import { clubs } from "@/app/data/data";
+import { me } from "@/app/lib/user";
 
-// export async function listClubs(): Promise<Club[]> {
+// export async function getAllClubs(): Promise<Club[]> {
 //   return apiFetch<Club[]>(`/api/v1/clubs`);
 // }
 
@@ -22,7 +23,7 @@ export function getAllClubs(): Club[] {
  */
 export function getClubById(id: string): Club {
     // Simulate fetching a single club by id
-    const club = clubs.find(club => club.id === id);
+    const club = clubs.find(club => club.clubId === id);
     if (!club) {
         throw new Error(`Club with id ${id} not found`)
     }
@@ -30,9 +31,10 @@ export function getClubById(id: string): Club {
     return club;
 }
 
-function createClub(name: string): string {
-    return name.trim().toLowerCase().replace(/\s+/g, '-');
-    
+export async function createClub(name: string): Promise<string> {
+    const club_name: string = name.trim().toLowerCase().replace(/\s+/g, '-');
+    // return name.trim().toLowerCase().replace(/\s+/g, '-');
+    return apiFetch<string>(`/api/v1/clubs`, { method: "POST", body: JSON.stringify({ club_name }) });
 }
 
 /** 
@@ -47,4 +49,17 @@ export function getTotalEventsForClub(clubId: string): number {
 
 function getEventsByClubId(clubId: string): EventInstance[] {
     return [];
+}
+
+// export async function isUserFollowingClub(clubId: string): Promise<boolean> {
+//     const user: RegularUser = await me();
+//     if (!isRegularUser(user)) return false;
+//     return user.followedClubs.includes(clubId);
+// }
+
+export async function followClub(clubId: string): Promise<void> {
+    // Simulate following a club (e.g., API call)
+    console.log(`Followed club with id: ${clubId}`);
+
+
 }

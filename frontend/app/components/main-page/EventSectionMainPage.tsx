@@ -6,9 +6,9 @@ export default function EventSection({title, events}: {title: string, events: Ev
   return (
     <section className="max-w-7xl mx-auto py-10 px-6">
       <div className="flex flex-row justify-between pr-4">
-        <a href="#" className="hover:text-indigo-600 hover:underline">
+        <Link href="#" className="hover:text-indigo-600 hover:underline">
           <h2 className="text-2xl font-semibold mb-6">{title}</h2>
-        </a>
+        </Link>
         <span>
           <Link
             href="/events"
@@ -27,7 +27,7 @@ export default function EventSection({title, events}: {title: string, events: Ev
         xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-y-6 xl:gap-x-6 xl:justify-between"
       >
         {events.map((event) => (
-          <Link key={event.eventId} href={`/events/${event.eventId}`} > <EventCard event={event} /> </Link>
+          <EventCard key={event.eventId} event={event} />
         ))}
       </div>
     </section>

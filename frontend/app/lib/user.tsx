@@ -1,5 +1,5 @@
 import { apiFetch, setToken } from "./api";
-import type { User } from "@/app/types";
+import type { User, Admin, ClubAdmin, RegularUser } from "@/app/types";
 
 type AuthResponse = { token: string; user: User };
 
@@ -46,6 +46,14 @@ export async function googleSignIn(idToken: string): Promise<User> {
 	return res.user;
 }
 
-export async function me(): Promise<User> {
-	return apiFetch<User>(`/api/v1/users/me`, { auth: true });
+export async function me(): Promise<Admin | ClubAdmin | RegularUser> {
+  return (await apiFetch(`/api/v1/users/me`, { auth: true })) as Admin | ClubAdmin | RegularUser;
+}
+
+export function isRegularUser(user: User): boolean {
+	return user.role === 'regularUser';
+}
+
+export async function logOut(): Promise<void> {
+	setToken("");
 }

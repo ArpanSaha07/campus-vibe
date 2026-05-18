@@ -21,7 +21,7 @@ export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
         {clubs
           .filter((club) => club.featured)
           .map((club) => (
-            <ClubProfileComponent key={club.id} club={club} />
+            <ClubProfileComponent key={club.clubId} club={club} />
         ))}
       </div>
     </section>

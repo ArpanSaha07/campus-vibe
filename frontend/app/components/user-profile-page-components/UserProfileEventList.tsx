@@ -37,7 +37,7 @@ export default function EventList() {
       ) : (
         <div className="grid gap-4">
           {filteredEvents.map(event => (
-            <div key={event.id} className="border p-4 rounded shadow">
+            <div key={event.eventId} className="border p-4 rounded shadow">
               <h2 className="font-bold">{event.title}</h2>
               <p>{event.dateTime.toISOString().split("T")[0]}</p>
             </div>

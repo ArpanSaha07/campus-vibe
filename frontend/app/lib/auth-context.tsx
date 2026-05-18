@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { User } from '@/app/types';
-import { me, googleSignIn as googleSignInFn, login, register } from './user';
-import { getToken, setToken, clearToken } from './api';
+import { me, googleSignIn as googleSignInFn, login, register } from '@/app/lib/user';
+import { getToken, setToken, clearToken } from '@/app/lib/api';
 
 export interface AuthContextType {
   user: User | null;
@@ -15,7 +15,7 @@ export interface AuthContextType {
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

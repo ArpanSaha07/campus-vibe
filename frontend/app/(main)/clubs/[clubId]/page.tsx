@@ -2,6 +2,7 @@
 import { use } from "react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import ClubFollowButton from "@/app/components/club/ClubFollowButton";
 import EventSection from "@/app/components/main-page/EventSectionMainPage";
 
 import { popularEvents, clubs } from "@/app/data/data";
@@ -16,7 +17,7 @@ export default function ClubPage({ params }: ClubPageProps) {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
   useEffect(() => {
-    function fetchClub() {
+    async function fetchClub() {
       try {
         const data: Club = getClubById(clubId);
         setClub(data);
@@ -42,7 +43,7 @@ export default function ClubPage({ params }: ClubPageProps) {
   if (!club) return <p>Club not found.</p>;
 
   return (
-    <div className="max-w-7xl mx-auto py-6 border-2">
+    <div className="max-w-7xl mx-auto py-6">
       {/* Logo + Info */}
       <div className="flex items-center gap-4 px-6">
         {club.logo && club.logo.trim() !== "" && (
@@ -59,7 +60,7 @@ export default function ClubPage({ params }: ClubPageProps) {
         <div>
           <h1 className="text-xl font-semibold">{club.name}</h1>
           <p className="text-sm text-gray-600">
-            {club.followers} Followers · {getTotalEventsForClub(club.id)} Total
+            {club.followers} Followers · {getTotalEventsForClub(club.clubId)} Total
             events
           </p>
           <div className="flex gap-2 mt-2">
@@ -80,9 +81,7 @@ export default function ClubPage({ params }: ClubPageProps) {
           </div>
         </div>
         <div className="ml-auto flex gap-2">
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
-            Follow
-          </button>
+          <ClubFollowButton clubId={club.clubId} />
           <button className="border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-100">
             Contact
           </button>
@@ -91,8 +90,8 @@ export default function ClubPage({ params }: ClubPageProps) {
 
       {/* Events Section */}
       <div className="mt-8">
-        <h2 className="text-lg font-semibold">Events</h2>
-        <div className="flex gap-4 mt-4">
+        <h2 className="text-lg font-semibold px-4">Events</h2>
+        <div className="flex gap-4 mt-4 px-4">
           <button
             onClick={() => setTab("upcoming")}
             className={`px-4 py-2 rounded-full border transition-all ${

@@ -39,16 +39,16 @@ services:
       AWS_S3_BUCKET_CLUBS: campusvibe-clubs
       AWS_S3_BUCKET_EVENTS: campusvibe-events
       AWS_S3_BUCKET_USER: campusvibe-user
-  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-      s3:
-        condition: service_started
-    volumes:
-      - ../backend:/app
+  # GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     s3:
+  #       condition: service_started
+  #   volumes:
+  #     - ../backend:/app
 
   frontend:
     build:

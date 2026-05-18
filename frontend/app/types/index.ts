@@ -2,24 +2,30 @@ import type { ReactNode } from "react"
 
 // Data Types
 export type EventInstance = {
-  eventId: number;
+  eventId: string;
   title: string;
-  description: string;
+  details: string;
   dateTime: Date;
   createdAt: Date;
-  location: string;
+  location: { 
+    name: string,
+    address: string,
+    mapUrl: string,
+    locationDetails?: string
+  };
   price: string;
-  organizer: Club["id"];
+  organizer: Club["clubId"];
   followers: number;
   images: string[];
   promoted: boolean;
   capacity: number;
   registered: number;
   categories: string[];
+  // recurrence?
 };
 
 export type Club = {
-    id: string;
+    clubId: string;
     name: string;
     description: string;
     followers: number;
@@ -33,8 +39,7 @@ export type Club = {
     featured: boolean;
     images: string[];
     createdAt: Date;
-    // categories: string[];
-    // events: EventInstance[];
+    // clubcategories: string[];
 };
 
 export interface User {
@@ -42,7 +47,7 @@ export interface User {
   name: string;
   email: string;
   password: string;
-  role: 'user' | 'clubAdmin' | 'admin';
+  role: 'regularUser' | 'clubAdmin' | 'admin';
   dateJoined: Date;
 };
 
@@ -52,14 +57,14 @@ export interface Admin extends User {
 
 export interface ClubAdmin extends User {
   role: 'clubAdmin';
-  managedClub: Club["id"];
+  managedClub: Club["clubId"];
 }
 
 export interface RegularUser extends User {
-  role: 'user';
-  savedEvents: EventInstance[];
-  followedClubs: Club[];
-  preferredCategories: string[]
+  role: 'regularUser';
+  followedClubs: Club["clubId"][];
+  savedEvents: EventInstance["eventId"][];
+  preferredCategories: string[];
 }
 
 // Page Types

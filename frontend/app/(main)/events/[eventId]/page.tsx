@@ -1,6 +1,9 @@
 import { use } from "react";
 import Image from "next/image";
 import { EventPageProps } from "@/app/types";
+import EventLikeButton from "@/app/components/event/EventLikeButton";
+import EventShareButton from "@/app/components/event/EventShareButton";
+import ClubFollowButton from "@/app/components/club/ClubFollowButton";
 
 export default function EventPage({ params }: EventPageProps) {
   const { eventId } = use(params);
@@ -22,7 +25,7 @@ export default function EventPage({ params }: EventPageProps) {
       Join us for an unforgettable night! Dance to Taylor Swift hits and enjoy
       a lively atmosphere in downtown Montreal.
     `,
-    tags: [
+    categories: [
       "Canada Events",
       "Quebec Events",
       "Things to do in Montreal, Canada",
@@ -55,23 +58,29 @@ export default function EventPage({ params }: EventPageProps) {
       {/* Content */}
       <div className="mx-auto grid grid-cols-3 gap-15 py-8">
         {/* Left Column */}
-        <div className="col-span-2 space-y-8 border">
+        <div className="col-span-2 space-y-8">
           {/* Details */}
           <section>
-            <h2 className="text-2xl font-bold mb-2">Details</h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-bold">Details</h2>
+              <div className="flex pr-2">
+                {/* <EventLikeButton event={} /> */}
+                <EventShareButton eventId={event.eventId} />
+              </div>
+            </div>
             <p className="text-gray-700 whitespace-pre-line">{event.details}</p>
           </section>
 
           {/* Tags */}
           <section className="mr-20">
-            <h2 className="text-xl font-semibold mb-3">Tags</h2>
+            <h2 className="text-xl font-semibold mb-3">Categories</h2>
             <div className="flex flex-wrap gap-2 space-y-2">
-              {event.tags.map((tag) => (
+              {event.categories.map((category) => (
                 <span
-                  key={tag}
+                  key={category}
                   className="px-3 py-1 text-sm rounded-full bg-gray-100"
                 >
-                  {tag}
+                  {category}
                 </span>
               ))}
             </div>
@@ -99,9 +108,7 @@ export default function EventPage({ params }: EventPageProps) {
             </div>
             <div className="flex gap-2 py-6 font-bold">
               <button className="border px-6 py-2 rounded border-gray-200 hover:bg-gray-200">Contact</button>
-              <button className="px-6 py-2 rounded bg-orange-600 text-white hover:bg-orange-700">
-                Follow
-              </button>
+              <ClubFollowButton clubId={event.organizer.name} />
             </div>
           </section>
 

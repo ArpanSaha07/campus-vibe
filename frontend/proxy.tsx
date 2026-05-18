@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server'
 export function proxy(request: NextRequest) {
   const token = request.cookies.get('token')
 
-  const protectedPaths = ['/create-event', '/dashboard']
+  const protectedPaths = ['/dashboard']
 
   const isProtected = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)

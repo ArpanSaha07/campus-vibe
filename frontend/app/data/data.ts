@@ -5,12 +5,16 @@ import { Club } from "@/app/types";
 
 export const popularEvents: EventInstance[] = [
   {
-    eventId: 1,
+    eventId: "sat-2025",
     title: "ReMode, Circular Fashion Festival | Festival de Mode...",
-    description: "A festival celebrating circular fashion and sustainability.",
+    details: "A festival celebrating circular fashion and sustainability.",
     dateTime: new Date("2025-09-28T12:00:00"),
     createdAt: new Date("2025-09-01T09:00:00"),
-    location: "Society for Arts and Technology [SAT]",
+    location: { 
+      name: "Society for Arts and Technology [SAT]",
+      address: "1201 Boulevard Saint-Laurent, Montréal, QC H2X 2S6",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "fashion-takes-action",
     followers: 137,
@@ -21,12 +25,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    eventId: 2,
+    eventId: "mts-2025",
     title: "Montreal Tech Summit 2025",
-    description: "Annual summit for tech enthusiasts and professionals.",
+    details: "Annual summit for tech enthusiasts and professionals.",
     dateTime: new Date("2025-10-06T09:00:00"),
     createdAt: new Date("2025-09-10T09:00:00"),
-    location: "Palais des congrès de Montréal",
+    location: { 
+      name: "Palais des congrès de Montréal",
+      address: "1201 Boulevard Saint-Laurent, Montréal, QC H2X 2S6",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Paid",
     organizer: "tech-montreal",
     followers: 520,
@@ -37,12 +45,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    eventId: 3,
+    eventId: "art-expo-montreal",
     title: "Art Expo Montreal",
-    description: "Showcase of local and international artists.",
+    details: "Showcase of local and international artists.",
     dateTime: new Date("2025-10-18T11:00:00"),
     createdAt: new Date("2025-09-15T09:00:00"),
-    location: "Montreal Art Centre",
+    location: { 
+      name: "Montreal Art Centre",
+      address: "1201 Boulevard Saint-Laurent, Montréal, QC H2X 2S6",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "montreal-artists",
     followers: 260,
@@ -53,12 +65,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    eventId: 4,
+    eventId: "startup-pitch-night",
     title: "Startup Pitch Night",
-    description: "Pitch your startup ideas to investors.",
+    details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
     createdAt: new Date("2025-09-20T09:00:00"),
-    location: "Notman House",
+    location: { 
+      name: "Notman House",
+      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "startup-montreal",
     followers: 420,
@@ -69,12 +85,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    eventId: 5,
+    eventId: "startup-pitch-night-2",
     title: "Startup Pitch Night",
-    description: "Pitch your startup ideas to investors.",
+    details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
     createdAt: new Date("2025-09-20T09:00:00"),
-    location: "Notman House",
+    location: { 
+      name: "Notman House",
+      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "startup-montreal",
     followers: 420,
@@ -85,12 +105,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Dating", "Research", "Food"]
   },
   {
-    eventId: 6,
+    eventId: "startup-pitch-night-3",
     title: "Startup Pitch Night",
-    description: "Pitch your startup ideas to investors.",
+    details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
     createdAt: new Date("2025-09-20T09:00:00"),
-    location: "Notman House",
+    location: { 
+      name: "Notman House",
+      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "startup-montreal",
     followers: 420,
@@ -101,12 +125,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Nightlife"]
   },
   {
-    eventId: 7,
+    eventId: "startup-pitch-night-4",
     title: "Startup Pitch Night",
-    description: "Pitch your startup ideas to investors.",
+    details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
     createdAt: new Date("2025-09-20T09:00:00"),
-    location: "Notman House",
+    location: { 
+      name: "Notman House",
+      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "startup-montreal",
     followers: 420,
@@ -117,12 +145,16 @@ export const popularEvents: EventInstance[] = [
     categories: ["Tech", "Networking"]
   },
   {
-    eventId: 8,
+    eventId: "startup-pitch-night-5",
     title: "Startup Pitch Night",
-    description: "Pitch your startup ideas to investors.",
+    details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
     createdAt: new Date("2025-09-20T09:00:00"),
-    location: "Notman House",
+    location: { 
+      name: "Notman House",
+      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    },
     price: "Free",
     organizer: "startup-montreal",
     followers: 420,
@@ -136,7 +168,7 @@ export const popularEvents: EventInstance[] = [
 
 export const clubs: Club[] = [
   {
-    id: "fashion-takes-action",
+    clubId: "fashion-takes-action",
     name: "Fashion Takes Action",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 130,
@@ -152,7 +184,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "rib-entertainment",
+    clubId: "rib-entertainment",
     name: "RIB ENTERTAINMENT",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 380,
@@ -168,7 +200,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "startup-montreal",
+    clubId: "startup-montreal",
     name: "Making Waves Montreal",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 174,
@@ -184,7 +216,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "tech-montreal",
+    clubId: "tech-montreal",
     name: "PersianEvents",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 128,
@@ -200,7 +232,7 @@ export const clubs: Club[] = [
     createdAt: new Date("2025-08-01T09:00:00"),
   },
   {
-    id: "montreal-artists",
+    clubId: "montreal-artists",
     name: "Glimmering Dolls",
     description: "A student-run organization dedicated to promoting sustainable fashion practices and raising awareness about the environmental and social impacts of the fashion industry.",
     followers: 341,
