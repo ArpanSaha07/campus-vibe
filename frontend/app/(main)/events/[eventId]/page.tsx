@@ -10,9 +10,9 @@ export default function EventPage({ params }: EventPageProps) {
 
   // Example event data (replace with API or DB fetch)
   const event = {
-    title: "Taylor Swift Dance Party",
-    eventId: "taylor-swift-dance-party",
-    banner: "/techfair-image.png",
+    title: "Dance Party",
+    eventId: "dance-party",
+    banner: "/rave.jpg",
     date: "Sunday, September 28, 2025 6:00 PM - 9:00 PM EDT",
     recurrence: "Every week on Sunday until March 25, 2026",
     location: {
@@ -22,8 +22,7 @@ export default function EventPage({ params }: EventPageProps) {
         "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
     },
     details: `
-      Join us for an unforgettable night! Dance to Taylor Swift hits and enjoy
-      a lively atmosphere in downtown Montreal.
+      A festival with high-energy dance music, vibrant lights, and a lively atmosphere.
     `,
     categories: [
       "Canada Events",
@@ -31,7 +30,6 @@ export default function EventPage({ params }: EventPageProps) {
       "Things to do in Montreal, Canada",
       "Montreal Parties",
       "#danceparty",
-      "#taylorswift",
       "#lgbtq_friendly",
     ],
     organizer: {
