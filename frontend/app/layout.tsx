@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/globals.css";
 import type { RootLayoutProps } from "@/app/types";
-import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
 import { GoogleProvider } from "./components/auth-components/GoogleProvider";
+import { AuthProvider } from "./lib/auth-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,7 +16,6 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  // metadataBase: new URL(""),
   title: "CampusVibe",
   description: "Never miss out on your favorite campus events again!"
 };
@@ -30,12 +28,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
       </head>
 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        <GoogleProvider>  {/* what is this tag for?? */} 
-          <Navbar />
-          <div className="flex-1 flex flex-col"> {/* Allows the main content area to grow and fill the available space between the navbar and footer */}
+        <GoogleProvider>
+          <AuthProvider>
             {children}
-          </div>
-          <Footer />
+          </AuthProvider>
         </GoogleProvider>
       </body>
     </html>

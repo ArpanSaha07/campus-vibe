@@ -14,6 +14,7 @@ public class ClubMapper implements Function<Club, ClubDTO> {
                 club.getDescription(),
                 club.getFollowers(),
                 club.getLogo(),
+                club.getSocialLinks(),
                 club.getFeatured(),
                 club.getImages(),
                 club.getCreatedAt()
