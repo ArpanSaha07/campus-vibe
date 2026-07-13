@@ -2,6 +2,7 @@ package com.campusvibe.event;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.function.Function;
 
 @Component
@@ -18,11 +19,12 @@ public class EventMapper implements Function<Event, EventDTO> {
                 event.getPrice(),
                 event.getOrganizer().getId(),
                 event.getFollowers(),
-                event.getImages(),
+                // copy so lazy collections are initialized while the session is open
+                List.copyOf(event.getImages()),
                 event.getPromoted(),
                 event.getCapacity(),
                 event.getRegistered(),
-                event.getCategories()
+                List.copyOf(event.getCategories())
         );
     }
 }

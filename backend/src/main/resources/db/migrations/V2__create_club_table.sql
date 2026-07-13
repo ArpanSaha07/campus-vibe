@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS clubs (
 	description TEXT,
 	followers INT NOT NULL DEFAULT 0,
 	logo TEXT,
+	social_links TEXT,
 	featured BOOLEAN NOT NULL DEFAULT FALSE,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

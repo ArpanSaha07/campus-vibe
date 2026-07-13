@@ -2,6 +2,7 @@ package com.campusvibe.club;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.function.Function;
 
 @Component
@@ -16,7 +17,8 @@ public class ClubMapper implements Function<Club, ClubDTO> {
                 club.getLogo(),
                 club.getSocialLinks(),
                 club.getFeatured(),
-                club.getImages(),
+                // copy so the lazy collection is initialized while the session is open
+                List.copyOf(club.getImages()),
                 club.getCreatedAt()
         );
     }

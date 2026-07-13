@@ -17,13 +17,13 @@ services:
       timeout: 5s
       retries: 5
 
-  s3:
-    image: adobe/s3mock:3.1.0
-    container_name: campusvibe-s3
-    ports:
-      - "9090:9090"
-    environment:
-      - initialBuckets=campusvibe-clubs,campusvibe-events,campusvibe-user
+  # s3:
+  #   image: adobe/s3mock:3.1.0
+  #   container_name: campusvibe-s3
+  #   ports:
+  #     - "9090:9090"
+  #   environment:
+  #     - initialBuckets=campusvibe-clubs,campusvibe-events,campusvibe-user
 
   backend:
     build:
@@ -39,6 +39,9 @@ services:
       AWS_S3_BUCKET_CLUBS: campusvibe-clubs
       AWS_S3_BUCKET_EVENTS: campusvibe-events
       AWS_S3_BUCKET_USER: campusvibe-user
+    volumes:
+      - ../backend:/app
+
   # GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   #   ports:
   #     - "8080:8080"
@@ -60,8 +63,8 @@ services:
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
+    # depends_on:
+    #   - backend
     volumes:
       - ../frontend:/app
 

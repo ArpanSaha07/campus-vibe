@@ -42,29 +42,21 @@ export type Club = {
     // clubcategories: string[];
 };
 
+// Mirrors backend UserDTO (com.campusvibe.user.UserDTO)
+export type Role = 'USER' | 'CLUB_ADMIN' | 'ADMIN';
+
 export interface User {
   id: number;
   name: string;
   email: string;
-  password: string;
-  role: 'regularUser' | 'clubAdmin' | 'admin';
-  dateJoined: Date;
-};
-
-export interface Admin extends User {
-  role: 'admin';
+  role: Role;
+  dateJoined: string; // ISO-8601 instant from the backend
+  managedClubId: string | null;
 }
 
-export interface ClubAdmin extends User {
-  role: 'clubAdmin';
-  managedClub: Club["clubId"];
-}
-
-export interface RegularUser extends User {
-  role: 'regularUser';
-  followedClubs: Club["clubId"][];
-  savedEvents: EventInstance["eventId"][];
-  preferredCategories: string[];
+export interface AuthResponse {
+  token: string;
+  user: User;
 }
 
 // Page Types

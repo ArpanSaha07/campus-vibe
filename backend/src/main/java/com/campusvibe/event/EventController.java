@@ -17,25 +17,23 @@ import java.util.List;
 @RequestMapping("/api/v1/events")
 public class EventController {
     private final EventService eventService;
-    private final EventMapper eventMapper;
     private final S3Service s3Service;
     private final S3Buckets buckets;
 
-    public EventController(EventService eventService, EventMapper eventMapper, S3Service s3Service, S3Buckets buckets) {
+    public EventController(EventService eventService, S3Service s3Service, S3Buckets buckets) {
         this.eventService = eventService;
-        this.eventMapper = eventMapper;
         this.s3Service = s3Service;
         this.buckets = buckets;
     }
 
     @GetMapping
     public List<EventDTO> list() {
-        return eventService.list().stream().map(eventMapper).toList();
+        return eventService.list();
     }
 
     @GetMapping("/{id}")
     public EventDTO get(@PathVariable Long id) {
-        return eventMapper.apply(eventService.get(id));
+        return eventService.get(id);
     }
 
     @PostMapping
@@ -50,7 +48,7 @@ public class EventController {
         e.setPrice(request.price());
         e.setCapacity(request.capacity());
         e.setCategories(request.categories());
-        return eventMapper.apply(eventService.create(e, request.organizerId()));
+        return eventService.create(e, request.organizerId());
     }
 
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

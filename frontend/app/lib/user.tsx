@@ -1,23 +1,5 @@
-import { apiFetch, setToken } from "./api";
-import type { User, Admin, ClubAdmin, RegularUser } from "@/app/types";
-
-type AuthResponse = { token: string; user: User };
-
-export async function sendVerificationCode(email: string): Promise<void> {
-	await apiFetch(`/api/v1/auth/send-code`, {
-		method: "POST",
-		body: JSON.stringify({ email }),
-	});
-}
-
-export async function verifyCode(email: string, code: string): Promise<User> {
-	const res = await apiFetch<AuthResponse>(`/api/v1/auth/verify-code`, {
-		method: "POST",
-		body: JSON.stringify({ email, code }),
-	});
-	setToken(res.token);
-	return res.user;
-}
+import { apiFetch, setToken, clearToken } from "./api";
+import type { AuthResponse, User } from "@/app/types";
 
 export async function login(email: string, password: string): Promise<User> {
 	const res = await apiFetch<AuthResponse>(`/api/v1/auth/login`, {
@@ -46,14 +28,22 @@ export async function googleSignIn(idToken: string): Promise<User> {
 	return res.user;
 }
 
-export async function me(): Promise<Admin | ClubAdmin | RegularUser> {
-  return (await apiFetch(`/api/v1/users/me`, { auth: true })) as Admin | ClubAdmin | RegularUser;
+export async function me(): Promise<User> {
+	return apiFetch<User>(`/api/v1/users/me`, { auth: true });
 }
 
 export function isRegularUser(user: User): boolean {
-	return user.role === 'regularUser';
+	return user.role === "USER";
 }
 
-export async function logOut(): Promise<void> {
-	setToken("");
+export function isClubAdmin(user: User): boolean {
+	return user.role === "CLUB_ADMIN";
+}
+
+export function isAdmin(user: User): boolean {
+	return user.role === "ADMIN";
+}
+
+export function logOut(): void {
+	clearToken();
 }

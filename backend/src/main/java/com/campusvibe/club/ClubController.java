@@ -18,25 +18,23 @@ import java.util.List;
 public class ClubController {
 
     private final ClubService clubService;
-    private final ClubMapper clubMapper;
     private final S3Service s3Service;
     private final S3Buckets buckets;
 
-    public ClubController(ClubService clubService, ClubMapper clubMapper, S3Service s3Service, S3Buckets buckets) {
+    public ClubController(ClubService clubService, S3Service s3Service, S3Buckets buckets) {
         this.clubService = clubService;
-        this.clubMapper = clubMapper;
         this.s3Service = s3Service;
         this.buckets = buckets;
     }
 
     @GetMapping
     public List<ClubDTO> list() {
-        return clubService.list().stream().map(clubMapper).toList();
+        return clubService.list();
     }
 
     @GetMapping("/{id}")
     public ClubDTO get(@PathVariable String id) {
-        return clubMapper.apply(clubService.get(id));
+        return clubService.get(id);
     }
 
     @PostMapping
@@ -53,7 +51,7 @@ public class ClubController {
         club.setId(request.id());
         club.setName(request.name());
         club.setDescription(request.description());
-        return clubMapper.apply(clubService.create(club));
+        return clubService.create(club);
     }
 
     @PostMapping(path = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

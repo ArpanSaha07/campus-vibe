@@ -9,12 +9,7 @@ import { useAuth } from "@/app/lib/auth-context";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  // const { isAuthenticated, logout } = useAuth();
-  const isAuthenticated = false;
-  const logout = () => {
-    // Implement logout logic here
-    console.log("Logged out");
-  }
+  const { isAuthenticated, logout } = useAuth();
 
   return (
     <nav className="w-full border-b border-gray-200 bg-white top-0 z-50">
@@ -63,7 +58,7 @@ export default function Navbar() {
             {isAuthenticated ? (
               <>
                 <Link href="/my-events" className="p-3 rounded-full hover:bg-gray-100">My Events</Link>
-                <Link href="/my-profile" className="p-3 rounded-full hover:bg-gray-100">My Profile</Link>
+                <Link href="/profile" className="p-3 rounded-full hover:bg-gray-100">My Profile</Link>
                 <button
                   onClick={logout}
                   className="p-3 rounded-full hover:bg-gray-100"
@@ -133,7 +128,7 @@ export default function Navbar() {
             </Link>
             {isAuthenticated && (
               <>
-                <Link href="/my-profile" className="block p-2 hover:text-orange-600 hover:bg-gray-100">
+                <Link href="/profile" className="block p-2 hover:text-orange-600 hover:bg-gray-100">
                   My Profile
                 </Link>
                 <button

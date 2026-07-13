@@ -1,5 +1,6 @@
 package com.campusvibe.auth;
 
+import com.campusvibe.exception.DuplicateResourceException;
 import com.campusvibe.jwt.JWTUtil;
 import com.campusvibe.user.*;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -61,6 +62,9 @@ public class AuthenticationService {
 
     @Transactional
     public AuthenticationResponse register(RegisterRequest request) {
+        if (userRepository.findByEmail(request.email()).isPresent()) {
+            throw new DuplicateResourceException("An account with this email already exists");
+        }
         User user = new User();
         user.setName(request.name());
         user.setEmail(request.email());
