@@ -40,6 +40,17 @@ public class EventService {
         return eventMapper.apply(eventRepository.save(event));
     }
 
+    @Transactional
+    public void delete(Long id) {
+        eventRepository.delete(findEvent(id));
+    }
+
+    @Transactional
+    public void addImages(Long id, List<String> keys) {
+        Event event = findEvent(id);
+        event.getImages().addAll(keys);
+    }
+
     private Event findEvent(Long id) {
         return eventRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Event with id [%s] not found".formatted(id)));

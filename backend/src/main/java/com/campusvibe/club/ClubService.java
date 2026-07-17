@@ -1,5 +1,6 @@
 package com.campusvibe.club;
 
+import com.campusvibe.exception.DuplicateResourceException;
 import com.campusvibe.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,9 +27,34 @@ public class ClubService {
         return clubMapper.apply(findClub(id));
     }
 
+    @Transactional(readOnly = true)
+    public ClubDTO getManagedClub(Long userId) {
+        return clubRepository.findByClubAdminId(userId)
+                .map(clubMapper)
+                .orElseThrow(() -> new ResourceNotFoundException("No club is assigned to this user"));
+    }
+
     @Transactional
     public ClubDTO create(Club club) {
+        if (clubRepository.existsById(club.getId())) {
+            throw new DuplicateResourceException("Club with id [%s] already exists".formatted(club.getId()));
+        }
         return clubMapper.apply(clubRepository.save(club));
+    }
+
+    @Transactional
+    public ClubDTO update(String id, ClubUpdateRequest request) {
+        Club club = findClub(id);
+        if (request.name() != null && !request.name().isBlank()) {
+            club.setName(request.name());
+        }
+        if (request.description() != null) {
+            club.setDescription(request.description());
+        }
+        if (request.socialLinks() != null) {
+            club.setSocialLinks(request.socialLinks());
+        }
+        return clubMapper.apply(club);
     }
 
     @Transactional

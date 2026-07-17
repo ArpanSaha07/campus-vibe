@@ -42,21 +42,38 @@ export type Club = {
     // clubcategories: string[];
 };
 
-// Mirrors backend UserDTO (com.campusvibe.user.UserDTO)
-export type Role = 'USER' | 'CLUB_ADMIN' | 'ADMIN';
+// Mirrors backend RBAC (see .claude/user-roles.md and com.campusvibe.user.UserDTO).
+// One User interface for all roles — role-specific data comes from separate endpoints.
+export enum Role {
+  USER = "ROLE_USER",
+  CLUB_ADMIN = "ROLE_CLUB_ADMIN",
+  ADMIN = "ROLE_ADMIN",
+}
 
 export interface User {
   id: number;
   name: string;
   email: string;
-  role: Role;
-  dateJoined: string; // ISO-8601 instant from the backend
-  managedClubId: string | null;
+  roles: Role[];
+  createdAt: string; // ISO-8601 instant from the backend
 }
 
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+export interface ClubAdminRequest {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  clubId: string;
+  clubName: string;
+  message: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
+  reviewedAt: string | null;
 }
 
 // Page Types

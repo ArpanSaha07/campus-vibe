@@ -2,15 +2,13 @@ package com.campusvibe.event;
 
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
-import com.campusvibe.user.Role;
-import com.campusvibe.user.User;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -37,9 +35,8 @@ public class EventController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','CLUB_ADMIN')")
-    public EventDTO create(@RequestBody EventCreateRequest request, Authentication auth) {
-        authorizeEventCreate(request.organizerId(), auth);
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #request.organizerId())")
+    public EventDTO create(@RequestBody EventCreateRequest request) {
         Event e = new Event();
         e.setTitle(request.title());
         e.setDescription(request.description());
@@ -47,26 +44,27 @@ public class EventController {
         e.setLocation(request.location());
         e.setPrice(request.price());
         e.setCapacity(request.capacity());
-        e.setCategories(request.categories());
+        if (request.categories() != null) {
+            e.setCategories(request.categories());
+        }
         return eventService.create(e, request.organizerId());
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
+    public void delete(@PathVariable Long id) {
+        eventService.delete(id);
+    }
+
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','CLUB_ADMIN')")
-    public void uploadImages(@PathVariable Long id, @RequestPart("files") List<MultipartFile> files, Authentication auth) throws IOException {
-        // Organizer authorization would require lookup; assuming pre-checked at creation
+    @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
+    public void uploadImages(@PathVariable Long id, @RequestPart("files") List<MultipartFile> files) throws IOException {
+        List<String> keys = new ArrayList<>();
         for (MultipartFile file : files) {
             String key = "events/" + id + "/images/" + file.getOriginalFilename();
             s3Service.putObject(buckets.getEvents(), key, file.getBytes());
+            keys.add(key);
         }
-    }
-
-    private void authorizeEventCreate(String organizerId, Authentication auth) {
-        User user = (User) auth.getPrincipal();
-        if (user.getRole() == Role.CLUB_ADMIN) {
-            if (user.getManagedClub() == null || !user.getManagedClub().getId().equals(organizerId)) {
-                throw new RuntimeException("Forbidden");
-            }
-        }
+        eventService.addImages(id, keys);
     }
 }

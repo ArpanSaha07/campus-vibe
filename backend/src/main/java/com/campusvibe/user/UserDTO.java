@@ -1,12 +1,12 @@
 package com.campusvibe.user;
 
 import java.time.Instant;
+import java.util.List;
 
 public record UserDTO(
 	Long id,
 	String name,
 	String email,
-	Role role,
-	Instant dateJoined,
-	String managedClubId
+	List<String> roles,
+	Instant createdAt
 ) {}

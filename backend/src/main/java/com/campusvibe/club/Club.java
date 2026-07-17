@@ -31,6 +31,10 @@ public class Club {
 
     private String socialLinks; // JSON string of { email, website, facebook, instagram }
 
+    // One club <-> one club admin; ownership checks go through ClubPermissionService
+    @Column(name = "club_admin_id")
+    private Long clubAdminId;
+
     @Column(nullable = false)
     private Boolean featured = false;
 

@@ -12,10 +12,8 @@ public class UserDTOMapper implements Function<User, UserDTO> {
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole(),
-                user.getDateJoined(),
-                user.getManagedClub() != null ? user.getManagedClub().getId() : null
+                user.getRoleNames(),
+                user.getCreatedAt()
         );
     }
 }
-
