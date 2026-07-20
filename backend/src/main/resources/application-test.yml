@@ -2,6 +2,10 @@ aws:
   s3:
     mock: false
 
+openai:
+  # Never call the real OpenAI API from tests, even if OPENAI_API_KEY is set
+  api-key: ""
+
 spring:
   datasource:
     url: jdbc-secretsmanager:postgresql://awseb-e-ezjnxfjb44-stack-awsebrdsdatabase-f2ocmocryc5g.celswdmxhcr1.eu-east-2.rds.amazonaws.com:5432/ebdb

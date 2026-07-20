@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { EventInstance } from "@/app/types";
-import { getClubById } from "@/app/lib/club";
+import { getClubNameById } from "@/app/lib/club";
+import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import EventShareButton from "@/app/components/event/EventShareButton";
 import { isRegularUser, me } from "@/app/lib/user";
@@ -21,7 +22,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
         >
           <div className="relative w-full h-full">
             <Image
-              src={event.images[0]}
+              src={event.images[0] || FALLBACK_EVENT_IMAGE}
               alt={event.title}
               fill
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -48,7 +49,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
       <div className="space-y-1 px-3 pb-3">
         <Link href={`/events/${event.eventId}`}>
           <div className="flex space-x-2 pt-1.5">
-            {event.registered / event.capacity >= 0.75 && (
+            {event.capacity > 0 && event.registered / event.capacity >= 0.75 && (
               <span className="text-xs text-gray-500 font-semibold bg-orange-300 rounded-lg p-2">
                 Almost Full
               </span>
@@ -72,7 +73,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
           <p className="text-xs font-medium">{event.price}</p>
 
           <div className="text-sm text-gray-700">
-            <p className="font-medium">{(getClubById(event.organizer)).name}</p>
+            <p className="font-medium">{getClubNameById(event.organizer)}</p>
           </div>
 
           <p className="text-xs text-gray-400 pt-1">

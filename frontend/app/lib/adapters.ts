@@ -1,0 +1,53 @@
+import type { ApiClub, ApiEvent, Club, EventInstance } from "@/app/types";
+
+export const FALLBACK_EVENT_IMAGE = "/frosh1.jpeg";
+export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
+
+/** Maps a backend EventDTO to the EventInstance shape the UI components use. */
+export function toEventInstance(api: ApiEvent): EventInstance {
+  return {
+    eventId: String(api.id),
+    title: api.title,
+    details: api.description ?? "",
+    dateTime: new Date(api.dateTime),
+    createdAt: new Date(api.createdAt),
+    location: {
+      name: api.location ?? "Location TBA",
+      address: "",
+      mapUrl: "",
+    },
+    price: api.price ?? "Free",
+    organizer: api.organizerId,
+    followers: api.followers,
+    images: api.images.length > 0 ? api.images : [FALLBACK_EVENT_IMAGE],
+    promoted: api.promoted,
+    capacity: api.capacity ?? 0,
+    registered: api.registered,
+    categories: api.categories,
+  };
+}
+
+/** Maps a backend ClubDTO to the Club shape the UI components use. */
+export function toClub(api: ApiClub): Club {
+  return {
+    clubId: api.id,
+    name: api.name,
+    description: api.description ?? "",
+    followers: api.followers,
+    logo: api.logo ?? FALLBACK_CLUB_LOGO,
+    socialLinks: parseSocialLinks(api.socialLinks),
+    featured: api.featured,
+    images: api.images,
+    createdAt: new Date(api.createdAt),
+  };
+}
+
+function parseSocialLinks(raw: string | null): Club["socialLinks"] {
+  if (!raw) return { email: "" };
+  try {
+    const parsed = JSON.parse(raw);
+    return { email: "", ...parsed };
+  } catch {
+    return { email: "" };
+  }
+}

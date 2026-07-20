@@ -2,7 +2,7 @@ package com.campusvibe.club;
 
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
-import com.campusvibe.user.Role;
+import com.campusvibe.search.SearchService;
 import com.campusvibe.user.User;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,20 +18,37 @@ import java.util.List;
 public class ClubController {
 
     private final ClubService clubService;
-    private final ClubMapper clubMapper;
+    private final SearchService searchService;
     private final S3Service s3Service;
     private final S3Buckets buckets;
 
-    public ClubController(ClubService clubService, ClubMapper clubMapper, S3Service s3Service, S3Buckets buckets) {
+    public ClubController(ClubService clubService, SearchService searchService,
+                          S3Service s3Service, S3Buckets buckets) {
         this.clubService = clubService;
-        this.clubMapper = clubMapper;
+        this.searchService = searchService;
         this.s3Service = s3Service;
         this.buckets = buckets;
     }
 
     @GetMapping
     public List<ClubDTO> list() {
-        return clubService.list().stream().map(clubMapper).toList();
+        return clubService.list();
+    }
+
+    @GetMapping("/search")
+    public List<ClubDTO> search(@RequestParam String q,
+                                @RequestParam(defaultValue = "20") int limit) {
+        if (q == null || q.isBlank()) {
+            return List.of();
+        }
+        return searchService.searchClubs(q.trim(), Math.clamp(limit, 1, 50));
+    }
+
+    @GetMapping("/my-club")
+    @PreAuthorize("hasRole('CLUB_ADMIN')")
+    public ClubDTO myClub(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return clubService.getManagedClub(user.getId());
     }
 
     @GetMapping("/{id}")

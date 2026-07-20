@@ -31,6 +31,16 @@ export function getClubById(id: string): Club {
     return club;
 }
 
+/** Display name for a club id; falls back to a title-cased slug for clubs not in mock data. */
+export function getClubNameById(id: string): string {
+    const club = clubs.find(club => club.clubId === id);
+    if (club) return club.name;
+    return id
+        .split("-")
+        .map(word => (word ? word[0].toUpperCase() + word.slice(1) : word))
+        .join(" ");
+}
+
 export async function createClub(name: string): Promise<string> {
     const club_name: string = name.trim().toLowerCase().replace(/\s+/g, '-');
     // return name.trim().toLowerCase().replace(/\s+/g, '-');

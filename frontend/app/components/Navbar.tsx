@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { Menu, X, Search } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import SearchBar from "@/app/components/SearchBar";
 import { useAuth } from "@/app/lib/auth-context";
 
 // notes: fix spacing of items in desktop view; work on search functionality
@@ -36,16 +37,7 @@ export default function Navbar() {
 
           {/* Search bar (inline on md+, shrinks with flex) */}
           <div className="flex-1 hidden lg:flex">
-            <div className="group relative w-full max-w-3xl">
-              <input
-                type="text"
-                placeholder="Search events"
-                className="w-full rounded-full border border-gray-300 py-2 pl-4 pr-10 text-sm placeholder-gray-500 focus:border-black focus:ring-black group-hover:shadow-md transition-all"
-              />
-              <button className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center h-8 w-8 rounded-full bg-orange-600 group-hover:shadow-md transition-all">
-                <Search className="h-4 w-4 text-white" />
-              </button>
-            </div>
+            <SearchBar className="w-full max-w-3xl" />
           </div>
 
           {/* Desktop Links */}
@@ -110,16 +102,7 @@ export default function Navbar() {
 
         {/* Search bar (second row for mobile only) */}
         <div className="w-full py-2 lg:hidden">
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              placeholder="Search events"
-              className="w-full rounded-full border border-gray-300 py-2 pl-4 pr-10 text-sm placeholder-gray-500 focus:border-black focus:ring-black"
-            />
-            <button className="absolute right-1 flex items-center justify-center h-8 w-8 rounded-full bg-orange-600">
-              <Search className="h-4 w-4 text-white" />
-            </button>
-          </div>
+          <SearchBar />
         </div>
 
         {/* Mobile Dropdown */}
