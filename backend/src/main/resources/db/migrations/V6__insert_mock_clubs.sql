@@ -1,7 +1,7 @@
 -- V6__insert_mock_clubs.sql
 -- Insert mock club data for testing
 
-INSERT INTO clubs (id, name, description, followers, logo, socialLinks, featured, created_at)
+INSERT INTO clubs (id, name, description, followers, logo, social_links, featured, created_at)
 VALUES 
 ('coding-club', 'Coding Club', 'A community of passionate programmers learning and building together', 120, NULL, '{"email":"coding@campus.com","website":"coding.campus.edu","instagram":"@campuscodingclub"}', true, NOW()),
 ('photography-society', 'Photography Society', 'Capture the world through our lenses. Join us for workshops and photo walks', 85, NULL, '{"email":"photo@campus.com","instagram":"@campusphoto"}', true, NOW()),

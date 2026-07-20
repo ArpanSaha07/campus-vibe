@@ -1,8 +1,12 @@
 package com.campusvibe.club;
 
+<<<<<<< HEAD
 import com.campusvibe.exception.DuplicateResourceException;
 import com.campusvibe.exception.ResourceNotFoundException;
 import com.campusvibe.search.SearchIndexService;
+=======
+import com.campusvibe.exception.ResourceNotFoundException;
+>>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +16,7 @@ import java.util.List;
 public class ClubService {
     private final ClubRepository clubRepository;
     private final ClubMapper clubMapper;
+<<<<<<< HEAD
     private final SearchIndexService searchIndexService;
 
     public ClubService(ClubRepository clubRepository, ClubMapper clubMapper,
@@ -19,6 +24,12 @@ public class ClubService {
         this.clubRepository = clubRepository;
         this.clubMapper = clubMapper;
         this.searchIndexService = searchIndexService;
+=======
+
+    public ClubService(ClubRepository clubRepository, ClubMapper clubMapper) {
+        this.clubRepository = clubRepository;
+        this.clubMapper = clubMapper;
+>>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     @Transactional(readOnly = true)
@@ -31,6 +42,7 @@ public class ClubService {
         return clubMapper.apply(findClub(id));
     }
 
+<<<<<<< HEAD
     @Transactional(readOnly = true)
     public ClubDTO getManagedClub(Long userId) {
         return clubRepository.findByClubAdminId(userId)
@@ -62,6 +74,11 @@ public class ClubService {
         }
         searchIndexService.indexClub(club);
         return clubMapper.apply(club);
+=======
+    @Transactional
+    public ClubDTO create(Club club) {
+        return clubMapper.apply(clubRepository.save(club));
+>>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     @Transactional

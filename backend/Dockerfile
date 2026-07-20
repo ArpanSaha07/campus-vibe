@@ -1,5 +1,4 @@
-# Use official OpenJDK image for Spring Boot
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:25-jdk-alpine
 
 WORKDIR /app
 

@@ -1,20 +1,19 @@
 import { apiFetch } from "@/app/lib/api";
-import { Club, EventInstance, RegularUser } from "@/app/types";
+import { Club, EventInstance } from "@/app/types";
 import { clubs } from "@/app/data/data";
-import { me } from "@/app/lib/user";
 
-// export async function getAllClubs(): Promise<Club[]> {
-//   return apiFetch<Club[]>(`/api/v1/clubs`);
-// }
+export async function getAllClubs(): Promise<Club[]> {
+  return apiFetch<Club[]>(`/api/v1/clubs`);
+}
 
 // export async function getClubById(id: string): Promise<Club> {
 //   return apiFetch<Club>(`/api/v1/clubs/${id}`);
 // }
 
-export function getAllClubs(): Club[] {
-    // Simulate fetching clubs from an API
-    return clubs;
-}
+// export function getAllClubs(): Club[] {
+//     // Simulate fetching clubs from an API
+//     return clubs;
+// }
 
 /**
  * Get a club by its id.

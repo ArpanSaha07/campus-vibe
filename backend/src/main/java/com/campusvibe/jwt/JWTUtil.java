@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
@@ -17,8 +18,14 @@ import static java.time.temporal.ChronoUnit.DAYS;
 @Service
 public class JWTUtil {
 
-    private static final String SECRET_KEY =
-            "foobar_123456789_foobar_123456789_foobar_123456789_foobar_123456789";
+    private final String secretKey;
+    private final String issuer;
+
+    public JWTUtil(@Value("${jwt.secret}") String secretKey,
+                   @Value("${jwt.issuer}") String issuer) {
+        this.secretKey = secretKey;
+        this.issuer = issuer;
+    }
 
 
     public String issueToken(String subject) {
@@ -41,7 +48,7 @@ public class JWTUtil {
                 .builder()
                 .setClaims(claims)
                 .setSubject(subject)
-                .setIssuer("https://amigoscode.com")
+                .setIssuer(issuer)
                 .setIssuedAt(Date.from(Instant.now()))
                 .setExpiration(
                         Date.from(
@@ -68,7 +75,7 @@ public class JWTUtil {
     }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
     public boolean isTokenValid(String jwt, String username) {

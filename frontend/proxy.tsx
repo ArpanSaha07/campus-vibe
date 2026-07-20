@@ -1,3 +1,5 @@
+// ** To restrict access to certain pages based on user login details in the page. **
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -18,5 +20,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/create-event/:path*', '/dashboard/:path*'],
+  matcher: ['/create-event/:path*', '/dashboard/:path*']
 }

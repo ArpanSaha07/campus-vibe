@@ -18,6 +18,7 @@ import java.util.List;
 public class ClubController {
 
     private final ClubService clubService;
+<<<<<<< HEAD
     private final SearchService searchService;
     private final S3Service s3Service;
     private final S3Buckets buckets;
@@ -26,6 +27,13 @@ public class ClubController {
                           S3Service s3Service, S3Buckets buckets) {
         this.clubService = clubService;
         this.searchService = searchService;
+=======
+    private final S3Service s3Service;
+    private final S3Buckets buckets;
+
+    public ClubController(ClubService clubService, S3Service s3Service, S3Buckets buckets) {
+        this.clubService = clubService;
+>>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
         this.s3Service = s3Service;
         this.buckets = buckets;
     }
@@ -33,6 +41,7 @@ public class ClubController {
     @GetMapping
     public List<ClubDTO> list() {
         return clubService.list();
+<<<<<<< HEAD
     }
 
     @GetMapping("/search")
@@ -49,11 +58,13 @@ public class ClubController {
     public ClubDTO myClub(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         return clubService.getManagedClub(user.getId());
+=======
+>>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     @GetMapping("/{id}")
     public ClubDTO get(@PathVariable String id) {
-        return clubMapper.apply(clubService.get(id));
+        return clubService.get(id);
     }
 
     @PostMapping
@@ -70,7 +81,7 @@ public class ClubController {
         club.setId(request.id());
         club.setName(request.name());
         club.setDescription(request.description());
-        return clubMapper.apply(clubService.create(club));
+        return clubService.create(club);
     }
 
     @PostMapping(path = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
