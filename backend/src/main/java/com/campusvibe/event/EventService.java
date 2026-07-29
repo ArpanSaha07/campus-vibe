@@ -3,10 +3,7 @@ package com.campusvibe.event;
 import com.campusvibe.club.Club;
 import com.campusvibe.club.ClubRepository;
 import com.campusvibe.exception.ResourceNotFoundException;
-<<<<<<< HEAD
 import com.campusvibe.search.SearchIndexService;
-=======
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +14,6 @@ public class EventService {
     private final EventRepository eventRepository;
     private final ClubRepository clubRepository;
     private final EventMapper eventMapper;
-<<<<<<< HEAD
     private final SearchIndexService searchIndexService;
 
     public EventService(EventRepository eventRepository,
@@ -28,15 +24,6 @@ public class EventService {
         this.clubRepository = clubRepository;
         this.eventMapper = eventMapper;
         this.searchIndexService = searchIndexService;
-=======
-
-    public EventService(EventRepository eventRepository,
-                        ClubRepository clubRepository,
-                        EventMapper eventMapper) {
-        this.eventRepository = eventRepository;
-        this.clubRepository = clubRepository;
-        this.eventMapper = eventMapper;
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     @Transactional(readOnly = true)
@@ -54,7 +41,6 @@ public class EventService {
         Club club = clubRepository.findById(organizerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Club with id [%s] not found".formatted(organizerId)));
         event.setOrganizer(club);
-<<<<<<< HEAD
         Event saved = eventRepository.save(event);
         searchIndexService.indexEvent(saved);
         return eventMapper.apply(saved);
@@ -69,9 +55,6 @@ public class EventService {
     public void addImages(Long id, List<String> keys) {
         Event event = findEvent(id);
         event.getImages().addAll(keys);
-=======
-        return eventMapper.apply(eventRepository.save(event));
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     private Event findEvent(Long id) {

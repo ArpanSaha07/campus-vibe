@@ -51,7 +51,6 @@ aws:
 google:
   clientId: ${GOOGLE_CLIENT_ID:}
 
-<<<<<<< HEAD
 openai:
   # Leave empty to run search in keyword-only mode (no OpenAI calls)
   api-key: ${OPENAI_API_KEY:}
@@ -62,8 +61,6 @@ search:
   keyword-weight: 0.3
   min-score: 0.2
 
-=======
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
 jwt:
   # Dev-only default; set JWT_SECRET in any real environment (min 32 bytes for HS256).
   secret: ${JWT_SECRET:campusvibe-dev-secret-0123456789-0123456789-0123456789}

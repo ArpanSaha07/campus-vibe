@@ -84,7 +84,6 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-<<<<<<< HEAD
 		<dependency>
 			<groupId>org.testcontainers</groupId>
 			<artifactId>junit-jupiter</artifactId>
@@ -95,8 +94,6 @@
 			<artifactId>postgresql</artifactId>
 			<scope>test</scope>
 		</dependency>
-=======
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
 		<!-- Test Database -->
 		<dependency>
 			<groupId>com.h2database</groupId>

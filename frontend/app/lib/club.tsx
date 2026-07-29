@@ -1,9 +1,11 @@
 import { apiFetch } from "@/app/lib/api";
-import { Club, EventInstance } from "@/app/types";
+import { ApiClub, Club, EventInstance } from "@/app/types";
 import { clubs } from "@/app/data/data";
+import { toClub } from "@/app/lib/adapters";
 
 export async function getAllClubs(): Promise<Club[]> {
-  return apiFetch<Club[]>(`/api/v1/clubs`);
+  const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/clubs`);
+  return apiClubs.map(toClub);
 }
 
 // export async function getClubById(id: string): Promise<Club> {

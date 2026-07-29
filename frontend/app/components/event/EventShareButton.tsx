@@ -66,8 +66,8 @@ export default function EventFollowButton({eventId}: {eventId: string}) {
         >
           <svg
             fill="#444444"
-            width="20px"
-            height="20px"
+            width="25px"
+            height="25px"
             viewBox="0 0 24 24"
           >
             <path

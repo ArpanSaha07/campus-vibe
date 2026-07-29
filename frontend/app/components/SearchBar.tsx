@@ -89,33 +89,33 @@ export default function SearchBar({ className = "" }: { className?: string }) {
           placeholder="Search events and clubs"
           aria-label="Search events and clubs"
           aria-expanded={open}
-          className="w-full rounded-full border border-gray-300 py-2 pl-4 pr-10 text-sm placeholder-gray-500 focus:border-black focus:ring-black group-hover:shadow-md transition-all"
+          className="w-full rounded-full bg-mist-100 border border-transparent py-2 pl-4 pr-10 text-sm text-ink-900 placeholder-ink-600 focus:bg-white focus:border-lavender-300 outline-none transition-colors"
         />
         <button
           type="submit"
           aria-label="Search"
-          className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center h-8 w-8 rounded-full bg-orange-600 hover:bg-orange-700 group-hover:shadow-md transition-all"
+          className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center h-8 w-8 rounded-full bg-lavender-600 hover:bg-lavender-800 transition-colors"
         >
           <Search className="h-4 w-4 text-white" />
         </button>
       </form>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+        <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl border border-mist-200 bg-white shadow-lift overflow-hidden">
           <div className="max-h-96 overflow-y-auto py-1">
             {loading && (
-              <p className="px-4 py-3 text-sm text-gray-500">Searching…</p>
+              <p className="px-4 py-3 text-sm text-ink-600">Searching…</p>
             )}
 
             {!loading && !hasResults && (
-              <p className="px-4 py-3 text-sm text-gray-500">
+              <p className="px-4 py-3 text-sm text-ink-600">
                 No matches for &ldquo;{query.trim()}&rdquo;
               </p>
             )}
 
             {!loading && events.length > 0 && (
               <section aria-label="Event results">
-                <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <p className="ticket-label px-4 pt-2 pb-1 text-ink-600">
                   Events
                 </p>
                 {events.map((event) => (
@@ -123,7 +123,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
                     key={event.eventId}
                     href={`/events/${event.eventId}`}
                     onClick={() => setOpen(false)}
-                    className="block px-4 py-2 hover:bg-gray-100"
+                    className="block px-4 py-2 hover:bg-lavender-50"
                   >
                     <p className="text-sm font-medium line-clamp-1">{event.title}</p>
                     <p className="text-xs text-gray-500">
@@ -140,7 +140,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
 
             {!loading && clubs.length > 0 && (
               <section aria-label="Club results">
-                <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <p className="ticket-label px-4 pt-2 pb-1 text-ink-600">
                   Clubs
                 </p>
                 {clubs.map((club) => (
@@ -148,7 +148,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
                     key={club.clubId}
                     href={`/clubs/${club.clubId}`}
                     onClick={() => setOpen(false)}
-                    className="block px-4 py-2 hover:bg-gray-100"
+                    className="block px-4 py-2 hover:bg-lavender-50"
                   >
                     <p className="text-sm font-medium line-clamp-1">{club.name}</p>
                     <p className="text-xs text-gray-500">{club.followers} followers</p>
@@ -162,7 +162,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
             <button
               type="button"
               onClick={() => goToResults()}
-              className="w-full border-t border-gray-100 px-4 py-2.5 text-left text-sm font-medium text-orange-600 hover:bg-gray-50"
+              className="w-full border-t border-mist-200 px-4 py-2.5 text-left text-sm font-semibold text-lavender-600 hover:bg-lavender-50"
             >
               See all results for &ldquo;{query.trim()}&rdquo;
             </button>

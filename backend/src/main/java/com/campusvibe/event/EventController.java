@@ -16,7 +16,6 @@ import java.util.List;
 @RequestMapping("/api/v1/events")
 public class EventController {
     private final EventService eventService;
-<<<<<<< HEAD
     private final SearchService searchService;
     private final S3Service s3Service;
     private final S3Buckets buckets;
@@ -25,13 +24,6 @@ public class EventController {
                            S3Service s3Service, S3Buckets buckets) {
         this.eventService = eventService;
         this.searchService = searchService;
-=======
-    private final S3Service s3Service;
-    private final S3Buckets buckets;
-
-    public EventController(EventService eventService, S3Service s3Service, S3Buckets buckets) {
-        this.eventService = eventService;
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
         this.s3Service = s3Service;
         this.buckets = buckets;
     }
@@ -39,7 +31,6 @@ public class EventController {
     @GetMapping
     public List<EventDTO> list() {
         return eventService.list();
-<<<<<<< HEAD
     }
 
     @GetMapping("/search")
@@ -49,8 +40,6 @@ public class EventController {
             return List.of();
         }
         return searchService.searchEvents(q.trim(), Math.clamp(limit, 1, 50));
-=======
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     @GetMapping("/{id}")
@@ -68,7 +57,6 @@ public class EventController {
         e.setLocation(request.location());
         e.setPrice(request.price());
         e.setCapacity(request.capacity());
-<<<<<<< HEAD
         if (request.categories() != null) {
             e.setCategories(request.categories());
         }
@@ -79,10 +67,6 @@ public class EventController {
     @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
     public void delete(@PathVariable Long id) {
         eventService.delete(id);
-=======
-        e.setCategories(request.categories());
-        return eventService.create(e, request.organizerId());
->>>>>>> 6b7d78bf92e7a4fa2d029d0a46eff35a0313265d
     }
 
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -1,5 +1,5 @@
 import { apiFetch, setToken, clearToken } from "./api";
-import type { AuthResponse, User } from "@/app/types";
+import { Role, type AuthResponse, type User } from "@/app/types";
 
 export async function login(email: string, password: string): Promise<User> {
 	const res = await apiFetch<AuthResponse>(`/api/v1/auth/login`, {
@@ -32,16 +32,23 @@ export async function me(): Promise<User> {
 	return apiFetch<User>(`/api/v1/users/me`, { auth: true });
 }
 
-export function isRegularUser(user: User): boolean {
-	return user.role === "USER";
+// Role helpers. Every authenticated user has ROLE_USER; visibility only —
+// the backend enforces all authorization.
+export function hasRole(user: User | null, role: Role): boolean {
+	return !!user?.roles?.includes(role);
 }
 
-export function isClubAdmin(user: User): boolean {
-	return user.role === "CLUB_ADMIN";
+export function isAdmin(user: User | null): boolean {
+	return hasRole(user, Role.ADMIN);
 }
 
-export function isAdmin(user: User): boolean {
-	return user.role === "ADMIN";
+export function isClubAdmin(user: User | null): boolean {
+	return hasRole(user, Role.CLUB_ADMIN);
+}
+
+/** A user with no elevated roles. */
+export function isRegularUser(user: User | null): boolean {
+	return hasRole(user, Role.USER) && !isClubAdmin(user) && !isAdmin(user);
 }
 
 export function logOut(): void {

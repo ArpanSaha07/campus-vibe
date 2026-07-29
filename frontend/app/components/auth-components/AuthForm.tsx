@@ -37,14 +37,14 @@ export default function AuthForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <h1 className="text-2xl font-bold mb-4">
+      <h1 className="font-display text-2xl font-bold text-ink-900 mb-4">
         {mode === "login" ? "Log in" : "Create your account"}
       </h1>
       {mode === "register" && (
         <input
           type="text"
           placeholder="Full name"
-          className="w-full border rounded px-4 py-2 mb-4"
+          className="w-full rounded-xl bg-mist-100 border border-transparent px-4 py-2.5 mb-4 text-ink-900 placeholder-ink-600 focus:bg-white focus:border-lavender-300 outline-none transition-colors"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
@@ -54,7 +54,7 @@ export default function AuthForm() {
       <input
         type="email"
         placeholder="Email"
-        className="w-full border rounded px-4 py-2 mb-4"
+        className="w-full rounded-xl bg-mist-100 border border-transparent px-4 py-2.5 mb-4 text-ink-900 placeholder-ink-600 focus:bg-white focus:border-lavender-300 outline-none transition-colors"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
@@ -63,7 +63,7 @@ export default function AuthForm() {
       <input
         type="password"
         placeholder={mode === "register" ? "Password (min 8 characters)" : "Password"}
-        className="w-full border rounded px-4 py-2 mb-4"
+        className="w-full rounded-xl bg-mist-100 border border-transparent px-4 py-2.5 mb-4 text-ink-900 placeholder-ink-600 focus:bg-white focus:border-lavender-300 outline-none transition-colors"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         minLength={mode === "register" ? 8 : undefined}
@@ -72,7 +72,7 @@ export default function AuthForm() {
       />
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
       <button
-        className="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 disabled:opacity-50"
+        className="w-full h-11 bg-lavender-600 text-white font-semibold rounded-full hover:bg-lavender-800 active:scale-[0.98] transition disabled:opacity-50"
         disabled={loading}
       >
         {loading
@@ -85,7 +85,7 @@ export default function AuthForm() {
           setMode(mode === "login" ? "register" : "login");
           setError("");
         }}
-        className="mt-3 w-full text-sm text-gray-600 hover:text-gray-800"
+        className="mt-3 w-full text-sm font-semibold text-lavender-600 hover:text-lavender-800"
         disabled={loading}
       >
         {mode === "login"
