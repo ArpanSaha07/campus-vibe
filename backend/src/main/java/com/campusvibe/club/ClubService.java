@@ -65,6 +65,21 @@ public class ClubService {
     }
 
     @Transactional
+    public ClubDTO update(String id, ClubUpdateRequest request) {
+        Club club = findClub(id);
+        if (request.name() != null && !request.name().isBlank()) {
+            club.setName(request.name());
+        }
+        if (request.description() != null) {
+            club.setDescription(request.description());
+        }
+        if (request.socialLinks() != null) {
+            club.setSocialLinks(request.socialLinks());
+        }
+        return clubMapper.apply(club);
+    }
+
+    @Transactional
     public void updateLogo(String id, String logoKey) {
         Club club = findClub(id);
         club.setLogo(logoKey);

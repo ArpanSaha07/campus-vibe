@@ -8,16 +8,14 @@ openai:
 
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb
+    # PostgreSQL compatibility mode so entity DDL (TEXT columns) works on H2
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     driver-class-name: org.h2.Driver
     username: sa
     password:
-  h2:
-    console:
-      enabled: true
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
+    show-sql: false
   flyway:
     enabled: false
