@@ -1,5 +1,6 @@
 package com.campusvibe.auth;
 
+import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +20,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("login")
-    public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
+    public ResponseEntity<AuthenticationResponse> login(@Valid @RequestBody AuthenticationRequest request) {
         AuthenticationResponse response = authenticationService.login(request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.AUTHORIZATION, response.token())
@@ -27,7 +28,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthenticationResponse> register(@Valid @RequestBody RegisterRequest request) {
         AuthenticationResponse response = authenticationService.register(request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.AUTHORIZATION, response.token())

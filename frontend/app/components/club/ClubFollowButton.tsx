@@ -11,7 +11,7 @@ export default function ClubFollowButton({ clubId }: { clubId: string }) {
   return (
     <button
       onClick={handleFollowClick}
-      className={`px-4 py-2 rounded min-w-[110px] text-white text-center ${isFollowing ? 'bg-orange-500' : 'bg-orange-600 '} hover:bg-orange-700 transition`}
+      className={'px-4 py-2 rounded min-w-[110px] text-white text-center bg-lavender-600 hover:bg-lavender-800 transition'}
     >
       {isFollowing ? 'Following' : 'Follow'}
     </button>

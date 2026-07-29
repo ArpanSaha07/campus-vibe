@@ -1,20 +1,21 @@
 import { apiFetch } from "@/app/lib/api";
-import { Club, EventInstance, RegularUser } from "@/app/types";
+import { ApiClub, Club, EventInstance } from "@/app/types";
 import { clubs } from "@/app/data/data";
-import { me } from "@/app/lib/user";
+import { toClub } from "@/app/lib/adapters";
 
-// export async function getAllClubs(): Promise<Club[]> {
-//   return apiFetch<Club[]>(`/api/v1/clubs`);
-// }
+export async function getAllClubs(): Promise<Club[]> {
+  const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/clubs`);
+  return apiClubs.map(toClub);
+}
 
 // export async function getClubById(id: string): Promise<Club> {
 //   return apiFetch<Club>(`/api/v1/clubs/${id}`);
 // }
 
-export function getAllClubs(): Club[] {
-    // Simulate fetching clubs from an API
-    return clubs;
-}
+// export function getAllClubs(): Club[] {
+//     // Simulate fetching clubs from an API
+//     return clubs;
+// }
 
 /**
  * Get a club by its id.
@@ -29,6 +30,16 @@ export function getClubById(id: string): Club {
     }
 
     return club;
+}
+
+/** Display name for a club id; falls back to a title-cased slug for clubs not in mock data. */
+export function getClubNameById(id: string): string {
+    const club = clubs.find(club => club.clubId === id);
+    if (club) return club.name;
+    return id
+        .split("-")
+        .map(word => (word ? word[0].toUpperCase() + word.slice(1) : word))
+        .join(" ");
 }
 
 export async function createClub(name: string): Promise<string> {

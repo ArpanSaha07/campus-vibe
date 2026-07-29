@@ -1,12 +1,15 @@
 import { apiFetch } from "@/app/lib/api";
-import type { EventInstance } from "@/app/types";
+import { toEventInstance } from "@/app/lib/adapters";
+import type { ApiEvent, EventInstance } from "@/app/types";
 
 export async function listEvents(): Promise<EventInstance[]> {
-	return apiFetch<EventInstance[]>(`/api/v1/events`);
+	const events = await apiFetch<ApiEvent[]>(`/api/v1/events`);
+	return events.map(toEventInstance);
 }
 
 export async function getEvent(eventId: string): Promise<EventInstance> {
-	return apiFetch<EventInstance>(`/api/v1/events/${eventId}`);
+	const event = await apiFetch<ApiEvent>(`/api/v1/events/${eventId}`);
+	return toEventInstance(event);
 }
 
 export async function getUserEvents(): Promise<EventInstance[]> {

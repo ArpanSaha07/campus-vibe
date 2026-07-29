@@ -2,8 +2,9 @@ package com.campusvibe.club;
 
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
-import com.campusvibe.user.Role;
+import com.campusvibe.search.SearchService;
 import com.campusvibe.user.User;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -18,70 +19,77 @@ import java.util.List;
 public class ClubController {
 
     private final ClubService clubService;
-    private final ClubMapper clubMapper;
+    private final SearchService searchService;
     private final S3Service s3Service;
     private final S3Buckets buckets;
 
-    public ClubController(ClubService clubService, ClubMapper clubMapper, S3Service s3Service, S3Buckets buckets) {
+    public ClubController(ClubService clubService, SearchService searchService,
+                          S3Service s3Service, S3Buckets buckets) {
         this.clubService = clubService;
-        this.clubMapper = clubMapper;
+        this.searchService = searchService;
         this.s3Service = s3Service;
         this.buckets = buckets;
     }
 
     @GetMapping
     public List<ClubDTO> list() {
-        return clubService.list().stream().map(clubMapper).toList();
+        return clubService.list();
+    }
+
+    @GetMapping("/search")
+    public List<ClubDTO> search(@RequestParam String q,
+                                @RequestParam(defaultValue = "20") int limit) {
+        if (q == null || q.isBlank()) {
+            return List.of();
+        }
+        return searchService.searchClubs(q.trim(), Math.clamp(limit, 1, 50));
+    }
+
+    @GetMapping("/my-club")
+    @PreAuthorize("hasRole('CLUB_ADMIN')")
+    public ClubDTO myClub(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return clubService.getManagedClub(user.getId());
     }
 
     @GetMapping("/{id}")
     public ClubDTO get(@PathVariable String id) {
-        return clubMapper.apply(clubService.get(id));
+        return clubService.get(id);
     }
 
+    // Any authenticated user may create a club (see .claude/user-roles.md, ROLE_USER
+    // permissions); managing it requires ownership via a club admin request.
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','CLUB_ADMIN')")
-    public ClubDTO create(@RequestBody ClubCreateRequest request, Authentication auth) {
-        User user = (User) auth.getPrincipal();
-        if (user.getRole() == Role.CLUB_ADMIN) {
-            // For club admins, force the id to their managed club
-            if (user.getManagedClub() == null || !user.getManagedClub().getId().equals(request.id())) {
-                throw new RuntimeException("Club admin can only create their own club");
-            }
-        }
+    @PreAuthorize("hasRole('USER')")
+    public ClubDTO create(@Valid @RequestBody ClubCreateRequest request) {
         Club club = new Club();
         club.setId(request.id());
         club.setName(request.name());
         club.setDescription(request.description());
-        return clubMapper.apply(clubService.create(club));
+        return clubService.create(club);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #id)")
+    public ClubDTO update(@PathVariable String id, @RequestBody ClubUpdateRequest request) {
+        return clubService.update(id, request);
     }
 
     @PostMapping(path = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','CLUB_ADMIN')")
-    public void uploadLogo(@PathVariable String id, @RequestPart("file") MultipartFile file, Authentication auth) throws IOException {
-        authorizeClubWrite(id, auth);
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #id)")
+    public void uploadLogo(@PathVariable String id, @RequestPart("file") MultipartFile file) throws IOException {
         String key = "clubs/" + id + "/logo-" + file.getOriginalFilename();
         s3Service.putObject(buckets.getClubs(), key, file.getBytes());
         clubService.updateLogo(id, key);
     }
 
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('ADMIN','CLUB_ADMIN')")
-    public void uploadImages(@PathVariable String id, @RequestPart("files") List<MultipartFile> files, Authentication auth) throws IOException {
-        authorizeClubWrite(id, auth);
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #id)")
+    public void uploadImages(@PathVariable String id, @RequestPart("files") List<MultipartFile> files) throws IOException {
         for (MultipartFile file : files) {
             String key = "clubs/" + id + "/images/" + file.getOriginalFilename();
             s3Service.putObject(buckets.getClubs(), key, file.getBytes());
             clubService.addImages(id, List.of(key));
-        }
-    }
-
-    private void authorizeClubWrite(String clubId, Authentication auth) {
-        User user = (User) auth.getPrincipal();
-        if (user.getRole() == Role.CLUB_ADMIN) {
-            if (user.getManagedClub() == null || !user.getManagedClub().getId().equals(clubId)) {
-                throw new RuntimeException("Forbidden");
-            }
         }
     }
 }

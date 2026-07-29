@@ -1,30 +1,17 @@
-import Link from "next/link";
 import EventCard from "../event/EventCard";
+import SectionHeading from "@/app/components/ui/SectionHeading";
 import { EventInstance } from "@/app/types";
 
-export default function EventSection({title, events}: {title: string, events: EventInstance[]}) {
+export default function EventSection({ title, events }: { title: string; events: EventInstance[] }) {
   return (
-    <section className="max-w-7xl mx-auto py-10 px-6">
-      <div className="flex flex-row justify-between pr-4">
-        <Link href="#" className="hover:text-indigo-600 hover:underline">
-          <h2 className="text-2xl font-semibold mb-6">{title}</h2>
-        </Link>
-        <span>
-          <Link
-            href="/events"
-            className="text-sm text-gray-700 hover:text-indigo-600 hover:underline"
-          >
-            Explore more events
-          </Link>{" "}
-          &nbsp;&gt;
-        </span>
-      </div>
+    <section className="max-w-7xl mx-auto py-4 px-4 sm:px-6">
+      <SectionHeading title={title} moreHref="/events" moreLabel="Explore more events" />
 
       {/* Horizontal scroll, grid view for screens larger than xl */}
       <div
         className="
-        flex space-x-4 overflow-x-auto pb-4 scrollbar-thin
-        xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-y-6 xl:gap-x-6 xl:justify-between"
+        flex space-x-6 overflow-x-auto py-4
+        xl:grid xl:grid-cols-4 xl:grid-rows-2 xl:gap-6 xl:justify-between"
       >
         {events.map((event) => (
           <EventCard key={event.eventId} event={event} />

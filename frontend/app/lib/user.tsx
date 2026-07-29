@@ -1,23 +1,5 @@
-import { apiFetch, setToken } from "./api";
-import type { User, Admin, ClubAdmin, RegularUser } from "@/app/types";
-
-type AuthResponse = { token: string; user: User };
-
-export async function sendVerificationCode(email: string): Promise<void> {
-	await apiFetch(`/api/v1/auth/send-code`, {
-		method: "POST",
-		body: JSON.stringify({ email }),
-	});
-}
-
-export async function verifyCode(email: string, code: string): Promise<User> {
-	const res = await apiFetch<AuthResponse>(`/api/v1/auth/verify-code`, {
-		method: "POST",
-		body: JSON.stringify({ email, code }),
-	});
-	setToken(res.token);
-	return res.user;
-}
+import { apiFetch, setToken, clearToken } from "./api";
+import { Role, type AuthResponse, type User } from "@/app/types";
 
 export async function login(email: string, password: string): Promise<User> {
 	const res = await apiFetch<AuthResponse>(`/api/v1/auth/login`, {
@@ -46,14 +28,29 @@ export async function googleSignIn(idToken: string): Promise<User> {
 	return res.user;
 }
 
-export async function me(): Promise<Admin | ClubAdmin | RegularUser> {
-  return (await apiFetch(`/api/v1/users/me`, { auth: true })) as Admin | ClubAdmin | RegularUser;
+export async function me(): Promise<User> {
+	return apiFetch<User>(`/api/v1/users/me`, { auth: true });
 }
 
-export function isRegularUser(user: User): boolean {
-	return user.role === 'regularUser';
+// Role helpers. Every authenticated user has ROLE_USER; visibility only —
+// the backend enforces all authorization.
+export function hasRole(user: User | null, role: Role): boolean {
+	return !!user?.roles?.includes(role);
 }
 
-export async function logOut(): Promise<void> {
-	setToken("");
+export function isAdmin(user: User | null): boolean {
+	return hasRole(user, Role.ADMIN);
+}
+
+export function isClubAdmin(user: User | null): boolean {
+	return hasRole(user, Role.CLUB_ADMIN);
+}
+
+/** A user with no elevated roles. */
+export function isRegularUser(user: User | null): boolean {
+	return hasRole(user, Role.USER) && !isClubAdmin(user) && !isAdmin(user);
+}
+
+export function logOut(): void {
+	clearToken();
 }

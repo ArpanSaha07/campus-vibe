@@ -1,6 +1,5 @@
 package com.campusvibe.user;
 
-import com.campusvibe.club.Club;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -11,7 +10,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -33,20 +34,30 @@ public class User implements UserDetails {
 	@Column(nullable = false)
 	private String password;
 
-	@Enumerated(EnumType.STRING)
-	@Column(nullable = false)
-	private Role role = Role.USER;
+	// EAGER: the role set is tiny and is needed by getAuthorities() outside any session
+	@ManyToMany(fetch = FetchType.EAGER)
+	@JoinTable(
+			name = "user_roles",
+			joinColumns = @JoinColumn(name = "user_id"),
+			inverseJoinColumns = @JoinColumn(name = "role_id"))
+	private Set<Role> roles = new HashSet<>();
 
-	@Column(name = "date_joined", nullable = false)
-	private Instant dateJoined = Instant.now();
+	@Column(name = "created_at", nullable = false)
+	private Instant createdAt = Instant.now();
 
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "managed_club_id")
-	private Club managedClub;
+	public boolean hasRole(RoleName roleName) {
+		return roles.stream().anyMatch(r -> r.getName().equals(roleName.name()));
+	}
+
+	public List<String> getRoleNames() {
+		return roles.stream().map(Role::getName).sorted().toList();
+	}
 
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
-		return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+		return roles.stream()
+				.map(role -> new SimpleGrantedAuthority(role.getName()))
+				.toList();
 	}
 
 	@Override

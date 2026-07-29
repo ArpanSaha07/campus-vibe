@@ -42,29 +42,69 @@ export type Club = {
     // clubcategories: string[];
 };
 
+// Mirrors backend RBAC (see .claude/user-roles.md and com.campusvibe.user.UserDTO).
+// One User interface for all roles — role-specific data comes from separate endpoints.
+export enum Role {
+  USER = "ROLE_USER",
+  CLUB_ADMIN = "ROLE_CLUB_ADMIN",
+  ADMIN = "ROLE_ADMIN",
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
-  password: string;
-  role: 'regularUser' | 'clubAdmin' | 'admin';
-  dateJoined: Date;
-};
-
-export interface Admin extends User {
-  role: 'admin';
+  roles: Role[];
+  createdAt: string; // ISO-8601 instant from the backend
 }
 
-export interface ClubAdmin extends User {
-  role: 'clubAdmin';
-  managedClub: Club["clubId"];
+export interface AuthResponse {
+  token: string;
+  user: User;
 }
 
-export interface RegularUser extends User {
-  role: 'regularUser';
-  followedClubs: Club["clubId"][];
-  savedEvents: EventInstance["eventId"][];
-  preferredCategories: string[];
+// Raw backend DTO shapes (com.campusvibe.event.EventDTO / club.ClubDTO).
+// Adapt to EventInstance/Club via app/lib/adapters before rendering.
+export interface ApiEvent {
+  id: number;
+  title: string;
+  description: string | null;
+  dateTime: string;
+  createdAt: string;
+  location: string | null;
+  price: string | null;
+  organizerId: string;
+  followers: number;
+  images: string[];
+  promoted: boolean;
+  capacity: number | null;
+  registered: number;
+  categories: string[];
+}
+
+export interface ApiClub {
+  id: string;
+  name: string;
+  description: string | null;
+  followers: number;
+  logo: string | null;
+  socialLinks: string | null;
+  featured: boolean;
+  images: string[];
+  createdAt: string;
+}
+
+export interface ClubAdminRequest {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  clubId: string;
+  clubName: string;
+  message: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
+  reviewedAt: string | null;
 }
 
 // Page Types

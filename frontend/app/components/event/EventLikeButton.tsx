@@ -1,26 +1,39 @@
 "use client";
 import { useState } from "react";
+import { useAuth } from "@/app/lib/auth-context";
 import { saveEvent, unsaveEvent } from "@/app/lib/event";
 import { EventInstance } from "@/app/types";
 
-export default function EventFollowButton({ event }: { event: EventInstance }) {
+// Only the event id is needed, so a full EventInstance (as passed by EventCard)
+// or a lightweight { eventId } object (as passed by the event page) both work.
+export default function EventLikeButton({ event }: { event: Pick<EventInstance, "eventId"> }) {
+  const { isAuthenticated } = useAuth();
   const [isSaved, setIsSaved] = useState(false);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
+    if (!isAuthenticated) {
+      alert("Please log in to like events.");
+      return;
+    }
     e.preventDefault();
-    const newSavedState = !isSaved;
-    setIsSaved(newSavedState);
-    if (newSavedState) {
-      saveEvent(event.eventId);
-    } else {
-      unsaveEvent(event.eventId);
+    const next = !isSaved;
+    setIsSaved(next); // optimistic
+    try {
+      if (next) {
+        await saveEvent(event.eventId);
+      } else {
+        await unsaveEvent(event.eventId);
+      }
+    } catch {
+      setIsSaved(!next); // revert if the request fails
     }
   };
 
   return (
     <span data-spec="icon-button">
       <button
-        aria-label="Save"
+        aria-label={isSaved ? "Unlike" : "Like"}
+        aria-pressed={isSaved}
         className="p-2 rounded-full bg-white cursor-pointer"
         onClick={handleClick}
       >
@@ -28,8 +41,8 @@ export default function EventFollowButton({ event }: { event: EventInstance }) {
           fill={isSaved ? "red" : "#444444"}
           stroke={isSaved ? "darkred" : "none"}
           strokeWidth={isSaved ? "1" : "0"}
-          width="20px"
-          height="20px"
+          width="25px"
+          height="25px"
           viewBox="0 0 24 24"
         >
           <path
