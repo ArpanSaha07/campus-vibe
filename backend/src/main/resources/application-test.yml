@@ -2,10 +2,6 @@ aws:
   s3:
     mock: true
 
-openai:
-  # Never call the real OpenAI API from tests, even if OPENAI_API_KEY is set
-  api-key: ""
-
 spring:
   datasource:
     # PostgreSQL compatibility mode so entity DDL (TEXT columns) works on H2
@@ -13,7 +9,11 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  h2:
+    console:
+      enabled: true
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
     show-sql: false
