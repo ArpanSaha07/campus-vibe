@@ -58,7 +58,7 @@ For local development, expect the key to be supplied through:
 ```env
 OPENAI_API_KEY=replace-with-local-key
 ```
-
+```
 The `.env` file must be ignored by Git.
 
 Ensure `.gitignore` includes:
@@ -570,5 +570,3 @@ An AI feature is complete only when:
 * tests do not require a real API key
 * `.env.example` documents required variables
 * no secret appears in Git changes
-
-```

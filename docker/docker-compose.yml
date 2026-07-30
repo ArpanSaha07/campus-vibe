@@ -1,19 +1,23 @@
-version: '3.8'
+# Values come from docker/.env, which Compose loads automatically because it
+# sits beside this file. Copy .env.example to .env to get started.
+#
+#   ${VAR:?msg}  required — Compose refuses to start if unset
+#   ${VAR:-}     optional — empty is a supported mode
 services:
   db:
     # postgres:15 + pgvector extension, needed for hybrid semantic search (V8 migration)
     image: pgvector/pgvector:pg15
     container_name: campusvibe-db
     environment:
-      POSTGRES_DB: campusvibe
-      POSTGRES_USER: arpan
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB:-campusvibe}
+      POSTGRES_USER: ${POSTGRES_USER:-arpan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in docker/.env}
     ports:
       - "5332:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U arpan"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arpan}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,27 +36,36 @@ services:
       dockerfile: backend/Dockerfile
     container_name: campusvibe-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/campusvibe
-      SPRING_DATASOURCE_USERNAME: arpan
-      SPRING_DATASOURCE_PASSWORD: password
-      AWS_S3_MOCK: "true"
-      AWS_REGION: us-east-2
-      AWS_S3_BUCKET_CLUBS: campusvibe-clubs
-      AWS_S3_BUCKET_EVENTS: campusvibe-events
-      AWS_S3_BUCKET_USER: campusvibe-user
-    volumes:
-      - ../backend:/app
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-campusvibe}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-arpan}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in docker/.env}
 
-  # GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     s3:
-  #       condition: service_started
-  #   volumes:
-  #     - ../backend:/app
+      # Required: the app refuses to start without a >=32-byte secret.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in docker/.env (openssl rand -hex 32)}
+
+      # Optional: blank runs search in keyword-only mode with no OpenAI calls.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com}
+      OPENAI_CONNECT_TIMEOUT: ${OPENAI_CONNECT_TIMEOUT:-2s}
+      OPENAI_READ_TIMEOUT: ${OPENAI_READ_TIMEOUT:-10s}
+      OPENAI_MAX_RETRIES: ${OPENAI_MAX_RETRIES:-2}
+
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+
+      # No AWS credentials here: the SDK's default provider chain resolves an
+      # IAM role in production and your local profile in development.
+      AWS_S3_MOCK: ${AWS_S3_MOCK:-true}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET_CLUBS: ${AWS_S3_BUCKET_CLUBS:-campusvibe-clubs}
+      AWS_S3_BUCKET_EVENTS: ${AWS_S3_BUCKET_EVENTS:-campusvibe-events}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    # No source bind-mount: the image runs a packaged jar at /app/app.jar, and
+    # mounting ../backend over /app hides it.
 
   frontend:
     build:
@@ -60,14 +73,13 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: campusvibe-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     ports:
       - "3000:3000"
-    # depends_on:
-    #   - backend
-    volumes:
-      - ../frontend:/app
+    depends_on:
+      - backend
+    # No source bind-mount: it would hide the built .next and node_modules.
 
 volumes:
   db_data:

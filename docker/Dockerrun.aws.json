@@ -1,24 +1,24 @@
 {
-  "AWSEBDockerrunVersion": 2,
-  "containerDefinitions": [
+  "_comment": [
+    "Single-container Docker platform (Dockerrun v1). This was previously v2",
+    "(multi-container/ECS), where Elastic Beanstalk environment properties are",
+    "NOT injected into containers - values had to be hardcoded in the",
+    "containerDefinitions environment array, which is why a plaintext database",
+    "password was committed here. On v1, EB environment properties are injected",
+    "as real OS environment variables and Spring reads them natively, so no",
+    "secret needs to live in this file. The v2 multi-container platform is also",
+    "retired. Configure all environment properties in the EB console - see",
+    "EB-DEPLOYMENT.md."
+  ],
+  "AWSEBDockerrunVersion": "1",
+  "Image": {
+    "Name": "<your-backend-image>:latest",
+    "Update": "true"
+  },
+  "Ports": [
     {
-      "name": "backend",
-      "image": "<your-backend-image>:latest",
-      "essential": true,
-      "memory": 1024,
-      "portMappings": [
-        { "containerPort": 8080, "hostPort": 8080 }
-      ],
-      "environment": [
-        { "name": "SPRING_DATASOURCE_URL", "value": "jdbc:postgresql://<rds-endpoint>:5432/campusvibe" },
-        { "name": "SPRING_DATASOURCE_USERNAME", "value": "arpan" },
-        { "name": "SPRING_DATASOURCE_PASSWORD", "value": "password" },
-        { "name": "AWS_REGION", "value": "us-east-1" },
-        { "name": "AWS_S3_BUCKET_CLUBS", "value": "campusvibe-clubs" },
-        { "name": "AWS_S3_BUCKET_EVENTS", "value": "campusvibe-events" },
-        { "name": "AWS_S3_BUCKET_CUSTOMER", "value": "campusvibe-customer" },
-        { "name": "GOOGLE_CLIENT_ID", "value": "<your-google-client-id>" }
-      ]
+      "ContainerPort": 8080,
+      "HostPort": 80
     }
   ]
 }

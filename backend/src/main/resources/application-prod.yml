@@ -1,0 +1,30 @@
+# Production overrides. NON-SECRET VALUES ONLY.
+#
+# Secrets (JWT_SECRET, SPRING_DATASOURCE_PASSWORD, OPENAI_API_KEY) arrive as
+# Elastic Beanstalk environment properties and are read by the placeholders in
+# application.yml. Never add a secret to this file — it is committed.
+
+server:
+  error:
+    # application.yml uses "always" for local debugging; exception messages
+    # must not be returned to clients in production.
+    include-message: never
+
+spring:
+  jpa:
+    # Logging every statement in production is noise and can echo user data.
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+aws:
+  s3:
+    # Use real S3; credentials come from the instance IAM role via the AWS
+    # default credential provider chain (see s3/S3Config.java).
+    mock: false
+
+logging:
+  level:
+    root: INFO
+    com.campusvibe: INFO
