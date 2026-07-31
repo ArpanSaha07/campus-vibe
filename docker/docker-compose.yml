@@ -17,7 +17,10 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arpan}"]
+      # -d is required: without it pg_isready defaults the dbname to the
+      # username, and the failed connect logs "FATAL: database ... does not
+      # exist" every interval even though the check itself passes.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-arpan} -d ${POSTGRES_DB:-campusvibe}"]
       interval: 10s
       timeout: 5s
       retries: 5
