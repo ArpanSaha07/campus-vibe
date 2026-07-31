@@ -1,4 +1,3 @@
-````markdown
 # LLM API Key Management & AI Architecture Guide
 
 ## Purpose
@@ -707,4 +706,3 @@ CampusVibe will follow these principles:
 - Protect AI endpoints with authentication, authorization, validation, and rate limiting.
 - Log operational metrics while never exposing API keys or sensitive user data.
 - Keep all AI configuration externalized through environment variables for flexibility across development and production environments.
-```
