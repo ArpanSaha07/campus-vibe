@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-07-30** · Branch: `llm-api-integration`
+Last updated: **2026-07-31** · Branch: `llm-api-integration`
 
 Priorities: **P0** blocking / broken · **P1** next up · **P2** planned · **P3** backlog
 Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
@@ -15,6 +15,7 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 3. **P0** — Fix semantic search returning 0 results ([BUG-001](../bugs/bugs.md#bug-001)).
 4. **P1** — Step 6 of the LLM key work: query-embedding cache + rate limiting ([BUG-005](../bugs/bugs.md#bug-005)).
 5. **P1** — Decide JWT transport (localStorage vs httpOnly cookie) and fix route protection ([BUG-003](../bugs/bugs.md#bug-003)).
+6. **P1** — [`dev` profile → admin bootstrap](#database-lifecycle--seeding), in that order. Small, and together they unblock `/search/reindex` and the whole Admin Dashboard track.
 
 ---
 
@@ -64,6 +65,22 @@ Architecture reference: [`.claude/docs/architecture/llm-api-key-management.md`](
 - [ ] **P3** Candidate generative features once the layer exists: event summarisation, event description generation, recommendations, moderation assistance.
 - [ ] **P3** Multi-provider support (`AnthropicLlmClient`, etc.) — do not add before a feature requires it.
 
+## Database Lifecycle & Seeding
+
+Reference: [`.claude/skills/database-lifecycle/PLAN.md`](../skills/database-lifecycle/PLAN.md) (audit + implementation sequence) · [`SKILL.md`](../skills/database-lifecycle/SKILL.md) (rules)
+
+Ordered — each task unblocks the ones below it. *(Step N)* maps to PLAN.md's
+Implementation Sequence.
+
+- [ ] **P1** *(Step 1)* **Create the `dev` profile.** Smallest task here, and it gates every other one: a `@Profile("dev")` seeder written before this exists compiles, deploys, and silently never runs — no error. Add `backend/src/main/resources/application-dev.yml`; add `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}` to the `backend` service in `docker-compose.yml`; add the var to `docker/.env.example`. Verify the banner logs `The following 1 profile is active: "dev"`, and that `application-test.yml` never pulls it in.
+- [ ] **P1** *(Step 2)* **Admin bootstrap runner.** There is currently **no admin account in the system** — the single user holds `ROLE_USER` only. This blocks `POST /api/v1/search/reindex` (`@PreAuthorize("hasRole('ADMIN')")`) and every Admin Dashboard endpoint listed under Backend / Features. Add `bootstrap/BootstrapProperties.java` + `bootstrap/AdminBootstrapRunner.java` as an `ApplicationRunner` — never `@PostConstruct`, which can race Flyway on a cold start. Must support **promote-existing-user** as the primary mode: OAuth accounts have no password to hash. Grant idempotently (`user_roles` PK is `(user_id, role_id)` → `ON CONFLICT DO NOTHING`); never revoke. Add `APP_BOOTSTRAP_ADMIN_{ENABLED,EMAIL,PASSWORD}` to compose, `.env.example` (blank / `false`), and `.env`.
+- [ ] **P1** **Backfill club embeddings.** All 8 clubs have `embedding IS NULL`, so the semantic half of club search cannot match anything — only the keyword path works today. A single `POST /api/v1/search/reindex` once an admin exists. Distinct from [BUG-001](../bugs/bugs.md#bug-001) (events, repository-level) but the symptoms look identical, so confirm embeddings are non-null *before* debugging ranking.
+- [ ] **P2** *(Step 3)* **Dev seeder** (`seed/DevDataSeeder.java`). `@Profile("dev")`, idempotent — skip when clubs already exist. Port the 8 clubs out of V6 and create them **through the service layer** so `SearchIndexService` populates `clubs.embedding` on write; that is precisely why a programmatic seeder is mandated over seed SQL. Verify with `docker compose down -v && docker compose up -d`, then `count(embedding) = count(*)` on `clubs`.
+- [ ] **P2** *(Step 4)* **Retire `V6__insert_mock_clubs.sql`.** Only after the seeder reproduces the same data. Do **not** delete the file — Flyway aborts with `Detected applied migration not resolved locally: 6` and the app will not boot. Supersede it with `V9__remove_mock_club_seed_data.sql`. Locally `docker compose down -v` is cleaner; ship V9 only if V6 ever reached another environment.
+- [ ] **P2** **Tests** — migrations apply from an empty schema; bootstrap is idempotent across two runs, promotes an existing non-admin, refuses to create a password-less account, and never revokes; the seeder creates no duplicates and does not run under `test` or `prod`.
+- [ ] **P2** *(Step 5)* **Production posture** — before the first EB deploy: `SPRING_PROFILES_ACTIVE=prod` so `DevDataSeeder` cannot run, and `APP_BOOTSTRAP_ADMIN_ENABLED=false` once the admin exists.
+- [ ] **P3** **Keep reference data out of schema migrations.** `V7__multi_role_rbac.sql` creates the RBAC tables *and* inserts the three role rows. It is applied, so leave it alone — but split the two concerns in every migration from here on.
+
 ## Infrastructure & CI/CD
 
 - [ ] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
@@ -87,6 +104,14 @@ Architecture reference: [`.claude/docs/architecture/llm-api-key-management.md`](
 ---
 
 ## Recently completed
+
+**2026-07-31 — Postgres healthcheck fix + database-lifecycle standards.**
+
+- `docker-compose.yml` healthcheck ran `pg_isready -U arpan` with no `-d`, so it defaulted the dbname to the *username* and logged `FATAL: database "arpan" does not exist` every 10s. The check still passed — a FATAL reply proves the server is listening — so the container reported `healthy` while spamming errors. Added `-d ${POSTGRES_DB:-campusvibe}`. Verified: 0 FATAL lines across multiple cycles, `db_data` volume and all rows intact.
+- `.claude/skills/database-lifecycle/SKILL.md` had **no YAML frontmatter**, so the skill never loaded and none of its rules were ever enforced. Added `name`/`description`, then trimmed 622 → 318 lines (presentation only; no rules dropped).
+- Corrected both files against the actual repo: migration path is `db/migrations` (**plural**, pinned by `application.yml:26`) not `db/migration`; dropped the `_FIRST_NAME`/`_LAST_NAME` bootstrap vars that do not map to the single `name` column; rewrote admin bootstrap around **promoting an existing user**, since the create-and-hash flow does not fit OAuth accounts.
+- Added rules that were missing: never delete an applied migration (with the exact `Detected applied migration not resolved locally` failure and the four recovery options), derived-column ownership for `clubs.embedding` / `events.embedding`, and a Known Deviations table recording V6, V7, and the absent `dev` profile.
+- `PLAN.md` gained a measured Current State audit and a 5-step implementation sequence, each step with its own verification — now tracked under [Database Lifecycle & Seeding](#database-lifecycle--seeding).
 
 **2026-07-30 — LLM API key management (Steps 1-5).** Same build artifact runs
 unchanged in local dev (`docker/.env`) and Elastic Beanstalk (environment
