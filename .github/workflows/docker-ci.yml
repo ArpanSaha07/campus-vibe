@@ -1,0 +1,197 @@
+name: Docker CI - Build & Run Stack
+
+# Boots the full compose stack (Postgres + backend + frontend) and asserts it
+# actually serves traffic. This is the only workflow that exercises the
+# Dockerfiles, the compose wiring, and the container-to-container networking.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker/**'
+      - '.github/workflows/docker-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker/**'
+      - '.github/workflows/docker-ci.yml'
+
+concurrency:
+  group: docker-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-up:
+    name: Build images and run the stack
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # docker/.env is gitignored, so at this point it does not exist. Compose
+      # marks POSTGRES_PASSWORD and JWT_SECRET with `:?`, so it must refuse to
+      # produce a config at all. This asserts the fail-fast guard still works —
+      # a regression here would let an environment start with no JWT secret.
+      - name: Verify compose refuses to start without required secrets
+        working-directory: ./docker
+        run: |
+          set -uo pipefail
+          if [ -f .env ]; then
+            echo "::error::docker/.env is committed. It must stay gitignored."
+            exit 1
+          fi
+
+          if err=$(docker compose config 2>&1); then
+            echo "::error::compose produced a config with no secrets set; the ':?' guards are gone."
+            exit 1
+          fi
+
+          echo "$err"
+          if ! echo "$err" | grep -qiE 'POSTGRES_PASSWORD|JWT_SECRET'; then
+            echo "::error::compose failed, but not because of the required secrets."
+            exit 1
+          fi
+          echo "Fail-fast guard confirmed."
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      # backend/Dockerfile COPYs backend/target/campusvibe-*.jar rather than
+      # building inside the image, so the jar must exist before `compose build`.
+      # Tests belong to backend-ci; this job only needs the artifact.
+      - name: Build backend jar
+        working-directory: ./backend
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -DskipTests package
+
+      - name: Create docker/.env
+        working-directory: ./docker
+        run: |
+          set -euo pipefail
+          cat > .env <<EOF
+          POSTGRES_DB=campusvibe
+          POSTGRES_USER=campusvibe_ci
+          POSTGRES_PASSWORD=ci-only-password
+          JWT_SECRET=$(openssl rand -hex 32)
+          OPENAI_API_KEY=
+          GOOGLE_CLIENT_ID=
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+          NEXT_PUBLIC_API_URL=http://localhost:8080
+          AWS_REGION=us-east-1
+          AWS_S3_MOCK=true
+          AWS_S3_BUCKET_CLUBS=campusvibe-clubs
+          AWS_S3_BUCKET_EVENTS=campusvibe-events
+          EOF
+          echo "Wrote docker/.env (JWT_SECRET generated, OpenAI key left blank)."
+
+      - name: Build images
+        working-directory: ./docker
+        run: docker compose build
+
+      - name: Start the stack
+        working-directory: ./docker
+        run: docker compose up -d
+
+      # `--wait` is not used: it would mask which service failed. Waiting
+      # per-service makes the failing one obvious in the log.
+      - name: Wait for Postgres to report healthy
+        working-directory: ./docker
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' campusvibe-db 2>/dev/null || echo starting)
+            if [ "$status" = "healthy" ]; then
+              echo "Postgres healthy."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Postgres never became healthy."
+          docker compose ps
+          exit 1
+
+      - name: Wait for the backend
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
+              echo "Backend UP — Flyway ran and the schema validated inside the container."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Backend never became healthy."
+          exit 1
+
+      - name: Wait for the frontend
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://localhost:3000 2>/dev/null; then
+              echo "Frontend responding."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Frontend never responded on :3000."
+          exit 1
+
+      - name: Smoke test the API
+        run: |
+          set -euo pipefail
+
+          echo "--- GET /ping ---"
+          curl -fsS http://localhost:8080/ping && echo
+
+          # Public endpoint backed by real data, so this proves the backend
+          # reached Postgres over the compose network rather than merely
+          # starting. Asserts non-empty rather than a fixed count, because the
+          # seed source is planned to move from V6 into a dev seeder.
+          echo "--- GET /api/v1/clubs ---"
+          body=$(curl -fsS http://localhost:8080/api/v1/clubs)
+          count=$(echo "$body" | jq 'length')
+          echo "clubs returned: $count"
+          if [ "$count" -lt 1 ]; then
+            echo "::error::/api/v1/clubs returned an empty list; the backend is not reading seeded data."
+            exit 1
+          fi
+
+          echo "--- GET /api/v1/clubs/search?q=coding ---"
+          curl -fsS "http://localhost:8080/api/v1/clubs/search?q=coding" | jq 'length'
+
+          # Unauthenticated access to a protected route must be rejected.
+          echo "--- GET /api/v1/clubs/my-club (expect 401/403) ---"
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/v1/clubs/my-club)
+          echo "status: $code"
+          if [ "$code" != "401" ] && [ "$code" != "403" ]; then
+            echo "::error::Protected endpoint returned $code for an unauthenticated request."
+            exit 1
+          fi
+
+      - name: Dump container logs
+        if: failure()
+        working-directory: ./docker
+        run: |
+          docker compose ps
+          echo "=================== db ==================="
+          docker compose logs db --tail 100
+          echo "================= backend ================"
+          docker compose logs backend --tail 200
+          echo "================ frontend ================"
+          docker compose logs frontend --tail 100
+
+      - name: Tear down
+        if: always()
+        working-directory: ./docker
+        run: docker compose down -v --remove-orphans

@@ -1,4 +1,4 @@
-name: Frontend CI - Check All Pages
+name: Frontend CI - Lint, Test & Build
 
 on:
   workflow_dispatch:
@@ -7,41 +7,68 @@ on:
       - main
       - frontend
     paths:
-      - frontend/**
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  check-pages:
+  verify:
+    name: Lint, type-check, test and build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js app
+      # Each check runs even if an earlier one failed, so a single push reports
+      # every problem at once instead of one per re-run.
+
+      # NON-BLOCKING for now. The tree currently has 5 pre-existing eslint
+      # errors (no-explicit-any x4, ban-ts-comment x1) plus 15 warnings, none
+      # introduced by this workflow. Blocking on them would make every PR red
+      # for reasons unrelated to its change, which trains people to ignore CI.
+      # Fix those 5, then delete this line so lint gates merges.
+      - name: Lint
+        if: '!cancelled()'
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Type check
+        if: '!cancelled()'
+        run: npm run type-check
+
+      # The suite under frontend/app/__tests__ (React Testing Library + Jest).
+      # --ci makes snapshot mismatches fail rather than silently rewrite.
+      - name: Unit tests
+        if: '!cancelled()'
+        run: npm test -- --ci
+
+      # NEXT_PUBLIC_* values are inlined at build time. They are set here only
+      # so the build is deterministic in CI; the real Docker build passes them
+      # as build args. (BUG-004)
+      - name: Build
+        if: '!cancelled()'
         run: npm run build
-
-      - name: Start Next.js app in background
-        run: |
-          npm run start &
-          sleep 10
-
-      # No tests are defined for Playwright yet, but here are some ideas for future checks:
-      # - name: Install Playwright
-      #   run: npx playwright install --with-deps
-
-      # - name: Run Playwright page checks
-      #   run: npx playwright test
-
-      # Optionally, you can use a simple crawler like linkinator for basic checks:
-      # - name: Check all links with linkinator
-      #   run: npx linkinator http://localhost:3000 --silent
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8080
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ''

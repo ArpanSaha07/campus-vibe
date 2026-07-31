@@ -1,4 +1,4 @@
-name: Backend CI - Build Backend
+name: Backend CI - Build & Test
 
 on:
   workflow_dispatch:
@@ -8,26 +8,64 @@ on:
       - backend
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-test:
+    name: Build and run backend tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # Must match backend/pom.xml <java.version> and backend/Dockerfile.
+      # JDK 17 cannot compile this project at all. (BUG-002)
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '25'
+          cache: 'maven'
 
-      - name: Build backend (skip tests)
-        run: |
-          cd backend
-          chmod +x mvnw
-          ./mvnw -q -DskipTests package
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
+      # `verify` runs the full surefire suite. Tests are deliberately NOT
+      # skipped: skipping them is what let a non-compiling merge and a failing
+      # search test reach the branch unnoticed. SearchIntegrationTest starts a
+      # pgvector container through Testcontainers, which works because
+      # ubuntu-latest ships a running Docker daemon. Every other test uses
+      # in-memory H2 and needs nothing external.
+      - name: Build and test
+        run: ./mvnw -B verify
+
+      # Uploaded even on failure — otherwise the only way to see which
+      # assertion broke is to reproduce the whole run locally.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/campusvibe-*.jar
+          if-no-files-found: error
+          retention-days: 7

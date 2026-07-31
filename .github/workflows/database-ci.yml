@@ -1,0 +1,275 @@
+name: Database CI - Flyway Migrations
+
+# Guards the rules in .claude/skills/database-lifecycle/SKILL.md.
+#
+# Why this workflow exists separately from backend-ci:
+# the backend test suite runs on in-memory H2 with `ddl-auto: create-drop` and
+# `flyway.enabled: false` (application-test.yml), so Hibernate builds the schema
+# from the entities and the migrations are never executed. Only
+# SearchIntegrationTest touches real Postgres. That means a migration could be
+# malformed, out of order, or drifted from the entities and the whole backend
+# suite would still pass. This workflow runs the migrations for real.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - backend
+    paths:
+      - 'backend/src/main/resources/db/migrations/**'
+      - 'backend/src/main/java/**'
+      - 'backend/pom.xml'
+      - '.github/workflows/database-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/src/main/resources/db/migrations/**'
+      - 'backend/src/main/java/**'
+      - 'backend/pom.xml'
+      - '.github/workflows/database-ci.yml'
+
+concurrency:
+  group: database-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MIGRATIONS_DIR: backend/src/main/resources/db/migrations
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Fast, no database. Catches convention breaches before spending 3 minutes on
+  # a Maven build.
+  # ---------------------------------------------------------------------------
+  lint-migrations:
+    name: Lint migration files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check naming, versioning and forbidden content
+        run: |
+          set -uo pipefail
+          failed=0
+
+          if [ ! -d "$MIGRATIONS_DIR" ]; then
+            echo "::error::Migrations directory not found: $MIGRATIONS_DIR"
+            echo "Flyway is pinned to classpath:db/migrations (PLURAL) in application.yml."
+            exit 1
+          fi
+
+          echo "--- Migration files ---"
+          ls -1 "$MIGRATIONS_DIR"
+          echo
+
+          # Rule: V<version>__<snake_case_description>.sql
+          for f in "$MIGRATIONS_DIR"/*.sql; do
+            base=$(basename "$f")
+            if ! echo "$base" | grep -Eq '^V[0-9]+__[a-z0-9_]+\.sql$'; then
+              echo "::error file=$f::Bad migration name '$base'. Expected V<n>__<snake_case>.sql"
+              failed=1
+            fi
+          done
+
+          # Rule: never reuse a version number. Flyway refuses to start on a
+          # duplicate, but the error only appears at runtime.
+          dupes=$(ls -1 "$MIGRATIONS_DIR"/*.sql \
+            | xargs -n1 basename \
+            | sed -E 's/^V([0-9]+)__.*/\1/' \
+            | sort | uniq -d)
+          if [ -n "$dupes" ]; then
+            echo "::error::Duplicate migration version(s): $dupes"
+            failed=1
+          fi
+
+          # Rule: no personal data or secrets in migrations. A migration runs in
+          # EVERY environment including production, and is immutable once
+          # applied, so anything committed here is permanent.
+          if grep -rniE '[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}' "$MIGRATIONS_DIR" \
+               | grep -viE '@campus\.(com|edu)' ; then
+            echo "::error::Real-looking email address found in a migration."
+            echo "Personal accounts are bootstrapped from environment variables, never seeded in SQL."
+            failed=1
+          fi
+
+          if grep -rniE "(password|secret|api[_-]?key|token)\s*(=|:)\s*['\"][^'\"]{6,}" "$MIGRATIONS_DIR"; then
+            echo "::error::Possible secret literal in a migration."
+            failed=1
+          fi
+
+          # Advisory only: user rows belong to sign-up / OAuth / the bootstrap
+          # runner, never to Flyway.
+          if grep -rniE 'INSERT\s+INTO\s+users' "$MIGRATIONS_DIR"; then
+            echo "::warning::A migration inserts into users. User accounts must not be seeded through Flyway."
+          fi
+
+          if [ "$failed" -ne 0 ]; then
+            echo "Migration lint failed."
+            exit 1
+          fi
+          echo "Migration lint passed."
+
+  # ---------------------------------------------------------------------------
+  # Applies the migrations for real, against the same image used in dev and
+  # compose (pgvector is required by V8).
+  # ---------------------------------------------------------------------------
+  migrate:
+    name: Apply migrations to a clean database
+    runs-on: ubuntu-latest
+    needs: lint-migrations
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_DB: campusvibe
+          POSTGRES_USER: campusvibe_ci
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U campusvibe_ci -d campusvibe"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/campusvibe
+      SPRING_DATASOURCE_USERNAME: campusvibe_ci
+      SPRING_DATASOURCE_PASSWORD: ci-only-password
+      # Required by JWTUtil (>=32 bytes) or the context refuses to start.
+      # CI-only throwaway value; never used to sign anything real.
+      JWT_SECRET: ci-only-secret-0123456789-0123456789-0123456789
+      OPENAI_API_KEY: ''
+      PGPASSWORD: ci-only-password
+      PSQL: psql -h localhost -U campusvibe_ci -d campusvibe -tA
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Ensure psql is available
+        run: |
+          command -v psql >/dev/null 2>&1 || {
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          }
+          psql --version
+
+      # Tests are backend-ci's responsibility; this job only needs the artifact.
+      - name: Build jar
+        working-directory: ./backend
+        run: |
+          chmod +x mvnw
+          ./mvnw -B -DskipTests package
+
+      # Booting the real application is a deliberate choice over invoking the
+      # Flyway CLI: it exercises the exact code path production uses, and
+      # because application.yml sets `ddl-auto: validate`, a successful start
+      # ALSO proves the JPA entities still match the migrated schema. A
+      # migration that adds a column the entity lacks — or an entity field with
+      # no migration behind it — fails here. Nothing else in CI catches that
+      # drift, since the H2 tests generate their schema from the entities.
+      - name: Apply migrations to an empty schema
+        run: |
+          set -euo pipefail
+          jar=$(ls backend/target/campusvibe-*.jar | head -1)
+          echo "Booting $jar against an empty database..."
+          java -jar "$jar" > boot-1.log 2>&1 &
+          pid=$!
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
+              echo "Application is UP — migrations applied and entities validated."
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+              exit 0
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "::error::Application exited before becoming healthy."
+              tail -80 boot-1.log
+              exit 1
+            fi
+            sleep 3
+          done
+
+          echo "::error::Timed out waiting for the application to become healthy."
+          tail -80 boot-1.log
+          kill "$pid" 2>/dev/null || true
+          exit 1
+
+      - name: Verify migration history
+        run: |
+          set -euo pipefail
+          expected=$(ls -1 "$MIGRATIONS_DIR"/*.sql | wc -l | tr -d ' ')
+          applied=$($PSQL -c "SELECT count(*) FROM flyway_schema_history WHERE success;")
+          failedrows=$($PSQL -c "SELECT count(*) FROM flyway_schema_history WHERE NOT success;")
+
+          echo "Migration files: $expected"
+          echo "Applied OK:      $applied"
+          echo "Failed:          $failedrows"
+          echo
+          $PSQL -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
+
+          if [ "$failedrows" != "0" ]; then
+            echo "::error::$failedrows migration(s) recorded as failed."
+            exit 1
+          fi
+          if [ "$applied" != "$expected" ]; then
+            echo "::error::Expected $expected applied migrations but found $applied."
+            exit 1
+          fi
+
+      # Second boot against the already-migrated database. Proves two things:
+      # migrations are not re-applied, and every checksum still matches
+      # (application.yml sets validate-on-migrate: true, so an edited migration
+      # that has already run fails startup here rather than in production).
+      - name: Re-run against the migrated schema
+        run: |
+          set -euo pipefail
+          before=$($PSQL -c "SELECT count(*) FROM flyway_schema_history;")
+          jar=$(ls backend/target/campusvibe-*.jar | head -1)
+          java -jar "$jar" > boot-2.log 2>&1 &
+          pid=$!
+
+          healthy=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
+              healthy=1
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            sleep 3
+          done
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+
+          if [ "$healthy" -ne 1 ]; then
+            echo "::error::Second boot failed. Usually means an already-applied migration was edited (checksum mismatch)."
+            tail -80 boot-2.log
+            exit 1
+          fi
+
+          after=$($PSQL -c "SELECT count(*) FROM flyway_schema_history;")
+          if [ "$before" != "$after" ]; then
+            echo "::error::History changed on re-run ($before -> $after). Migrations are not idempotent."
+            exit 1
+          fi
+          echo "Re-run clean: $after migrations, none re-applied, all checksums valid."
+
+      - name: Upload boot logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-ci-boot-logs
+          path: boot-*.log
+          if-no-files-found: ignore
+          retention-days: 7

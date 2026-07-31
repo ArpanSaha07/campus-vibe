@@ -21,7 +21,7 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 ## P0 — Blocking
 
-- [ ] **Backend CI cannot pass.** `backend-ci.yml` sets up JDK 17; the project needs Java 25. Also runs `-DskipTests`, so no backend test has ever run in CI — which is why a non-compiling merge and a failing search test both slipped through. Fix the JDK, then drop `-DskipTests`. ([BUG-002](../bugs/bugs.md#bug-002))
+- [x] **Backend CI cannot pass.** `backend-ci.yml` sets up JDK 17; the project needs Java 25. Also runs `-DskipTests`, so no backend test has ever run in CI — which is why a non-compiling merge and a failing search test both slipped through. Fix the JDK, then drop `-DskipTests`. ([BUG-002](../bugs/bugs.md#bug-002)) — **workflow rewritten on `ci/github-actions`; JDK 25 + `./mvnw -B verify`. Unverified until it runs on GitHub, and the first run is expected to fail on BUG-001 (below), which is the correct signal.**
 - [ ] **Semantic search returns nothing for meaning-only matches.** Pre-existing; 1 of 40 tests failing. Embedding *writes* are proven fine, so the fault is in `SearchRepository.hybridSearchEventIds`. ([BUG-001](../bugs/bugs.md#bug-001))
 
 ---
@@ -83,8 +83,12 @@ Implementation Sequence.
 
 ## Infrastructure & CI/CD
 
-- [ ] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
+- [x] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
+- [ ] **P1** **Push `ci/github-actions` and confirm the four workflows go green.** None of them has ever executed on GitHub; everything below assumes a first real run. Expect backend-ci to fail on [BUG-001](../bugs/bugs.md#bug-001) until that is fixed.
+- [ ] **P1** **Fix the 5 pre-existing eslint errors** (`no-explicit-any` ×4, `ban-ts-comment` ×1 — see `app/lib/api.tsx`), then delete `continue-on-error: true` from the Lint step in `frontend-ci.yml` so lint actually gates merges. 15 warnings can follow later.
 - [ ] **P1** Implement `.ci/build-publish.sh` (currently a 0-byte file) and enable the frontend CD job (`frontend-cd.yml:14` is `if: false`). ([BUG-008](../bugs/bugs.md#bug-008))
+- [ ] **P2** Add branch-protection rules on `main` requiring backend-ci, frontend-ci, database-ci and docker-ci to pass. The workflows are only a gate once GitHub enforces them.
+- [ ] **P2** Extend `database-ci.yml` once the dev seeder lands: assert `DevDataSeeder` does **not** run under the `prod` profile, and that `count(embedding) = count(*)`.
 - [ ] **P1** Use **GitHub OIDC** (`aws-actions/configure-aws-credentials` with `role-to-assume`) for AWS auth in CI. Do not add long-lived `AWS_ACCESS_KEY_ID` repo secrets. No LLM key should ever enter CI.
 - [ ] **P2** First Elastic Beanstalk deployment — follow [`docker/EB-DEPLOYMENT.md`](../../docker/EB-DEPLOYMENT.md) for the environment-property list.
 - [ ] **P2** Attach an IAM instance role granting S3 access, so the default credential chain resolves in production (`s3/S3Config.java` already expects this).
@@ -104,6 +108,14 @@ Implementation Sequence.
 ---
 
 ## Recently completed
+
+**2026-07-31 — GitHub Actions CI (branch `ci/github-actions`).** Four workflows,
+all YAML-validated locally. **None has run on GitHub yet.**
+
+- **`backend-ci.yml`** rewritten — JDK 17 → 25 (matching `pom.xml` and `backend/Dockerfile`), `-DskipTests` dropped for `./mvnw -B verify`, Maven caching, surefire reports uploaded on failure, jar uploaded as an artifact. ([BUG-002](../bugs/bugs.md#bug-002))
+- **`frontend-ci.yml`** rewritten — replaced the `npm start &&  sleep 10` step, which asserted nothing and therefore could never fail, with lint + `tsc --noEmit` + Jest + build. Verified locally: type-check clean, **23/23 Jest tests pass**, lint has 5 pre-existing errors so that step is `continue-on-error` for now.
+- **`database-ci.yml`** *(new)* — the migrations were previously never executed in CI at all: the backend suite runs on H2 with `ddl-auto: create-drop` and `flyway.enabled: false`, so Hibernate builds the schema from entities and the SQL files are bypassed. Now lints migration filenames/duplicate versions/secrets/emails, then applies all 8 migrations to a clean pgvector database by booting the real jar — which, because `application.yml` sets `ddl-auto: validate`, simultaneously proves the JPA entities still match the migrated schema. A second boot proves idempotency and checksum validity.
+- **`docker-ci.yml`** *(new)* — builds the jar first (`backend/Dockerfile` COPYs `target/*.jar` rather than building in-image), then builds both images, starts the stack, waits per-service, and smoke-tests `/ping`, `/api/v1/clubs`, club search, and a 401/403 on a protected route. Also asserts compose still **refuses to start** with no `.env`, guarding the `:?` fail-fast on `POSTGRES_PASSWORD` / `JWT_SECRET` — verified locally against a copy of the compose file.
 
 **2026-07-31 — Postgres healthcheck fix + database-lifecycle standards.**
 
