@@ -152,6 +152,8 @@ In Progress:
 - Follow Next.js best practices (Server Components, dynamic routing, SSR where appropriate).
 - Prefer reusable Tailwind components over duplicated UI.
 - Follow software industry and development best practices.
+- Always read and update todo.md after completing or discovering a task.
+- Update fixed_bugs.md and bugs.md after fixing or discovering a bug.
 
 ---
 

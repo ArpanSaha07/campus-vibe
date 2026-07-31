@@ -8,6 +8,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
@@ -19,11 +20,27 @@ import static java.time.temporal.ChronoUnit.DAYS;
 @Service
 public class JWTUtil {
 
+    /** HS256 requires a key of at least 256 bits. */
+    private static final int MIN_SECRET_BYTES = 32;
+
     private final String secretKey;
     private final String issuer;
 
     public JWTUtil(@Value("${jwt.secret}") String secretKey,
                    @Value("${jwt.issuer}") String issuer) {
+        // Fail fast at startup. Booting with a weak or missing secret would
+        // silently issue forgeable tokens, which is far worse than not booting.
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET is not set. Set it in docker/.env locally, or as an "
+                            + "Elastic Beanstalk environment property in production. "
+                            + "Generate one with: openssl rand -hex 32");
+        }
+        if (secretKey.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                    ("JWT_SECRET is too short: HS256 requires at least %d bytes. "
+                            + "Generate one with: openssl rand -hex 32").formatted(MIN_SECRET_BYTES));
+        }
         this.secretKey = secretKey;
         this.issuer = issuer;
     }
@@ -78,7 +95,7 @@ public class JWTUtil {
     }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes());
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
     private boolean isTokenExpired(String jwt) {

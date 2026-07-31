@@ -48,7 +48,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * which makes semantic matching testable without OpenAI: "machine learning"
  * and "AI" land on the same dimension despite sharing no keywords.
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        // This test deliberately does not use the "test" profile (it needs Flyway
+        // and pgvector), so it supplies the same test-only secrets directly. The
+        // blank api-key guarantees no live OpenAI call even if the developer has
+        // OPENAI_API_KEY exported.
+        "jwt.secret=test-only-secret-0123456789-0123456789-0123456789",
+        "campusvibe.ai.openai.api-key="
+})
 @AutoConfigureMockMvc
 @Testcontainers
 class SearchIntegrationTest {

@@ -1,0 +1,259 @@
+# CampusVibe — Bug Log
+
+Last updated: **2026-07-30** · Branch: `llm-api-integration`
+
+Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
+(BUG-009 … BUG-012 so far). Bug ids are never reused.
+
+| ID | Severity | Summary |
+|---|---|---|
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results |
+| [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
+| [BUG-003](#bug-003) | High | Frontend route protection never executes |
+| [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
+| [BUG-005](#bug-005) | Medium | Unauthenticated search can drive unbounded OpenAI spend |
+| [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
+| [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
+| [BUG-008](#bug-008) | Low | `.ci/build-publish.sh` is empty; frontend CD is hard-disabled |
+
+---
+
+### BUG-001
+**Semantic-only search match returns 0 results** · High · OPEN
+
+**Found:** 2026-07-30, running the backend test suite during the LLM API key
+management work.
+
+**Symptom:** an event that matches a query only by *meaning* (no shared
+keywords) is not returned. The test asserts one result and receives zero:
+
+```
+java.lang.AssertionError:
+Expected: a collection with size <1>
+     but: collection size was <0>
+```
+
+**This is pre-existing, not caused by the secrets work.** Verified by building a
+git worktree at `HEAD` with *only* the duplicate-method fix
+([BUG-009](fixed_bugs.md#bug-009)) applied — the identical failure reproduces
+(7 run, 1 failure, same assertion).
+It also fails when run in isolation, so it is not test-ordering pollution.
+
+**What is ruled out:** embedding *writes* are fine.
+`reindexBackfillsMissingEmbeddingsAndRequiresAdmin` passes and asserts
+`SELECT count(*) FROM events WHERE embedding IS NOT NULL` equals 1, exercising
+the same `SearchIndexService.indexEvent` path. No `Failed to index` warning
+appears anywhere in the test log.
+
+**Likely cause:** the hybrid scoring query. With the deterministic test stub the
+"AI Networking Night" event should score roughly `0.7 × 0.77 + 0.3 × 0 ≈ 0.54`
+against a `search.min-score` of `0.2`, so the `WHERE score >= ? OR kw > 0` gate
+should admit it. Worth checking, in order:
+1. the cosine expression `1 - (e.embedding <=> CAST(? AS vector))` and whether
+   `COALESCE(..., 0)` is masking a NULL embedding at query time;
+2. JDBC parameter ordering across the two `CROSS JOIN LATERAL` blocks;
+3. `%f` interpolation of the weights via `String.formatted` — this uses the
+   default *format* locale, so a comma decimal separator would corrupt the SQL.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/search/SearchRepository.java` (`hybridSearchEventIds`, lines 38-65 — the prime suspect)
+- `backend/src/main/java/com/campusvibe/search/SearchService.java:44-52`
+- `backend/src/main/java/com/campusvibe/search/SearchIndexService.java:38-49`
+
+**Affected tests**
+- `SearchIntegrationTest.semanticSearchMatchesMeaningWithoutSharedKeywords` — **FAILING**
+- Remaining 6 tests in that class pass. Note `semanticallyClosestResultRanksFirst`
+  passes but does **not** prove semantics work: its query `chess` also matches by
+  keyword, so the keyword leg alone satisfies it.
+
+**Current suite state:** 40 tests, 39 pass, this 1 failure.
+
+---
+
+### BUG-002
+**Backend CI runs JDK 17 but the project requires Java 25** · High · OPEN
+
+**Found:** 2026-07-30, while establishing why a non-compiling `main` had a green
+history.
+
+**Symptom:** `.github/workflows/backend-ci.yml:23-27` sets up JDK 17, while
+`backend/pom.xml:33` declares `<java.version>25</java.version>` and
+`backend/Dockerfile:1` uses `eclipse-temurin:25-jdk-alpine`. The build cannot
+succeed on 17.
+
+Compounding it, line 33 runs `./mvnw -q -DskipTests package` — **backend tests
+never run in CI at all**, which is why [BUG-001](#bug-001) and
+[BUG-009](fixed_bugs.md#bug-009) both reached the branch unnoticed.
+
+**Affected files**
+- `.github/workflows/backend-ci.yml:23-27` (JDK version), `:29-33` (skipped tests)
+- `backend/pom.xml:33`, `backend/Dockerfile:1` (the versions CI must match)
+
+**Note for local work:** there is no JDK on `PATH` on the current dev machine and
+`JAVA_HOME` is unset. The only installed JDK is IntelliJ's bundled JBR 25.0.3:
+`export JAVA_HOME="C:/Program Files/JetBrains/IntelliJ IDEA 2026.2/jbr"`.
+Do not pipe `./mvnw` into `tail`/`grep` to check success — the pipeline exit code
+comes from the last command, so a failed build reports `0`.
+
+---
+
+### BUG-003
+**Frontend route protection never executes** · High · OPEN
+
+**Found:** 2026-07-30, auditing where the JWT is stored during the secrets work.
+
+**Symptom:** protected routes are not actually guarded. Three independent
+reasons, each sufficient on its own:
+
+1. **Wrong filename.** The file is `frontend/proxy.tsx`. Next.js only runs
+   `middleware.ts` at the project root. Confirmed no `middleware.*` exists
+   anywhere under `frontend/`.
+2. **Wrong export name.** It exports `export function proxy(request)`; Next.js
+   requires an export named `middleware`.
+3. **Wrong token source.** Even if it ran, `proxy.tsx:7` reads
+   `request.cookies.get('token')`, but the JWT is stored in **localStorage**
+   under `cv_jwt` (`app/lib/api.tsx:3,12`). Middleware runs on the server and
+   cannot read localStorage, so the check would always redirect.
+
+There is also a `matcher` mismatch: `protectedPaths` lists only `/dashboard`
+(line 9) while `config.matcher` covers `/create-event/:path*` too (line 23), so
+`/create-event` would invoke the guard but never be treated as protected.
+
+**Fix direction:** decide token transport first. Server-side route protection
+requires the JWT in an **httpOnly cookie**, which is also what
+`.claude/claude.md` calls for ("Persistent login using secure cookies"). Moving
+off localStorage additionally removes an XSS token-theft path. If the token stays
+in localStorage, delete `proxy.tsx` and guard client-side instead — a half-wired
+middleware is worse than none, because it looks like protection exists.
+
+**Affected files**
+- `frontend/proxy.tsx` (entire file)
+- `frontend/app/lib/api.tsx:3-18` (token storage), `:22-30` (`apiFetch` auth header)
+- Backend counterpart if switching to cookies: `com.campusvibe.jwt` / security config
+
+**Affected tests:** none — there is no test covering route protection. Add one
+with the fix.
+
+---
+
+### BUG-004
+**`NEXT_PUBLIC_*` baked in empty by the frontend Docker build** · Medium · OPEN
+
+**Found:** 2026-07-30, reviewing `docker-compose.yml` during the secrets work.
+
+**Symptom:** `frontend/Dockerfile:7` runs `npm run build` in the builder stage,
+before any environment variable is supplied. Next.js inlines `NEXT_PUBLIC_*`
+values into the client bundle **at build time**, so they are baked in as empty.
+The `environment:` block in `docker-compose.yml` sets them at *runtime*, which is
+too late for client-side reads. The containerised frontend therefore falls back
+to `http://localhost:8080` (`app/lib/api.tsx:1`) and renders the Google button's
+dev fallback (`OAuthButtons.tsx:10`).
+
+**Not a secrets issue** — both values are public by design (an API URL and a
+Google *client* id). It is a correctness issue for the containerised frontend.
+
+**Fix direction:** pass them as `ARG`/`ENV` before `npm run build` and declare
+matching `build.args` in compose.
+
+**Affected files**
+- `frontend/Dockerfile:1-7`
+- `docker/docker-compose.yml` (frontend service `environment:` → needs `build.args`)
+- `frontend/app/lib/api.tsx:1`, `frontend/app/components/auth-components/OAuthButtons.tsx:10`
+
+---
+
+### BUG-005
+**Unauthenticated search can drive unbounded OpenAI spend** · Medium · OPEN
+
+**Found:** 2026-07-30, during the LLM API key management design review.
+
+**Symptom:** `GET /api/v1/events/search` and `/api/v1/clubs/search` are public and
+issue **one OpenAI embedding call per request** (`SearchService.java:66`). The
+only throttle is a 300 ms client-side debounce
+(`frontend/app/components/SearchBar.tsx:10-11`), trivially bypassed by calling
+the API directly. There is no server-side rate limit, no query-length cap, and no
+cache of query embeddings.
+
+Document embeddings are persisted in pgvector
+(`db/migrations/V8__search_embeddings.sql:8-9`), but **query** embeddings are
+recomputed on every request, including identical repeat queries.
+
+Keeping search public is a deliberate product decision (unauthenticated users must
+be able to browse and search), which is exactly why the compensating controls are
+required rather than optional. See `.claude/skills/llm-integration/SKILL.md`
+("Rate Limiting and Quotas").
+
+**Mitigated so far:** connect/read timeouts and bounded retries were added in
+`ai/client/OpenAiEmbeddingClient.java`, and per-call token usage is now logged, so
+spend is at least observable. The rate limit and cache are still missing.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/search/SearchService.java:44-52, 65-67`
+- `backend/src/main/java/com/campusvibe/event/EventController.java:42`, `club/ClubController.java:45`
+- `backend/src/main/java/com/campusvibe/ai/client/OpenAiEmbeddingClient.java`
+
+**Affected tests:** none yet. Needs a rate-limit rejection test (expect `429`).
+
+---
+
+### BUG-006
+**Events are never re-indexed after an edit** · Low · OPEN
+
+**Found:** 2026-07-30, comparing `EventService` against
+`.claude/search-implementation.md`.
+
+**Symptom:** the design note (lines 150-177) specifies regenerating an event's
+embedding when its title, description or category changes. `EventService` indexes
+only on `create` (`:45`) and has **no update method at all**, so an edited event
+keeps a stale embedding indefinitely. `ClubService.update` does re-index
+(`:63`), so the two are inconsistent.
+
+Related: the duplicate-method merge damage ([BUG-009](fixed_bugs.md#bug-009)) removed a
+`ClubService.update` variant that omitted the re-index call — the surviving copy
+is the correct one.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/event/EventService.java` (no update path)
+- `backend/src/main/java/com/campusvibe/club/ClubService.java:51-65` (correct reference implementation)
+
+**Affected tests:** none. Add one asserting the embedding changes after an update.
+
+---
+
+### BUG-007
+**`application-test.yml` lives in `src/main/resources`** · Low · OPEN
+
+**Found:** 2026-07-30, while ensuring tests can never make live billed API calls.
+
+**Symptom:** `backend/src/main/resources/application-test.yml` is a *test* profile
+shipped inside the production jar. Because it originally declared no `openai:`
+block, it inherited `${OPENAI_API_KEY:}` from `application.yml` — meaning a
+developer with `OPENAI_API_KEY` exported would have had non-stubbed integration
+tests make **live billed calls**.
+
+**Mitigated, not fixed:** `campusvibe.ai.openai.api-key: ""` and a test-only
+`jwt.secret` were added to that file, and `SearchIntegrationTest` (which
+deliberately does not use the `test` profile, because it needs Flyway + pgvector)
+now pins both via `@SpringBootTest(properties = …)`. The file should still be
+moved to `src/test/resources` so test config cannot ship to production.
+
+**Affected files**
+- `backend/src/main/resources/application-test.yml` → should be `backend/src/test/resources/`
+- `backend/src/test/java/com/campusvibe/AbstractIntegrationTest.java:22` (`@ActiveProfiles("test")`)
+- `backend/src/test/java/com/campusvibe/search/SearchIntegrationTest.java:51-58`
+
+---
+
+### BUG-008
+**`.ci/build-publish.sh` is empty; frontend CD is hard-disabled** · Low · OPEN
+
+**Found:** 2026-07-30, auditing the deployment path.
+
+**Symptom:** `.ci/build-publish.sh` is a **0-byte file**. `frontend-cd.yml:14`
+sets `if: false` on the deploy job, and its only remaining step generates a build
+number string — there is no Vercel or AWS deploy action. So the README's claim of
+a CI/CD pipeline is aspirational; nothing deploys.
+
+**Affected files**
+- `.ci/build-publish.sh` (empty)
+- `.github/workflows/frontend-cd.yml:12-23`

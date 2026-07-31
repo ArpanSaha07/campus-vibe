@@ -9,7 +9,8 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5332/campusvibe}
     username: ${SPRING_DATASOURCE_USERNAME:arpan}
-    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    # Required — no default. See docker/.env.example.
+    password: ${SPRING_DATASOURCE_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -51,10 +52,20 @@ aws:
 google:
   clientId: ${GOOGLE_CLIENT_ID:}
 
-openai:
-  # Leave empty to run search in keyword-only mode (no OpenAI calls)
-  api-key: ${OPENAI_API_KEY:}
-  embedding-model: text-embedding-3-small
+# AI providers. Every value is externalised so the same artifact runs unchanged
+# in local dev (docker/.env) and production (Elastic Beanstalk environment
+# properties) — only the source of the values differs.
+campusvibe:
+  ai:
+    provider: openai
+    openai:
+      # OPTIONAL. Blank runs search in keyword-only mode with no OpenAI calls.
+      api-key: ${OPENAI_API_KEY:}
+      embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      connect-timeout: ${OPENAI_CONNECT_TIMEOUT:2s}
+      read-timeout: ${OPENAI_READ_TIMEOUT:10s}
+      max-retries: ${OPENAI_MAX_RETRIES:2}
 
 search:
   semantic-weight: 0.7
@@ -62,6 +73,8 @@ search:
   min-score: 0.2
 
 jwt:
-  # Dev-only default; set JWT_SECRET in any real environment (min 32 bytes for HS256).
-  secret: ${JWT_SECRET:campusvibe-dev-secret-0123456789-0123456789-0123456789}
+  # Required — no default. A committed fallback would let any environment that
+  # forgets to set this sign forgeable tokens with a publicly known key.
+  # Minimum 32 bytes for HS256; generate with: openssl rand -hex 32
+  secret: ${JWT_SECRET}
   issuer: campusvibe

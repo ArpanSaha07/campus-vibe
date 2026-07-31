@@ -2,13 +2,24 @@ aws:
   s3:
     mock: true
 
+# Test-only, non-production values. These exist so tests never depend on the
+# developer's environment: an exported OPENAI_API_KEY must not cause a test run
+# to make live billed calls, and no real JWT secret belongs on the classpath.
+campusvibe:
+  ai:
+    openai:
+      api-key: ""
+
+jwt:
+  secret: "test-only-secret-0123456789-0123456789-0123456789"
+
 spring:
   datasource:
     # PostgreSQL compatibility mode so entity DDL (TEXT columns) works on H2
     url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     driver-class-name: org.h2.Driver
     username: sa
-    password:
+    password: ""
   h2:
     console:
       enabled: true
