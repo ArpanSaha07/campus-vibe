@@ -24,6 +24,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migrations
+    validate-on-migrate: true   # Fail fast if the schema is out of sync with the migrations. This value is true by default.
   servlet:
     multipart:
       max-file-size: 10MB
