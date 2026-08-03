@@ -82,6 +82,15 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    develop:
+       watch:
+        - action: sync
+          path: ../frontend/app
+          target: /app
+          ignore:
+            - node_modules/
+        - action: rebuild
+          path: package.json
     # No source bind-mount: it would hide the built .next and node_modules.
 
 volumes:

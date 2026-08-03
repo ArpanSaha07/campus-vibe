@@ -31,7 +31,7 @@ export default function BannerCarousel() {
   ];
 
   return (
-    <div aria-label="Banner Section" className="w-full max-w-7xl mx-auto sm:p-5">
+    <div aria-label="Banner Section" className="w-full max-w-7xl mx-auto pb-5 sm:px-5 sm:pt-5">
       <Swiper
         spaceBetween={10}
         centeredSlides={true}
@@ -48,7 +48,7 @@ export default function BannerCarousel() {
       >
         {banners.map((banner, index) => (
           <SwiperSlide key={index}>
-            <Link href={banner.link} target="_blank" rel="noopener noreferrer">
+            <Link href={banner.link}>
               <Image
                 src={banner.img}
                 alt={banner.alt}

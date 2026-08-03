@@ -1,11 +1,32 @@
-# Use official Node.js image for Next.js
-FROM node:20-alpine AS builder
+# Shared dependency layer so the dev and production paths install once.
+FROM node:20-alpine AS deps
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm install
+
+# Development image, selected by `build.target: dev` in docker/docker-compose.yml.
+# `next dev` keeps a compiler running, which is what makes the files that
+# `docker compose watch` syncs in actually show up in the browser. The default
+# production image below has no compiler, so a sync into it is a no-op.
+FROM node:20-alpine AS dev
+WORKDIR /app
+ENV NODE_ENV=development
+# Compose `sync` writes into the container's own filesystem, so inotify fires
+# normally and polling is not needed. Uncomment if HMR ever stops reacting.
+# ENV WATCHPACK_POLLING=true
+# ENV CHOKIDAR_USEPOLLING=true
+COPY --from=deps /app/node_modules ./node_modules
+COPY frontend/ ./
+EXPOSE 3000
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ ./
 RUN npm run build
 
+# Last stage, so this stays the default target for production builds.
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
