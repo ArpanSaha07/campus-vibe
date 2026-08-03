@@ -24,6 +24,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    develop:
+      watch:
+        # Postgres runs a stock image with nothing to compile, so the only
+        # watchable input is the init scripts in db/. Two caveats: the schema
+        # here is owned by Flyway (migrations ship inside the backend jar), so
+        # db/ is empty and this rule rarely fires; and Postgres only executes
+        # init scripts when the data directory is empty, so a change also needs
+        # `docker compose down -v` to take effect. No restart action, because
+        # bouncing the database would drop the backend's connection pool.
+        - action: sync
+          path: ../db
+          target: /docker-entrypoint-initdb.d
 
   # s3:
   #   image: adobe/s3mock:3.1.0
@@ -69,11 +81,27 @@ services:
         condition: service_healthy
     # No source bind-mount: the image runs a packaged jar at /app/app.jar, and
     # mounting ../backend over /app hides it.
+    develop:
+      watch:
+        # The image compiles nothing — it just packages a jar built on the host
+        # — so the jar is the real input, not backend/src. Run
+        # `mvn -f backend/pom.xml package` and this copies the result in and
+        # restarts the JVM. Flyway migrations are bundled in the jar, so they
+        # ride along. sync+restart rather than rebuild: build.context is the
+        # repo root with no .dockerignore, so a rebuild would re-send
+        # node_modules, target/ and .git on every change.
+        - action: sync+restart
+          path: ../backend/target/campusvibe-0.0.1-SNAPSHOT.jar
+          target: /app/app.jar
 
   frontend:
     build:
       context: ..
       dockerfile: frontend/Dockerfile
+      # Runs `next dev` instead of the packaged production build. Without a
+      # compiler watching the synced files, nothing below has any visible
+      # effect. Drop this line to serve the production build again.
+      target: dev
     container_name: campusvibe-frontend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
@@ -83,15 +111,37 @@ services:
     depends_on:
       - backend
     develop:
-       watch:
+      watch:
+        # Source edits land in the running dev server and Next recompiles the
+        # changed route in place. No restart, so the backend and db containers
+        # are never touched. Target is /app because WORKDIR is /app and the
+        # router lives at /app/app — syncing ../frontend/app onto /app would
+        # put page.tsx one directory too high.
         - action: sync
-          path: ../frontend/app
+          path: ../frontend
           target: /app
           ignore:
             - node_modules/
+            - .next/
+            - package.json
+            - package-lock.json
+            - next.config.ts
+            - Dockerfile
+
+        # next.config.ts is read once at boot, so syncing it alone does nothing.
+        - action: sync+restart
+          path: ../frontend/next.config.ts
+          target: /app/next.config.ts
+
+        # Dependency changes need `npm install`, which only the image build runs.
+        # Paths are relative to this compose file, so ../frontend/ is required —
+        # a bare `package.json` resolves to docker/package.json and never fires.
         - action: rebuild
-          path: package.json
-    # No source bind-mount: it would hide the built .next and node_modules.
+          path: ../frontend/package.json
+        - action: rebuild
+          path: ../frontend/package-lock.json
+    # No source bind-mount: watch syncs the source in instead, which avoids the
+    # slow filesystem crossing that a Windows bind-mount into the VM incurs.
 
 volumes:
   db_data:

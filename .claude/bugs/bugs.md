@@ -1,9 +1,9 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-07-30** · Branch: `llm-api-integration`
+Last updated: **2026-08-03** · Branch: `feature/frontend-ui`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-009 … BUG-012 so far). Bug ids are never reused.
+(BUG-009 … BUG-013 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -151,6 +151,13 @@ dev fallback (`OAuthButtons.tsx:10`).
 
 **Not a secrets issue** — both values are public by design (an API URL and a
 Google *client* id). It is a correctness issue for the containerised frontend.
+
+**Scope narrowed 2026-08-03:** the compose stack now builds the `dev` stage
+([BUG-013](fixed_bugs.md#bug-013)), and `next dev` reads `NEXT_PUBLIC_*` from the
+environment at runtime rather than inlining them at build time. So local Docker
+development no longer hits this. **The bug is unchanged for the production
+image** — the `builder`/`runner` path still runs `npm run build` with no values
+supplied, so it stays open and must be fixed before deploying.
 
 **Fix direction:** pass them as `ARG`/`ENV` before `npm run build` and declare
 matching `build.args` in compose.
