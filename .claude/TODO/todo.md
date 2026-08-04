@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-07-31** · Branch: `llm-api-integration`
+Last updated: **2026-08-03** · Branch: `feature/frontend-ui`
 
 Priorities: **P0** blocking / broken · **P1** next up · **P2** planned · **P3** backlog
 Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
@@ -42,7 +42,7 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 ## Frontend / Features
 
 - [ ] **P1** Fix route protection — `proxy.tsx` is never executed by Next.js (wrong filename *and* wrong export name), and it reads a cookie while the JWT lives in localStorage. Decide the token transport first; a half-wired guard is worse than none. ([BUG-003](../bugs/bugs.md#bug-003))
-- [ ] **P2** Fix `NEXT_PUBLIC_*` in the Docker build — values are inlined at build time, so the containerised frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. ([BUG-004](../bugs/bugs.md#bug-004))
+- [ ] **P2** Fix `NEXT_PUBLIC_*` in the **production** Docker build — values are inlined at build time, so the deployed frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. No longer affects local dev, which now builds the `dev` stage and reads them at runtime. ([BUG-004](../bugs/bugs.md#bug-004))
 - [ ] **P2** Category filtering on the events listing.
 - [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.
@@ -108,6 +108,18 @@ Implementation Sequence.
 ---
 
 ## Recently completed
+
+**2026-08-03 — Working `docker compose watch` for all three services
+([BUG-013](../bugs/fixed_bugs.md#bug-013)).** Frontend edits did nothing because
+the container served a production build with no compiler watching — the
+unaddressed follow-up from [BUG-012](../bugs/fixed_bugs.md#bug-012). Two smaller
+faults compounded it: the sync target was one directory too high, and the
+`rebuild` path resolved to `docker/package.json`.
+
+- `frontend/Dockerfile` gained a `dev` stage running `next dev` and a shared `deps` stage; `runner` stays last so production builds are unaffected. Compose selects it via `build.target: dev`.
+- Per-service watch rules: **frontend** syncs source (no restart), `sync+restart` for `next.config.ts`, `rebuild` for `package.json` / `package-lock.json`; **backend** `sync+restart` on the jar after `mvn package`, avoiding a rebuild that would re-send the whole repo as build context; **db** syncs init scripts, documented as near-inert since the schema is Flyway-owned.
+- Verified: `✓ Ready in 746ms`, HTTP 200, and a file copied into the container triggers `✓ Compiled in 108ms` — so inotify works for synced writes and no polling vars are needed.
+- Noted while working: `build.context` is the repo root with **no root `.dockerignore`**, so every image build tars up `node_modules`, `target/` and `.git`. Worth adding, but it must not exclude `backend/target/*.jar`, which `backend/Dockerfile` COPYs.
 
 **2026-07-31 — GitHub Actions CI (branch `ci/github-actions`).** Four workflows,
 all YAML-validated locally. **None has run on GitHub yet.**

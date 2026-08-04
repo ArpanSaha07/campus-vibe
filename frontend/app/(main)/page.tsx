@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import BannerCarousel from "@/app/components/main-page/BannerCarouselMainPage";
-import CategoriesSection from "@/app/components/main-page/CategoriesSectionMainPage";
 import EventSection from "@/app/components/main-page/EventSectionMainPage";
 import DiscoverClubs from "@/app/components/main-page/DiscoverClubsMainPage";
 
@@ -16,9 +15,6 @@ export default function Home() {
     <main>
       <div className="fade-up" style={reveal(0)}>
         <BannerCarousel />
-      </div>
-      <div className="fade-up" style={reveal(1)}>
-        <CategoriesSection />
       </div>
       <div className="fade-up" style={reveal(2)}>
         <EventSection title="Popular this weekend" events={popularEvents} />

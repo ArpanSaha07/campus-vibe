@@ -2,7 +2,7 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-07-30**
+Last updated: **2026-08-02**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
@@ -10,6 +10,7 @@ Last updated: **2026-07-30**
 | [BUG-010](#bug-010) | High | 2026-07-30 | Committed JWT fallback secret |
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
+| [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
 
 ---
 
@@ -88,3 +89,54 @@ condition restored. Verified: backend boots and serves
 `/api/v1/clubs/search?q=coding`.
 
 **Affected files:** `docker/docker-compose.yml`
+
+**Follow-up:** the observation above — *"neither mount provided hot reload, since
+both images run production builds"* — went unaddressed, and the later
+`develop.watch` attempt hit exactly that wall. See [BUG-013](#bug-013).
+
+---
+
+### BUG-013
+**`compose watch` synced into a production image, so edits never appeared** · Medium · FIXED 2026-08-03
+
+**Symptom:** editing `frontend/app/(main)/page.tsx` produced no change at
+`localhost:3000`, despite a `develop.watch` block on the `frontend` service.
+
+**Three independent causes, each sufficient on its own:**
+
+1. **Nothing was compiling.** `frontend/Dockerfile` ran `npm start`
+   (`next start`) under `NODE_ENV=production`, which serves the pre-built
+   `.next` output. A sync into that container changes nothing, because no
+   compiler is watching. The runner stage does not even contain the source tree
+   — it copies only `.next`, `public`, `package.json` and `node_modules`, so the
+   synced files landed in a directory Next never reads. **This is the primary
+   cause**, and it is the unaddressed follow-up from [BUG-012](#bug-012).
+2. **Wrong sync target.** `path: ../frontend/app` → `target: /app` maps
+   `frontend/app/(main)/page.tsx` onto `/app/(main)/page.tsx`. WORKDIR is `/app`
+   and the router lives at `/app/app`, so every file arrived one directory too
+   high.
+3. **Wrong rebuild path.** Watch paths resolve relative to the **compose file**,
+   not the build context, so `path: package.json` pointed at
+   `docker/package.json`, which does not exist. That rule could never fire.
+
+**Not a cause:** `develop.watch` is already per-service, so a frontend rule was
+never able to restart the backend container.
+
+**Fix:** added a `dev` stage to `frontend/Dockerfile` running `next dev`, plus a
+shared `deps` stage so dev and production install once; `runner` stays last and
+therefore remains the default build target. Compose selects it with
+`build.target: dev`. Rewrote the watch rules and gave `backend` and `db` their
+own.
+
+Backend uses `sync+restart` on `backend/target/*.jar` rather than `rebuild`,
+because `build.context` is the repo root with no `.dockerignore` — a rebuild
+would re-send `node_modules`, `target/` and `.git` on every change. Flyway
+migrations ship inside the jar, so they ride along with it.
+
+**Verified:** dev image builds; `next dev` boots (`✓ Ready in 746ms`) and serves
+HTTP 200; a file copied into the running container triggers
+`✓ Compiled in 108ms`, which confirms inotify fires for compose-synced writes and
+that no polling env vars are needed. `docker compose config` resolves all six
+watch rules to real absolute paths.
+
+**Affected files:** `frontend/Dockerfile`, `docker/docker-compose.yml`
