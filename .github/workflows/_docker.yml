@@ -1,34 +1,28 @@
-name: Docker CI - Build & Run Stack
+name: Docker
 
-# Boots the full compose stack (Postgres + backend + frontend) and asserts it
-# actually serves traffic. This is the only workflow that exercises the
-# Dockerfiles, the compose wiring, and the container-to-container networking.
+# Reusable. Called only by ci.yml, and only in the full tier — this is the
+# most expensive job in the pipeline.
+#
+# It boots the full compose stack (Postgres + backend + frontend) and asserts
+# it actually serves traffic. This is the only place that exercises the
+# Dockerfiles, the compose wiring, and container-to-container networking.
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - 'docker/**'
-      - '.github/workflows/docker-ci.yml'
-  pull_request:
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - 'docker/**'
-      - '.github/workflows/docker-ci.yml'
+  workflow_call:
 
-concurrency:
-  group: docker-ci-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
+
+env:
+  # Pins the names `docker compose build` gives the images, so the Trivy step
+  # below has something deterministic to scan.
+  COMPOSE_PROJECT_NAME: campusvibe
 
 jobs:
   compose-up:
     name: Build images and run the stack
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -38,6 +32,7 @@ jobs:
       # marks POSTGRES_PASSWORD and JWT_SECRET with `:?`, so it must refuse to
       # produce a config at all. This asserts the fail-fast guard still works —
       # a regression here would let an environment start with no JWT secret.
+      # Must stay ahead of the step that writes .env.
       - name: Verify compose refuses to start without required secrets
         working-directory: ./docker
         run: |
@@ -68,12 +63,17 @@ jobs:
 
       # backend/Dockerfile COPYs backend/target/campusvibe-*.jar rather than
       # building inside the image, so the jar must exist before `compose build`.
-      # Tests belong to backend-ci; this job only needs the artifact.
+      #
+      # This is a second Maven build: the backend job already produced a jar,
+      # but consuming its artifact would mean `needs: backend`, which serialises
+      # the two jobs and breaks outright on a frontend-only PR — the docker job
+      # would still need a jar while the backend job was skipped. The trade is
+      # deliberate: extra runner minutes to keep the jobs parallel. Build-once
+      # and promote is the real fix, and it belongs with CD, where a registry
+      # exists.
       - name: Build backend jar
         working-directory: ./backend
-        run: |
-          chmod +x mvnw
-          ./mvnw -B -DskipTests package
+        run: ./mvnw -B -DskipTests -DskipITs package
 
       - name: Create docker/.env
         working-directory: ./docker
@@ -179,6 +179,82 @@ jobs:
             exit 1
           fi
 
+      # The compose stack pins `target: dev`, so the `runner` stage — the image
+      # that would actually ship — is never built anywhere. Build and boot it
+      # here, on port 3001 so it does not collide with the dev container still
+      # running on 3000.
+      - name: Build and boot the production frontend image
+        run: |
+          set -euo pipefail
+          docker build \
+            --target runner \
+            -f frontend/Dockerfile \
+            -t campusvibe-frontend:prod \
+            .
+
+          docker run -d --name campusvibe-frontend-prod -p 3001:3000 campusvibe-frontend:prod
+
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:3001 2>/dev/null; then
+              echo "Production frontend image serves / on :3001."
+              exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' campusvibe-frontend-prod)" != "true" ]; then
+              echo "::error::Production frontend container exited."
+              docker logs campusvibe-frontend-prod --tail 100
+              exit 1
+            fi
+            sleep 3
+          done
+          echo "::error::Production frontend never responded on :3001."
+          docker logs campusvibe-frontend-prod --tail 100
+          exit 1
+
+      - name: Install Trivy
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
+          trivy --version
+
+      # Two passes on purpose.
+      #
+      # The first is a report: every fixable HIGH and CRITICAL, printed, never
+      # failing. Base images (node:20-alpine, eclipse-temurin:25-jdk-alpine)
+      # routinely carry a handful of HIGHs that no change in this repo can
+      # resolve, and a gate that red-lights every PR for those trains people to
+      # ignore CI — the same reasoning that keeps frontend lint non-blocking.
+      #
+      # The second is the actual gate, narrowed to fixable CRITICALs. That set
+      # is small, actionable, and almost always resolved by bumping a base image
+      # tag. Tighten to HIGH once the baseline is known to be clean.
+      - name: Scan images for known vulnerabilities
+        run: |
+          set -euo pipefail
+          backend_image=$(docker inspect -f '{{.Config.Image}}' campusvibe-backend)
+          echo "Backend image:  $backend_image"
+          echo "Frontend image: campusvibe-frontend:prod"
+
+          for img in "$backend_image" campusvibe-frontend:prod; do
+            echo "::group::Trivy report (HIGH+CRITICAL, fixable) — $img"
+            trivy image --scanners vuln --ignore-unfixed \
+              --severity HIGH,CRITICAL --exit-code 0 "$img"
+            echo "::endgroup::"
+          done
+
+          failed=0
+          for img in "$backend_image" campusvibe-frontend:prod; do
+            echo "--- Gate: fixable CRITICAL — $img ---"
+            trivy image --scanners vuln --ignore-unfixed \
+              --severity CRITICAL --exit-code 1 --quiet "$img" || failed=1
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::A fixable CRITICAL vulnerability is present. Bump the base image."
+            exit 1
+          fi
+          echo "No fixable CRITICAL vulnerabilities."
+
       - name: Dump container logs
         if: failure()
         working-directory: ./docker
@@ -190,6 +266,10 @@ jobs:
           docker compose logs backend --tail 200
           echo "================ frontend ================"
           docker compose logs frontend --tail 100
+
+      - name: Remove the production frontend container
+        if: always()
+        run: docker rm -f campusvibe-frontend-prod 2>/dev/null || true
 
       - name: Tear down
         if: always()

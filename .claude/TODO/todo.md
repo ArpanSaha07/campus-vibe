@@ -84,11 +84,20 @@ Implementation Sequence.
 ## Infrastructure & CI/CD
 
 - [x] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
-- [ ] **P1** **Push `ci/github-actions` and confirm the four workflows go green.** None of them has ever executed on GitHub; everything below assumes a first real run. Expect backend-ci to fail on [BUG-001](../bugs/bugs.md#bug-001) until that is fixed.
-- [ ] **P1** **Fix the 5 pre-existing eslint errors** (`no-explicit-any` ×4, `ban-ts-comment` ×1 — see `app/lib/api.tsx`), then delete `continue-on-error: true` from the Lint step in `frontend-ci.yml` so lint actually gates merges. 15 warnings can follow later.
-- [ ] **P1** Implement `.ci/build-publish.sh` (currently a 0-byte file) and enable the frontend CD job (`frontend-cd.yml:14` is `if: false`). ([BUG-008](../bugs/bugs.md#bug-008))
-- [ ] **P2** Add branch-protection rules on `main` requiring backend-ci, frontend-ci, database-ci and docker-ci to pass. The workflows are only a gate once GitHub enforces them.
-- [ ] **P2** Extend `database-ci.yml` once the dev seeder lands: assert `DevDataSeeder` does **not** run under the `prod` profile, and that `count(embedding) = count(*)`.
+- [ ] **P1** **Push `ci/github-actions` and confirm `ci.yml` goes green.** Still nothing has ever executed on GitHub; everything below assumes a first real run. The fast tier (branch push) is expected green. The **full tier will fail on [BUG-001](../bugs/bugs.md#bug-001)**, which now runs as `SearchIT` in the PR tier — that is the correct signal, not a pipeline defect.
+- [ ] **P1** **Decide BUG-001 before enabling branch protection.** Once `CI` is a required check, a failing `SearchIT` makes `main` unmergeable. Either fix BUG-001 or quarantine that single test with `@Disabled("BUG-001")` and a link. This is a blocking decision, not a cleanup.
+- [ ] **P1** *(plan Step 5)* **Fix the 5 pre-existing eslint errors** (`no-explicit-any` ×4, `ban-ts-comment` ×1 — see `app/lib/api.tsx`), then delete `continue-on-error: true` from the Lint step in `.github/workflows/_frontend.yml` so lint actually gates merges. 15 warnings can follow later.
+- [ ] **P2** *(plan Step 6)* **Add `.github/dependabot.yml`** (maven · npm · github-actions · docker; weekly; minor/patch grouped per ecosystem) and a **standalone `codeql.yml`** — deliberately *not* wired into `ci-success`, because CodeQL's Java extractor lags new JDK releases and this project is on Java 25. CodeQL is free only on public repos; a private repo needs GitHub Advanced Security.
+- [ ] **P2** *(plan Step 7)* **Branch protection on `main`: require the single check named `CI`, and nothing else.** Requiring the component jobs (`Backend`, `Frontend`, …) reintroduces the deadlock the orchestrator exists to avoid — a PR that does not touch a component never starts its job, and the rule waits forever on "Expected — Waiting for status".
+- [ ] **P2** **Tighten the Trivy gate** in `_docker.yml` once the base-image baseline is known. It currently reports fixable HIGH+CRITICAL and *fails* only on fixable CRITICAL, so a noisy base image cannot red-line every PR. Move the gate to HIGH after one clean run.
+- [ ] **P2** **Add `output: "standalone"` to `frontend/next.config.ts`** and rework the `runner` stage to `COPY .next/standalone` + `.next/static` and run `node server.js`. The production image currently ships the full dev+prod `node_modules` and runs `npm start`. CI now builds and boots this image (`_docker.yml`), so the change is verifiable.
+- [ ] **P2** Extend `_database.yml` once the dev seeder lands: assert `DevDataSeeder` does **not** run under the `prod` profile, and that `count(embedding) = count(*)`.
+- [ ] **P3** Consider **build-once / promote-one-artifact**. `_docker.yml` builds its own jar rather than consuming `_backend.yml`'s artifact, because `needs: backend` would serialise the jobs and break on a frontend-only PR. The clean fix needs a registry, so it belongs with CD.
+- [ ] **P1** **CD prerequisites — none of these exist yet, which is why CD was scoped out** ([BUG-008](../bugs/fixed_bugs.md#bug-008) closed by deleting the stub rather than filling it in). All four are needed before a deploy workflow is worth writing:
+  1. An AWS account and an Elastic Beanstalk environment (`docker/Dockerrun.aws.json` still carries the literal `<your-backend-image>:latest` placeholder).
+  2. A GitHub OIDC role + trust policy — see the next item.
+  3. A registry decision: GHCR or ECR.
+  4. A Vercel project + deploy token, if the frontend goes there rather than to EB.
 - [ ] **P1** Use **GitHub OIDC** (`aws-actions/configure-aws-credentials` with `role-to-assume`) for AWS auth in CI. Do not add long-lived `AWS_ACCESS_KEY_ID` repo secrets. No LLM key should ever enter CI.
 - [ ] **P2** First Elastic Beanstalk deployment — follow [`docker/EB-DEPLOYMENT.md`](../../docker/EB-DEPLOYMENT.md) for the environment-property list.
 - [ ] **P2** Attach an IAM instance role granting S3 access, so the default credential chain resolves in production (`s3/S3Config.java` already expects this).
@@ -119,10 +128,25 @@ faults compounded it: the sync target was one directory too high, and the
 - `frontend/Dockerfile` gained a `dev` stage running `next dev` and a shared `deps` stage; `runner` stays last so production builds are unaffected. Compose selects it via `build.target: dev`.
 - Per-service watch rules: **frontend** syncs source (no restart), `sync+restart` for `next.config.ts`, `rebuild` for `package.json` / `package-lock.json`; **backend** `sync+restart` on the jar after `mvn package`, avoiding a rebuild that would re-send the whole repo as build context; **db** syncs init scripts, documented as near-inert since the schema is Flyway-owned.
 - Verified: `✓ Ready in 746ms`, HTTP 200, and a file copied into the container triggers `✓ Compiled in 108ms` — so inotify works for synced writes and no polling vars are needed.
-- Noted while working: `build.context` is the repo root with **no root `.dockerignore`**, so every image build tars up `node_modules`, `target/` and `.git`. Worth adding, but it must not exclude `backend/target/*.jar`, which `backend/Dockerfile` COPYs.
+- Noted while working: `build.context` is the repo root with **no root `.dockerignore`**, so every image build tars up `node_modules`, `target/` and `.git`. Worth adding, but it must not exclude `backend/target/*.jar`, which `backend/Dockerfile` COPYs. — **Done 2026-08-05**; the jar is re-included by negation.
+
+**2026-08-05 — CI restructured into one orchestrator (branch `ci/github-actions`).**
+The four standalone workflows below were replaced. **Still nothing has run on
+GitHub.** Plan steps 1–4 of 7 are done; 5–7 remain open above.
+
+- **The structural problem they had:** `paths:` filters at the *workflow* level make required status checks impossible. A PR touching only `frontend/` never *starts* `backend-ci`, so a branch-protection rule requiring it waits forever on "Expected — Waiting for status". Since branch protection was already a goal, that layout could never get there.
+- **`ci.yml`** *(new, the only trigger)* — `changes` (dorny/paths-filter, failing **open** on a branch's first push where `github.event.before` is all zeros) → `secret-scan` (gitleaks binary, not the action, which needs a paid licence on org-owned repos) → four component calls → **`ci-success`, named `CI`**. That gate runs `if: always()`, needs every job, and fails only on `failure`/`cancelled` — `skipped` passes. That is precisely what lets job-level path filtering coexist with branch protection. **Require `CI` and nothing else.**
+- **Tiering.** Fast tier on a branch push (compile, unit tests, lint, `tsc`, Jest, migration-file lint, secret scan). Full tier on PR, push-to-`main`, `merge_group` and manual dispatch (adds the `*IT` suites, a real Flyway migrate, and the Docker stack).
+- **`_backend.yml` / `_frontend.yml` / `_database.yml` / `_docker.yml`** *(new, `workflow_call` only)* — the job bodies were **carried over intact**, not rewritten: the migration lint rules, the double-boot checksum/drift check, the compose fail-fast secret guard and the API smoke tests are all unchanged. Added: `permissions: contents: read` and `timeout-minutes` everywhere (the GitHub default is **six hours** per job).
+- **`_docker.yml` gained two things** — it now builds and boots the **production** frontend image (`--target runner`), which nothing built before because compose pins `target: dev`; and it Trivy-scans both images. Verified locally: the prod image builds and serves `/` (`✓ Ready in 167ms`).
+- **Deleted:** `backend-ci.yml`, `frontend-ci.yml`, `database-ci.yml`, `docker-ci.yml`, `frontend-cd.yml`, `.ci/build-publish.sh`.
+- **Unit/integration split** — added `maven-failsafe-plugin` to `backend/pom.xml` and renamed `SearchIntegrationTest` → `SearchIT`, `AuthenticationFlowIntegrationTest` → `AuthenticationFlowIT`, `ClubAdminRequestFlowIntegrationTest` → `ClubAdminRequestFlowIT`. Declaring the plugin is *all* that is needed: `spring-boot-starter-parent` already binds `integration-test` + `verify` in pluginManagement, so adding an execution of our own would have run every IT **twice**. Verified: `./mvnw test` → 14 unit tests, no Spring context, no Docker; `./mvnw verify` → those plus 20 in the three `*IT` classes, each run exactly once.
+- **Root `.dockerignore`** *(new)* — both Dockerfiles use the repo root as build context and there was none (`frontend/.dockerignore` sits one level too deep to apply). Measured: frontend build context **688 KB**; backend **76.03 MB**, which is the jar alone — so the `backend/target/*` + `!backend/target/campusvibe-*.jar` negation works.
+- **`frontend/Dockerfile`** — `npm install` → `npm ci`. CI enforced the lockfile and the image did not, so one commit could resolve two different dependency trees.
+- **`backend/mvnw`** is now mode `100755` in the index, removing a `chmod +x` step from three jobs.
 
 **2026-07-31 — GitHub Actions CI (branch `ci/github-actions`).** Four workflows,
-all YAML-validated locally. **None has run on GitHub yet.**
+all YAML-validated locally. **None ran on GitHub; superseded by the entry above.**
 
 - **`backend-ci.yml`** rewritten — JDK 17 → 25 (matching `pom.xml` and `backend/Dockerfile`), `-DskipTests` dropped for `./mvnw -B verify`, Maven caching, surefire reports uploaded on failure, jar uploaded as an artifact. ([BUG-002](../bugs/bugs.md#bug-002))
 - **`frontend-ci.yml`** rewritten — replaced the `npm start &&  sleep 10` step, which asserted nothing and therefore could never fail, with lint + `tsc --noEmit` + Jest + build. Verified locally: type-check clean, **23/23 Jest tests pass**, lint has 5 pre-existing errors so that step is `continue-on-error` for now.

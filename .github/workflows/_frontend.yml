@@ -1,27 +1,19 @@
-name: Frontend CI - Lint, Test & Build
+name: Frontend
+
+# Reusable. Called only by ci.yml. Runs identically in both tiers — the whole
+# job is under two minutes, so there is nothing worth deferring to the PR.
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-      - frontend
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
-  pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/frontend-ci.yml'
+  workflow_call:
 
-concurrency:
-  group: frontend-ci-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
   verify:
     name: Lint, type-check, test and build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./frontend
@@ -47,7 +39,7 @@ jobs:
       # errors (no-explicit-any x4, ban-ts-comment x1) plus 15 warnings, none
       # introduced by this workflow. Blocking on them would make every PR red
       # for reasons unrelated to its change, which trains people to ignore CI.
-      # Fix those 5, then delete this line so lint gates merges.
+      # Fix those 5, then delete this line so lint gates merges. (todo.md:88)
       - name: Lint
         if: '!cancelled()'
         continue-on-error: true

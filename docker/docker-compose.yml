@@ -87,9 +87,10 @@ services:
         # — so the jar is the real input, not backend/src. Run
         # `mvn -f backend/pom.xml package` and this copies the result in and
         # restarts the JVM. Flyway migrations are bundled in the jar, so they
-        # ride along. sync+restart rather than rebuild: build.context is the
-        # repo root with no .dockerignore, so a rebuild would re-send
-        # node_modules, target/ and .git on every change.
+        # ride along. sync+restart rather than rebuild: the image compiles
+        # nothing, so a rebuild would re-send the build context and re-run
+        # `docker build` only to COPY the same jar this rule already syncs in.
+        # (The repo-root .dockerignore keeps that context small either way.)
         - action: sync+restart
           path: ../backend/target/campusvibe-0.0.1-SNAPSHOT.jar
           target: /app/app.jar

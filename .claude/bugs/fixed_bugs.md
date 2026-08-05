@@ -2,15 +2,43 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-02**
+Last updated: **2026-08-05**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
 | [BUG-009](#bug-009) | Blocker | 2026-07-30 | Duplicate methods from merge `8f81d82` broke compilation |
 | [BUG-010](#bug-010) | High | 2026-07-30 | Committed JWT fallback secret |
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-008
+**`.ci/build-publish.sh` is empty; frontend CD is hard-disabled** · Low · FIXED 2026-08-05
+
+**Found:** 2026-07-30, auditing the deployment path.
+
+**Symptom:** `.ci/build-publish.sh` was a **0-byte file**. `frontend-cd.yml:14`
+set `if: false` on the deploy job, and its only remaining step generated a build
+number string that no other step read — there was no Vercel or AWS deploy action.
+Worse, its `workflow_run` trigger carried no branch guard, so it fired after
+frontend CI passed on *any* branch. The README's claim of a CI/CD pipeline was
+aspirational; nothing deployed.
+
+**Fix:** both were **deleted** rather than implemented. CD was scoped out of the
+`ci/github-actions` work deliberately — there is no AWS account, no OIDC role, no
+registry, and `Dockerrun.aws.json` still carries the literal
+`<your-backend-image>:latest` placeholder. A stub that lies about deploying is
+worse than no stub: it makes the pipeline look finished. The prerequisites for
+real CD are tracked in [`todo.md`](../TODO/todo.md) instead.
+
+This closes the defect (dead code claiming to deploy). "Nothing deploys yet" is
+not a bug — it is planned work.
+
+**Affected files:** `.ci/build-publish.sh` (deleted),
+`.github/workflows/frontend-cd.yml` (deleted)
 
 ---
 

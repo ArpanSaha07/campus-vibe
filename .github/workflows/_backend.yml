@@ -1,0 +1,80 @@
+name: Backend
+
+# Reusable. Called only by ci.yml — never triggered directly, so it carries no
+# `paths:` filter of its own. Change detection lives in the orchestrator.
+
+on:
+  workflow_call:
+    inputs:
+      full-tier:
+        description: >-
+          true  - ./mvnw verify: surefire unit tests AND failsafe *IT suites.
+          false - ./mvnw verify -DskipITs: unit tests only. The jar is still
+                  packaged either way, so downstream jobs are unaffected.
+        type: boolean
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    # A cold Maven cache plus the failsafe suites lands around 6 minutes.
+    # 20 is generous enough not to flake and short enough to notice a hang —
+    # the GitHub default is six hours.
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Must match backend/pom.xml <java.version> and backend/Dockerfile.
+      # JDK 17 cannot compile this project at all. (BUG-002)
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      # mvnw is mode 100755 in the index, so no chmod step is needed.
+      #
+      # Tests are deliberately never skipped wholesale: skipping them is what
+      # let a non-compiling merge and a failing search test reach the branch
+      # unnoticed. The fast tier drops only the *IT classes, which need a
+      # Spring context (H2) or a Testcontainers pgvector container.
+      - name: Build and test
+        run: |
+          if [ "${{ inputs.full-tier }}" = "true" ]; then
+            echo "Full tier: unit tests + integration tests."
+            ./mvnw -B verify
+          else
+            echo "Fast tier: unit tests only. *IT suites run on the PR."
+            ./mvnw -B verify -DskipITs
+          fi
+
+      # Uploaded even on failure — otherwise the only way to see which
+      # assertion broke is to reproduce the whole run locally.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/target/surefire-reports/
+            backend/target/failsafe-reports/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/target/campusvibe-*.jar
+          if-no-files-found: error
+          retention-days: 7

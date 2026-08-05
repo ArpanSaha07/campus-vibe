@@ -1,0 +1,15 @@
+# Findings gitleaks should not report. One fingerprint per line, in the form
+#   <commit>:<path>:<rule-id>:<line>
+# which is printed under "Fingerprint:" in the scan output.
+#
+# Add an entry ONLY for a value that is provably not a credential. Anything that
+# ever authenticated against a real system must be rotated, not ignored —
+# rewriting history does not help, because the commit was already pushed.
+#
+# ---------------------------------------------------------------------------
+# JWTUtilTest's signing key. A literal `test-secret-0123456789-...`, chosen only
+# because HS256 requires >= 32 bytes; it signs tokens that exist inside a single
+# unit test and authenticates nothing. Flagged as generic-api-key on entropy
+# alone. The real committed JWT fallback secret was BUG-010, which is fixed —
+# see .claude/bugs/fixed_bugs.md.
+442bffa1bdff5acbc1081097e9a4813bf57fadeb:backend/src/test/java/com/campusvibe/jwt/JWTUtilTest.java:generic-api-key:12

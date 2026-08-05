@@ -58,7 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 @Testcontainers
-class SearchIntegrationTest {
+class SearchIT {
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(

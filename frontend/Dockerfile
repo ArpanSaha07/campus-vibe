@@ -2,7 +2,11 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm install
+# npm ci, not npm install: CI runs `npm ci` and so enforces the lockfile, while
+# `npm install` is free to resolve a different tree from the same commit. Two
+# dependency graphs for one commit is exactly the drift the lockfile exists to
+# prevent.
+RUN npm ci
 
 # Development image, selected by `build.target: dev` in docker/docker-compose.yml.
 # `next dev` keeps a compiler running, which is what makes the files that
