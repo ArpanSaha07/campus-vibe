@@ -1,0 +1,75 @@
+name: CodeQL
+
+# STANDALONE ON PURPOSE. This is not called by ci.yml and is not part of the
+# `ci-success` gate, so a CodeQL failure never blocks a merge.
+#
+# Why: CodeQL's extractors trail new language releases, and this project is on
+# Java 25. If the Java analysis breaks, JavaScript still reports and `main` stays
+# mergeable. Security findings are advisory input to a human, not a build gate —
+# the things that MUST stop a merge (secrets, tests, migrations) live in ci.yml.
+#
+# Findings appear under the repository's Security > Code scanning tab.
+#
+# Free here because ArpanSaha07/campus-vibe is public. If the repo is ever made
+# private, code scanning requires GitHub Advanced Security and this workflow will
+# start failing on permissions — delete it rather than leaving it red.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Mondays 07:00 UTC. The scheduled run is the point of CodeQL: it re-scans
+    # unchanged code against newly published queries, catching vulnerabilities
+    # disclosed after the code was last touched.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      # The only elevated scope in this repo's workflows: required to upload
+      # SARIF results to the code-scanning API.
+      security-events: write
+      contents: read
+      actions: read
+
+    strategy:
+      # One language failing must not cancel the other. This is the mechanism
+      # that keeps a broken Java extractor from also losing the JS results.
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, java-kotlin]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # build-mode: none analyses source directly instead of observing a
+      # compile. It yields somewhat fewer results than a built analysis, and
+      # that is an accepted trade here: a built Java analysis would need CodeQL
+      # to drive Maven on JDK 25, which is exactly the fragility this workflow
+      # is designed to tolerate rather than depend on.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-and-quality
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}

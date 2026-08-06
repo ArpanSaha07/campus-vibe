@@ -3,7 +3,7 @@
 Last updated: **2026-08-05** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-013 so far). Bug ids are never reused.
+(BUG-008 … BUG-014 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -67,7 +67,14 @@ should admit it. Worth checking, in order:
   passes but does **not** prove semantics work: its query `chess` also matches by
   keyword, so the keyword leg alone satisfies it.
 
-**Current suite state:** 40 tests, 39 pass, this 1 failure.
+**Current suite state:** 40 tests, 39 pass, this 1 failure. Re-measured
+2026-08-05 against the surefire/failsafe split: 14 unit tests + 26 integration
+tests, failing at `SearchIT:163`.
+
+**Blocks branch protection.** Once `CI` is a required check on `main`, this one
+test makes the branch unmergeable. Either fix it or annotate **the single
+method** `@Disabled("BUG-001: …")` — disabling the whole class would also lose
+the 6 passing search tests. See `.claude/TODO/todo.md`.
 
 ---
 

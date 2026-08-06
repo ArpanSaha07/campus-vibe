@@ -22,10 +22,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Must match the `node:` tag in frontend/Dockerfile. CI testing on one
+      # major while the shipped image runs another is how a build passes here
+      # and fails in the container.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -35,14 +38,11 @@ jobs:
       # Each check runs even if an earlier one failed, so a single push reports
       # every problem at once instead of one per re-run.
 
-      # NON-BLOCKING for now. The tree currently has 5 pre-existing eslint
-      # errors (no-explicit-any x4, ban-ts-comment x1) plus 15 warnings, none
-      # introduced by this workflow. Blocking on them would make every PR red
-      # for reasons unrelated to its change, which trains people to ignore CI.
-      # Fix those 5, then delete this line so lint gates merges. (todo.md:88)
+      # BLOCKING as of 2026-08-05. The 5 pre-existing errors are fixed, so a new
+      # one is now genuinely new and stops the merge. 15 warnings remain and do
+      # not fail the build — `eslint` exits non-zero on errors only.
       - name: Lint
         if: '!cancelled()'
-        continue-on-error: true
         run: npm run lint
 
       - name: Type check

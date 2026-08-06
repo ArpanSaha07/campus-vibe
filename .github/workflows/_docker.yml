@@ -220,7 +220,7 @@ jobs:
       # Two passes on purpose.
       #
       # The first is a report: every fixable HIGH and CRITICAL, printed, never
-      # failing. Base images (node:20-alpine, eclipse-temurin:25-jdk-alpine)
+      # failing. Base images (node:24-alpine, eclipse-temurin:25-jdk-alpine)
       # routinely carry a handful of HIGHs that no change in this repo can
       # resolve, and a gate that red-lights every PR for those trains people to
       # ignore CI — the same reasoning that keeps frontend lint non-blocking.
