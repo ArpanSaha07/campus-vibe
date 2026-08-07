@@ -46,7 +46,8 @@ public class JWTUtil {
     }
 
     /**
-     * Issues a token carrying identity + roles only (see .claude/user-roles.md):
+     * Issues a token carrying identity + roles only
+     * (see .claude/docs/architecture/user-roles.md):
      * subject = user id, claims = email and role names. No club ids, permissions
      * or profile data — ownership is always checked against the database.
      */

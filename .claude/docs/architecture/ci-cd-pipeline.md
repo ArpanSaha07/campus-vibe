@@ -2,12 +2,42 @@
 
 **Status:** 2026-08-06 · branch `ci/github-actions` · `88a03b1` plus uncommitted
 work · **CI only — nothing is deployed.**
+**Authors:** main session (pre-dates the agent team).
 
 > **Read this first.** None of these workflows has ever executed on GitHub. The
 > branch has not been pushed. Everything below describes code that has been
 > validated locally — YAML parsed, shell logic reasoned through, Maven and Docker
 > steps run by hand — but not one run exists in the Actions tab. The first push
 > is the real test. See [Known gaps](#known-gaps-and-blockers).
+
+## In one paragraph
+
+Every push and pull request runs an automated check suite on GitHub's servers
+before code can be merged, so a broken build is caught by a machine rather than
+by you. It is deliberately two-speed: a push to a working branch gets a
+roughly three-minute answer, while a pull request runs the full twelve-minute
+suite including a real database and the full Docker stack. **Nothing deploys** —
+there is no AWS account or registry yet, so this is testing only. The one thing
+to know before acting on this: none of it has actually run yet, because the
+branch is unpushed, and when it does run the full suite is *expected* to fail on
+the known search bug (BUG-001) until that is fixed or quarantined.
+
+## Read this before you change anything here
+
+- **`.github/workflows/ci.yml`** is the only file with real triggers. Everything
+  named `_*.yml` is a reusable workflow that runs only when `ci.yml` calls it.
+- **`ci-success` is load-bearing.** It is the single required status check, it
+  runs `if: always()`, and it treats `skipped` as a pass. That is what lets
+  job-level path filtering coexist with branch protection. Changing its `if:`
+  condition breaks merging repo-wide.
+- **The invariant that is easy to break:** the backend test suite runs on H2 with
+  `flyway.enabled: false`, so it never executes the migration files. Only
+  `_database.yml` does. Deleting that job means schema drift ships silently.
+- Bound by [`database-lifecycle/SKILL.md`](../../skills/database-lifecycle/SKILL.md)
+  for anything touching migrations, and by the root `.dockerignore`, which both
+  Dockerfiles depend on because compose sets `context: ..`.
+- Open defects and priorities: [`bugs.md`](../../bugs/bugs.md) ·
+  [`todo.md`](../../TODO/todo.md).
 
 ---
 
@@ -372,7 +402,7 @@ so push first.
 **The V6 seed is load-bearing for two assertions.** `V6__insert_mock_clubs.sql`
 seeds the 8 clubs that both `_docker.yml`'s `/api/v1/clubs` non-empty assertion
 and `SearchIT.clubSearchFindsSeededClubs()` depend on.
-[`database-lifecycle/SKILL.md`](../skills/database-lifecycle/SKILL.md) plans to
+[`database-lifecycle/SKILL.md`](../../skills/database-lifecycle/SKILL.md) plans to
 move that seed into a dev seeder — that migration breaks both assertions, so they
 must move together.
 
@@ -392,7 +422,7 @@ empty. Only matters once something deploys.
 ## Possible improvements
 
 Ordered by value, each with the reason it has not been done. Tracked in
-[`todo.md`](../TODO/todo.md) under Infrastructure & CI/CD.
+[`todo.md`](../../TODO/todo.md) under Infrastructure & CI/CD.
 
 1. **Push the branch and confirm a green run.** Blocks everything else here. The
    fast tier is expected green; the full tier will fail on BUG-001, which is the
@@ -428,3 +458,8 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 - **2026-08-06** — Created. Documents the pipeline as of `88a03b1` plus the
   uncommitted step 5–6 work (blocking lint, Dependabot, CodeQL, Node 24).
+  *(main session)*
+- **2026-08-06** — Moved from `.claude/docs/` to `.claude/docs/architecture/`;
+  added the *In one paragraph* and *Read this before you change anything here*
+  sections required by the revised `implementation-docs` skill. No change to any
+  described behaviour. *(main session)*
