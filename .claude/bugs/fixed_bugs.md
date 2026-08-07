@@ -6,6 +6,7 @@ Last updated: **2026-08-07**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
 | [BUG-015](#bug-015) | High | 2026-08-07 | `/actuator/health` never existed; two CI jobs waited on it until timeout |
 | [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
 | [BUG-014](#bug-014) | Medium | 2026-08-05 | Google sign-in passed `client_id: undefined`, hidden by `(window as any)` |
@@ -14,6 +15,120 @@ Last updated: **2026-08-07**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-016
+**Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Docker workflow → *Scan images for known vulnerabilities*,
+on the run that followed the [BUG-015](#bug-015) fix. This was the first time the
+scan step had ever reached the frontend image, because the job used to die at the
+health probe before getting there.
+
+**Symptom:** three fixable CRITICALs in `campusvibe-frontend:prod`, all
+`node-pkg`:
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `swiper` | CVE-2026-27212 — prototype pollution | 12.0.2 | 12.1.2 |
+| `tar` | CVE-2026-59873 — DoS via crafted gzip bomb | 7.4.3 | 7.5.19 |
+| `tar` | CVE-2026-59873 | 7.5.16 | 7.5.19 |
+
+**Cause — three separate ones wearing the same error message.** The gate printed
+`Bump the base image`, which was wrong for all three:
+
+1. **`swiper` 12.0.2** was a genuine, directly declared runtime dependency. The
+   hero banner slider uses it, and the code ships to the browser. A real fix.
+
+2. **`tar` 7.4.3** was never a runtime dependency at all. It arrives as
+   `tailwindcss → @tailwindcss/postcss → @tailwindcss/node → @tailwindcss/oxide
+   → tar`, marked `"dev": true` in the lockfile. It was in the production image
+   only because the `runner` stage did `COPY --from=builder /app/node_modules`,
+   which copies **the entire tree, devDependencies included**, into the artifact
+   that would ship. A build-time archive extractor was being shipped to
+   production so that Tailwind, which never runs there, could have it.
+
+3. **`tar` 7.5.16** was not ours in any sense: it is the copy npm bundles at
+   `/usr/local/lib/node_modules/npm/node_modules/tar`, inside `node:24-alpine`
+   itself. Verified by inspecting the image directly — node 24.19.0 ships npm
+   11.17.0, which bundles tar 7.5.16. **No published tag fixed it**:
+   `node:25-alpine` is worse (npm 11.12.1, tar 7.5.11). Only npm 12.0.2 bundles
+   the patched 7.5.19, and no Node release carries it yet.
+
+**Fix.**
+
+- `swiper` `^12.0.2` → `^12.2.0`.
+- `tar` updated in place to 7.5.22 via `npm update tar`, which stays inside the
+  `^7.4.3` range `@tailwindcss/oxide` declares, so nothing was overridden.
+- `output: "standalone"` in `next.config.ts`, and the `runner` stage rebuilt
+  around `.next/standalone` instead of a wholesale `node_modules` copy. The
+  bundle carries **11 top-level packages** rather than the full tree, and `tar`
+  is not among them.
+- **npm deleted from the `runner` stage.** Nothing in that stage invokes it —
+  the entrypoint is now plain `node server.js` — so the vendored tar goes with
+  it. This is what resolved finding 3, and it is the only available answer while
+  no Node tag ships a fixed npm. It is also the better answer regardless: a
+  production image has no business carrying a package manager.
+
+**A trap worth naming.** The standalone change alone would have turned the scan
+green *without fixing anything*, because `swiper` has no `package.json` in the
+standalone bundle — it is compiled into the client chunks — so Trivy simply stops
+seeing it. The vulnerable code still reaches every visitor's browser. **Trivy no
+longer has visibility into client-side dependencies of this image.** Dependabot
+and `npm audit` are the controls for those now, not the image scan. Do not read a
+green Trivy result as a statement about the frontend's npm tree.
+
+**Verified locally**, each step against the real image:
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | clean |
+| `eslint` | 0 errors, 15 warnings (unchanged baseline) |
+| Jest | 23/23 |
+| `next build` | succeeds, 14 routes |
+| Standalone bundle | 11 top-level packages, no `tar` |
+| Image boots | HTTP 200 on `/`, `Ready in 0ms`, 323 MB |
+| **Trivy gate, fixable CRITICAL** | **exit 0** |
+| **Trivy fixable HIGH + CRITICAL** | **zero findings** |
+| Gate still fires | `node:24-alpine` → exit 1, class `lang-pkgs` |
+
+**Picked up on the way.** The HIGH report — printed but non-blocking — showed 12
+findings against `next` 16.2.0, including **CVE-2026-64642, an authentication
+bypass leading to unauthorized access**, fixed in 16.2.11. All 12 sat inside the
+declared `^16.2.0` range, so `npm update next sharp` cleared them; that resolved
+next to **16.3.0** and sharp to 0.35.3, which also cleared the one HIGH against
+sharp 0.34.5 (inherited libvips CVEs). The gate never required this. Leaving a
+known auth bypass in place because the gate only checks CRITICAL would have been
+the wrong call.
+
+**Two follow-on repairs, both caused by the standalone switch:**
+
+- `next start` does not work with `output: standalone` — it boots, warns, and
+  serves markup with no styles. `npm start` pointed at it. Replaced with
+  `frontend/scripts/start-standalone.mjs`, which performs the two copies Next
+  leaves out of the trace (`.next/static`, `public/`) and then runs `server.js`.
+- That script initially failed on Windows in a way worth recording: standalone's
+  `server.js` binds `process.env.HOSTNAME`, and Git Bash exports `HOSTNAME` as
+  the machine name — so it bound the machine interface, `http://localhost:PORT`
+  was refused, and the banner still said `Ready`. The first verification pass
+  appeared to succeed only because Docker Desktop's proxy was answering on
+  port 3000. The script now pins `HOSTNAME` to `127.0.0.1` unless
+  `NEXT_HOSTNAME` overrides it. The Dockerfile sets it to `0.0.0.0` explicitly
+  for the same reason.
+- `jest-haste-map` began reporting a module naming collision between
+  `package.json` and `.next/standalone/package.json` on any local run made after
+  a build. Silenced with `modulePathIgnorePatterns`. CI never saw it, since
+  tests run before the build there.
+
+**Also changed:** the gate's failure message. `Bump the base image` was actively
+misleading — it named the one cause that applied to none of the three findings.
+It now reports the Trivy finding *class* and explains how to route `lang-pkgs`
+(check the Target path: under `/app` it is ours, under
+`/usr/local/lib/node_modules` it is vendored tooling) versus `os-pkgs`.
+
+**Not verified on GitHub.** Everything above is local. The backend image was
+clean in the failing run and was not re-scanned locally.
 
 ---
 

@@ -17,15 +17,19 @@ gate** · **CI only — nothing is deployed.**
 > Dependabot PRs. That decision is now blocking rather than upcoming; see
 > [Known gaps](#known-gaps-and-blockers).
 >
-> The merge to `main` was the first time the **full** tier ran, and it caught a
-> real defect: `Database / Apply migrations to a clean database` and
-> `Docker / Wait for the backend` both timed out on `/actuator/health` because
+> **The full tier has now run twice and failed twice, one step further each
+> time.** Run one timed out on `/actuator/health`, which did not exist because
 > `spring-boot-starter-actuator` was never a dependency
-> ([BUG-015](../../bugs/fixed_bugs.md#bug-015)). **Exactly the class of defect
-> the full tier exists to catch** — no unit test could have found it, because
-> nothing else in the repo boots the packaged jar and asks whether it is ready.
-> Fixed and guarded, but **not yet re-run on GitHub**; the first PR under branch
-> protection is what confirms it.
+> ([BUG-015](../../bugs/fixed_bugs.md#bug-015)). Run two cleared that, ran the
+> whole Docker stack, and failed on the Trivy gate with three fixable CRITICALs
+> ([BUG-016](../../bugs/fixed_bugs.md#bug-016)) — one of which turned out to be
+> an actual vulnerable runtime dependency shipping to browsers, and one of which
+> was a build-time package that was only in the image because the production
+> stage copied the entire `node_modules`. **Exactly the class of defect these
+> jobs exist to catch** — no unit test could have found either, because nothing
+> else in the repo builds the shipping artifact and looks inside it. Both are
+> fixed and verified locally, but **neither is yet re-run on GitHub**; the first
+> PR under branch protection is what confirms them.
 
 ## In one paragraph
 
@@ -36,13 +40,15 @@ stopped by a machine rather than caught after the fact. It is deliberately
 two-speed: a push to a working branch gets a roughly three-minute answer, while
 a pull request runs the full twelve-minute suite including a real database and
 the full Docker stack. **Nothing deploys** — there is no AWS account or registry
-yet, so this is testing only. It has already paid for itself, catching three
-dependency upgrades that break the frontend build and a missing health endpoint
-that would have left any deployment platform unable to tell whether the app had
-started. The one thing to know before acting on it: **`main` cannot currently be
-merged into at all**, because the known search bug (BUG-001) fails the full tier
-that every pull request now has to pass. Fixing or quarantining that one test is
-the next thing that has to happen.
+yet, so this is testing only. It has already paid for itself several times over:
+three dependency upgrades that break the frontend build, a missing health
+endpoint that would have left any deployment platform unable to tell whether the
+app had started, and a vulnerable slider library that was shipping to every
+visitor's browser alongside an entire build toolchain nobody meant to deploy.
+The one thing to know before acting on it: **`main` cannot currently be merged
+into at all**, because the known search bug (BUG-001) fails the full tier that
+every pull request now has to pass. Fixing or quarantining that one test is the
+next thing that has to happen.
 
 ## Read this before you change anything here
 
@@ -276,9 +282,15 @@ In order:
 6. **Build and boot the production frontend image.** Compose pins
    `target: dev`, so the `runner` stage — the image that would actually ship —
    is built nowhere else. Runs on port 3001 to avoid the dev container on 3000.
+   Since [BUG-016](../../bugs/fixed_bugs.md#bug-016) that stage is built from
+   `.next/standalone` and started with `node server.js`; it no longer copies
+   `node_modules`, and npm is deleted from it.
 7. **Trivy**, two passes. Pass one reports every fixable HIGH and CRITICAL with
    `--exit-code 0`. Pass two is the gate, narrowed to fixable CRITICAL with
-   `--exit-code 1`.
+   `--exit-code 1`. On failure the step now reports the Trivy finding **class**
+   and how to route it. It previously said `Bump the base image`, which was the
+   one cause that applied to none of the three findings in the first real
+   failure — see BUG-016.
 
 Container logs dump `if: failure()`; teardown is `if: always()`.
 
@@ -405,9 +417,26 @@ the real fix and belongs with CD, where a registry exists.
 `eclipse-temurin:25-jdk-alpine` routinely carry a handful of HIGHs that no change
 in this repo can resolve. A gate that red-lights every PR for those trains people
 to ignore CI — the same reasoning that kept frontend lint non-blocking until its
-errors were actually fixed. Fixable CRITICALs are a small, actionable set,
-usually resolved by bumping a base image tag. The plan called for HIGH+CRITICAL;
-this is a deliberate departure, with tightening tracked in `todo.md`.
+errors were actually fixed. Fixable CRITICALs are a small, actionable set. The
+plan called for HIGH+CRITICAL; this is a deliberate departure, with tightening
+tracked in `todo.md`.
+
+The original wording here added *usually resolved by bumping a base image tag*.
+[BUG-016](../../bugs/fixed_bugs.md#bug-016) disproved it on the very first real
+failure: of three CRITICALs, one was a declared runtime dependency, one was a
+devDependency that had no business being in the image, and one was npm's own
+bundled `tar` inside `node:24-alpine` **that no published tag fixed** — the
+newer `node:25-alpine` carried an older, worse copy. Bumping the tag would have
+fixed none of them. The gate now reports the finding class instead of asserting a
+cause.
+
+**A limit of image scanning worth stating plainly.** Now that the frontend image
+ships `.next/standalone`, client-side dependencies have no `package.json` in it —
+they are compiled into the browser chunks. Trivy cannot see them, so a green scan
+says nothing about them. `swiper`'s prototype-pollution CVE was visible only
+because the old image copied the whole `node_modules`; after the standalone
+switch the same vulnerable code would ship silently. **Dependabot and
+`npm audit` are the controls for client-side dependencies, not the image scan.**
 
 **Why CodeQL is outside the gate.** CodeQL's extractors trail new language
 releases and this project is on Java 25. Kept standalone with `fail-fast: false`,
@@ -439,16 +468,23 @@ Printing a match to prove it was found would publish it.
 
 ## Known gaps and blockers
 
-**The full tier has run once, on the merge to `main`, and failed.** Both
-full-tier jobs timed out waiting on `/actuator/health`, which did not exist
-([BUG-015](../../bugs/fixed_bugs.md#bug-015)). The dependency is now added and
-both jobs were reproduced locally against `pgvector/pgvector:pg15` — first boot
-UP in ~6 s with 8 of 8 migrations applied, history clean, second boot UP with no
-re-apply, and the containerised backend UP in ~15 s serving 8 clubs. **None of
-that is yet confirmed on GitHub.** Everything past the health probe in those two
-jobs — the compose secret fail-fast, the production frontend image, the Trivy
-gate — has still never executed on a runner, because the run died before
-reaching it.
+**The full tier has run twice and failed twice — but it is advancing.** Run one,
+on the merge to `main`, timed out in both full-tier jobs waiting on
+`/actuator/health`, which did not exist
+([BUG-015](../../bugs/fixed_bugs.md#bug-015)). Run two got past the health probe,
+through the compose stack, through the API smoke tests, built and booted the
+production frontend image — and then failed on the Trivy gate with three fixable
+CRITICALs ([BUG-016](../../bugs/fixed_bugs.md#bug-016)). Each failure has been
+one step further down the job than the last, which is what a pipeline being
+brought up for the first time looks like.
+
+Both are fixed and verified locally: the backend reproduced against
+`pgvector/pgvector:pg15` — first boot UP in ~6 s with 8 of 8 migrations applied,
+history clean, second boot UP with no re-apply, containerised backend UP in ~15 s
+serving 8 clubs — and the frontend image rebuilt, booted (HTTP 200) and rescanned
+to **zero fixable HIGH or CRITICAL findings**. **Neither fix is yet confirmed on
+GitHub.** What has still never executed on a runner is now a much shorter list:
+the Trivy gate *passing*, and the steps after it.
 
 **Every readiness probe depends on one dependency.** Both full-tier jobs, the
 compose backend healthcheck, and any future deployment health check all poll
@@ -510,9 +546,13 @@ GitHub-hosted runners share an IP pool. If pulls start failing, mirror to GHCR.
 **Node 24 is pinned in two places** — `frontend/Dockerfile` and
 `_frontend.yml` — with no `engines` field or `.nvmrc` to enforce agreement.
 
-**BUG-004 is unaddressed.** `NEXT_PUBLIC_*` values are inlined at build time and
-the production image passes no build args, so a deployed frontend would ship them
-empty. Only matters once something deploys.
+**BUG-004 is unaddressed, and now runs on every full tier.** `NEXT_PUBLIC_*`
+values are inlined at build time and the `builder` stage passes no build args, so
+the production image ships them empty. BUG-016 rebuilt the `runner` stage but did
+not touch the `builder` stage, which is where the defect lives. `_docker.yml` now
+builds *and boots* that image on every full-tier run, so CI is exercising an
+artifact that is already wrong in a way no assertion checks — the smoke test only
+asks for HTTP 200 on `/`, which an empty API URL still returns.
 
 ---
 
@@ -529,12 +569,14 @@ Ordered by value, each with the reason it has not been done. Tracked in
    production frontend image, the Trivy gate — has still never executed on a
    runner, because the only full-tier run so far died before reaching it. The
    BUG-015 fix is verified locally and nowhere else.
-3. **Tighten the Trivy gate to HIGH** — after one clean run establishes the base
-   image baseline. Doing it before means guessing at the noise floor.
-4. **`output: standalone` in `next.config.ts`** and a `runner` stage that copies
-   `.next/standalone` + `.next/static` and runs `node server.js`. The production
-   image currently ships the full dev+prod `node_modules`. Now verifiable,
-   because `_docker.yml` builds and boots that image.
+3. **Fix BUG-004** — build args for `NEXT_PUBLIC_*`. Promoted because CI now
+   builds and boots the production image on every full-tier run, so the pipeline
+   is actively producing a misconfigured artifact. Cheap: two `ARG`/`ENV` lines
+   before `npm run build` and matching `build.args` in compose.
+4. **Tighten the Trivy gate to HIGH** — the frontend image now measures **zero**
+   fixable HIGHs locally, so the noise floor is no longer a guess for that half.
+   The backend image has not been measured. Do it after one clean full-tier run
+   establishes both baselines together.
 5. **Add `.nvmrc` or an `engines` field** so the Node version has one source of
    truth instead of two.
 6. **Extend `_database.yml` when the dev seeder lands** — assert `DevDataSeeder`
@@ -595,3 +637,19 @@ Ordered by value, each with the reason it has not been done. Tracked in
   blocker to an active one** — it fails the full tier, every PR runs the full
   tier, so nothing merges until it is fixed or quarantined. Improvements
   reordered behind it. *(main session)*
+- **2026-08-07** — **Second full-tier run: past the health probe, failed on the
+  Trivy gate** with three fixable CRITICALs
+  ([BUG-016](../../bugs/fixed_bugs.md#bug-016)). Fixed by bumping `swiper` and
+  `tar`, switching the frontend to `output: standalone` so the production image
+  stops carrying the devDependency tree, and deleting npm from the `runner`
+  stage — the third finding was npm's own bundled `tar`, which no published Node
+  tag fixes. The gate's failure message no longer claims the base image is at
+  fault; it reports the finding class and how to route it. Two documented
+  claims were **wrong and are corrected**: that fixable CRITICALs are *usually*
+  a base-image bump, and — newly added — that a green image scan says anything
+  about client-side dependencies, which it no longer can. The `output:
+  standalone` improvement item is now done and has been replaced by BUG-004,
+  promoted because CI builds and boots that image on every full-tier run.
+  Also picked up outside the gate: 12 HIGH findings against `next` 16.2.0,
+  including an authentication bypass, cleared by an in-range update to 16.3.0.
+  *(main session)*

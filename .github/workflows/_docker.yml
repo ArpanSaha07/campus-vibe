@@ -252,8 +252,15 @@ jobs:
       # ignore CI — the same reasoning that keeps frontend lint non-blocking.
       #
       # The second is the actual gate, narrowed to fixable CRITICALs. That set
-      # is small, actionable, and almost always resolved by bumping a base image
-      # tag. Tighten to HIGH once the baseline is known to be clean.
+      # is small and actionable. Tighten to HIGH once the baseline is known to
+      # be clean — as of BUG-016 the production frontend image reports zero
+      # fixable HIGHs, so that tightening is now within reach for this image.
+      #
+      # The advice printed on failure used to say `bump the base image`, which
+      # sent the first real failure looking in the wrong place: two of the three
+      # CRITICALs were npm packages this repo controls, and the third was npm's
+      # own bundled copy inside node:24-alpine, which no published tag fixed.
+      # Report the finding class instead and let the reader route it.
       - name: Scan images for known vulnerabilities
         run: |
           set -euo pipefail
@@ -269,14 +276,35 @@ jobs:
           done
 
           failed=0
+          classes=""
           for img in "$backend_image" campusvibe-frontend:prod; do
             echo "--- Gate: fixable CRITICAL — $img ---"
-            trivy image --scanners vuln --ignore-unfixed \
-              --severity CRITICAL --exit-code 1 --quiet "$img" || failed=1
+            if ! trivy image --scanners vuln --ignore-unfixed \
+              --severity CRITICAL --exit-code 1 --quiet "$img"; then
+              failed=1
+              # Which ecosystem a finding came from decides who fixes it, so
+              # collect the classes rather than guessing in the error message.
+              classes="$classes $(trivy image --scanners vuln --ignore-unfixed \
+                --severity CRITICAL --format json --quiet "$img" \
+                | jq -r '[.Results[]? | select(.Vulnerabilities != null) | .Class]
+                         | unique | join(",")')"
+            fi
           done
 
           if [ "$failed" -ne 0 ]; then
-            echo "::error::A fixable CRITICAL vulnerability is present. Bump the base image."
+            echo "::error::A fixable CRITICAL vulnerability is present (finding classes:$classes)."
+            echo "Route it by class. Do not assume the base image is at fault:"
+            echo "  lang-pkgs — a dependency (node-pkg, jar). Check the Target"
+            echo "              column for the path. Under /app it is ours, so"
+            echo "              bump it in frontend/package-lock.json with"
+            echo "              npm update <pkg>, or npm install <pkg>@<version>"
+            echo "              when the fix sits outside the declared range."
+            echo "              Under /usr/local/lib/node_modules it is tooling"
+            echo "              vendored into the base image; if the runtime"
+            echo "              stage does not use it, delete it there."
+            echo "  os-pkgs   — the base image proper. Bump the tag, and if no"
+            echo "              published tag carries the fix yet, say so in"
+            echo "              bugs.md rather than leaving CI red."
             exit 1
           fi
           echo "No fixable CRITICAL vulnerabilities."

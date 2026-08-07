@@ -3,7 +3,7 @@
 Last updated: **2026-08-07** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-015 so far). Bug ids are never reused.
+(BUG-008 … BUG-016 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -190,11 +190,18 @@ development no longer hits this. **The bug is unchanged for the production
 image** — the `builder`/`runner` path still runs `npm run build` with no values
 supplied, so it stays open and must be fixed before deploying.
 
+**Still open after BUG-016 (2026-08-07).** That change rewrote the `runner`
+stage around `output: standalone` and now boots the production image in CI, so
+the bug is closer to being *observable* — but the `builder` stage still runs
+`npm run build` with no values supplied, which is the actual defect. If anything
+it matters more now: CI builds and serves that image on every full-tier run, so
+whatever it bakes in is what a deployment would ship.
+
 **Fix direction:** pass them as `ARG`/`ENV` before `npm run build` and declare
 matching `build.args` in compose.
 
 **Affected files**
-- `frontend/Dockerfile:1-7`
+- `frontend/Dockerfile` — the `builder` stage
 - `docker/docker-compose.yml` (frontend service `environment:` → needs `build.args`)
 - `frontend/app/lib/api.tsx:1`, `frontend/app/components/auth-components/OAuthButtons.tsx:10`
 
