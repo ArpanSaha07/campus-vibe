@@ -1,0 +1,255 @@
+name: CI
+
+# The single entry point. Everything else under .github/workflows/_*.yml is a
+# reusable workflow called from here and never triggered on its own.
+#
+# WHY ONE WORKFLOW INSTEAD OF FOUR
+#
+# The previous layout put `paths:` filters at the workflow level. That makes
+# required status checks impossible: a PR touching only frontend/ never STARTS
+# backend-ci, so a branch-protection rule requiring it waits forever on
+# "Expected — Waiting for status". Filtering at the JOB level instead, behind a
+# single always-run gate job, keeps the work component-scoped while still
+# producing exactly one check that always reports.
+#
+# BRANCH PROTECTION: require only the check named "CI". Never require the
+# component jobs — that reintroduces the deadlock this design exists to avoid.
+
+on:
+  pull_request:
+  push:
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded runs on a feature branch are noise. On main they are history —
+  # every commit that lands should have a completed run against it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Which components does this change actually touch, and how hard do we test?
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changed components
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.decide.outputs.backend }}
+      frontend: ${{ steps.decide.outputs.frontend }}
+      db: ${{ steps.decide.outputs.db }}
+      docker: ${{ steps.decide.outputs.docker }}
+      # Fast tier = a plain push to a feature branch: compile, unit tests, lint,
+      # type-check, migration lint, secret scan. Roughly three minutes, which is
+      # the point — a branch push is an iteration loop.
+      #
+      # Full tier = pull_request, push to main, merge_group, manual dispatch. It
+      # adds the integration suites, a real Flyway migrate and the Docker stack.
+      # main re-runs everything because a merge result can differ from the PR
+      # head that was tested, and because main is what would eventually deploy.
+      full-tier: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # dorny/paths-filter diffs a push against github.event.before, which is
+      # all zeros on the first push to a new branch — there is no base to
+      # compare with. Fail OPEN in that case: run everything. A wasted full run
+      # on a branch's first push is the cheap mistake; silently skipping every
+      # component is the expensive one.
+      - name: Decide whether change detection can be trusted
+        id: force
+        run: |
+          set -euo pipefail
+          force=false
+          case "${{ github.event_name }}" in
+            workflow_dispatch|merge_group)
+              force=true
+              reason="event is ${{ github.event_name }}"
+              ;;
+            push)
+              before="${{ github.event.before }}"
+              if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+                force=true
+                reason="first push to this branch; no base commit to diff against"
+              fi
+              ;;
+          esac
+          if [ "$force" = "true" ]; then
+            echo "Running every component: ${reason:-unknown}"
+          fi
+          echo "all=$force" >> "$GITHUB_OUTPUT"
+
+      - name: Filter paths
+        id: filter
+        if: steps.force.outputs.all != 'true'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/_backend.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/_frontend.yml'
+            db:
+              - 'backend/src/main/resources/db/migrations/**'
+              - 'backend/src/main/java/**'
+              - 'backend/pom.xml'
+              - '.github/workflows/_database.yml'
+            docker:
+              - 'backend/**'
+              - 'frontend/**'
+              - 'docker/**'
+              - '.dockerignore'
+              - '.github/workflows/_docker.yml'
+            # A change to the pipeline itself is the one case where the pipeline
+            # cannot be trusted to scope itself, so it runs everything.
+            workflows:
+              - '.github/workflows/**'
+
+      - name: Combine
+        id: decide
+        run: |
+          set -euo pipefail
+          all='${{ steps.force.outputs.all }}'
+          wf='${{ steps.filter.outputs.workflows }}'
+
+          decide() {
+            if [ "$all" = "true" ] || [ "$wf" = "true" ] || [ "$1" = "true" ]; then
+              echo true
+            else
+              echo false
+            fi
+          }
+
+          {
+            echo "backend=$(decide '${{ steps.filter.outputs.backend }}')"
+            echo "frontend=$(decide '${{ steps.filter.outputs.frontend }}')"
+            echo "db=$(decide '${{ steps.filter.outputs.db }}')"
+            echo "docker=$(decide '${{ steps.filter.outputs.docker }}')"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Runs in every tier, on every component. A leaked credential is the one
+  # failure that cannot be undone by a follow-up commit.
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Full history: the scan below walks commits, not the working tree, and
+      # the default depth of 1 would leave it nothing to walk. 87 commits at the
+      # time of writing — the fetch costs a couple of seconds.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The binary, not gitleaks/gitleaks-action@v2 — that action requires a
+      # paid GITLEAKS_LICENSE for organisation-owned repositories and fails
+      # closed without one. The version is resolved at run time rather than
+      # pinned so a stale tag can never break the pipeline.
+      - name: Install gitleaks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(curl -sSfL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+            | jq -r .tag_name | sed 's/^v//')
+          echo "gitleaks version: $version"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      # `git` scans commit history, not the working tree. Two reasons:
+      #
+      #   1. A secret that was committed and later deleted is still compromised.
+      #      Only a history scan sees it. Scanning the tree would report the
+      #      repo as clean while the credential sits one `git log -p` away.
+      #   2. `dir` has no gitignore awareness, so it also reads build output —
+      #      locally it scanned 99 MB of frontend/.next and returned 7 findings,
+      #      every one of them a Next.js manifest key. History has none of that.
+      #
+      # Verified locally at gitleaks 8.30.1: 68 commits, 1.56 MB, 428 ms.
+      #
+      # --redact keeps any match out of the log, which is world-readable on a
+      # public repo. A genuine false positive belongs in .gitleaksignore at the
+      # repo root — with a comment justifying it — never in a loosened flag.
+      - name: Scan commit history
+        run: gitleaks git . --redact --verbose --no-banner
+
+  # ---------------------------------------------------------------------------
+  # Components. Each is skipped when its paths are untouched; `ci-success`
+  # below treats a skip as a pass.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/_backend.yml
+    with:
+      full-tier: ${{ needs.changes.outputs.full-tier == 'true' }}
+
+  frontend:
+    name: Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend.yml
+
+  # Called in both tiers. The workflow gates its own expensive `migrate` job on
+  # full-tier and always runs the seconds-long migration file lint.
+  database:
+    name: Database
+    needs: changes
+    if: needs.changes.outputs.db == 'true'
+    uses: ./.github/workflows/_database.yml
+    with:
+      full-tier: ${{ needs.changes.outputs.full-tier == 'true' }}
+
+  docker:
+    name: Docker
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' && needs.changes.outputs.full-tier == 'true'
+    uses: ./.github/workflows/_docker.yml
+
+  # ---------------------------------------------------------------------------
+  # THE required status check. Require this one, and only this one, on main.
+  #
+  # `always()` is what makes it report even when every component skipped, and
+  # the failure test below counts only real failures and cancellations —
+  # `skipped` passes. That combination is precisely what lets job-level path
+  # filtering coexist with branch protection.
+  # ---------------------------------------------------------------------------
+  ci-success:
+    name: CI
+    if: always()
+    needs: [changes, secret-scan, backend, frontend, database, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report component results
+        run: |
+          echo "changes:     ${{ needs.changes.result }}"
+          echo "secret-scan: ${{ needs.secret-scan.result }}"
+          echo "backend:     ${{ needs.backend.result }}"
+          echo "frontend:    ${{ needs.frontend.result }}"
+          echo "database:    ${{ needs.database.result }}"
+          echo "docker:      ${{ needs.docker.result }}"
+          echo
+          echo "tier: ${{ needs.changes.outputs.full-tier == 'true' && 'full' || 'fast' }}"
+
+      - name: Fail if any component failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+
+      - name: Pass
+        run: echo "All required checks passed or were not applicable."

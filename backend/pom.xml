@@ -175,6 +175,32 @@
 					</excludes>
 				</configuration>
 			</plugin>
+
+			<!--
+			  Splits the suite in two by class-name convention:
+
+			    surefire  (test phase)              *Test  — plain unit tests,
+			                                        no Spring context, no Docker
+			    failsafe  (integration-test/verify) *IT    — @SpringBootTest and
+			                                        Testcontainers suites
+
+			  So `./mvnw test` is a fast local loop, and CI's fast tier runs
+			  `./mvnw verify -DskipITs` — still producing the jar, just without
+			  the slow half. `-DskipITs` is failsafe's own property; nothing
+			  extra is needed to make it work.
+
+			  AbstractIntegrationTest keeps its name: surefire's default includes
+			  match it, but both plugins skip abstract classes.
+
+			  No <executions> here on purpose. spring-boot-starter-parent already
+			  binds integration-test and verify in its pluginManagement; merely
+			  declaring the plugin activates that binding. Adding our own
+			  execution would run every IT twice.
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+			</plugin>
 		</plugins>
 	</build>
 

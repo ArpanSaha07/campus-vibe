@@ -11,14 +11,18 @@ export default function OAuthButtons() {
 
   useEffect(() => {
     if (!clientId) return;
+    // Re-bound after the guard so `init` sees a `string` rather than the
+    // component-scope `string | undefined`. GIS requires client_id; passing
+    // undefined renders no button and reports nothing.
+    const resolvedClientId = clientId;
 
     function init() {
-      const google = (window as any).google;
+      const google = window.google;
       if (!google?.accounts?.id) return;
 
       google.accounts.id.initialize({
-        client_id: clientId,
-        callback: async (response: any) => {
+        client_id: resolvedClientId,
+        callback: async (response) => {
           const idToken = response?.credential;
           if (!idToken) {
             setError("Failed to get Google token");
@@ -53,7 +57,7 @@ export default function OAuthButtons() {
     );
 
     if (existing) {
-      if ((window as any).google?.accounts?.id) {
+      if (window.google?.accounts?.id) {
         init();
       } else {
         existing.addEventListener("load", init, { once: true });

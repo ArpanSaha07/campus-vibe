@@ -1,8 +1,8 @@
-AGENTS.md
-
 # Secrets — never commit real values.
 # .env.example is the committed template and is explicitly re-included.
 .env
 .env.*
 !.env.example
 *.pem
+
+.claude/docs/commit-message.md

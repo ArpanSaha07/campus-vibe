@@ -1,36 +1,30 @@
-name: Database CI - Flyway Migrations
+name: Database
 
-# Guards the rules in .claude/skills/database-lifecycle/SKILL.md.
+# Reusable. Called only by ci.yml.
 #
-# Why this workflow exists separately from backend-ci:
-# the backend test suite runs on in-memory H2 with `ddl-auto: create-drop` and
-# `flyway.enabled: false` (application-test.yml), so Hibernate builds the schema
-# from the entities and the migrations are never executed. Only
-# SearchIntegrationTest touches real Postgres. That means a migration could be
-# malformed, out of order, or drifted from the entities and the whole backend
-# suite would still pass. This workflow runs the migrations for real.
+# Why this exists separately from the backend job: the backend test suite runs
+# on in-memory H2 with `ddl-auto: create-drop` and `flyway.enabled: false`
+# (application-test.yml), so Hibernate builds the schema from the entities and
+# the migrations are never executed. Only SearchIT touches real Postgres. That
+# means a migration could be malformed, out of order, or drifted from the
+# entities and the whole backend suite would still pass. This runs them for
+# real.
+#
+# Tiering: `lint-migrations` needs no database and finishes in seconds, so it
+# runs in BOTH tiers — a bad filename should be caught on the push that
+# introduced it. `migrate` costs a full Maven build plus a Postgres container,
+# so it is gated to the full tier.
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-      - backend
-    paths:
-      - 'backend/src/main/resources/db/migrations/**'
-      - 'backend/src/main/java/**'
-      - 'backend/pom.xml'
-      - '.github/workflows/database-ci.yml'
-  pull_request:
-    paths:
-      - 'backend/src/main/resources/db/migrations/**'
-      - 'backend/src/main/java/**'
-      - 'backend/pom.xml'
-      - '.github/workflows/database-ci.yml'
+  workflow_call:
+    inputs:
+      full-tier:
+        description: 'When false, only the no-database lint job runs.'
+        type: boolean
+        required: true
 
-concurrency:
-  group: database-ci-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 env:
   MIGRATIONS_DIR: backend/src/main/resources/db/migrations
@@ -43,6 +37,7 @@ jobs:
   lint-migrations:
     name: Lint migration files
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout repository
@@ -112,12 +107,14 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Applies the migrations for real, against the same image used in dev and
-  # compose (pgvector is required by V8).
+  # compose (pgvector is required by V8). Full tier only.
   # ---------------------------------------------------------------------------
   migrate:
     name: Apply migrations to a clean database
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: lint-migrations
+    if: inputs.full-tier
 
     services:
       postgres:
@@ -164,12 +161,12 @@ jobs:
           }
           psql --version
 
-      # Tests are backend-ci's responsibility; this job only needs the artifact.
+      # Tests are the backend job's responsibility; this one only needs the
+      # artifact. -DskipITs additionally keeps failsafe from starting a second
+      # Postgres through Testcontainers alongside the service container.
       - name: Build jar
         working-directory: ./backend
-        run: |
-          chmod +x mvnw
-          ./mvnw -B -DskipTests package
+        run: ./mvnw -B -DskipTests -DskipITs package
 
       # Booting the real application is a deliberate choice over invoking the
       # Flyway CLI: it exercises the exact code path production uses, and
@@ -269,7 +266,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: database-ci-boot-logs
+          name: database-boot-logs
           path: boot-*.log
           if-no-files-found: ignore
           retention-days: 7

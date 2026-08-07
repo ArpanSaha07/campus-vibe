@@ -1,9 +1,9 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-03** · Branch: `feature/frontend-ui`
+Last updated: **2026-08-05** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-009 … BUG-013 so far). Bug ids are never reused.
+(BUG-008 … BUG-014 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -14,7 +14,6 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-005](#bug-005) | Medium | Unauthenticated search can drive unbounded OpenAI spend |
 | [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
-| [BUG-008](#bug-008) | Low | `.ci/build-publish.sh` is empty; frontend CD is hard-disabled |
 
 ---
 
@@ -61,12 +60,21 @@ should admit it. Worth checking, in order:
 - `backend/src/main/java/com/campusvibe/search/SearchIndexService.java:38-49`
 
 **Affected tests**
-- `SearchIntegrationTest.semanticSearchMatchesMeaningWithoutSharedKeywords` — **FAILING**
+- `SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords` — **FAILING**
+  (renamed from `SearchIntegrationTest` on `ci/github-actions` so maven-failsafe
+  picks it up; it now runs in the PR tier, not on every branch push)
 - Remaining 6 tests in that class pass. Note `semanticallyClosestResultRanksFirst`
   passes but does **not** prove semantics work: its query `chess` also matches by
   keyword, so the keyword leg alone satisfies it.
 
-**Current suite state:** 40 tests, 39 pass, this 1 failure.
+**Current suite state:** 40 tests, 39 pass, this 1 failure. Re-measured
+2026-08-05 against the surefire/failsafe split: 14 unit tests + 26 integration
+tests, failing at `SearchIT:163`.
+
+**Blocks branch protection.** Once `CI` is a required check on `main`, this one
+test makes the branch unmergeable. Either fix it or annotate **the single
+method** `@Disabled("BUG-001: …")` — disabling the whole class would also lose
+the 6 passing search tests. See `.claude/TODO/todo.md`.
 
 ---
 
@@ -76,7 +84,7 @@ should admit it. Worth checking, in order:
 **Found:** 2026-07-30, while establishing why a non-compiling `main` had a green
 history.
 
-**Symptom:** `.github/workflows/backend-ci.yml:23-27` sets up JDK 17, while
+**Symptom (as found):** `.github/workflows/backend-ci.yml:23-27` set up JDK 17, while
 `backend/pom.xml:33` declares `<java.version>25</java.version>` and
 `backend/Dockerfile:1` uses `eclipse-temurin:25-jdk-alpine`. The build cannot
 succeed on 17.
@@ -85,8 +93,15 @@ Compounding it, line 33 runs `./mvnw -q -DskipTests package` — **backend tests
 never run in CI at all**, which is why [BUG-001](#bug-001) and
 [BUG-009](fixed_bugs.md#bug-009) both reached the branch unnoticed.
 
+**Status:** the workflow was rewritten on `ci/github-actions` and `backend-ci.yml`
+no longer exists — the backend job now lives in `.github/workflows/_backend.yml`,
+which pins JDK 25 and runs `./mvnw -B verify` (never `-DskipTests`). Kept OPEN
+only because **no workflow in this repo has ever executed on GitHub**, so the fix
+is unverified. Close it once a run is green.
+
 **Affected files**
-- `.github/workflows/backend-ci.yml:23-27` (JDK version), `:29-33` (skipped tests)
+- `.github/workflows/_backend.yml` (JDK 25, `./mvnw -B verify`) — supersedes the
+  deleted `backend-ci.yml`
 - `backend/pom.xml:33`, `backend/Dockerfile:1` (the versions CI must match)
 
 **Note for local work:** there is no JDK on `PATH` on the current dev machine and
@@ -239,7 +254,7 @@ developer with `OPENAI_API_KEY` exported would have had non-stubbed integration
 tests make **live billed calls**.
 
 **Mitigated, not fixed:** `campusvibe.ai.openai.api-key: ""` and a test-only
-`jwt.secret` were added to that file, and `SearchIntegrationTest` (which
+`jwt.secret` were added to that file, and `SearchIT` (which
 deliberately does not use the `test` profile, because it needs Flyway + pgvector)
 now pins both via `@SpringBootTest(properties = …)`. The file should still be
 moved to `src/test/resources` so test config cannot ship to production.
@@ -247,20 +262,4 @@ moved to `src/test/resources` so test config cannot ship to production.
 **Affected files**
 - `backend/src/main/resources/application-test.yml` → should be `backend/src/test/resources/`
 - `backend/src/test/java/com/campusvibe/AbstractIntegrationTest.java:22` (`@ActiveProfiles("test")`)
-- `backend/src/test/java/com/campusvibe/search/SearchIntegrationTest.java:51-58`
-
----
-
-### BUG-008
-**`.ci/build-publish.sh` is empty; frontend CD is hard-disabled** · Low · OPEN
-
-**Found:** 2026-07-30, auditing the deployment path.
-
-**Symptom:** `.ci/build-publish.sh` is a **0-byte file**. `frontend-cd.yml:14`
-sets `if: false` on the deploy job, and its only remaining step generates a build
-number string — there is no Vercel or AWS deploy action. So the README's claim of
-a CI/CD pipeline is aspirational; nothing deploys.
-
-**Affected files**
-- `.ci/build-publish.sh` (empty)
-- `.github/workflows/frontend-cd.yml:12-23`
+- `backend/src/test/java/com/campusvibe/search/SearchIT.java:51-58`

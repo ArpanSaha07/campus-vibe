@@ -2,15 +2,44 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-02**
+Last updated: **2026-08-05**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
+| [BUG-014](#bug-014) | Medium | 2026-08-05 | Google sign-in passed `client_id: undefined`, hidden by `(window as any)` |
 | [BUG-009](#bug-009) | Blocker | 2026-07-30 | Duplicate methods from merge `8f81d82` broke compilation |
 | [BUG-010](#bug-010) | High | 2026-07-30 | Committed JWT fallback secret |
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-008
+**`.ci/build-publish.sh` is empty; frontend CD is hard-disabled** · Low · FIXED 2026-08-05
+
+**Found:** 2026-07-30, auditing the deployment path.
+
+**Symptom:** `.ci/build-publish.sh` was a **0-byte file**. `frontend-cd.yml:14`
+set `if: false` on the deploy job, and its only remaining step generated a build
+number string that no other step read — there was no Vercel or AWS deploy action.
+Worse, its `workflow_run` trigger carried no branch guard, so it fired after
+frontend CI passed on *any* branch. The README's claim of a CI/CD pipeline was
+aspirational; nothing deployed.
+
+**Fix:** both were **deleted** rather than implemented. CD was scoped out of the
+`ci/github-actions` work deliberately — there is no AWS account, no OIDC role, no
+registry, and `Dockerrun.aws.json` still carries the literal
+`<your-backend-image>:latest` placeholder. A stub that lies about deploying is
+worse than no stub: it makes the pipeline look finished. The prerequisites for
+real CD are tracked in [`todo.md`](../TODO/todo.md) instead.
+
+This closes the defect (dead code claiming to deploy). "Nothing deploys yet" is
+not a bug — it is planned work.
+
+**Affected files:** `.ci/build-publish.sh` (deleted),
+`.github/workflows/frontend-cd.yml` (deleted)
 
 ---
 
@@ -140,3 +169,40 @@ that no polling env vars are needed. `docker compose config` resolves all six
 watch rules to real absolute paths.
 
 **Affected files:** `frontend/Dockerfile`, `docker/docker-compose.yml`
+
+---
+
+### BUG-014
+**Google sign-in passed `client_id: undefined`, hidden by `(window as any)`** · Medium · FIXED 2026-08-05
+
+**Found:** 2026-08-05, while fixing the 5 eslint errors so lint could gate merges
+(CI plan step 5). Not found by reading the file — found by `tsc` the moment the
+`any` was removed.
+
+**Symptom:** `OAuthButtons.tsx` reached the Google Identity Services library
+through `(window as any).google`, so every argument to `initialize()` and
+`renderButton()` was unchecked. `client_id` was passed
+`process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID`, typed `string | undefined`. The
+effect does guard with `if (!clientId) return;`, but that narrowing does not
+reach the nested `init()` closure, so the value TypeScript saw there was still
+possibly `undefined`.
+
+This is worse than a normal type hole because **GIS silently ignores keys it does
+not recognise and options it cannot use** — there is no exception and no console
+error. The failure mode is a sign-in button that simply never renders, which
+looks identical to the "Google sign-in not configured" path the component already
+has for a missing client id.
+
+**Fix:** added `frontend/app/types/google-identity.d.ts` declaring only the GIS
+surface this app actually calls (`initialize`, `renderButton`, the credential
+response) plus a `Window.google?: GoogleIdentityServices` augmentation — optional,
+because the global exists only after the remote script loads. Replaced both
+`(window as any)` casts and the `callback: (response: any)` parameter, which now
+infers. Re-bound `clientId` to a local `const` after the guard so `init()` sees a
+`string`.
+
+Value beyond the lint fix: a typo in any GIS option name is now a compile error
+rather than a silent no-op.
+
+**Affected files:** `frontend/app/components/auth-components/OAuthButtons.tsx`,
+`frontend/app/types/google-identity.d.ts` *(new)*

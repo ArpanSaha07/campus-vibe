@@ -1,0 +1,74 @@
+version: 2
+
+# Weekly dependency PRs, grouped so a quiet week produces four PRs rather than
+# forty. Every PR runs the full CI tier (it opens a pull_request), so a bump
+# that breaks the build says so before it is merged.
+#
+# Majors are deliberately NOT grouped: they are the ones that need reading, and
+# burying a major inside a "minor and patch" PR is how a breaking change gets
+# rubber-stamped.
+
+updates:
+  # --- Backend (Maven) ------------------------------------------------------
+  # Most of the tree is version-managed by spring-boot-starter-parent, so there
+  # is little to bump there. What Dependabot is actually here for is the block
+  # of hard-pinned dependencies in backend/pom.xml that sit outside any BOM:
+  # software.amazon.awssdk:s3, commons-io, the three Google OAuth/API/HTTP
+  # client libraries, and jjwt. Those go stale silently.
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      maven-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # --- Frontend (npm) -------------------------------------------------------
+  # Expect this to open with `eslint-config-next`, pinned at 15.5.3 while `next`
+  # is ^16.2.0 — the lint rules are a major behind the framework they lint.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # --- GitHub Actions -------------------------------------------------------
+  # Keeps actions/checkout, actions/setup-java, actions/setup-node,
+  # actions/upload-artifact and dorny/paths-filter current. Note that the
+  # gitleaks and Trivy binaries are resolved at run time, not pinned here, so
+  # they are not Dependabot's to manage.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']
+
+  # --- Base images ----------------------------------------------------------
+  # One entry per Dockerfile directory; Dependabot does not search recursively.
+  # These are what the Trivy gate in _docker.yml scans, so a bump here is
+  # usually the fix when that gate goes red.
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

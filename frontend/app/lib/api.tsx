@@ -19,7 +19,7 @@ export function clearToken() {
 
 type FetchOptions = RequestInit & { auth?: boolean };
 
-export async function apiFetch<T = any>(path: string, opts: FetchOptions = {}): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(opts.headers as Record<string, string> | undefined),
@@ -42,6 +42,9 @@ export async function apiFetch<T = any>(path: string, opts: FetchOptions = {}): 
   if (ct.includes("application/json")) {
     return res.json();
   }
-  // @ts-ignore
-  return undefined;
+  // A 204, or any non-JSON body, has nothing to parse. The cast is the honest
+  // shape of that: the caller's T states what it expects, and an empty response
+  // has no value to satisfy it. Callers of endpoints that can return no body
+  // should type T accordingly (e.g. `apiFetch<void>`).
+  return undefined as T;
 }

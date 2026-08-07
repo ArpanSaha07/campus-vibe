@@ -1,0 +1,42 @@
+# Build context exclusions for BOTH images.
+#
+# docker/docker-compose.yml sets `context: ..` (the repo root) for the backend
+# and the frontend, so this file — not frontend/.dockerignore — is the one that
+# applies. Without it every image build uploads .git/, node_modules/, target/
+# and .next/ to the daemon before the first instruction runs.
+
+# --- VCS, tooling, docs ---
+.git
+.gitignore
+.github
+.claude
+.vscode
+.idea
+**/*.md
+
+# --- Secrets. Nothing here should ever reach an image layer. ---
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+
+# --- Node ---
+**/node_modules
+frontend/.next
+frontend/out
+frontend/coverage
+frontend/npm-debug.log*
+
+# --- Java ---
+# backend/Dockerfile COPYs the packaged jar out of backend/target, so the
+# directory itself must stay in the context. Excluding its children one level
+# down (rather than the directory) keeps the negation below reliable.
+backend/target/*
+!backend/target/campusvibe-*.jar
+backend/.mvn/wrapper/maven-wrapper.jar
+**/*.class
+
+# --- Local noise ---
+**/.DS_Store
+**/Thumbs.db
+docker/.env

@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-class AuthenticationFlowIntegrationTest extends AbstractIntegrationTest {
+class AuthenticationFlowIT extends AbstractIntegrationTest {
 
     private String json(Object body) throws Exception {
         return objectMapper.writeValueAsString(body);
