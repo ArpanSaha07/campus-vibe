@@ -1,9 +1,9 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-05** · Branch: `ci/github-actions`
+Last updated: **2026-08-07** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-014 so far). Bug ids are never reused.
+(BUG-008 … BUG-015 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|

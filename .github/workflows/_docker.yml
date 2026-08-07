@@ -121,17 +121,43 @@ jobs:
           docker compose ps
           exit 1
 
+      # Same status-capture reasoning as _database.yml: 000 is a connection
+      # refusal, anything else is served-but-not-UP. Without it, a container
+      # that crash-loops and one that is up but has no actuator produce an
+      # identical message. The container-running check below separates those
+      # two cases before the timeout is even reached.
       - name: Wait for the backend
+        working-directory: ./docker
         run: |
           set -euo pipefail
+          code=000
           for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health 2>/dev/null || echo 000)
             if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
               echo "Backend UP — Flyway ran and the schema validated inside the container."
               exit 0
             fi
+            if [ "$(docker inspect -f '{{.State.Running}}' campusvibe-backend 2>/dev/null)" != "true" ]; then
+              echo "::error::Backend container is no longer running."
+              docker compose logs backend --tail 200
+              exit 1
+            fi
             sleep 5
           done
-          echo "::error::Backend never became healthy."
+          echo "::error::Backend never became healthy (last HTTP status: $code)."
+          echo "Container health: $(docker inspect -f '{{.State.Health.Status}}' campusvibe-backend 2>/dev/null || echo unknown)"
+          if [ "$code" = "000" ]; then
+            # The compose healthcheck probes localhost INSIDE the container, so
+            # a healthy container that this loop cannot reach isolates the fault
+            # to port publishing rather than to the application.
+            echo "Nothing accepted a connection on the published port."
+            echo "If container health above is 'healthy', the app is fine and the"
+            echo "8080:8080 port mapping is what broke."
+          else
+            echo "The container is serving HTTP but /actuator/health did not report UP."
+            echo "A 404 or 500 here means the endpoint is absent — check that"
+            echo "spring-boot-starter-actuator is still a backend dependency."
+          fi
           exit 1
 
       - name: Wait for the frontend

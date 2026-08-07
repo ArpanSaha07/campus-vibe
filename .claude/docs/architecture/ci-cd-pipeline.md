@@ -1,43 +1,59 @@
 # CI/CD Pipeline — Implementation & Design Decisions
 
-**Status:** 2026-08-07 · branch `agentic-team-creation` · `00a0933` ·
-**fast tier verified green on GitHub; full tier still unrun on this branch** ·
-**CI only — nothing is deployed.**
+**Status:** 2026-08-07 · branch `ci/github-actions` ·
+**branch protection is ENABLED on `main`; the pipeline is now a real merge
+gate** · **CI only — nothing is deployed.**
 **Authors:** main session (pre-dates the agent team).
 
-> **Read this first.** The pipeline **works**. Run `31141549342` on `00a0933`
-> passed in 1m6s: `Detect changed components`, `Secret scan`,
-> `Frontend / Lint, type-check, test and build`, `Backend / Build and test`,
-> `Database / Lint migration files`, and the `CI` gate.
+> **Read this first.** The pipeline is **enforced**. As of 2026-08-07 `main`
+> requires a pull request, requires branches to be up to date, and requires the
+> single status check named **`CI`**. Direct pushes to `main` no longer land.
+> This document stopped describing a proposal and started describing a gate.
 >
-> `Docker` and `Database / Apply migrations to a clean database` reported
-> **`skipped`** — correct for a branch push, and proof the `ci-success` gate
-> treats `skipped` as a pass exactly as designed. **The full tier has therefore
-> never run on this branch**; opening a PR is what exercises it, and it is still
-> expected to fail on BUG-001. See [Known gaps](#known-gaps-and-blockers).
+> **The immediate consequence: `main` is currently unmergeable.**
+> [BUG-001](../../bugs/bugs.md#bug-001) fails in the full tier, the full tier
+> runs on every pull request, and `CI` is required. Until BUG-001 is fixed or
+> that one test method is quarantined, no PR can merge — including the nine open
+> Dependabot PRs. That decision is now blocking rather than upcoming; see
+> [Known gaps](#known-gaps-and-blockers).
+>
+> The merge to `main` was the first time the **full** tier ran, and it caught a
+> real defect: `Database / Apply migrations to a clean database` and
+> `Docker / Wait for the backend` both timed out on `/actuator/health` because
+> `spring-boot-starter-actuator` was never a dependency
+> ([BUG-015](../../bugs/fixed_bugs.md#bug-015)). **Exactly the class of defect
+> the full tier exists to catch** — no unit test could have found it, because
+> nothing else in the repo boots the packaged jar and asks whether it is ready.
+> Fixed and guarded, but **not yet re-run on GitHub**; the first PR under branch
+> protection is what confirms it.
 
 ## In one paragraph
 
-Every push and pull request runs an automated check suite on GitHub's servers
-before code can be merged, so a broken build is caught by a machine rather than
-by you. It is deliberately two-speed: a push to a working branch gets a roughly
-three-minute answer, while a pull request runs the full twelve-minute suite
-including a real database and the full Docker stack. **Nothing deploys** — there
-is no AWS account or registry yet, so this is testing only. It is now proven to
-work: the fast tier went green on its first real run, and within a day it had
-caught three dependency upgrades that break the frontend build. The one thing to
-know before acting on it: the *full* tier has still not run on the current
-branch, and when it does it is expected to fail on the known search bug
-(BUG-001) until that is fixed or quarantined.
+Every push and pull request runs an automated check suite on GitHub's servers,
+and as of 2026-08-07 that suite **must pass before anything can merge into
+`main`** — you can no longer push to `main` directly, and a broken build is now
+stopped by a machine rather than caught after the fact. It is deliberately
+two-speed: a push to a working branch gets a roughly three-minute answer, while
+a pull request runs the full twelve-minute suite including a real database and
+the full Docker stack. **Nothing deploys** — there is no AWS account or registry
+yet, so this is testing only. It has already paid for itself, catching three
+dependency upgrades that break the frontend build and a missing health endpoint
+that would have left any deployment platform unable to tell whether the app had
+started. The one thing to know before acting on it: **`main` cannot currently be
+merged into at all**, because the known search bug (BUG-001) fails the full tier
+that every pull request now has to pass. Fixing or quarantining that one test is
+the next thing that has to happen.
 
 ## Read this before you change anything here
 
 - **`.github/workflows/ci.yml`** is the only file with real triggers. Everything
   named `_*.yml` is a reusable workflow that runs only when `ci.yml` calls it.
-- **`ci-success` is load-bearing.** It is the single required status check, it
-  runs `if: always()`, and it treats `skipped` as a pass. That is what lets
-  job-level path filtering coexist with branch protection. Changing its `if:`
-  condition breaks merging repo-wide.
+- **`ci-success` is load-bearing, and now literally so.** It is the required
+  status check on `main`, it runs `if: always()`, and it treats `skipped` as a
+  pass. That is what lets job-level path filtering coexist with branch
+  protection. **Its display name `CI` is wired into a repository setting that is
+  not in this repo** — renaming the job, or changing its `if:` condition, breaks
+  merging repo-wide and the fix is in GitHub settings, not in a commit.
 - **The invariant that is easy to break:** the backend test suite runs on H2 with
   `flyway.enabled: false`, so it never executes the migration files. Only
   `_database.yml` does. Deleting that job means schema drift ships silently.
@@ -55,12 +71,13 @@ Six workflow files under `.github/workflows/`, plus `.github/dependabot.yml`,
 `.dockerignore` and `.gitleaksignore` at the repo root. There is **no CD**: no
 deploy job, no registry, no cloud credentials.
 
-The whole design turns on one constraint. The goal is branch protection on
-`main` — a rule that blocks a merge until CI passes. GitHub implements that by
-requiring a named status check. But work here is component-scoped: a
-frontend-only PR has no reason to spend twelve minutes booting Postgres. Those
-two requirements conflict in the obvious layout, and the conflict is what the
-architecture exists to resolve.
+The whole design turns on one constraint. The goal was branch protection on
+`main` — a rule that blocks a merge until CI passes — and since 2026-08-07 it is
+in force. GitHub implements that by requiring a named status check. But work
+here is component-scoped: a frontend-only PR has no reason to spend twelve
+minutes booting Postgres. Those two requirements conflict in the obvious layout,
+and the conflict is what the architecture exists to resolve. That resolution is
+no longer theoretical — it is what every merge now depends on.
 
 The resolution: **one workflow, filtering at the job level, behind a gate job
 that always reports.**
@@ -211,6 +228,13 @@ second boot proves migrations are not re-applied and that every checksum still
 matches — an already-applied migration that someone edited fails here rather
 than in production. Nothing else in the repo catches either kind of drift.
 
+Both boots wait on `/actuator/health` reporting `UP`, which requires
+`spring-boot-starter-actuator` on the backend classpath — see
+[BUG-015](../../bugs/fixed_bugs.md#bug-015) for what happens when it is missing.
+On timeout the step prints the last HTTP status, because a connection refusal
+(`000`) and a served-but-absent endpoint (`404` or `500`) mean entirely
+different things and previously produced the same message.
+
 ### `.github/workflows/_docker.yml`
 
 The most expensive job, full tier only. The only place that exercises the
@@ -227,7 +251,24 @@ In order:
 3. Generate `docker/.env` with a throwaway password and
    `JWT_SECRET=$(openssl rand -hex 32)`.
 4. `docker compose build` then `up -d`. Health is awaited **per service** rather
-   than with `--wait`, because `--wait` masks which service failed.
+   than with `--wait`, because `--wait` masks which service failed. The backend
+   wait polls `/actuator/health` on the **published port** (see
+   [BUG-015](../../bugs/fixed_bugs.md#bug-015)), reports the last HTTP status on
+   timeout, and bails out early with container logs if `campusvibe-backend` has
+   stopped running — a crash-loop and a missing endpoint used to be
+   indistinguishable, and both cost the full 200-second wait.
+
+   The compose file now gives the backend its own `healthcheck`, so this step
+   could inspect container health instead. It deliberately does not: the compose
+   probe runs *inside* the container, so an HTTP poll from the runner is the
+   only thing that also proves the `8080:8080` mapping works. Container health
+   is printed alongside the HTTP status on timeout, which separates a broken
+   application from a broken port publish.
+
+   One side effect: because `frontend.depends_on.backend` is now
+   `condition: service_healthy`, `up -d` itself blocks until the backend is
+   healthy and fails outright if it never is. That moves the failure earlier and
+   makes it clearer, and the `if: failure()` log dump still runs.
 5. Smoke-test the API: `/ping`; `/api/v1/clubs` asserted **non-empty** rather
    than a fixed count, which proves the backend reached Postgres over the compose
    network rather than merely starting; club search; and a protected route that
@@ -306,8 +347,18 @@ Three classes were renamed to make the split possible: `SearchIntegrationTest` �
 `AbstractIntegrationTest` keeps its name — surefire's default includes match it,
 but both plugins skip abstract classes.
 
-Measured: `./mvnw test` → **14 tests**, no Spring context, no Docker.
-`./mvnw verify` → **40 tests**, each run exactly once.
+Measured 2026-08-07: `./mvnw test` → **16 tests in 15.5 s**, no Docker.
+`./mvnw verify` → **42 tests** expected, each run exactly once — 40 measured on
+2026-08-05 plus the two new actuator cases; not re-measured since.
+
+`ActuatorHealthEndpointTest` is the one deliberate exception to *the fast tier
+loads no Spring context*. It costs 8.3 s of the 15.5 s, and it is worth that
+because it guards the readiness contract both full-tier jobs poll — the fast
+tier is the only place that can fail on the push that breaks it rather than on
+the PR ([BUG-015](../../bugs/fixed_bugs.md#bug-015)). Its annotations match
+`AbstractIntegrationTest` exactly, so the TestContext cache reuses one context
+and the full tier pays nothing extra. Keep new `@SpringBootTest` classes out of
+surefire unless they earn their place the same way.
 
 ---
 
@@ -388,13 +439,25 @@ Printing a match to prove it was found would publish it.
 
 ## Known gaps and blockers
 
-**The full tier has never run.** The fast tier is verified green
-(`31141549342`), but `Docker` and `Database / Apply migrations to a clean
-database` have only ever reported `skipped` on this branch. Everything those two
-jobs uniquely prove — that the images build, that the stack boots, that the
-compose secret fail-fast holds, that migrations apply and are idempotent against
-real Postgres, that the entities match the migrated schema — **remains validated
-only locally.** Opening a PR is what exercises them.
+**The full tier has run once, on the merge to `main`, and failed.** Both
+full-tier jobs timed out waiting on `/actuator/health`, which did not exist
+([BUG-015](../../bugs/fixed_bugs.md#bug-015)). The dependency is now added and
+both jobs were reproduced locally against `pgvector/pgvector:pg15` — first boot
+UP in ~6 s with 8 of 8 migrations applied, history clean, second boot UP with no
+re-apply, and the containerised backend UP in ~15 s serving 8 clubs. **None of
+that is yet confirmed on GitHub.** Everything past the health probe in those two
+jobs — the compose secret fail-fast, the production frontend image, the Trivy
+gate — has still never executed on a runner, because the run died before
+reaching it.
+
+**Every readiness probe depends on one dependency.** Both full-tier jobs, the
+compose backend healthcheck, and any future deployment health check all poll
+`/actuator/health`. Removing `spring-boot-starter-actuator` from
+`backend/pom.xml` breaks all of them at once, and none of it is a compile error.
+This is now guarded by `ActuatorHealthEndpointTest` in the fast tier — verified
+to fail with the exact CI symptom when the dependency is removed — so the
+coupling is no longer silent. It is still a single point of failure worth
+knowing about.
 
 **Nine open dependency PRs are red** as of 2026-08-07. Three fail the *fast*
 tier and are genuine breaking majors: `#22` eslint-config-next 16, `#21` eslint
@@ -403,19 +466,35 @@ maven-minor-patch. Four fail only the full tier and are probably BUG-001. This i
 the ungrouped-majors design working — but nothing tracked them for a day, which
 is a process gap rather than a pipeline one.
 
-**BUG-001 blocks branch protection.** Measured 2026-08-05 with Docker running:
-`./mvnw verify` is **40 tests, 39 pass**. The single failure is
-`SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords:163`. That test runs
-in the **full tier**, so branch pushes stay green — but the moment `CI` becomes a
-required check, `main` is unmergeable. Fix BUG-001, or quarantine **that one
-method** with `@Disabled`. Disabling the whole class would also lose six passing
-search tests.
+**BUG-001 now blocks every merge.** This was a *predicted* blocker until
+2026-08-07; branch protection made it a live one. Measured 2026-08-05 with
+Docker running: `./mvnw verify` was **40 tests, 39 pass**. Adding
+`ActuatorHealthEndpointTest`'s two cases should make that 42 and 41 — inferred,
+not re-measured, because `verify` has not been run since. The single failure is
+`SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords:163`. It runs in the
+**full tier**, every pull request runs the full tier, and `CI` is required — so
+**nothing can merge into `main` right now**, including the nine open Dependabot
+PRs. Two ways out: fix [BUG-001](../../bugs/bugs.md#bug-001), or quarantine
+**that one method** with `@Disabled("BUG-001: …")`. Disabling the whole class
+would also lose six passing search tests. Nothing else in the full tier is
+known-red, so this single method is the whole gate.
 
-**Branch protection is not enabled** and cannot be set from the working tree — it
-needs repository settings. Require the single check named `CI`, plus require a
-pull request and require branches up to date. **Do not require the component
-jobs.** The check only becomes selectable in the UI after `ci.yml` has run once,
-so push first.
+**Branch protection settings live outside the repository.** Enabled 2026-08-07
+on `main`: require a pull request, require branches to be up to date, require
+the single check named **`CI`**. Two consequences that are easy to miss because
+no file in this repo records them:
+
+- **The required check is matched by display name.** `ci-success` renders as
+  `CI` via its `name:`. Renaming that job silently leaves branch protection
+  waiting on a check that no longer exists, and every PR hangs on
+  `Expected — Waiting for status`. **Do not require the component jobs** — that
+  reintroduces the deadlock the whole architecture exists to avoid.
+- **Require-branches-up-to-date serialises merges.** Each merge makes every
+  other open PR out of date, forcing an update and a fresh full-tier run. With
+  nine Dependabot PRs open that is nine sequential update-and-rerun cycles at
+  roughly twelve minutes each. Fine for a single maintainer; the standard fix
+  when it stops being fine is a merge queue, which `merge_group` is already
+  wired for.
 
 **The V6 seed is load-bearing for two assertions.** `V6__insert_mock_clubs.sql`
 seeds the 8 clubs that both `_docker.yml`'s `/api/v1/clubs` non-empty assertion
@@ -442,13 +521,14 @@ empty. Only matters once something deploys.
 Ordered by value, each with the reason it has not been done. Tracked in
 [`todo.md`](../../TODO/todo.md) under Infrastructure & CI/CD.
 
-1. **Open a PR to run the full tier.** The fast tier is now proven; the full tier
-   is not. It is expected to fail on BUG-001, which is the correct signal, not a
-   pipeline defect — but until it runs, the Docker and migration jobs are
-   unexercised code.
-2. **Enable branch protection.** Now unblocked: `CI` has reported, so it is
-   selectable in the UI. Still needs a BUG-001 decision, since requiring `CI`
-   makes `main` unmergeable while the full tier fails.
+1. **Resolve BUG-001.** No longer merely a bug — it is the reason `main` cannot
+   be merged into at all. Everything below is blocked behind it, because every
+   change now arrives through a PR that must pass the full tier.
+2. **Get one full-tier run green.** Everything past the health probe in
+   `_database.yml` and `_docker.yml` — the compose secret fail-fast, the
+   production frontend image, the Trivy gate — has still never executed on a
+   runner, because the only full-tier run so far died before reaching it. The
+   BUG-015 fix is verified locally and nowhere else.
 3. **Tighten the Trivy gate to HIGH** — after one clean run establishes the base
    image baseline. Doing it before means guessing at the noise floor.
 4. **`output: standalone` in `next.config.ts`** and a `runner` stage that copies
@@ -469,8 +549,11 @@ Ordered by value, each with the reason it has not been done. Tracked in
    frontend goes there. **AWS auth must use OIDC** via
    `aws-actions/configure-aws-credentials` with `role-to-assume` — no long-lived
    `AWS_ACCESS_KEY_ID` repo secrets, and no LLM key in CI, ever.
-9. **Merge queue.** `merge_group` is already in the trigger list so it works if
-   enabled, but a single-maintainer repo does not need it.
+9. **Merge queue.** `merge_group` is already in the trigger list, so enabling it
+   is a settings change with no code behind it. Not needed for one maintainer
+   today — but require-branches-up-to-date means each merge invalidates every
+   other open PR, so the moment several PRs are in flight at once (the nine
+   Dependabot ones, once BUG-001 unblocks them) this stops being optional.
 
 ---
 
@@ -489,3 +572,26 @@ Ordered by value, each with the reason it has not been done. Tracked in
   red. The prior claim that nothing had ever executed was stale for about a day
   and was being read as fact by every agent — found by `sparring` on its first
   invocation. *(main session)*
+- **2026-08-07** — **The full tier ran for the first time, on the merge to
+  `main`, and failed.** Both full-tier jobs timed out on `/actuator/health`;
+  `spring-boot-starter-actuator` had never been a dependency
+  ([BUG-015](../../bugs/fixed_bugs.md#bug-015)). Status block, opening banner,
+  summary, the `_database.yml` and `_docker.yml` sections and known gaps all
+  updated. Both wait loops now report the last HTTP status on timeout, and the
+  docker loop fails fast when the container stops. *(main session)*
+- **2026-08-07** — Followed up on BUG-015 rather than only patching it.
+  `ActuatorHealthEndpointTest` guards the readiness contract from the **fast**
+  tier (verified to fail with the same `500` when the dependency is removed) and
+  also asserts the actuator exposure ceiling holds. The compose backend gained a
+  `healthcheck` and the frontend now waits on `service_healthy`. Fast tier is
+  16 tests / 15.5 s, full tier 42. *(main session)*
+- **2026-08-07** — **Branch protection enabled on `main`**: require a pull
+  request, require branches up to date, require the single check `CI`. The
+  document now describes an enforced gate rather than an intended one. Status
+  block, banner, summary, overview and the `ci-success` entry updated; the
+  *branch protection is not enabled* gap replaced with the settings that are now
+  live and the two consequences they carry (the check is matched by display
+  name; up-to-date serialises merges). **BUG-001 reclassified from a predicted
+  blocker to an active one** — it fails the full tier, every PR runs the full
+  tier, so nothing merges until it is fixed or quarantined. Improvements
+  reordered behind it. *(main session)*

@@ -62,6 +62,20 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+		<!--
+			Provides /actuator/health. Without it the management.endpoints block
+			in application.yml is inert config: the endpoint is never created,
+			the request falls through to static-resource handling, and the global
+			exception handler answers 500. Every readiness probe then fails
+			against a perfectly healthy application — which is exactly what hung
+			both the database and docker CI jobs for their full timeout (BUG-015).
+			ActuatorHealthEndpointTest guards this; do not remove one without the
+			other.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
 
 
 		<dependency>

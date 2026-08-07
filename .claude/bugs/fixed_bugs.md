@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-05**
+Last updated: **2026-08-07**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-015](#bug-015) | High | 2026-08-07 | `/actuator/health` never existed; two CI jobs waited on it until timeout |
 | [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
 | [BUG-014](#bug-014) | Medium | 2026-08-05 | Google sign-in passed `client_id: undefined`, hidden by `(window as any)` |
 | [BUG-009](#bug-009) | Blocker | 2026-07-30 | Duplicate methods from merge `8f81d82` broke compilation |
@@ -13,6 +14,110 @@ Last updated: **2026-08-05**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-015
+**`/actuator/health` never existed; two CI jobs waited on it until timeout** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, on the first run of the pipeline after `ci/github-actions`
+merged to `main` — the first time these workflows had ever executed on GitHub.
+
+**Symptom:** two jobs failed, both on a readiness probe:
+
+- Database → *Apply migrations to an empty schema*:
+  `Timed out waiting for the application to become healthy.`
+- Docker → *Wait for the backend*: `Backend never became healthy.`
+
+Everything else in the run passed.
+
+**Cause:** `backend/pom.xml` never declared `spring-boot-starter-actuator`. The
+`management.endpoints.web.exposure.include: "health,info"` block in
+`application.yml:36` was therefore inert configuration — it names endpoints that
+do not exist. `SecurityFilterChainConfig.java:47` already permitted
+`/actuator/**`, which made the gap easy to miss: every part of the wiring was in
+place except the dependency that creates the endpoint.
+
+Both jobs poll with `curl -fsS … | grep -q '"status":"UP"'`. With no actuator,
+the request falls through to static-resource handling and the global exception
+handler returns **500**:
+
+```
+{"path":"/actuator/health","message":"No static resource actuator/health.","statusCode":500}
+```
+
+`-f` makes curl exit non-zero, the loop retries, and it exhausts every attempt.
+Confirmed directly against the still-running pre-fix dev container.
+
+The failure mode is the expensive kind: the application was **completely
+healthy** the whole time. Migrations applied, entities validated, `/ping` and
+`/api/v1/clubs` both served. The database job burned its full 3-minute wait and
+the docker job its full 200-second wait proving nothing, and reported it as an
+application fault.
+
+**Fix:** added `spring-boot-starter-actuator` to `backend/pom.xml`. No
+configuration change was needed — the existing `include` and the existing
+security permit were already correct and became live the moment the endpoint
+existed. Exposure stays limited to `health,info`; neither
+`application-prod.yml` nor `application-test.yml` widens it, so no management
+endpoint beyond those two is reachable.
+
+Both wait loops now also capture the HTTP status and report it on timeout, so a
+served-but-missing endpoint is distinguishable from a connection refusal. The
+docker loop additionally checks whether the container is still running and
+fails immediately with logs if it is not, rather than waiting out the timeout.
+
+**Guarded against recurrence.**
+`backend/src/test/java/com/campusvibe/actuator/ActuatorHealthEndpointTest.java`
+asserts `/actuator/health` returns 200 with `status: UP` for an unauthenticated
+request. It is a `*Test`, not a `*IT`, so surefire runs it in the **fast tier**
+and it fails on the push that breaks the contract rather than on the pull
+request. It covers all three ways this can break — dependency dropped, `health`
+removed from the exposure list, `/actuator/**` permit removed — none of which
+produce a compile error.
+
+A second assertion checks `/actuator/env` does **not** return 200. Because
+`/actuator/**` is permitAll, anything added to
+`management.endpoints.web.exposure.include` becomes publicly readable, and
+`env` would leak datasource configuration. Widening that list must break a test.
+
+**The guard was verified by breaking the code**, not just by passing: with the
+dependency commented out, the test fails with
+`Status expected:<200> but was:<500>` — the identical symptom CI hit — in 5.8 s
+rather than a 3-minute timeout. The dependency was then restored and the full
+fast tier re-run at 16/16.
+
+**Put to use, not merely tested.** `docker/docker-compose.yml` now gives the
+backend a `healthcheck` (busybox `wget`, already present in
+`eclipse-temurin:25-jdk-alpine`; `start_period: 45s` so a normal slow boot never
+counts as a failure), and `frontend.depends_on.backend` became
+`condition: service_healthy` instead of a bare `depends_on` that waited only for
+container start. Verified against an isolated compose project: the first probe
+exited 1 inside the start period without counting, the second exited 0, and the
+container reached `healthy`.
+
+The dev trade-off is recorded inline in the compose file: a backend that cannot
+start now blocks the frontend as well, and the escape hatch for frontend-only
+work is `docker compose up db frontend`.
+
+**Verified locally** against `pgvector/pgvector:pg15`, reproducing both jobs:
+
+| Check | Result |
+|---|---|
+| First boot, empty schema | UP in ~6 s, 8 migrations applied |
+| Migration history | 8 files, 8 applied, 0 failed |
+| Second boot, migrated schema | UP, no re-apply, checksums valid |
+| Containerised backend via `backend/Dockerfile` | UP in ~15 s |
+| `GET /api/v1/clubs` | 8 clubs |
+| `GET /api/v1/clubs/my-club` unauthenticated | 403 |
+| Compose backend `healthcheck` | `healthy`, probes 1→0 |
+| `./mvnw test` | 16/16 pass |
+| Same, dependency removed | 1 failure, `expected:<200> but was:<500>` |
+
+**Affected files:** `backend/pom.xml`,
+`backend/src/test/java/com/campusvibe/actuator/ActuatorHealthEndpointTest.java`,
+`docker/docker-compose.yml`,
+`.github/workflows/_database.yml`, `.github/workflows/_docker.yml`
 
 ---
 
