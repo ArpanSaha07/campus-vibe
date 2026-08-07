@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # dorny/paths-filter diffs a push against github.event.before, which is
       # all zeros on the first push to a new branch — there is no base to
@@ -148,7 +148,7 @@ jobs:
       # the default depth of 1 would leave it nothing to walk. 87 commits at the
       # time of writing — the fetch costs a couple of seconds.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

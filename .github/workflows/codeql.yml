@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # build-mode: none analyses source directly instead of observing a
       # compile. It yields somewhat fewer results than a built analysis, and
@@ -63,13 +63,13 @@ jobs:
       # to drive Maven on JDK 25, which is exactly the fragility this workflow
       # is designed to tolerate rather than depend on.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-and-quality
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: /language:${{ matrix.language }}
