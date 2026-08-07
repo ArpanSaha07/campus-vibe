@@ -1,6 +1,10 @@
 # CampusVibe — TODO
 
-Last updated: **2026-08-03** · Branch: `feature/frontend-ui`
+Last updated: **2026-08-06** · Branch: `agentic-team-creation`
+
+Project knowledge — what the code does and why — lives in
+[`.claude/docs/`](../docs/README.md). Read that index before changing a
+subsystem; this file is the work queue, not the reasoning.
 
 Priorities: **P0** blocking / broken · **P1** next up · **P2** planned · **P3** backlog
 Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
@@ -84,7 +88,9 @@ Implementation Sequence.
 ## Infrastructure & CI/CD
 
 - [x] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
-- [ ] **P1** **Push `ci/github-actions` and confirm `ci.yml` goes green.** Full write-up of what every workflow file does and why: [`.claude/docs/ci-cd-pipeline.md`](../docs/ci-cd-pipeline.md). Still nothing has ever executed on GitHub; everything below assumes a first real run. The fast tier (branch push) is expected green. The **full tier will fail on [BUG-001](../bugs/bugs.md#bug-001)**, which now runs as `SearchIT` in the PR tier — that is the correct signal, not a pipeline defect.
+- [x] **P1** ~~Push and confirm `ci.yml` goes green~~ — **done 2026-08-07.** Run `31141549342` on `00a0933` (`agentic-team-creation`): secret scan, frontend, backend, migration lint and the `CI` gate all **passed** in 1m6s. Full write-up: [`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md).
+- [ ] **P1** **Run the full tier.** Only the fast tier has executed on this branch — `Docker` and `Database / Apply migrations to a clean database` show `skipped`, which is correct for a branch push. Open a PR to exercise them. The full tier is still **expected to fail on [BUG-001](../bugs/bugs.md#bug-001)**; that is the correct signal, not a pipeline defect.
+- [ ] **P1** **Triage the nine red dependency PRs.** Nothing tracked them until 2026-08-07. Three fail the **fast** tier and so are genuine breaking majors: `#22` eslint-config-next 16, `#21` eslint 10, `#20` lucide-react 1.28 (`frontend`). Two fail both tiers: `#17` Spring Boot 4.1.0, `#15` maven-minor-patch (`backend`). Four fail only the full tier — `#19`, `#18`, `#16`, `#14` — and are probably BUG-001 rather than the bumps (`devops` to confirm). This is Dependabot's ungrouped-majors design working exactly as intended.
 - [ ] **P1** **BLOCKER — decide BUG-001 before enabling branch protection.** Measured 2026-08-05 with Docker running: `./mvnw verify` is **40 tests, 39 pass**, and the single failure is `SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords:163`. Nothing else in the full tier is red. Once `CI` is a required check that one test makes `main` unmergeable, so either fix [BUG-001](../bugs/bugs.md#bug-001) or quarantine **just that method** with `@Disabled("BUG-001: …")`. Quarantining the whole class would also lose the 6 passing search tests.
 - [x] **P1** *(plan Step 5)* ~~Fix the 5 pre-existing eslint errors, then delete `continue-on-error`~~ — **done 2026-08-05.** Note the plan mislocated them: only **2** were in `app/lib/api.tsx`; the other **3** were `no-explicit-any` in `components/auth-components/OAuthButtons.tsx`. Lint now gates merges; 15 warnings remain and do not fail the build.
 - [x] **P2** *(plan Step 6)* ~~Add `dependabot.yml` and a standalone `codeql.yml`~~ — **done 2026-08-05.** The repo is **public** (`ArpanSaha07/campus-vibe`), so CodeQL is free; if it is ever made private, code scanning needs GitHub Advanced Security and `codeql.yml` should be deleted rather than left red.
@@ -111,14 +117,77 @@ Implementation Sequence.
 
 ## Docs
 
-- [x] **P2** ~~Document the CI/CD implementation and its design decisions~~ — **done 2026-08-06.** [`.claude/docs/ci-cd-pipeline.md`](../docs/ci-cd-pipeline.md), written under the new [`implementation-docs`](../skills/implementation-docs/SKILL.md) skill. Update it, do not fork it, when the pipeline changes.
-- [ ] **P2** **Backfill implementation docs for the other subsystems** now that the skill exists — authentication, search, and the Docker development environment are the three with the most undocumented reasoning. One doc per topic in `.claude/docs/`.
+- [x] **P2** ~~Document the CI/CD implementation and its design decisions~~ — **done 2026-08-06.** [`.claude/docs/architecture/ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md), written under the new [`implementation-docs`](../skills/implementation-docs/SKILL.md) skill. Update it, do not fork it, when the pipeline changes.
+- [x] **P2** ~~Consolidate the knowledge base into one folder~~ — **done 2026-08-06.** [`.claude/docs/README.md`](../docs/README.md) is now the single entry point; implementation docs live in `docs/architecture/`, ADRs in `docs/decisions/`. See [Recently completed](#recently-completed).
+- [ ] **P1** **Re-verify [`user-roles.md`](../docs/architecture/user-roles.md) against the code** and split it into a spec and an as-built description. Highest priority of the three backfills because four source files cite it as the authority for RBAC, so a drifted claim there propagates. Owner: `backend`, reviewed by `security`.
+- [ ] **P2** **Rewrite [`authentication.md`](../docs/architecture/authentication.md)** to the [`implementation-docs`](../skills/implementation-docs/SKILL.md) standard. It currently describes endpoints as *Required* rather than existing, so it reads as a plan. Blocked in part on [BUG-003](../bugs/bugs.md#bug-003) — the JWT transport decision should be an ADR first, then the doc describes what shipped.
+- [ ] **P2** **Rewrite [`search.md`](../docs/architecture/search.md)** against `com.campusvibe.search`. Keep the existing design note as the rejected-alternatives record. Best done *after* [BUG-001](../bugs/bugs.md#bug-001) is fixed, so the doc describes working behaviour rather than a bug.
+- [ ] **P2** **Write the Docker development environment doc** — `docs/architecture/docker-environment.md`. Nothing records why the frontend image has a `dev` stage, why backend watch uses `sync+restart` on the jar rather than `rebuild`, or why the `db` watch rule is near-inert. That reasoning currently survives only in [BUG-013](../bugs/fixed_bugs.md#bug-013) and in compose comments.
+- [ ] **P3** **Verify [`llm-api-key-management.md`](../docs/architecture/llm-api-key-management.md)** against the shipped `com.campusvibe.ai` package and add the standard sections.
 - [ ] **P3** Update the root `README.md` — it claims a Vercel + Elastic Beanstalk CI/CD pipeline that does not exist yet.
 - [ ] **P3** Update the *Current Progress* section of `.claude/claude.md` once the secrets work is committed.
+- [ ] **P3** Delete the empty `CLAUDE.md` at the repo root — created accidentally by `/memory`, 0 bytes, untracked. The real project instructions are `.claude/claude.md`.
+
+---
+
+## Agentic team
+
+Charter and rules: [`.claude/team/CHARTER.md`](../team/CHARTER.md) ·
+[`ROSTER.md`](../team/ROSTER.md) ·
+[`WORKING-AGREEMENT.md`](../team/WORKING-AGREEMENT.md)
+
+- [x] **Phase 0** — knowledge base ([`docs/`](../docs/README.md)). Done 2026-08-06.
+- [x] **Phase 1** — scaffold + `staff-eng`, `backend`, `frontend` + `/ask`. 2026-08-06.
+- [x] **Phase 2** — the other nine agents + their `members/<name>.md`. 2026-08-06.
+- [x] **Phase 3** — eight commands: `/kickoff`, `/all-hands`, `/ship-check`, `/design-review`, `/retro`, `/standup`, `/board`, `/digest`. 2026-08-06.
+- [x] **Phase 4** — `AUTOMATION.md` switch, [`ROUTINES.md`](../team/ROUTINES.md), `/team`. 2026-08-06. Routine prompts written; **routines deliberately not created yet** — see below.
+- [ ] **P1** **Verify the team after restarting Claude Code.** `.claude/agents/` is scanned at session start, so nine of the twelve have never run. Checks: `/ask ai-eng "why does BUG-001 return zero results?"` cites real `file:line`; a follow-up `/ask` continues the *same* agent rather than cold-starting; `staff-eng` returns `REQUEST-CHANGES` or `BLOCK` on a deliberately flawed patch; each agent refuses work outside its charter and names the right owner.
+- [ ] **P1** **Commit and push the team, then create the two routines.** Cloud routines clone the GitHub repo, so `main` must contain `.claude/team/` and `.claude/agents/` or they fail on first run. Then confirm the Claude GitHub App can reach the repo (`/web-setup`), decide whether the digest routine may open a PR, and create both from the prompts in [`ROUTINES.md`](../team/ROUTINES.md).
+- [ ] **P2** **Run one real `/kickoff` before trusting the process** — the JWT transport decision (BUG-003) is the natural candidate: architectural, currently blocking, and it should end in the first ADR. Judge the cost against the value before making it routine.
+- [ ] **P3** **Reconsider the Opus/Sonnet split after that kickoff.** Seven of twelve are Opus, and a full kickoff spawns six-plus agents. `pm`, `design` and `sparring` are the ones to re-examine first.
 
 ---
 
 ## Recently completed
+
+**2026-08-06 (c) — Agentic team completed, Phases 2–4.**
+
+- **Nine more agents**, each grounded in verified repo facts rather than generic role descriptions: `pm`, `design`, `security`, `sparring` (opus); `devops`, `qa-automation`, `qa-exploratory`, `ai-eng`, `growth` (sonnet). Twelve total, all with a `members/<name>.md`.
+- **Eight commands.** `/kickoff` runs four sequential rounds — problem, shape, approach, coherence — and **stops for Arpan before anything is assigned**. `/ship-check` needs five independent signoffs and never softens a `BLOCK`. `/standup`, `/board` and `/digest` spawn **no agents at all**: twelve agents each reporting *nothing since yesterday* costs real money and says nothing, and drift is visible in the files anyway.
+- **`WORKING-AGREEMENT.md` gained a ritual cost table** making `/ask` the explicit default. A `/kickoff` for a bug fix spends six agents to reach an answer one would have given.
+- **`AUTOMATION.md`** is the pause switch; routines read it first and **fail closed** if it is missing or unparseable — a misfiring unattended routine is worse than one that does nothing.
+- **[`ROUTINES.md`](../team/ROUTINES.md)** holds both routine prompts, ready to create. **Deliberately not created:** they run as *cloud* sessions that clone the GitHub repo, and `main` has none of this yet, so they would fail daily and train Arpan to ignore them. Prerequisites and the two options for the digest routine's write access are recorded there.
+- **`gh` turned out to be installed and authenticated** (2.97.0, `ArpanSaha07`), contrary to the plan's assumption — so `/team sync` is real rather than degraded. It previews and **requires confirmation before creating any issue**, and refuses to publish an unfixed security finding, because the repository is public.
+- **Verified:** 12 agents, 12 member files, 11 commands; every frontmatter `name` matches its filename; every agent named in a command resolves; all relative links resolve.
+- **Not verified:** nine agents have never run — `.claude/agents/` is scanned at session start, confirmed by `Agent type 'sparring' not found` after creating it.
+
+**2026-08-06 (b) — Agentic team, Phase 1.** Ad-hoc prompting was producing
+unreviewed, disjointed code with nobody holding the whole picture. This is the
+scaffold for a standing team that moves work through *discuss → decide → assign →
+implement → test → review → ship*.
+
+- **[`team/CHARTER.md`](../team/CHARTER.md)** — read by every agent on every spawn. Product, honest current state, the priority order that breaks ties, and the standing constraints that have already bitten this project.
+- **[`ROSTER.md`](../team/ROSTER.md)** — all 12 agents, three built and nine marked planned. Includes the ownership seams where work actually gets dropped, and an escalation ladder ending at Arpan for anything scope-changing, irreversible, or costing money.
+- **[`WORKING-AGREEMENT.md`](../team/WORKING-AGREEMENT.md)** — six-point definition of done, the `APPROVE` / `REQUEST-CHANGES` / `BLOCK` vocabulary, the `file:line` evidence standard, and the rule that **a ritual leaving no trace in `git diff .claude/team/` was theatre**.
+- **`board/sprint.md`** (in-flight only, every row linking back to `todo.md` or a BUG), **`board/deadlines.md`** (the only file the deadline watcher reads), **`digest/latest.md`** (state of the world, read on spawn).
+- **`members/{staff-eng,backend,frontend}.md`** — per-agent memory. Load-bearing, not bookkeeping: agents start cold every spawn, so anything not written here is gone. Pre-seeded with the traps each role keeps hitting.
+- **Three agents** in `.claude/agents/`, all Opus: `staff-eng` (read-only reviewer — it may write to nothing but its own member file, because a reviewer that fixes code cannot then review it), `backend`, `frontend`.
+- **[`/ask`](../commands/ask.md)** — talk to one teammate. Continues an already-spawned agent via `SendMessage` so follow-ups are a real conversation, and relays the full answer, since agent reports are never shown to the user otherwise.
+- **Verified:** structure, frontmatter and every relative link resolve; and every factual claim baked into the agent definitions was spot-checked against the repo — `application.yml:26` migrations path, the deliberately empty `maven-failsafe-plugin` executions block, `application-test.yml:29-31`, and `components/ui/`.
+- **Found while grounding the `frontend` agent:** two of BUG-003's three stated causes are probably stale after the Next 16 upgrade. Recorded in [`bugs.md`](../bugs/bugs.md#bug-003).
+
+**2026-08-06 (a) — Knowledge base consolidated into `.claude/docs/`.** Project
+knowledge was spread across four loose files at `.claude/` root plus one file in
+`docs/` plus one hidden inside a skill folder, with no index — so an agent
+starting cold had no way to know what existed. Now one folder, one entry point.
+
+- **[`.claude/docs/README.md`](../docs/README.md)** *(new)* — the index. Every document gets one line stating what it covers and **how far it can be trusted**. Also lists the standards that deliberately live elsewhere (`design-guidelines.md`, the skills), so this stays the single place to start.
+- **`docs/architecture/`** holds implementation docs; **`docs/decisions/`** holds ADRs. The split is deliberate: an implementation doc is rewritten whenever the code changes, an ADR is frozen the moment it is accepted. Editing an ADR to reflect a change of mind destroys the only record of what was believed at the time.
+- **Moved:** `AUTH_IMPLEMENTATION.md` → `architecture/authentication.md`, `search-implementation.md` → `architecture/search.md`, `user-roles.md` → `architecture/user-roles.md`, `docs/ci-cd-pipeline.md` → `architecture/ci-cd-pipeline.md`, and `skills/llm-integration/llm-api-key-management.md` → `architecture/llm-api-key-management.md`. That last move **fixes two pre-existing broken links** — `todo.md:57` and `frontend/README.md:26` already pointed at `docs/architecture/llm-api-key-management.md`, which did not exist.
+- **Four of the five carry a ⚠ banner.** They predate the standard and were not re-verified against the code, so each says exactly what is and is not trustworthy about it. Moving them unlabelled would have been worse than leaving them scattered — an authoritative-looking folder full of unverified claims is how a stale doc gets believed. Rewrites are tracked under [Docs](#docs).
+- **`V7__multi_role_rbac.sql:1` and `V8__search_embeddings.sql:1` still cite the old paths, permanently.** Flyway checksums the entire migration file, so editing a single comment in an applied migration triggers `Migration checksum mismatch` on every existing database. Recorded in both docs' banners so the mismatch reads as intentional rather than as an oversight. The four *non-migration* references (`ClubController.java:60`, `JWTUtil.java:49`, `SearchRepository.java:11`, `frontend/app/types/index.ts:45`) were updated.
+- **[`implementation-docs`](../skills/implementation-docs/SKILL.md) rewritten** for the agent team: docs now serve two readers, so every doc opens with an *In one paragraph* plain-language summary for Arpan and a *Read this before you change anything here* block for a cold-starting agent. Adds an `Authors` line, makes the implementing agent the writer, and makes `staff-eng` refuse to APPROVE work whose doc omits an open `security` or QA finding.
+- **[`adr.md`](../skills/implementation-docs/adr.md)** *(new)* — ADR format, numbering, and the rule that status only moves to `Accepted` when Arpan says so.
 
 **2026-08-03 — Working `docker compose watch` for all three services
 ([BUG-013](../bugs/fixed_bugs.md#bug-013)).** Frontend edits did nothing because

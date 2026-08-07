@@ -1,13 +1,51 @@
 # CI/CD Pipeline — Implementation & Design Decisions
 
-**Status:** 2026-08-06 · branch `ci/github-actions` · `88a03b1` plus uncommitted
-work · **CI only — nothing is deployed.**
+**Status:** 2026-08-07 · branch `agentic-team-creation` · `00a0933` ·
+**fast tier verified green on GitHub; full tier still unrun on this branch** ·
+**CI only — nothing is deployed.**
+**Authors:** main session (pre-dates the agent team).
 
-> **Read this first.** None of these workflows has ever executed on GitHub. The
-> branch has not been pushed. Everything below describes code that has been
-> validated locally — YAML parsed, shell logic reasoned through, Maven and Docker
-> steps run by hand — but not one run exists in the Actions tab. The first push
-> is the real test. See [Known gaps](#known-gaps-and-blockers).
+> **Read this first.** The pipeline **works**. Run `31141549342` on `00a0933`
+> passed in 1m6s: `Detect changed components`, `Secret scan`,
+> `Frontend / Lint, type-check, test and build`, `Backend / Build and test`,
+> `Database / Lint migration files`, and the `CI` gate.
+>
+> `Docker` and `Database / Apply migrations to a clean database` reported
+> **`skipped`** — correct for a branch push, and proof the `ci-success` gate
+> treats `skipped` as a pass exactly as designed. **The full tier has therefore
+> never run on this branch**; opening a PR is what exercises it, and it is still
+> expected to fail on BUG-001. See [Known gaps](#known-gaps-and-blockers).
+
+## In one paragraph
+
+Every push and pull request runs an automated check suite on GitHub's servers
+before code can be merged, so a broken build is caught by a machine rather than
+by you. It is deliberately two-speed: a push to a working branch gets a roughly
+three-minute answer, while a pull request runs the full twelve-minute suite
+including a real database and the full Docker stack. **Nothing deploys** — there
+is no AWS account or registry yet, so this is testing only. It is now proven to
+work: the fast tier went green on its first real run, and within a day it had
+caught three dependency upgrades that break the frontend build. The one thing to
+know before acting on it: the *full* tier has still not run on the current
+branch, and when it does it is expected to fail on the known search bug
+(BUG-001) until that is fixed or quarantined.
+
+## Read this before you change anything here
+
+- **`.github/workflows/ci.yml`** is the only file with real triggers. Everything
+  named `_*.yml` is a reusable workflow that runs only when `ci.yml` calls it.
+- **`ci-success` is load-bearing.** It is the single required status check, it
+  runs `if: always()`, and it treats `skipped` as a pass. That is what lets
+  job-level path filtering coexist with branch protection. Changing its `if:`
+  condition breaks merging repo-wide.
+- **The invariant that is easy to break:** the backend test suite runs on H2 with
+  `flyway.enabled: false`, so it never executes the migration files. Only
+  `_database.yml` does. Deleting that job means schema drift ships silently.
+- Bound by [`database-lifecycle/SKILL.md`](../../skills/database-lifecycle/SKILL.md)
+  for anything touching migrations, and by the root `.dockerignore`, which both
+  Dockerfiles depend on because compose sets `context: ..`.
+- Open defects and priorities: [`bugs.md`](../../bugs/bugs.md) ·
+  [`todo.md`](../../TODO/todo.md).
 
 ---
 
@@ -350,10 +388,20 @@ Printing a match to prove it was found would publish it.
 
 ## Known gaps and blockers
 
-**Nothing has run on GitHub.** The branch is unpushed. Local validation covered
-YAML parsing, the Maven test split, both Docker build contexts, the production
-frontend image serving `/`, and a clean gitleaks scan — but never the Actions
-runtime.
+**The full tier has never run.** The fast tier is verified green
+(`31141549342`), but `Docker` and `Database / Apply migrations to a clean
+database` have only ever reported `skipped` on this branch. Everything those two
+jobs uniquely prove — that the images build, that the stack boots, that the
+compose secret fail-fast holds, that migrations apply and are idempotent against
+real Postgres, that the entities match the migrated schema — **remains validated
+only locally.** Opening a PR is what exercises them.
+
+**Nine open dependency PRs are red** as of 2026-08-07. Three fail the *fast*
+tier and are genuine breaking majors: `#22` eslint-config-next 16, `#21` eslint
+10, `#20` lucide-react 1.28. Two fail both tiers: `#17` Spring Boot 4.1.0, `#15`
+maven-minor-patch. Four fail only the full tier and are probably BUG-001. This is
+the ungrouped-majors design working — but nothing tracked them for a day, which
+is a process gap rather than a pipeline one.
 
 **BUG-001 blocks branch protection.** Measured 2026-08-05 with Docker running:
 `./mvnw verify` is **40 tests, 39 pass**. The single failure is
@@ -372,7 +420,7 @@ so push first.
 **The V6 seed is load-bearing for two assertions.** `V6__insert_mock_clubs.sql`
 seeds the 8 clubs that both `_docker.yml`'s `/api/v1/clubs` non-empty assertion
 and `SearchIT.clubSearchFindsSeededClubs()` depend on.
-[`database-lifecycle/SKILL.md`](../skills/database-lifecycle/SKILL.md) plans to
+[`database-lifecycle/SKILL.md`](../../skills/database-lifecycle/SKILL.md) plans to
 move that seed into a dev seeder — that migration breaks both assertions, so they
 must move together.
 
@@ -392,13 +440,15 @@ empty. Only matters once something deploys.
 ## Possible improvements
 
 Ordered by value, each with the reason it has not been done. Tracked in
-[`todo.md`](../TODO/todo.md) under Infrastructure & CI/CD.
+[`todo.md`](../../TODO/todo.md) under Infrastructure & CI/CD.
 
-1. **Push the branch and confirm a green run.** Blocks everything else here. The
-   fast tier is expected green; the full tier will fail on BUG-001, which is the
-   correct signal, not a pipeline defect.
-2. **Enable branch protection** — needs step 1 first (the check is not selectable
-   until it has reported) and a BUG-001 decision.
+1. **Open a PR to run the full tier.** The fast tier is now proven; the full tier
+   is not. It is expected to fail on BUG-001, which is the correct signal, not a
+   pipeline defect — but until it runs, the Docker and migration jobs are
+   unexercised code.
+2. **Enable branch protection.** Now unblocked: `CI` has reported, so it is
+   selectable in the UI. Still needs a BUG-001 decision, since requiring `CI`
+   makes `main` unmergeable while the full tier fails.
 3. **Tighten the Trivy gate to HIGH** — after one clean run establishes the base
    image baseline. Doing it before means guessing at the noise floor.
 4. **`output: standalone` in `next.config.ts`** and a `runner` stage that copies
@@ -428,3 +478,14 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 - **2026-08-06** — Created. Documents the pipeline as of `88a03b1` plus the
   uncommitted step 5–6 work (blocking lint, Dependabot, CodeQL, Node 24).
+  *(main session)*
+- **2026-08-06** — Moved from `.claude/docs/` to `.claude/docs/architecture/`;
+  added the *In one paragraph* and *Read this before you change anything here*
+  sections required by the revised `implementation-docs` skill. No change to any
+  described behaviour. *(main session)*
+- **2026-08-07** — **The pipeline ran.** Status, opening banner, summary, known
+  gaps and improvements all corrected: the fast tier is verified green on
+  `00a0933`; the full tier remains unrun on this branch; nine dependency PRs are
+  red. The prior claim that nothing had ever executed was stale for about a day
+  and was being read as fact by every agent — found by `sparring` on its first
+  invocation. *(main session)*

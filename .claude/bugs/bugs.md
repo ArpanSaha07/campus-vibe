@@ -134,6 +134,22 @@ There is also a `matcher` mismatch: `protectedPaths` lists only `/dashboard`
 (line 9) while `config.matcher` covers `/create-event/:path*` too (line 23), so
 `/create-event` would invoke the guard but never be treated as protected.
 
+**Re-audit 2026-08-06 — causes 1 and 2 above are probably wrong now.** They were
+written against Next.js 15 conventions. The project has since moved to
+**Next 16.2**, which renamed the middleware convention from `middleware.ts` to
+**`proxy.ts`** — so `frontend/proxy.tsx` may now be the *correct* filename, and a
+compiled `middleware.js` does exist under `frontend/.next/server/`, suggesting
+Next is picking the file up. The export at `proxy.tsx:6` is a **named** `proxy`;
+whether Next 16 wants that or a default export needs confirming against the
+Next 16 docs, not assumed.
+
+Cause 3 is unaffected and is on its own sufficient: the guard reads a cookie
+while the token is in `localStorage`, which the server cannot read. So the bug is
+real and the severity stands — but **anyone fixing this must re-establish which
+of the three causes actually applies** rather than working from the list above.
+Found while grounding the `frontend` agent definition, which is exactly the class
+of stale claim that would otherwise have been repeated with confidence.
+
 **Fix direction:** decide token transport first. Server-side route protection
 requires the JWT in an **httpOnly cookie**, which is also what
 `.claude/claude.md` calls for ("Persistent login using secure cookies"). Moving
@@ -222,7 +238,7 @@ spend is at least observable. The rate limit and cache are still missing.
 **Events are never re-indexed after an edit** · Low · OPEN
 
 **Found:** 2026-07-30, comparing `EventService` against
-`.claude/search-implementation.md`.
+[`.claude/docs/architecture/search.md`](../docs/architecture/search.md).
 
 **Symptom:** the design note (lines 150-177) specifies regenerating an event's
 embedding when its title, description or category changes. `EventService` indexes

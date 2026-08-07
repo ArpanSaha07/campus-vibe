@@ -42,7 +42,8 @@ export type Club = {
     // clubcategories: string[];
 };
 
-// Mirrors backend RBAC (see .claude/user-roles.md and com.campusvibe.user.UserDTO).
+// Mirrors backend RBAC (see .claude/docs/architecture/user-roles.md and
+// com.campusvibe.user.UserDTO).
 // One User interface for all roles — role-specific data comes from separate endpoints.
 export enum Role {
   USER = "ROLE_USER",
