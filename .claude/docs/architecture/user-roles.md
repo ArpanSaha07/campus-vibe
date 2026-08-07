@@ -1,5 +1,26 @@
 # User Roles & Authorization Architecture (CampusVibe)
 
+> ⚠ **Part specification, part implementation doc — unverified.** Moved here
+> from `.claude/user-roles.md` on 2026-08-06. Much of it is written as
+> *there should be three roles*, which is a spec for intended behaviour, not a
+> description of shipped code. It does not yet follow
+> [`implementation-docs`](../../skills/implementation-docs/SKILL.md).
+>
+> It is nonetheless **binding** — `V7__multi_role_rbac.sql`, `JWTUtil.java:49`,
+> `ClubController.java:60` and `frontend/app/types/index.ts:45` all cite it as
+> the authority for the role model, so it is the closest thing to a source of
+> truth for RBAC. Where it and the code disagree, the code wins and the
+> disagreement is a bug worth filing.
+>
+> Splitting the spec from the as-built description is tracked in
+> [`todo.md`](../../TODO/todo.md), owned by `backend` with `security` reviewing.
+>
+> **`V7__multi_role_rbac.sql:1` still cites the old path `.claude/user-roles.md`
+> and always will.** Flyway checksums the whole file, so editing one comment in
+> an applied migration causes `Migration checksum mismatch` on every existing
+> database. The stale path is the cheaper of the two costs. See
+> [`database-lifecycle/SKILL.md`](../../skills/database-lifecycle/SKILL.md).
+
 ## Overview
 
 CampusVibe uses **Role-Based Access Control (RBAC)** with **Spring Security** and **JWT authentication**.

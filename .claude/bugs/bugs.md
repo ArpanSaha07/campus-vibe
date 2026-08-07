@@ -1,9 +1,9 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-05** · Branch: `ci/github-actions`
+Last updated: **2026-08-07** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-014 so far). Bug ids are never reused.
+(BUG-008 … BUG-017 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -14,6 +14,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-005](#bug-005) | Medium | Unauthenticated search can drive unbounded OpenAI spend |
 | [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
+| [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
 
 ---
 
@@ -134,6 +135,22 @@ There is also a `matcher` mismatch: `protectedPaths` lists only `/dashboard`
 (line 9) while `config.matcher` covers `/create-event/:path*` too (line 23), so
 `/create-event` would invoke the guard but never be treated as protected.
 
+**Re-audit 2026-08-06 — causes 1 and 2 above are probably wrong now.** They were
+written against Next.js 15 conventions. The project has since moved to
+**Next 16.2**, which renamed the middleware convention from `middleware.ts` to
+**`proxy.ts`** — so `frontend/proxy.tsx` may now be the *correct* filename, and a
+compiled `middleware.js` does exist under `frontend/.next/server/`, suggesting
+Next is picking the file up. The export at `proxy.tsx:6` is a **named** `proxy`;
+whether Next 16 wants that or a default export needs confirming against the
+Next 16 docs, not assumed.
+
+Cause 3 is unaffected and is on its own sufficient: the guard reads a cookie
+while the token is in `localStorage`, which the server cannot read. So the bug is
+real and the severity stands — but **anyone fixing this must re-establish which
+of the three causes actually applies** rather than working from the list above.
+Found while grounding the `frontend` agent definition, which is exactly the class
+of stale claim that would otherwise have been repeated with confidence.
+
 **Fix direction:** decide token transport first. Server-side route protection
 requires the JWT in an **httpOnly cookie**, which is also what
 `.claude/claude.md` calls for ("Persistent login using secure cookies"). Moving
@@ -174,11 +191,18 @@ development no longer hits this. **The bug is unchanged for the production
 image** — the `builder`/`runner` path still runs `npm run build` with no values
 supplied, so it stays open and must be fixed before deploying.
 
+**Still open after BUG-016 (2026-08-07).** That change rewrote the `runner`
+stage around `output: standalone` and now boots the production image in CI, so
+the bug is closer to being *observable* — but the `builder` stage still runs
+`npm run build` with no values supplied, which is the actual defect. If anything
+it matters more now: CI builds and serves that image on every full-tier run, so
+whatever it bakes in is what a deployment would ship.
+
 **Fix direction:** pass them as `ARG`/`ENV` before `npm run build` and declare
 matching `build.args` in compose.
 
 **Affected files**
-- `frontend/Dockerfile:1-7`
+- `frontend/Dockerfile` — the `builder` stage
 - `docker/docker-compose.yml` (frontend service `environment:` → needs `build.args`)
 - `frontend/app/lib/api.tsx:1`, `frontend/app/components/auth-components/OAuthButtons.tsx:10`
 
@@ -222,7 +246,7 @@ spend is at least observable. The rate limit and cache are still missing.
 **Events are never re-indexed after an edit** · Low · OPEN
 
 **Found:** 2026-07-30, comparing `EventService` against
-`.claude/search-implementation.md`.
+[`.claude/docs/architecture/search.md`](../docs/architecture/search.md).
 
 **Symptom:** the design note (lines 150-177) specifies regenerating an event's
 embedding when its title, description or category changes. `EventService` indexes
@@ -263,3 +287,59 @@ moved to `src/test/resources` so test config cannot ship to production.
 - `backend/src/main/resources/application-test.yml` → should be `backend/src/test/resources/`
 - `backend/src/test/java/com/campusvibe/AbstractIntegrationTest.java:22` (`@ActiveProfiles("test")`)
 - `backend/src/test/java/com/campusvibe/search/SearchIT.java:51-58`
+
+---
+
+### BUG-018
+**Vercel builds and deploys outside CI, with configuration recorded nowhere** · Medium · OPEN
+
+**Found:** 2026-08-07, when a Vercel preview deployment failed on
+[BUG-017](fixed_bugs.md#bug-017) — the first evidence in this repository that
+Vercel was building it at all.
+
+**Symptom:** there is a second, independent build of the frontend that no file
+in this repository describes:
+
+- It is **not** part of `ci.yml`, so it is **not** part of the `ci-success`
+  gate. A frontend change can be green in `CI`, satisfy branch protection, and
+  still fail to deploy. BUG-017 was exactly that: `CI` had no opinion, and the
+  only signal was the Vercel check on the pull request.
+- It builds from a **different configuration** than CI does. `next.config.ts`
+  now branches on `process.env.VERCEL`, so the two builds no longer produce the
+  same output by construction — deliberately, but it means CI cannot prove the
+  Vercel build works, and did not.
+- **No `vercel.json` and no `.vercel/` exist.** Root directory, build command,
+  Node version, and every `NEXT_PUBLIC_*` value live only in the Vercel
+  dashboard. The `/vercel/path0/frontend/` path in the failure implies a root
+  directory of `frontend`, which is inference, not a record.
+
+**Why this matters beyond the one failure.** The pipeline documentation asserted
+*nothing deploys* while a deployment platform had been building every push. Any
+agent or contributor reading it would have concluded that a frontend change
+could not reach anything outside the repository. That was wrong, and it is the
+kind of wrong that gets discovered by shipping.
+
+**It also splits BUG-004 in two.** `NEXT_PUBLIC_*` are inlined at build time.
+On Vercel they come from project environment variables and are probably correct;
+in the Docker image the `builder` stage passes no build args, so they ship
+empty. [BUG-004](#bug-004) is a *Docker* bug specifically, and fixing it does
+nothing for Vercel — nor the reverse.
+
+**Fix direction**, in order of value:
+
+1. Record what the Vercel project is actually configured with — root directory,
+   build command, Node version, and which `NEXT_PUBLIC_*` keys are set in which
+   environments. A `vercel.json` puts the build settings in version control;
+   the environment values belong in the docs as a list of key names, never
+   values.
+2. Decide whether the Vercel check should be a required status check on `main`
+   alongside `CI`. If a failed deploy should block a merge, requiring it is the
+   only thing that makes that true.
+3. Consider whether preview deployments should exist for this project at all
+   right now. They build against no backend, so a preview is a frontend shell
+   pointed at nothing.
+
+**Affected files**
+- `frontend/next.config.ts` — the `process.env.VERCEL` branch
+- `.claude/docs/architecture/ci-cd-pipeline.md` — corrected 2026-08-07
+- No `vercel.json` exists; that is the gap

@@ -2,10 +2,13 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-05**
+Last updated: **2026-08-07**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
+| [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
+| [BUG-015](#bug-015) | High | 2026-08-07 | `/actuator/health` never existed; two CI jobs waited on it until timeout |
 | [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
 | [BUG-014](#bug-014) | Medium | 2026-08-05 | Google sign-in passed `client_id: undefined`, hidden by `(window as any)` |
 | [BUG-009](#bug-009) | Blocker | 2026-07-30 | Duplicate methods from merge `8f81d82` broke compilation |
@@ -13,6 +16,296 @@ Last updated: **2026-08-05**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-017
+**`output: standalone` broke every Vercel build with an ENOENT on the trace file** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Vercel preview deployment of `77bd2e5` — the commit that
+fixed [BUG-016](#bug-016). **A regression introduced by that fix**, caught by a
+deployment path this repository does not manage and its own CI never exercises.
+
+**Symptom:**
+
+```
+> Build error occurred
+Error: ENOENT: no such file or directory, open
+  '/vercel/path0/frontend/.next/next-server.js.nft.json'
+Error: Command "npm run build" exited with 1
+```
+
+**Cause.** `next build` itself crashed — this is not Vercel's post-build
+packaging. Traced through the installed Next 16.3.0:
+
+- `build/index.js:2817` calls `writeStandaloneDirectory`, guarded by
+  `if (config.output === 'standalone')`.
+- That calls `copyTracedFiles` (`build/utils.js:1106`), which reads
+  `distDir/next-server.js.nft.json` to learn which modules to copy into the
+  bundle.
+
+**That read is the standalone path's only caller.** Without
+`output: standalone` the file is never opened, which is why every build before
+`77bd2e5` passed. Vercel performs its own file tracing and does not leave that
+artifact where the standalone step expects it, so the step ENOENTs. Next's own
+documentation says standalone is a self-hosting option and is not needed on
+Vercel; this is what *not needed* turns into in practice.
+
+**A hypothesis that had to be ruled out first.** The same commit also bumped
+`next` 16.2.0 → 16.3.0, so a builder incompatibility with a new minor was
+equally plausible from the error text alone. Ruled out by reading the call
+graph rather than guessing: the failing read sits behind the `output` check, not
+behind anything version-specific. Local builds were no help — the file *is*
+produced locally under standalone, so the failure does not reproduce off-Vercel.
+
+**Fix.** `output` is now conditional on `process.env.VERCEL`, which Vercel sets
+on every build:
+
+```ts
+const isVercel = Boolean(process.env.VERCEL);
+output: isVercel ? undefined : "standalone",
+```
+
+Self-hosting stays the default and Vercel is the exception, deliberately. The
+inverse — opting in only for Docker — would mean a plain `npm run build` no
+longer produces what the image ships, and `npm start` would have no bundle to
+serve.
+
+**Verified locally, both branches:**
+
+| Build | `.next/standalone` | Result |
+|---|---|---|
+| `VERCEL=1 npm run build` | absent | succeeds; trace file present and untouched |
+| `npm run build` | `server.js` present, 11 packages, no `tar` | succeeds |
+| Docker `--target runner` | — | boots HTTP 200, Trivy gate exit 0 |
+
+**The wider miss this exposed.** The pipeline documentation asserted *nothing
+deploys*. Vercel has been building this repository through its GitHub
+integration the whole time, outside `ci.yml` and outside `ci-success`, so a
+build that CI calls green can still fail there — and nothing in the repo said
+so. Corrected in
+[`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md). See
+[BUG-018](../bugs/bugs.md#bug-018) for the gap that remains: Vercel is an
+unguarded deployment surface with no build-time environment configuration
+recorded anywhere.
+
+---
+
+### BUG-016
+**Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Docker workflow → *Scan images for known vulnerabilities*,
+on the run that followed the [BUG-015](#bug-015) fix. This was the first time the
+scan step had ever reached the frontend image, because the job used to die at the
+health probe before getting there.
+
+**Symptom:** three fixable CRITICALs in `campusvibe-frontend:prod`, all
+`node-pkg`:
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `swiper` | CVE-2026-27212 — prototype pollution | 12.0.2 | 12.1.2 |
+| `tar` | CVE-2026-59873 — DoS via crafted gzip bomb | 7.4.3 | 7.5.19 |
+| `tar` | CVE-2026-59873 | 7.5.16 | 7.5.19 |
+
+**Cause — three separate ones wearing the same error message.** The gate printed
+`Bump the base image`, which was wrong for all three:
+
+1. **`swiper` 12.0.2** was a genuine, directly declared runtime dependency. The
+   hero banner slider uses it, and the code ships to the browser. A real fix.
+
+2. **`tar` 7.4.3** was never a runtime dependency at all. It arrives as
+   `tailwindcss → @tailwindcss/postcss → @tailwindcss/node → @tailwindcss/oxide
+   → tar`, marked `"dev": true` in the lockfile. It was in the production image
+   only because the `runner` stage did `COPY --from=builder /app/node_modules`,
+   which copies **the entire tree, devDependencies included**, into the artifact
+   that would ship. A build-time archive extractor was being shipped to
+   production so that Tailwind, which never runs there, could have it.
+
+3. **`tar` 7.5.16** was not ours in any sense: it is the copy npm bundles at
+   `/usr/local/lib/node_modules/npm/node_modules/tar`, inside `node:24-alpine`
+   itself. Verified by inspecting the image directly — node 24.19.0 ships npm
+   11.17.0, which bundles tar 7.5.16. **No published tag fixed it**:
+   `node:25-alpine` is worse (npm 11.12.1, tar 7.5.11). Only npm 12.0.2 bundles
+   the patched 7.5.19, and no Node release carries it yet.
+
+**Fix.**
+
+- `swiper` `^12.0.2` → `^12.2.0`.
+- `tar` updated in place to 7.5.22 via `npm update tar`, which stays inside the
+  `^7.4.3` range `@tailwindcss/oxide` declares, so nothing was overridden.
+- `output: "standalone"` in `next.config.ts`, and the `runner` stage rebuilt
+  around `.next/standalone` instead of a wholesale `node_modules` copy. The
+  bundle carries **11 top-level packages** rather than the full tree, and `tar`
+  is not among them.
+- **npm deleted from the `runner` stage.** Nothing in that stage invokes it —
+  the entrypoint is now plain `node server.js` — so the vendored tar goes with
+  it. This is what resolved finding 3, and it is the only available answer while
+  no Node tag ships a fixed npm. It is also the better answer regardless: a
+  production image has no business carrying a package manager.
+
+**A trap worth naming.** The standalone change alone would have turned the scan
+green *without fixing anything*, because `swiper` has no `package.json` in the
+standalone bundle — it is compiled into the client chunks — so Trivy simply stops
+seeing it. The vulnerable code still reaches every visitor's browser. **Trivy no
+longer has visibility into client-side dependencies of this image.** Dependabot
+and `npm audit` are the controls for those now, not the image scan. Do not read a
+green Trivy result as a statement about the frontend's npm tree.
+
+**Verified locally**, each step against the real image:
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | clean |
+| `eslint` | 0 errors, 15 warnings (unchanged baseline) |
+| Jest | 23/23 |
+| `next build` | succeeds, 14 routes |
+| Standalone bundle | 11 top-level packages, no `tar` |
+| Image boots | HTTP 200 on `/`, `Ready in 0ms`, 323 MB |
+| **Trivy gate, fixable CRITICAL** | **exit 0** |
+| **Trivy fixable HIGH + CRITICAL** | **zero findings** |
+| Gate still fires | `node:24-alpine` → exit 1, class `lang-pkgs` |
+
+**Picked up on the way.** The HIGH report — printed but non-blocking — showed 12
+findings against `next` 16.2.0, including **CVE-2026-64642, an authentication
+bypass leading to unauthorized access**, fixed in 16.2.11. All 12 sat inside the
+declared `^16.2.0` range, so `npm update next sharp` cleared them; that resolved
+next to **16.3.0** and sharp to 0.35.3, which also cleared the one HIGH against
+sharp 0.34.5 (inherited libvips CVEs). The gate never required this. Leaving a
+known auth bypass in place because the gate only checks CRITICAL would have been
+the wrong call.
+
+**Two follow-on repairs, both caused by the standalone switch:**
+
+- `next start` does not work with `output: standalone` — it boots, warns, and
+  serves markup with no styles. `npm start` pointed at it. Replaced with
+  `frontend/scripts/start-standalone.mjs`, which performs the two copies Next
+  leaves out of the trace (`.next/static`, `public/`) and then runs `server.js`.
+- That script initially failed on Windows in a way worth recording: standalone's
+  `server.js` binds `process.env.HOSTNAME`, and Git Bash exports `HOSTNAME` as
+  the machine name — so it bound the machine interface, `http://localhost:PORT`
+  was refused, and the banner still said `Ready`. The first verification pass
+  appeared to succeed only because Docker Desktop's proxy was answering on
+  port 3000. The script now pins `HOSTNAME` to `127.0.0.1` unless
+  `NEXT_HOSTNAME` overrides it. The Dockerfile sets it to `0.0.0.0` explicitly
+  for the same reason.
+- `jest-haste-map` began reporting a module naming collision between
+  `package.json` and `.next/standalone/package.json` on any local run made after
+  a build. Silenced with `modulePathIgnorePatterns`. CI never saw it, since
+  tests run before the build there.
+
+**Also changed:** the gate's failure message. `Bump the base image` was actively
+misleading — it named the one cause that applied to none of the three findings.
+It now reports the Trivy finding *class* and explains how to route `lang-pkgs`
+(check the Target path: under `/app` it is ours, under
+`/usr/local/lib/node_modules` it is vendored tooling) versus `os-pkgs`.
+
+**Not verified on GitHub.** Everything above is local. The backend image was
+clean in the failing run and was not re-scanned locally.
+
+---
+
+### BUG-015
+**`/actuator/health` never existed; two CI jobs waited on it until timeout** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, on the first run of the pipeline after `ci/github-actions`
+merged to `main` — the first time these workflows had ever executed on GitHub.
+
+**Symptom:** two jobs failed, both on a readiness probe:
+
+- Database → *Apply migrations to an empty schema*:
+  `Timed out waiting for the application to become healthy.`
+- Docker → *Wait for the backend*: `Backend never became healthy.`
+
+Everything else in the run passed.
+
+**Cause:** `backend/pom.xml` never declared `spring-boot-starter-actuator`. The
+`management.endpoints.web.exposure.include: "health,info"` block in
+`application.yml:36` was therefore inert configuration — it names endpoints that
+do not exist. `SecurityFilterChainConfig.java:47` already permitted
+`/actuator/**`, which made the gap easy to miss: every part of the wiring was in
+place except the dependency that creates the endpoint.
+
+Both jobs poll with `curl -fsS … | grep -q '"status":"UP"'`. With no actuator,
+the request falls through to static-resource handling and the global exception
+handler returns **500**:
+
+```
+{"path":"/actuator/health","message":"No static resource actuator/health.","statusCode":500}
+```
+
+`-f` makes curl exit non-zero, the loop retries, and it exhausts every attempt.
+Confirmed directly against the still-running pre-fix dev container.
+
+The failure mode is the expensive kind: the application was **completely
+healthy** the whole time. Migrations applied, entities validated, `/ping` and
+`/api/v1/clubs` both served. The database job burned its full 3-minute wait and
+the docker job its full 200-second wait proving nothing, and reported it as an
+application fault.
+
+**Fix:** added `spring-boot-starter-actuator` to `backend/pom.xml`. No
+configuration change was needed — the existing `include` and the existing
+security permit were already correct and became live the moment the endpoint
+existed. Exposure stays limited to `health,info`; neither
+`application-prod.yml` nor `application-test.yml` widens it, so no management
+endpoint beyond those two is reachable.
+
+Both wait loops now also capture the HTTP status and report it on timeout, so a
+served-but-missing endpoint is distinguishable from a connection refusal. The
+docker loop additionally checks whether the container is still running and
+fails immediately with logs if it is not, rather than waiting out the timeout.
+
+**Guarded against recurrence.**
+`backend/src/test/java/com/campusvibe/actuator/ActuatorHealthEndpointTest.java`
+asserts `/actuator/health` returns 200 with `status: UP` for an unauthenticated
+request. It is a `*Test`, not a `*IT`, so surefire runs it in the **fast tier**
+and it fails on the push that breaks the contract rather than on the pull
+request. It covers all three ways this can break — dependency dropped, `health`
+removed from the exposure list, `/actuator/**` permit removed — none of which
+produce a compile error.
+
+A second assertion checks `/actuator/env` does **not** return 200. Because
+`/actuator/**` is permitAll, anything added to
+`management.endpoints.web.exposure.include` becomes publicly readable, and
+`env` would leak datasource configuration. Widening that list must break a test.
+
+**The guard was verified by breaking the code**, not just by passing: with the
+dependency commented out, the test fails with
+`Status expected:<200> but was:<500>` — the identical symptom CI hit — in 5.8 s
+rather than a 3-minute timeout. The dependency was then restored and the full
+fast tier re-run at 16/16.
+
+**Put to use, not merely tested.** `docker/docker-compose.yml` now gives the
+backend a `healthcheck` (busybox `wget`, already present in
+`eclipse-temurin:25-jdk-alpine`; `start_period: 45s` so a normal slow boot never
+counts as a failure), and `frontend.depends_on.backend` became
+`condition: service_healthy` instead of a bare `depends_on` that waited only for
+container start. Verified against an isolated compose project: the first probe
+exited 1 inside the start period without counting, the second exited 0, and the
+container reached `healthy`.
+
+The dev trade-off is recorded inline in the compose file: a backend that cannot
+start now blocks the frontend as well, and the escape hatch for frontend-only
+work is `docker compose up db frontend`.
+
+**Verified locally** against `pgvector/pgvector:pg15`, reproducing both jobs:
+
+| Check | Result |
+|---|---|
+| First boot, empty schema | UP in ~6 s, 8 migrations applied |
+| Migration history | 8 files, 8 applied, 0 failed |
+| Second boot, migrated schema | UP, no re-apply, checksums valid |
+| Containerised backend via `backend/Dockerfile` | UP in ~15 s |
+| `GET /api/v1/clubs` | 8 clubs |
+| `GET /api/v1/clubs/my-club` unauthenticated | 403 |
+| Compose backend `healthcheck` | `healthy`, probes 1→0 |
+| `./mvnw test` | 16/16 pass |
+| Same, dependency removed | 1 failure, `expected:<200> but was:<500>` |
+
+**Affected files:** `backend/pom.xml`,
+`backend/src/test/java/com/campusvibe/actuator/ActuatorHealthEndpointTest.java`,
+`docker/docker-compose.yml`,
+`.github/workflows/_database.yml`, `.github/workflows/_docker.yml`
 
 ---
 

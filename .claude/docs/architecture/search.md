@@ -1,3 +1,34 @@
+# Search — design note
+
+> ⚠ **A design note, not an implementation doc.** Moved here from
+> `.claude/search-implementation.md` on 2026-08-06. This is the *reasoning that
+> led to* hybrid search — written in second person, before the code existed — and
+> it has never been reconciled with what shipped. It does not follow
+> [`implementation-docs`](../../skills/implementation-docs/SKILL.md).
+>
+> It is kept because it is genuinely useful: it is the only record of why
+> embeddings-in-Postgres was chosen over the alternatives, and
+> [BUG-006](../../bugs/bugs.md#bug-006) was found by comparing `EventService`
+> against lines 150-177 of this file. Treat it as a rejected-alternatives
+> archive, not as a description of current behaviour.
+>
+> The shipped implementation lives in
+> `backend/src/main/java/com/campusvibe/search/` — `SearchRepository.java`
+> carries the actual hybrid ranking formula. Note that
+> [BUG-001](../../bugs/bugs.md#bug-001) means meaning-only matches currently
+> return nothing, so the behaviour described below is **not** what the system
+> does today. Rewriting this as a real implementation doc is tracked in
+> [`todo.md`](../../TODO/todo.md).
+>
+> **`V8__search_embeddings.sql:1` still cites the old path
+> `.claude/search-implementation.md` and always will.** Flyway checksums the
+> whole file, so editing one comment in an applied migration causes
+> `Migration checksum mismatch` on every existing database. The stale path is the
+> cheaper of the two costs. See
+> [`database-lifecycle/SKILL.md`](../../skills/database-lifecycle/SKILL.md).
+
+---
+
 For your CampusVibe app, you should **not fetch all events into the frontend and filter there**. Industry practice is to **query/search on the backend and return only matching results**.
 
 The actual semantic search should happen server-side.

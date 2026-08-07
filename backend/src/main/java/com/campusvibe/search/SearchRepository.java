@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * Hybrid search queries. Final score = semanticWeight * cosine similarity
- * + keywordWeight * normalized ts_rank (see .claude/search-implementation.md).
+ * + keywordWeight * normalized ts_rank (see .claude/docs/architecture/search.md).
  * When no query embedding is available, falls back to keyword-only matching.
  */
 @Repository

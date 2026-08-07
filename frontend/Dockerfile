@@ -34,10 +34,25 @@ RUN npm run build
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
 
+# npm is build-time tooling. Nothing below invokes it — the standalone bundle
+# ships its own server.js and is started with plain node — and the copy of tar
+# that npm bundles is a CRITICAL finding no tag of node:24-alpine currently
+# fixes. Deleting the package manager clears the finding and removes a whole
+# class of attack surface from a shipping image at the same time (BUG-016).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
+# `output: standalone` in next.config.ts produces a tree containing server.js
+# and only the node_modules the build traced, so the devDependency tree stays
+# out of production. Static assets and public/ are deliberately excluded from
+# that trace and have to be copied alongside it.
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+# server.js binds to HOSTNAME, which defaults to localhost — unreachable from
+# outside the container however the port is published.
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
