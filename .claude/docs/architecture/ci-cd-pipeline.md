@@ -2,7 +2,7 @@
 
 **Status:** 2026-08-07 · branch `ci/github-actions` ·
 **branch protection is ENABLED on `main`; the pipeline is now a real merge
-gate** · **CI only — nothing is deployed.**
+gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
 
 > **Read this first.** The pipeline is **enforced**. As of 2026-08-07 `main`
@@ -16,6 +16,17 @@ gate** · **CI only — nothing is deployed.**
 > that one test method is quarantined, no PR can merge — including the nine open
 > Dependabot PRs. That decision is now blocking rather than upcoming; see
 > [Known gaps](#known-gaps-and-blockers).
+>
+> **Correction, 2026-08-07: this document said *nothing is deployed*, and that
+> was wrong.** Vercel has been building the frontend through its GitHub
+> integration all along — outside `ci.yml`, outside `ci-success`, and outside
+> branch protection. It surfaced only when a Vercel preview build failed
+> ([BUG-017](../../bugs/fixed_bugs.md#bug-017)). **A frontend change can pass
+> `CI` and still fail to deploy**, and until 2026-08-07 nothing in this
+> repository said so. The gap that remains — no `vercel.json`, no record of the
+> project's build settings or environment variables — is
+> [BUG-018](../../bugs/bugs.md#bug-018). What is still true: **these workflows**
+> deploy nothing, and there is no AWS account, registry or backend deployment.
 >
 > **The full tier has now run twice and failed twice, one step further each
 > time.** Run one timed out on `/actuator/health`, which did not exist because
@@ -39,8 +50,11 @@ and as of 2026-08-07 that suite **must pass before anything can merge into
 stopped by a machine rather than caught after the fact. It is deliberately
 two-speed: a push to a working branch gets a roughly three-minute answer, while
 a pull request runs the full twelve-minute suite including a real database and
-the full Docker stack. **Nothing deploys** — there is no AWS account or registry
-yet, so this is testing only. It has already paid for itself several times over:
+the full Docker stack. **These workflows deploy nothing** — there is no AWS
+account or registry yet — but that is not the same as nothing being deployed:
+**Vercel builds and previews the frontend on its own**, triggered by GitHub
+rather than by anything here, so it can fail on a commit this suite calls green.
+It has already paid for itself several times over:
 three dependency upgrades that break the frontend build, a missing health
 endpoint that would have left any deployment platform unable to tell whether the
 app had started, and a vulnerable slider library that was shipping to every
@@ -546,6 +560,19 @@ GitHub-hosted runners share an IP pool. If pulls start failing, mirror to GHCR.
 **Node 24 is pinned in two places** — `frontend/Dockerfile` and
 `_frontend.yml` — with no `engines` field or `.nvmrc` to enforce agreement.
 
+**There is a second build of the frontend that this pipeline does not run.**
+Vercel builds every push through its GitHub integration. It is not in `ci.yml`,
+so it is not in `ci-success`, so branch protection has no opinion about it — a
+frontend change can be green in `CI` and still fail to deploy, which is exactly
+what [BUG-017](../../bugs/fixed_bugs.md#bug-017) was. It also builds from a
+*different* configuration: `next.config.ts` branches on `process.env.VERCEL` and
+skips `output: standalone` there, because Vercel does its own file tracing and
+`next build` crashes on the standalone step otherwise. That branch is deliberate,
+but it means **CI cannot prove the Vercel build works** — and did not. No
+`vercel.json` exists, so the root directory, build command, Node version and
+every `NEXT_PUBLIC_*` value live only in the Vercel dashboard
+([BUG-018](../../bugs/bugs.md#bug-018)).
+
 **BUG-004 is unaddressed, and now runs on every full tier.** `NEXT_PUBLIC_*`
 values are inlined at build time and the `builder` stage passes no build args, so
 the production image ships them empty. BUG-016 rebuilt the `runner` stage but did
@@ -653,3 +680,13 @@ Ordered by value, each with the reason it has not been done. Tracked in
   Also picked up outside the gate: 12 HIGH findings against `next` 16.2.0,
   including an authentication bypass, cleared by an in-range update to 16.3.0.
   *(main session)*
+- **2026-08-07** — **`output: standalone` broke every Vercel build**
+  ([BUG-017](../../bugs/fixed_bugs.md#bug-017)), a regression from the commit
+  above. `next build` reads `.next/next-server.js.nft.json` only inside the
+  standalone path, and Vercel does its own tracing, so the step died on ENOENT.
+  Made `output` conditional on `process.env.VERCEL`. **This document's claim
+  that nothing is deployed was wrong** and is corrected throughout: Vercel has
+  been building this repository through its GitHub integration the whole time,
+  outside `ci.yml` and outside `ci-success`, so a green `CI` never implied a
+  working deploy. Added as a known gap and as
+  [BUG-018](../../bugs/bugs.md#bug-018). *(main session)*

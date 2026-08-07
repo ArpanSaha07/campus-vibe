@@ -3,7 +3,7 @@
 Last updated: **2026-08-07** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-016 so far). Bug ids are never reused.
+(BUG-008 … BUG-017 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -14,6 +14,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-005](#bug-005) | Medium | Unauthenticated search can drive unbounded OpenAI spend |
 | [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
+| [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
 
 ---
 
@@ -286,3 +287,59 @@ moved to `src/test/resources` so test config cannot ship to production.
 - `backend/src/main/resources/application-test.yml` → should be `backend/src/test/resources/`
 - `backend/src/test/java/com/campusvibe/AbstractIntegrationTest.java:22` (`@ActiveProfiles("test")`)
 - `backend/src/test/java/com/campusvibe/search/SearchIT.java:51-58`
+
+---
+
+### BUG-018
+**Vercel builds and deploys outside CI, with configuration recorded nowhere** · Medium · OPEN
+
+**Found:** 2026-08-07, when a Vercel preview deployment failed on
+[BUG-017](fixed_bugs.md#bug-017) — the first evidence in this repository that
+Vercel was building it at all.
+
+**Symptom:** there is a second, independent build of the frontend that no file
+in this repository describes:
+
+- It is **not** part of `ci.yml`, so it is **not** part of the `ci-success`
+  gate. A frontend change can be green in `CI`, satisfy branch protection, and
+  still fail to deploy. BUG-017 was exactly that: `CI` had no opinion, and the
+  only signal was the Vercel check on the pull request.
+- It builds from a **different configuration** than CI does. `next.config.ts`
+  now branches on `process.env.VERCEL`, so the two builds no longer produce the
+  same output by construction — deliberately, but it means CI cannot prove the
+  Vercel build works, and did not.
+- **No `vercel.json` and no `.vercel/` exist.** Root directory, build command,
+  Node version, and every `NEXT_PUBLIC_*` value live only in the Vercel
+  dashboard. The `/vercel/path0/frontend/` path in the failure implies a root
+  directory of `frontend`, which is inference, not a record.
+
+**Why this matters beyond the one failure.** The pipeline documentation asserted
+*nothing deploys* while a deployment platform had been building every push. Any
+agent or contributor reading it would have concluded that a frontend change
+could not reach anything outside the repository. That was wrong, and it is the
+kind of wrong that gets discovered by shipping.
+
+**It also splits BUG-004 in two.** `NEXT_PUBLIC_*` are inlined at build time.
+On Vercel they come from project environment variables and are probably correct;
+in the Docker image the `builder` stage passes no build args, so they ship
+empty. [BUG-004](#bug-004) is a *Docker* bug specifically, and fixing it does
+nothing for Vercel — nor the reverse.
+
+**Fix direction**, in order of value:
+
+1. Record what the Vercel project is actually configured with — root directory,
+   build command, Node version, and which `NEXT_PUBLIC_*` keys are set in which
+   environments. A `vercel.json` puts the build settings in version control;
+   the environment values belong in the docs as a list of key names, never
+   values.
+2. Decide whether the Vercel check should be a required status check on `main`
+   alongside `CI`. If a failed deploy should block a merge, requiring it is the
+   only thing that makes that true.
+3. Consider whether preview deployments should exist for this project at all
+   right now. They build against no backend, so a preview is a frontend shell
+   pointed at nothing.
+
+**Affected files**
+- `frontend/next.config.ts` — the `process.env.VERCEL` branch
+- `.claude/docs/architecture/ci-cd-pipeline.md` — corrected 2026-08-07
+- No `vercel.json` exists; that is the gap

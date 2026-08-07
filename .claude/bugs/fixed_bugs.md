@@ -6,6 +6,7 @@ Last updated: **2026-08-07**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
 | [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
 | [BUG-015](#bug-015) | High | 2026-08-07 | `/actuator/health` never existed; two CI jobs waited on it until timeout |
 | [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
@@ -15,6 +16,78 @@ Last updated: **2026-08-07**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-017
+**`output: standalone` broke every Vercel build with an ENOENT on the trace file** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Vercel preview deployment of `77bd2e5` — the commit that
+fixed [BUG-016](#bug-016). **A regression introduced by that fix**, caught by a
+deployment path this repository does not manage and its own CI never exercises.
+
+**Symptom:**
+
+```
+> Build error occurred
+Error: ENOENT: no such file or directory, open
+  '/vercel/path0/frontend/.next/next-server.js.nft.json'
+Error: Command "npm run build" exited with 1
+```
+
+**Cause.** `next build` itself crashed — this is not Vercel's post-build
+packaging. Traced through the installed Next 16.3.0:
+
+- `build/index.js:2817` calls `writeStandaloneDirectory`, guarded by
+  `if (config.output === 'standalone')`.
+- That calls `copyTracedFiles` (`build/utils.js:1106`), which reads
+  `distDir/next-server.js.nft.json` to learn which modules to copy into the
+  bundle.
+
+**That read is the standalone path's only caller.** Without
+`output: standalone` the file is never opened, which is why every build before
+`77bd2e5` passed. Vercel performs its own file tracing and does not leave that
+artifact where the standalone step expects it, so the step ENOENTs. Next's own
+documentation says standalone is a self-hosting option and is not needed on
+Vercel; this is what *not needed* turns into in practice.
+
+**A hypothesis that had to be ruled out first.** The same commit also bumped
+`next` 16.2.0 → 16.3.0, so a builder incompatibility with a new minor was
+equally plausible from the error text alone. Ruled out by reading the call
+graph rather than guessing: the failing read sits behind the `output` check, not
+behind anything version-specific. Local builds were no help — the file *is*
+produced locally under standalone, so the failure does not reproduce off-Vercel.
+
+**Fix.** `output` is now conditional on `process.env.VERCEL`, which Vercel sets
+on every build:
+
+```ts
+const isVercel = Boolean(process.env.VERCEL);
+output: isVercel ? undefined : "standalone",
+```
+
+Self-hosting stays the default and Vercel is the exception, deliberately. The
+inverse — opting in only for Docker — would mean a plain `npm run build` no
+longer produces what the image ships, and `npm start` would have no bundle to
+serve.
+
+**Verified locally, both branches:**
+
+| Build | `.next/standalone` | Result |
+|---|---|---|
+| `VERCEL=1 npm run build` | absent | succeeds; trace file present and untouched |
+| `npm run build` | `server.js` present, 11 packages, no `tar` | succeeds |
+| Docker `--target runner` | — | boots HTTP 200, Trivy gate exit 0 |
+
+**The wider miss this exposed.** The pipeline documentation asserted *nothing
+deploys*. Vercel has been building this repository through its GitHub
+integration the whole time, outside `ci.yml` and outside `ci-success`, so a
+build that CI calls green can still fail there — and nothing in the repo said
+so. Corrected in
+[`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md). See
+[BUG-018](../bugs/bugs.md#bug-018) for the gap that remains: Vercel is an
+unguarded deployment surface with no build-time environment configuration
+recorded anywhere.
 
 ---
 
