@@ -8,14 +8,12 @@ Talk to one member of the CampusVibe team.
 The first word of `$ARGUMENTS` is the agent name; everything after it is the
 question.
 
-## Built agents
+## The team
 
-`staff-eng` · `backend` · `frontend`
-
-Planned but not yet built (Phase 2): `pm`, `design`, `security`, `sparring`,
-`devops`, `qa-automation`, `qa-exploratory`, `ai-eng`, `growth`. If the user asks
-for one of these, say it does not exist yet and offer the closest built agent —
-do not silently substitute one.
+**Build and review:** `staff-eng` · `backend` · `frontend` · `ai-eng` · `devops`
+**Decide and challenge:** `pm` · `design` · `sparring`
+**Guard:** `security` · `qa-automation` · `qa-exploratory`
+**Reach:** `growth`
 
 Roster and ownership: `.claude/team/ROSTER.md`.
 

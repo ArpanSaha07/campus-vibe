@@ -4,7 +4,13 @@
 previous session. This file, your own `members/<you>.md`, and `digest/latest.md`
 are how anything the team already learned reaches you.
 
-Last updated: **2026-08-06**
+Last updated: **2026-08-07**
+
+> **State rots.** The *Where we actually are* and *What matters right now*
+> sections below were wrong within a day of being written, because a push
+> happened and nothing regenerated them. Run `/digest` — which spawns no
+> agents — before trusting them, and fix them here when they drift. The
+> *Standing constraints* at the bottom do not rot and can be trusted as-is.
 
 ---
 
@@ -33,7 +39,15 @@ Honest state, not the README's version:
   profile, login. Next.js 16 + TypeScript + Tailwind v4, no component library.
 - **Backend runs**: auth, clubs, events, club-admin requests, hybrid search, S3.
   Spring Boot on Java 25, Flyway V1–V8, PostgreSQL with pgvector.
-- **CI exists but has never executed on GitHub.** The branch is unpushed.
+- **CI runs on GitHub and the fast tier is green.** Verified 2026-08-07 on
+  `00a0933` (`agentic-team-creation`): secret scan, frontend lint/type-check/
+  test/build, backend build and test, migration lint, and the `CI` gate all
+  passed. **The full tier has not run on this branch** — Docker and the
+  real-migration job show `skipped`, which is correct for a branch push. So
+  BUG-001 remains unproven in CI rather than disproven.
+- **Nine open dependency PRs are red.** Three (`#22` eslint-config-next 16,
+  `#21` eslint 10, `#20` lucide-react 1.28) fail the **fast** tier, so they are
+  genuine breaking majors. That is Dependabot's ungrouped-majors design working.
 - **Nothing is deployed.** No AWS account, no registry, no OIDC role.
 - **40 backend tests, 39 pass.** The failure is BUG-001 and it is real.
 - Local dev is `docker compose watch` — all three services live-reload.
@@ -42,11 +56,13 @@ Honest state, not the README's version:
 
 In order. This list is the tiebreaker when two tasks both look important.
 
-1. **Get CI green and pushed.** Everything else is unverifiable until a machine
-   checks it. Blocked behind a decision on BUG-001.
+1. **Triage the nine red dependency PRs.** They are real, they are unassigned,
+   and three of them break the build outright. The pipeline found them at zero
+   agent cost; leaving them unread wastes that.
 2. **BUG-001 — semantic search returns nothing for meaning-only matches.** The
    embedding writes are proven fine, so the fault is in
-   `SearchRepository.hybridSearchEventIds`.
+   `SearchRepository.hybridSearchEventIds`. Open a PR from this branch to run
+   the full tier and see it fail honestly.
 3. **BUG-003 — decide JWT transport.** `localStorage` today; the product spec
    calls for secure cookies. Route protection is half-wired and cannot be fixed
    until this is settled. **This needs an ADR before any code.**
@@ -71,7 +87,8 @@ Defects: [`bugs.md`](../bugs/bugs.md) · In flight: [`board/sprint.md`](board/sp
   iterating. This is in `claude.md` and it applies to agents too.
 
 Full rules: [`WORKING-AGREEMENT.md`](WORKING-AGREEMENT.md) ·
-Who owns what: [`ROSTER.md`](ROSTER.md)
+Who owns what: [`ROSTER.md`](ROSTER.md) ·
+Automation: [`AUTOMATION.md`](AUTOMATION.md) · [`ROUTINES.md`](ROUTINES.md)
 
 ## What binds you
 

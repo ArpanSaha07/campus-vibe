@@ -1,34 +1,43 @@
 # Roster — who owns what
 
-Twelve agents. **Three exist so far** (Phase 1); the rest are marked *planned*
-and will be built in Phase 2. Call any of them with `/ask <name> <question>`.
+Twelve agents, **all built**. Call any of them with `/ask <name> <question>`.
 
 Ownership here is about *who is accountable*, not who is allowed to have an
 opinion. Shared areas are listed twice on purpose — a real team overlaps.
 
 ---
 
-## Built
+## Build and review
 
 | Agent | Owns | Model |
 |---|---|---|
 | **`staff-eng`** | Code review, architecture coherence, the final technical gate before anything reaches Arpan. Cross-cutting consistency: does this change fit the codebase we already have? | opus |
 | **`backend`** | Spring Boot, Spring Security, JPA, PostgreSQL, Flyway. Controller → Service → Repository layering. API contracts and DTOs. | opus |
 | **`frontend`** | Next.js 16, TypeScript, Tailwind v4. App Router, Server vs Client Components, the component library in `app/components/`. | opus |
+| **`ai-eng`** | Embeddings, hybrid search ranking, LLM features, token cost. Owns BUG-001. | sonnet |
+| **`devops`** | Docker, compose, GitHub Actions, AWS, deployment. Owns the pipeline. | sonnet |
 
-## Planned — Phase 2
+## Decide and challenge
 
 | Agent | Owns | Model |
 |---|---|---|
-| `pm` | Requirements, scope, user stories, market research, success metrics. Says no to features. | opus |
-| `design` | UI/UX and product design. Guardian of [`design-guidelines.md`](../design-guidelines.md). | opus |
-| `security` | AppSec, authn/authz, secrets handling, dependency risk. Veto power on `/ship-check`. | opus |
-| `sparring` | Idea challenger. Attacks a plan *before* code exists, when changing course is still cheap. | opus |
-| `devops` | Docker, compose, GitHub Actions, AWS, deployment. | sonnet |
-| `qa-automation` | JUnit, Failsafe, Jest, React Testing Library. Audits whether tests actually test anything. | sonnet |
-| `qa-exploratory` | Drives the running app like a real user. Prompt-injection and abuse robustness. | sonnet |
-| `ai-eng` | Embeddings, hybrid search ranking, LLM features, token cost. | sonnet |
-| `growth` | Marketing, SEO, positioning, launch copy. | sonnet |
+| **`pm`** | Requirements, scope, user stories, market research, success metrics. Says no to features. | opus |
+| **`design`** | UI/UX and product design. Guardian of [`design-guidelines.md`](../design-guidelines.md). | opus |
+| **`sparring`** | Idea challenger. Attacks a plan *before* code exists, when changing course is still cheap. | opus |
+
+## Guard
+
+| Agent | Owns | Model |
+|---|---|---|
+| **`security`** | AppSec, authn/authz, secrets handling, dependency risk. **Veto on shipping.** | opus |
+| **`qa-automation`** | JUnit, Failsafe, Jest, RTL. Audits whether tests actually catch anything. | sonnet |
+| **`qa-exploratory`** | Drives the running app like a real user. Prompt-injection and abuse robustness. | sonnet |
+
+## Reach
+
+| Agent | Owns | Model |
+|---|---|---|
+| **`growth`** | Marketing, SEO, positioning, launch copy. Writes the words users read. | sonnet |
 
 ---
 

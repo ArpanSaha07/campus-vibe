@@ -76,6 +76,26 @@ started this task again cold. Do not record what the code already says.
 
 ## Rituals
 
+| Command | When to use it | Cost |
+|---|---|---|
+| `/kickoff --full <feature>` | Genuinely architectural work, or anything that closes a door later | High — 6+ agents, 4 rounds |
+| `/all-hands <question>` | A strategic question with no clear owner | High |
+| `/ship-check` | Before any deploy. Five signoffs; any `BLOCK` stops it | High |
+| `/kickoff <feature>` | **The default kickoff.** A defined feature or a bug with real design choices | Medium — 3 agents, 2 rounds |
+| `/design-review <target>` | A built screen against the design direction | Medium — 3 agents |
+| `/retro` | Periodically, or after something went wrong | Medium |
+| `/ask <agent> <q>` | Everything else. **The default overall** | Low — 1 agent |
+| `/standup` · `/board` · `/digest` | Status. **No agents spawned** | Trivial |
+
+**`/ask` is the default and the rest are exceptions.** A kickoff for a bug fix
+spends three agents to reach an answer one would have given.
+
+**Escalate deliberately, never by accident.** `/kickoff` runs light unless
+`--full` is passed, so the expensive path is always a choice. Light mode has no
+`staff-eng` coherence pass and no security or design review — when its
+escalation check fires, prefer adding the **one** specialist it names over
+jumping to the full ritual.
+
 Every ritual **ends in a written decision plus assigned tasks.** If no decision
 was reached, the meeting note records `NO DECISION` and why. A meeting that
 produces only opinions is the exact failure this team exists to prevent.

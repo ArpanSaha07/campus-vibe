@@ -88,7 +88,9 @@ Implementation Sequence.
 ## Infrastructure & CI/CD
 
 - [x] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
-- [ ] **P1** **Push `ci/github-actions` and confirm `ci.yml` goes green.** Full write-up of what every workflow file does and why: [`.claude/docs/architecture/ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md). Still nothing has ever executed on GitHub; everything below assumes a first real run. The fast tier (branch push) is expected green. The **full tier will fail on [BUG-001](../bugs/bugs.md#bug-001)**, which now runs as `SearchIT` in the PR tier — that is the correct signal, not a pipeline defect.
+- [x] **P1** ~~Push and confirm `ci.yml` goes green~~ — **done 2026-08-07.** Run `31141549342` on `00a0933` (`agentic-team-creation`): secret scan, frontend, backend, migration lint and the `CI` gate all **passed** in 1m6s. Full write-up: [`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md).
+- [ ] **P1** **Run the full tier.** Only the fast tier has executed on this branch — `Docker` and `Database / Apply migrations to a clean database` show `skipped`, which is correct for a branch push. Open a PR to exercise them. The full tier is still **expected to fail on [BUG-001](../bugs/bugs.md#bug-001)**; that is the correct signal, not a pipeline defect.
+- [ ] **P1** **Triage the nine red dependency PRs.** Nothing tracked them until 2026-08-07. Three fail the **fast** tier and so are genuine breaking majors: `#22` eslint-config-next 16, `#21` eslint 10, `#20` lucide-react 1.28 (`frontend`). Two fail both tiers: `#17` Spring Boot 4.1.0, `#15` maven-minor-patch (`backend`). Four fail only the full tier — `#19`, `#18`, `#16`, `#14` — and are probably BUG-001 rather than the bumps (`devops` to confirm). This is Dependabot's ungrouped-majors design working exactly as intended.
 - [ ] **P1** **BLOCKER — decide BUG-001 before enabling branch protection.** Measured 2026-08-05 with Docker running: `./mvnw verify` is **40 tests, 39 pass**, and the single failure is `SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords:163`. Nothing else in the full tier is red. Once `CI` is a required check that one test makes `main` unmergeable, so either fix [BUG-001](../bugs/bugs.md#bug-001) or quarantine **just that method** with `@Disabled("BUG-001: …")`. Quarantining the whole class would also lose the 6 passing search tests.
 - [x] **P1** *(plan Step 5)* ~~Fix the 5 pre-existing eslint errors, then delete `continue-on-error`~~ — **done 2026-08-05.** Note the plan mislocated them: only **2** were in `app/lib/api.tsx`; the other **3** were `no-explicit-any` in `components/auth-components/OAuthButtons.tsx`. Lint now gates merges; 15 warnings remain and do not fail the build.
 - [x] **P2** *(plan Step 6)* ~~Add `dependabot.yml` and a standalone `codeql.yml`~~ — **done 2026-08-05.** The repo is **public** (`ArpanSaha07/campus-vibe`), so CodeQL is free; if it is ever made private, code scanning needs GitHub Advanced Security and `codeql.yml` should be deleted rather than left red.
@@ -135,15 +137,29 @@ Charter and rules: [`.claude/team/CHARTER.md`](../team/CHARTER.md) ·
 [`WORKING-AGREEMENT.md`](../team/WORKING-AGREEMENT.md)
 
 - [x] **Phase 0** — knowledge base ([`docs/`](../docs/README.md)). Done 2026-08-06.
-- [x] **Phase 1** — team scaffold + `staff-eng`, `backend`, `frontend` + `/ask`. Built 2026-08-06. **Functionally unverified — agents require a session restart to register.**
-- [ ] **P1** **Verify Phase 1 after restarting Claude Code.** Three checks, from the plan: `/ask backend "why does BUG-001 return zero results?"` cites real `file:line` from `SearchRepository.java`; a follow-up `/ask` continues the *same* agent rather than cold-starting; `staff-eng` returns `REQUEST-CHANGES` or `BLOCK` on a deliberately flawed patch instead of rubber-stamping.
-- [ ] **P2** **Phase 2** — the remaining nine agents (`pm`, `design`, `security`, `sparring`, `devops`, `qa-automation`, `qa-exploratory`, `ai-eng`, `growth`) plus their `members/<name>.md`.
-- [ ] **P2** **Phase 3** — rituals: `/kickoff`, `/standup`, `/all-hands`, `/design-review`, `/ship-check`, `/retro`, plus `/board` and `/digest`.
-- [ ] **P3** **Phase 4** — scheduled standup and deadline watch, `AUTOMATION.md` pause switch, `/team` command with GitHub Issues sync. Needs `gh` installed (`winget install GitHub.cli`, then `gh auth login`).
+- [x] **Phase 1** — scaffold + `staff-eng`, `backend`, `frontend` + `/ask`. 2026-08-06.
+- [x] **Phase 2** — the other nine agents + their `members/<name>.md`. 2026-08-06.
+- [x] **Phase 3** — eight commands: `/kickoff`, `/all-hands`, `/ship-check`, `/design-review`, `/retro`, `/standup`, `/board`, `/digest`. 2026-08-06.
+- [x] **Phase 4** — `AUTOMATION.md` switch, [`ROUTINES.md`](../team/ROUTINES.md), `/team`. 2026-08-06. Routine prompts written; **routines deliberately not created yet** — see below.
+- [ ] **P1** **Verify the team after restarting Claude Code.** `.claude/agents/` is scanned at session start, so nine of the twelve have never run. Checks: `/ask ai-eng "why does BUG-001 return zero results?"` cites real `file:line`; a follow-up `/ask` continues the *same* agent rather than cold-starting; `staff-eng` returns `REQUEST-CHANGES` or `BLOCK` on a deliberately flawed patch; each agent refuses work outside its charter and names the right owner.
+- [ ] **P1** **Commit and push the team, then create the two routines.** Cloud routines clone the GitHub repo, so `main` must contain `.claude/team/` and `.claude/agents/` or they fail on first run. Then confirm the Claude GitHub App can reach the repo (`/web-setup`), decide whether the digest routine may open a PR, and create both from the prompts in [`ROUTINES.md`](../team/ROUTINES.md).
+- [ ] **P2** **Run one real `/kickoff` before trusting the process** — the JWT transport decision (BUG-003) is the natural candidate: architectural, currently blocking, and it should end in the first ADR. Judge the cost against the value before making it routine.
+- [ ] **P3** **Reconsider the Opus/Sonnet split after that kickoff.** Seven of twelve are Opus, and a full kickoff spawns six-plus agents. `pm`, `design` and `sparring` are the ones to re-examine first.
 
 ---
 
 ## Recently completed
+
+**2026-08-06 (c) — Agentic team completed, Phases 2–4.**
+
+- **Nine more agents**, each grounded in verified repo facts rather than generic role descriptions: `pm`, `design`, `security`, `sparring` (opus); `devops`, `qa-automation`, `qa-exploratory`, `ai-eng`, `growth` (sonnet). Twelve total, all with a `members/<name>.md`.
+- **Eight commands.** `/kickoff` runs four sequential rounds — problem, shape, approach, coherence — and **stops for Arpan before anything is assigned**. `/ship-check` needs five independent signoffs and never softens a `BLOCK`. `/standup`, `/board` and `/digest` spawn **no agents at all**: twelve agents each reporting *nothing since yesterday* costs real money and says nothing, and drift is visible in the files anyway.
+- **`WORKING-AGREEMENT.md` gained a ritual cost table** making `/ask` the explicit default. A `/kickoff` for a bug fix spends six agents to reach an answer one would have given.
+- **`AUTOMATION.md`** is the pause switch; routines read it first and **fail closed** if it is missing or unparseable — a misfiring unattended routine is worse than one that does nothing.
+- **[`ROUTINES.md`](../team/ROUTINES.md)** holds both routine prompts, ready to create. **Deliberately not created:** they run as *cloud* sessions that clone the GitHub repo, and `main` has none of this yet, so they would fail daily and train Arpan to ignore them. Prerequisites and the two options for the digest routine's write access are recorded there.
+- **`gh` turned out to be installed and authenticated** (2.97.0, `ArpanSaha07`), contrary to the plan's assumption — so `/team sync` is real rather than degraded. It previews and **requires confirmation before creating any issue**, and refuses to publish an unfixed security finding, because the repository is public.
+- **Verified:** 12 agents, 12 member files, 11 commands; every frontmatter `name` matches its filename; every agent named in a command resolves; all relative links resolve.
+- **Not verified:** nine agents have never run — `.claude/agents/` is scanned at session start, confirmed by `Agent type 'sparring' not found` after creating it.
 
 **2026-08-06 (b) — Agentic team, Phase 1.** Ad-hoc prompting was producing
 unreviewed, disjointed code with nobody holding the whole picture. This is the
