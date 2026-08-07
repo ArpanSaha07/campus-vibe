@@ -60,8 +60,7 @@ subtly wrong accessibility code.
 
 ## Design system — read this before styling anything
 
-The visual direction is **ticket stock**: lavender on white, airy, with the
-EventCard's ticket perforation as the one signature device. Tokens are lavender /
+The visual direction is **ticket stock**: lavender on white, airy. Tokens are lavender /
 berry / ink / mist / go / alert / sun. Type is Bricolage Grotesque (display),
 Figtree (body), Spline Sans Mono (ticket data — dates, prices, counts).
 

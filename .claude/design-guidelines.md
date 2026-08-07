@@ -1,11 +1,12 @@
 # CampusVibe Design Guidelines
 
-**Direction: "Ticket stock."** CampusVibe is where students find out what's happening this week and actually go. The interface borrows its language from the artifact at the center of that world: the event ticket. Cards are structured like ticket stubs with a perforated divider, all machine data (dates, times, prices, seat counts) is set in a mono "printed" voice, and the page itself stays white and quiet so event imagery and the lavender brand carry the energy.
+**Direction: "Ticket stock."** CampusVibe is where students find out what's happening this week and actually go. The interface borrows its language from the artifact at the center of that world: the event ticket. All machine data (dates, times, prices, seat counts) is set in a mono "printed" voice, and the page itself stays white and quiet so event imagery and the lavender brand carry the energy.
 
 ## Research grounding
 
 - **Eventbrite (Marmalade)** commits to one signature color pushed to full brightness ("Brite Orange") and a single typeface (Benton Sans) with restrained weights. Lesson adopted: one color family used with conviction; restraint in type weights.
-- **Meetup (Swarm)** builds identity from a symbolic device (dots forming the "m") and duotone photography. Lesson adopted: a repeatable, ownable visual device — ours is the ticket perforation, which is subject-derived (events → tickets) rather than decorative.
+- **Meetup (Swarm)** builds identity from a symbolic device (dots forming the "m") and duotone photography. Lesson adopted: a repeatable, ownable visual device — ours was the ticket perforation, but there should be no ticket perforation line on the cards. 
+
 - Differentiation: Eventbrite is orange, Meetup is red; both use dense, dark-saturated marketing surfaces. CampusVibe is **lavender on white** — airy, gallery-like, with the logo's berry outline as the only second voice.
 
 Sources: [Eventbrite Marmalade](https://www.tnflnt.co/work/eventbrite-marmalade), [BUCK Eventbrite rebrand](https://buck.co/work/eventbrite), [Meetup rebrand](https://medium.com/meetup/meetup-rebrand-22087674d546), [Swarm design system](https://meetup.github.io/swarm-design-system/components/).
@@ -61,10 +62,6 @@ Scale (rem): display-1 `clamp(2.25, 5vw, 3.25)/1.05` · h2 `1.5/1.2` · h3 `1.12
 ## Radius & elevation
 
 Radius: cards `16px`, inputs `12px`, buttons & chips `full`, in-card images `12px` top corners. Elevation: **flat at rest** — 1px `mist-200` border, no shadow. Hover: translate -2px + `0 12px 28px -12px rgb(32 23 49 / 0.25)`. Focus: 2px `lavender-300` ring, 2px offset, never removed.
-
-## Signature: the ticket perforation
-
-Every EventCard separates its image from its details with a perforation: a dashed `mist-200` hairline with two punched semicircle notches at the edges (`.ticket-divider` utility). Price and date on the stub side are mono. This is the one loud device — nothing else on the card decorates. Dashboard "admission" stat tiles may reuse the notch motif; nothing else does.
 
 ## Motion
 
