@@ -6,7 +6,13 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.5</version>
+		<!--
+		  3.5.16 is the floor for the Trivy CRITICAL gate in CI: it is the first
+		  3.5.x that manages tomcat-embed-core 10.1.55 (CVE-2026-41293,
+		  CVE-2026-43512, CVE-2026-43515) and spring-security 6.5.11
+		  (CVE-2026-22732). Anything older ships a jar the docker job rejects.
+		-->
+		<version>3.5.16</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 
@@ -61,6 +67,20 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<!--
+			Provides /actuator/health. Without it the management.endpoints block
+			in application.yml is inert config: the endpoint is never created,
+			the request falls through to static-resource handling, and the global
+			exception handler answers 500. Every readiness probe then fails
+			against a perfectly healthy application — which is exactly what hung
+			both the database and docker CI jobs for their full timeout (BUG-015).
+			ActuatorHealthEndpointTest guards this; do not remove one without the
+			other.
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
 

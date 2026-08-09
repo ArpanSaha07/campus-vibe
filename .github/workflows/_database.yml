@@ -183,7 +183,17 @@ jobs:
           java -jar "$jar" > boot-1.log 2>&1 &
           pid=$!
 
+          # The HTTP status is captured separately from the -f probe so a
+          # timeout says WHICH failure it was. 000 means the port never
+          # accepted a connection (still starting, or bound elsewhere); any
+          # real status means the app is serving but the endpoint is not
+          # answering UP. A missing spring-boot-starter-actuator surfaces here
+          # as 500 (the global handler turns the unmatched route into
+          # 'No static resource actuator/health'), which is otherwise
+          # indistinguishable from a slow boot.
+          code=000
           for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health 2>/dev/null || echo 000)
             if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
               echo "Application is UP — migrations applied and entities validated."
               kill "$pid" 2>/dev/null || true
@@ -198,7 +208,12 @@ jobs:
             sleep 3
           done
 
-          echo "::error::Timed out waiting for the application to become healthy."
+          echo "::error::Timed out waiting for the application to become healthy (last HTTP status: $code)."
+          if [ "$code" != "000" ]; then
+            echo "The process is serving HTTP but /actuator/health did not report UP."
+            echo "A 404 or 500 here means the endpoint is absent — check that"
+            echo "spring-boot-starter-actuator is still a backend dependency."
+          fi
           tail -80 boot-1.log
           kill "$pid" 2>/dev/null || true
           exit 1

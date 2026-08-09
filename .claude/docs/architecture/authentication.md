@@ -1,5 +1,21 @@
 # Authentication Implementation Guide
 
+> ⚠ **Unverified — predates the documentation standard.** Moved here from
+> `.claude/AUTH_IMPLEMENTATION.md` on 2026-08-06 without being re-checked against
+> the code. It was written as a *guide to what should be built*, and parts of it
+> describe endpoints as `Required` rather than as existing — so it may not
+> describe what actually runs today. It does **not** yet follow
+> [`implementation-docs`](../../skills/implementation-docs/SKILL.md): there is no
+> verified status block, no design-decisions section and no known-gaps section.
+>
+> Do not trust a claim here without checking the file it refers to. Rewriting
+> this against the real code is tracked in [`todo.md`](../../TODO/todo.md) and
+> belongs to the `backend` agent with `security` reviewing.
+>
+> Known-good adjacent facts: the Google client-id type hole was
+> [BUG-014](../../bugs/fixed_bugs.md#bug-014); the JWT transport question is open
+> as [BUG-003](../../bugs/bugs.md#bug-003).
+
 ## Overview
 This document explains the complete authentication implementation for CampusVibe, including email + code verification and Google OAuth 2.0 sign-in.
 

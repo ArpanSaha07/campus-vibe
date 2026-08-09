@@ -79,6 +79,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # busybox wget, already in eclipse-temurin:25-jdk-alpine, so no extra
+      # package. Its exit code is enough: actuator answers 200 only when the
+      # aggregate status is UP and 503 when it is DOWN, and wget fails on any
+      # non-2xx — so there is nothing to grep for. Needs
+      # spring-boot-starter-actuator on the classpath (BUG-015).
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      # Flyway plus Hibernate validation puts first boot around 15-20s locally
+      # and slower on a cold CI runner. Failures inside this window do not count
+      # against retries, so a normal start is never reported as unhealthy.
+      start_period: 45s
     # No source bind-mount: the image runs a packaged jar at /app/app.jar, and
     # mounting ../backend over /app hides it.
     develop:
@@ -110,7 +124,16 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      # Waits for the backend to answer /actuator/health, not merely to have
+      # started, so an SSR page never renders against a backend that is still
+      # running migrations. Costs roughly 20s on `compose up`.
+      #
+      # The trade-off is real: if the backend cannot start, the frontend does
+      # not start either, so frontend-only work is blocked. Escape hatch is
+      # `docker compose up db frontend`, which ignores the condition because
+      # the backend was never requested.
+      backend:
+        condition: service_healthy
     develop:
       watch:
         # Source edits land in the running dev server and Next recompiles the

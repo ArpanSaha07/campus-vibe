@@ -121,17 +121,43 @@ jobs:
           docker compose ps
           exit 1
 
+      # Same status-capture reasoning as _database.yml: 000 is a connection
+      # refusal, anything else is served-but-not-UP. Without it, a container
+      # that crash-loops and one that is up but has no actuator produce an
+      # identical message. The container-running check below separates those
+      # two cases before the timeout is even reached.
       - name: Wait for the backend
+        working-directory: ./docker
         run: |
           set -euo pipefail
+          code=000
           for i in $(seq 1 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/actuator/health 2>/dev/null || echo 000)
             if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
               echo "Backend UP — Flyway ran and the schema validated inside the container."
               exit 0
             fi
+            if [ "$(docker inspect -f '{{.State.Running}}' campusvibe-backend 2>/dev/null)" != "true" ]; then
+              echo "::error::Backend container is no longer running."
+              docker compose logs backend --tail 200
+              exit 1
+            fi
             sleep 5
           done
-          echo "::error::Backend never became healthy."
+          echo "::error::Backend never became healthy (last HTTP status: $code)."
+          echo "Container health: $(docker inspect -f '{{.State.Health.Status}}' campusvibe-backend 2>/dev/null || echo unknown)"
+          if [ "$code" = "000" ]; then
+            # The compose healthcheck probes localhost INSIDE the container, so
+            # a healthy container that this loop cannot reach isolates the fault
+            # to port publishing rather than to the application.
+            echo "Nothing accepted a connection on the published port."
+            echo "If container health above is 'healthy', the app is fine and the"
+            echo "8080:8080 port mapping is what broke."
+          else
+            echo "The container is serving HTTP but /actuator/health did not report UP."
+            echo "A 404 or 500 here means the endpoint is absent — check that"
+            echo "spring-boot-starter-actuator is still a backend dependency."
+          fi
           exit 1
 
       - name: Wait for the frontend
@@ -226,8 +252,15 @@ jobs:
       # ignore CI — the same reasoning that keeps frontend lint non-blocking.
       #
       # The second is the actual gate, narrowed to fixable CRITICALs. That set
-      # is small, actionable, and almost always resolved by bumping a base image
-      # tag. Tighten to HIGH once the baseline is known to be clean.
+      # is small and actionable. Tighten to HIGH once the baseline is known to
+      # be clean — as of BUG-016 the production frontend image reports zero
+      # fixable HIGHs, so that tightening is now within reach for this image.
+      #
+      # The advice printed on failure used to say `bump the base image`, which
+      # sent the first real failure looking in the wrong place: two of the three
+      # CRITICALs were npm packages this repo controls, and the third was npm's
+      # own bundled copy inside node:24-alpine, which no published tag fixed.
+      # Report the finding class instead and let the reader route it.
       - name: Scan images for known vulnerabilities
         run: |
           set -euo pipefail
@@ -243,14 +276,35 @@ jobs:
           done
 
           failed=0
+          classes=""
           for img in "$backend_image" campusvibe-frontend:prod; do
             echo "--- Gate: fixable CRITICAL — $img ---"
-            trivy image --scanners vuln --ignore-unfixed \
-              --severity CRITICAL --exit-code 1 --quiet "$img" || failed=1
+            if ! trivy image --scanners vuln --ignore-unfixed \
+              --severity CRITICAL --exit-code 1 --quiet "$img"; then
+              failed=1
+              # Which ecosystem a finding came from decides who fixes it, so
+              # collect the classes rather than guessing in the error message.
+              classes="$classes $(trivy image --scanners vuln --ignore-unfixed \
+                --severity CRITICAL --format json --quiet "$img" \
+                | jq -r '[.Results[]? | select(.Vulnerabilities != null) | .Class]
+                         | unique | join(",")')"
+            fi
           done
 
           if [ "$failed" -ne 0 ]; then
-            echo "::error::A fixable CRITICAL vulnerability is present. Bump the base image."
+            echo "::error::A fixable CRITICAL vulnerability is present (finding classes:$classes)."
+            echo "Route it by class. Do not assume the base image is at fault:"
+            echo "  lang-pkgs — a dependency (node-pkg, jar). Check the Target"
+            echo "              column for the path. Under /app it is ours, so"
+            echo "              bump it in frontend/package-lock.json with"
+            echo "              npm update <pkg>, or npm install <pkg>@<version>"
+            echo "              when the fix sits outside the declared range."
+            echo "              Under /usr/local/lib/node_modules it is tooling"
+            echo "              vendored into the base image; if the runtime"
+            echo "              stage does not use it, delete it there."
+            echo "  os-pkgs   — the base image proper. Bump the tag, and if no"
+            echo "              published tag carries the fix yet, say so in"
+            echo "              bugs.md rather than leaving CI red."
             exit 1
           fi
           echo "No fixable CRITICAL vulnerabilities."

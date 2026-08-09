@@ -57,7 +57,7 @@ public class ClubController {
         return clubService.get(id);
     }
 
-    // Any authenticated user may create a club (see .claude/user-roles.md, ROLE_USER
+    // Any authenticated user may create a club (see .claude/docs/architecture/user-roles.md, ROLE_USER
     // permissions); managing it requires ownership via a club admin request.
     @PostMapping
     @PreAuthorize("hasRole('USER')")
