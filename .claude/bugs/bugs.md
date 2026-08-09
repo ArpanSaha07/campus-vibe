@@ -1,13 +1,13 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-07** · Branch: `ci/github-actions`
+Last updated: **2026-08-08** · Branch: `ci/github-actions`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-017 so far). Bug ids are never reused.
+(BUG-008 … BUG-017, BUG-019 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **does not reproduce as of 2026-08-08** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -72,10 +72,42 @@ should admit it. Worth checking, in order:
 2026-08-05 against the surefire/failsafe split: 14 unit tests + 26 integration
 tests, failing at `SearchIT:163`.
 
-**Blocks branch protection.** Once `CI` is a required check on `main`, this one
-test makes the branch unmergeable. Either fix it or annotate **the single
-method** `@Disabled("BUG-001: …")` — disabling the whole class would also lose
-the 6 passing search tests. See `.claude/TODO/todo.md`.
+**⚠️ DOES NOT REPRODUCE as of 2026-08-08 — do not act on this entry without
+re-measuring first.** Three runs on the dev machine, all green:
+
+| Run | Result |
+|---|---|
+| `./mvnw -B verify` (full suite, Boot 3.5.16) | **42/42**, `SearchIT` **7/7** |
+| `SearchIT` alone (Boot 3.5.16) | **7/7** |
+| `SearchIT` alone at `HEAD` in a worktree (Boot **3.5.5**) | **7/7** |
+
+The third run is the control: `HEAD` differs from the working tree only by the
+[BUG-019](fixed_bugs.md#bug-019) parent bump, so **the Spring Boot upgrade is not
+what changed this.** Nor is anything else obvious — the search sources have not
+changed since 2026-07-30 (`00a0933` touched only a doc path inside a comment),
+the rename to `SearchIT` in `88a03b1` changed exactly one line (the class name),
+and Testcontainers still uses the same `pgvector/pgvector:pg15` image cached on
+2026-07-29. Same code, same database image, same machine — failing 2026-08-05,
+passing 2026-08-08. **The cause of the change was not established**, and a bug
+that flips without an explanation is not a fixed bug.
+
+One recorded hypothesis can now be ruled *down*: cause 3 (`%f` under a
+comma-decimal FORMAT locale) would emit `0,700000 * COALESCE(...)`, which
+Postgres parses as two select-list items and then errors on the missing `score`
+column — an HTTP 500, which would fail the `status().isOk()` assertion first. The
+recorded symptom is a **200 with zero rows**, pointing instead at the embedding
+being NULL or unreadable at query time (cause 1): `COALESCE(1 - (...), 0)` scores
+a NULL embedding at 0, and `WHERE score >= 0.2 OR kw > 0` then drops it.
+
+**Kept OPEN deliberately.** The arbiter is a full-tier run on GitHub — clean
+runner, fresh image pull, Linux — which no push has yet produced. Close it on a
+green CI run, not on these local ones.
+
+**Blocks branch protection — probably no longer, but unconfirmed.** The plan on
+record was to fix it or annotate **the single method** `@Disabled("BUG-001: …")`
+(disabling the whole class would also lose the 6 passing search tests). Do not
+apply that annotation now: it would disable a test that currently passes, on the
+very run that could finally explain it.
 
 ---
 

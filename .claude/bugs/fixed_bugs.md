@@ -6,6 +6,7 @@ Last updated: **2026-08-07**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
 | [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
 | [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
 | [BUG-015](#bug-015) | High | 2026-08-07 | `/actuator/health` never existed; two CI jobs waited on it until timeout |
@@ -16,6 +17,127 @@ Last updated: **2026-08-07**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-019
+**Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Docker workflow → *Scan images for known vulnerabilities*,
+the run after [BUG-016](#bug-016). The frontend image came back clean, so the gate
+moved on to the backend and failed there.
+
+**Symptom:** four fixable CRITICALs, every one `jar`, every one inside
+`app/app.jar`. The `alpine 3.23.5` layer reported **0** — this is `lang-pkgs`,
+not the base image, which is exactly the distinction the gate message rewritten
+in BUG-016 was added to draw.
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `tomcat-embed-core` | CVE-2026-41293 — HTTP/2 request headers not validated | 10.1.44 | 10.1.55 |
+| `tomcat-embed-core` | CVE-2026-43512 — authentication bypass via digest authentication | 10.1.44 | 10.1.55 |
+| `tomcat-embed-core` | CVE-2026-43515 — improper authorization allows security bypass | 10.1.44 | 10.1.55 |
+| `spring-security-web` | CVE-2026-22732 — security policy bypass and information disclosure | 6.5.3 | 6.5.9 |
+
+**Cause.** Neither library appears in `pom.xml`. Both arrive transitively through
+`spring-boot-starter-web` and `-starter-security`, and both versions are dictated
+by `spring-boot-starter-parent`, which was pinned at **3.5.5**. That BOM manages
+tomcat 10.1.44 and spring-security 6.5.3, so the jar ships them regardless of
+anything this repository declares. **The parent version is the only lever** — a
+direct dependency bump would be overridden by the BOM, and overriding
+`<tomcat.version>` by hand would leave the rest of the tree on 3.5.5's matrix.
+
+Worth naming because it changes how this reads: **the image did not get worse,
+the database did.** BUG-016 recorded the backend image as clean one run earlier,
+on this same 3.5.5 jar. Nothing in the repo changed between those runs — these
+are newly published advisories, not newly *reached* ones. Anything that pins a
+framework version is on a clock it does not control.
+
+**Fix.** Parent `3.5.5` → **3.5.16**, picked as the *floor* rather than as
+"latest":
+
+| Boot | tomcat | spring-security | Clears the gate |
+|---|---|---|---|
+| 3.5.5 | 10.1.44 | 6.5.3 | no |
+| 3.5.12 | 10.1.52 | 6.5.9 | spring-security only |
+| 3.5.14 | 10.1.54 | 6.5.10 | spring-security only |
+| **3.5.16** | **10.1.55** | **6.5.11** | **yes** |
+
+Staying on the 3.5 line is deliberate. It is a patch-level move within a minor,
+so no API surface shifts and no migration reading is required. Boot **4.1.0**
+exists and is what Dependabot `#17` proposes; that is a major, it fails both CI
+tiers today, and taking it as a CVE remedy would mean debugging a framework
+migration against a security deadline. A comment on the `<version>` element
+records that 3.5.16 is a floor, so that a later tidy-up downward does not quietly
+reintroduce four CRITICALs.
+
+**Verified locally:**
+
+| Check | Result |
+|---|---|
+| `./mvnw -B verify -DskipITs` | BUILD SUCCESS, 16/16 unit tests |
+| `dependency:list` | `tomcat-embed-core` **10.1.55**, `spring-security-web`/`-core` **6.5.11** |
+| Fat jar contents | `BOOT-INF/lib/tomcat-embed-core-10.1.55.jar`, `spring-security-web-6.5.11.jar` |
+
+The evidence above is **version identity** — every installed version meets or
+exceeds the *Fixed Version* Trivy named. Strong for these four findings, silent
+about any fifth, so it needed the gate itself to confirm it.
+
+**Confirmed against the gate, 2026-08-08**, once Docker Desktop was running. The
+whole `_docker.yml` sequence was replayed locally with Trivy **0.73.0** — the
+same version `install.sh` fetches today, run from the `aquasec/trivy` image
+against the daemon rather than installed to `/usr/local/bin`:
+
+| Workflow step | Result |
+|---|---|
+| Compose fail-fast secret guard | refuses to produce a config; names `POSTGRES_PASSWORD` |
+| `compose build` + `up -d` | db healthy, backend **UP**, frontend serving |
+| API smoke tests | `/ping` ok · `/api/v1/clubs` **8** · search **1** hit · `/my-club` **403** |
+| Production frontend image | builds, serves `/` on :3001 |
+| **Gate — fixable CRITICAL** | **backend 0** (alpine **0**, `app/app.jar` **0**) · **frontend 0** · **exit 0** |
+
+So the four findings are gone from the artifact the gate actually scans, not
+merely from the dependency tree. `trivy fs` against the bare jar, tried while
+Docker was down, was never evidence of this: it reported
+`Number of language-specific files num=0` and scanned nothing, so a green result
+there would have meant only that it looked at nothing.
+
+**The fixable-HIGH report has now been read** — that was the open question, and
+the answer is that the backend image is **not** clean at HIGH. Ten findings, none
+of which the CRITICAL gate can see:
+
+| Class | Library | CVE | Installed | Fixed in | Whose to fix |
+|---|---|---|---|---|---|
+| `os-pkgs` | `libexpat` | CVE-2026-56408 | 2.8.1-r0 | 2.8.2-r0 | `eclipse-temurin:25-jdk-alpine` |
+| `os-pkgs` | `p11-kit`, `p11-kit-trust` | CVE-2026-2100 | 0.25.5-r2 | 0.26.2-r0 | same base image |
+| `lang-pkgs` | `commons-io` | CVE-2024-47554 | 2.11.0 | 2.14.0 | **ours** — hard-pinned in `pom.xml` |
+| `lang-pkgs` | `netty-codec` | CVE-2026-59901 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http` | CVE-2026-55831, -55833, -56745 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http2` | CVE-2026-56819 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `org.postgresql:postgresql` | CVE-2026-54291 | 42.7.11 | 42.7.12 | BOM |
+
+The production frontend image reports **0 HIGH and 0 CRITICAL**, holding the
+BUG-016 result.
+
+Two things this measurement settles. First, **tightening the gate to HIGH would
+fail today** — that task's precondition is now measured rather than assumed, and
+the answer is "not yet". Second, **netty is in the jar by accident**:
+`dependency:tree` shows all five netty artifacts arriving through
+`software.amazon.awssdk:s3` → `netty-nio-client`, the SDK's *async* transport.
+The version is Boot's (the BOM overrides what awssdk 2.20.26 asks for), so the
+CVEs are real, but if the S3 client here is the synchronous one then six of the
+ten HIGHs belong to a transport nothing calls, and an `<exclusion>` removes them
+outright. Worth establishing before bumping anything.
+
+**Deliberately left alone:** the hard-pinned block outside the BOM —
+`software.amazon.awssdk:s3` 2.20.26, `commons-io` 2.11.0, `jjwt` 0.11.5, and the
+three Google client libraries. Only `commons-io` surfaced above, and none of them
+reached the CRITICAL gate. These are what Dependabot's maven entry exists for.
+
+**Overlaps a Dependabot PR.** `#15` (`maven-minor-patch`, 7 updates) almost
+certainly carries this same parent bump plus six others, and is currently red in
+both tiers. This change is the minimum that clears the gate and does not settle
+`#15`, which still needs triage on its own merits.
 
 ---
 
