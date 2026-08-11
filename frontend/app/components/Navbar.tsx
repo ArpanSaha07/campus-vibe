@@ -24,7 +24,7 @@ export default function Navbar() {
           <div className="flex-shrink-0">
             <Link href="/">
               <Image
-                src="/campus-vibe-logo.png"
+                src="/nouvel-logo.png"
                 alt="CampusVibe Logo"
                 width={150}
                 height={60}

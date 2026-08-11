@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The AI Planner is a login-aware CampusVibe feature that helps users ask natural-language questions and receive personalized event and club recommendations, especially for planning things like weekends, evenings, budget-friendly outings, or activities based on preferences.
+The AI Planner is a login-aware CampusVibe feature that helps users ask natural-language questions and receive personalized event and club recommendations, especially for planning things like weekends, evenings, or activities based on preferences.
 
 The feature should feel like a dedicated planning assistant, not a generic search box. It should support conversational prompts, contextual recommendations, and structured plan output.
 
@@ -120,14 +120,8 @@ The results page should not be a plain text response page. It should present a u
 
 ## Suggested Results Layout
 
-The result should be structured into sections such as:
+The result should be structured into once section, with suggested events and/or clubs in the text output and possibly event/club cards.
 
-* Overview
-* Recommended events
-* Recommended clubs
-* Time slots
-* Budget estimate
-* Suggested next actions
 
 ### Example structure
 
@@ -294,7 +288,7 @@ The feature should help users move from:
 
 to
 
-“Here is a plan that fits my interests, budget, timing, and campus life.”
+“Here is a plan that fits my interests, timing, and campus life.”
 
 ## Acceptance Criteria
 

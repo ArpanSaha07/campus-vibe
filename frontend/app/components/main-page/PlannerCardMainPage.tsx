@@ -6,9 +6,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import Button from "@/app/components/ui/Button";
 import Chip from "@/app/components/ui/Chip";
 import { useAuth } from "@/app/lib/auth-context";
-
-/** Guest prompts survive the trip through sign-in here. */
-export const PLANNER_PROMPT_KEY = "campusvibe.planner.prompt";
+import { PLANNER_PROMPT_KEY } from "@/app/lib/planner";
 
 /** Chip label → the starting query it drops into the input. */
 const SUGGESTIONS: { label: string; prompt: string }[] = [
@@ -64,13 +62,13 @@ export default function PlannerCard() {
   }
 
   return (
-    <section aria-label="Plan with CampusVibe" className="max-w-7xl mx-auto py-4 px-4 sm:px-6">
+    <section aria-label="Plan with CampusVibe" className="max-w-7xl mx-auto pt-2 pb-4 px-4 sm:px-6">
       <div className="rounded-2xl border border-lavender-200 bg-lavender-100 px-6 py-10 sm:px-10 sm:py-14">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display mt-3 text-3xl sm:text-4xl font-bold text-ink-900">
             <div className="inline-flex items-center gap-3">
               Plan with CampusVibe 
-              <Sparkles className="h-7 w-7" aria-hidden="true" />
+              <Sparkles className="h-7 w-7 hidden sm:block" aria-hidden="true" />
             </div> 
             
           </h2>
