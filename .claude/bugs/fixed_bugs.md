@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-07**
+Last updated: **2026-08-12**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-020](#bug-020) | High | 2026-08-12 | Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume (28P01) |
 | [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
 | [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
 | [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
@@ -17,6 +18,64 @@ Last updated: **2026-08-07**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-020
+**Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume** · High · FIXED 2026-08-12
+
+**Found:** 2026-08-12, after rotating the local Postgres password in `docker/.env`.
+`campusvibe-db` came up healthy, `campusvibe-backend` exited 1 during Flyway's very
+first connection attempt.
+
+**Symptom:**
+
+```
+SQL State  : 28P01
+Message    : FATAL: password authentication failed for user "arpan"
+```
+
+The confusing part is that `db` reported **healthy** throughout. Its healthcheck is
+`pg_isready`, which only asks whether the server accepts connections — it never
+authenticates, so a password mismatch is invisible to it. Compose therefore satisfied
+`depends_on: service_healthy` and started the backend straight into the failure.
+
+**Cause:** `POSTGRES_PASSWORD` is read by the Postgres image's entrypoint **only when it
+runs `initdb` on an empty data directory**. The `docker_db_data` volume was initialized
+under the old password, so the `arpan` role kept the old SCRAM verifier while
+`SPRING_DATASOURCE_PASSWORD` (`docker-compose.yml:56`) now carried the new one. Compose
+did recreate the `db` container on the next `up` — its `POSTGRES_PASSWORD` env var
+matched `.env` exactly — but a recreated *container* over a pre-existing *volume* changes
+nothing about the role that already exists inside the database. The env var is an init
+input, not a desired-state declaration.
+
+**Fix:** reset the role in place, over the container's Unix socket. The image's generated
+`pg_hba.conf` keeps `local all all trust`, so the forgotten old password was not needed:
+
+```sh
+docker exec campusvibe-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '"'"'$POSTGRES_PASSWORD'"'"'"'
+```
+
+Both variables expand *inside* the container, so the value comes from the env Compose
+already injected from `.env` and the secret never lands in host argv or shell history.
+Postgres 15 defaults `password_encryption` to `scram-sha-256`, matching the
+`host all all all scram-sha-256` line the image appends, so the new verifier was usable
+by the JDBC driver immediately.
+
+Rejected the obvious alternative, `docker compose down -v`: it re-runs `initdb` with the
+new password and Flyway rebuilds the schema, but it drops the volume — 8 clubs and 1 user
+here, none of it reproducible from migrations.
+
+Verified with a TCP login (`PGPASSWORD=… psql -h 127.0.0.1`), which is the path the
+backend actually uses rather than the trust-based socket, then `compose up -d`: backend
+`Up (healthy)`, `/actuator/health` `{"status":"UP"}`, Flyway logged *Current version of
+schema "public": 8 — no migration necessary*, and `clubs` still held 8 rows.
+
+Also documented the one-shot nature of the variable in `docker/.env.example`, since
+nothing at the point of edit hinted that changing it would not take effect.
+
+**Affected files:** `docker/.env.example` *(comment only — the fix itself was a one-off
+database command, no application or compose change)*
 
 ---
 
