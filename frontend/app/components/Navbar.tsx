@@ -17,14 +17,14 @@ export default function Navbar() {
 
   return (
     <nav className="w-full border-b border-mist-200 bg-white top-0 z-50">
-      <div className="px-4 mb-1 sm:px-6 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8">
         {/* Top Row */}
         <div className="flex h-16 items-center justify-between space-x-4">
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/">
               <Image
-                src="/campus-vibe-logo.png"
+                src="/new-campus-vibe-logo.png"
                 alt="CampusVibe Logo"
                 width={150}
                 height={60}
@@ -46,19 +46,20 @@ export default function Navbar() {
             <Link href="/clubs" className={linkClasses}>
               Find clubs
             </Link>
-            <Link href="/create-event" className={linkClasses}>
-              Create event
-            </Link>
 
             {isAuthenticated ? (
               <>
-                <Link href="/dashboard" className={linkClasses}>Dashboard</Link>
+                {user && isClubAdmin(user) && (
+                  <Link href="/create-event" className={linkClasses}>Create event</Link>
+                )}
                 {user && isClubAdmin(user) && (
                   <Link href="/club-dashboard" className={linkClasses}>My club</Link>
                 )}
                 {user && isAdmin(user) && (
                   <Link href="/admin" className={linkClasses}>Admin</Link>
                 )}
+                <Link href="/my-events" className={linkClasses}>My events</Link>
+                <Link href="/my-clubs" className={linkClasses}>My clubs</Link>
                 <Link href="/profile" className={linkClasses}>Profile</Link>
                 <button onClick={logout} className={linkClasses}>
                   Sign out

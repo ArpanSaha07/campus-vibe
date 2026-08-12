@@ -17,6 +17,7 @@ export default function Chip({
       <button
         type="button"
         onClick={onClick}
+        aria-pressed={selected}
         className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors ${classes}`}
       >
         {children}

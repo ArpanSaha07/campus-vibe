@@ -1,4 +1,4 @@
-import type { ApiClub, ApiEvent, Club, EventInstance } from "@/app/types";
+import type { ApiClub, ApiEvent, ApiMyEvent, Club, EventInstance, MyEvent } from "@/app/types";
 
 export const FALLBACK_EVENT_IMAGE = "/frosh1.jpeg";
 export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
@@ -24,6 +24,15 @@ export function toEventInstance(api: ApiEvent): EventInstance {
     capacity: api.capacity ?? 0,
     registered: api.registered,
     categories: api.categories,
+  };
+}
+
+/** Maps a backend MyEventDTO to the shape the My events page renders. */
+export function toMyEvent(api: ApiMyEvent): MyEvent {
+  return {
+    event: toEventInstance(api.event),
+    going: api.going,
+    saved: api.saved,
   };
 }
 

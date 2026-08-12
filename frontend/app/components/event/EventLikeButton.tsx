@@ -6,9 +6,17 @@ import { EventInstance } from "@/app/types";
 
 // Only the event id is needed, so a full EventInstance (as passed by EventCard)
 // or a lightweight { eventId } object (as passed by the event page) both work.
-export default function EventLikeButton({ event }: { event: Pick<EventInstance, "eventId"> }) {
+// `initiallySaved` lets a caller that already knows the answer — the My events
+// page, which fetched the saved list — render the heart filled from the start.
+export default function EventLikeButton({
+  event,
+  initiallySaved = false,
+}: {
+  event: Pick<EventInstance, "eventId">;
+  initiallySaved?: boolean;
+}) {
   const { isAuthenticated } = useAuth();
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(initiallySaved);
 
   const handleClick = async (e: React.MouseEvent) => {
     if (!isAuthenticated) {

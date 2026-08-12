@@ -24,6 +24,22 @@ export type EventInstance = {
   // recurrence?
 };
 
+// How the signed-in user relates to an event on the My events page.
+//
+// The two are independent, not one status: a bookmark and a commitment are
+// different promises, and an event can be both. Mirrors the backend's
+// com.campusvibe.user.MyEventDTO.
+export type MyEvent = {
+  event: EventInstance;
+  going: boolean;
+  saved: boolean;
+};
+
+/** Which badge a card shows. "going" wins when both are true. */
+export type MyEventStatus = "going" | "saved";
+
+export type MyEventsTab = "going" | "saved" | "past";
+
 export type Club = {
     clubId: string;
     name: string;
@@ -81,6 +97,12 @@ export interface ApiEvent {
   capacity: number | null;
   registered: number;
   categories: string[];
+}
+
+export interface ApiMyEvent {
+  event: ApiEvent;
+  going: boolean;
+  saved: boolean;
 }
 
 export interface ApiClub {

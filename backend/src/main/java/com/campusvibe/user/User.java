@@ -45,6 +45,22 @@ public class User implements UserDetails {
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 
+	// Event ids rather than @ManyToMany Event: this entity is the security
+	// principal, loaded on every authenticated request, and mapping the events
+	// themselves would invite a lazy-initialization failure the moment anything
+	// outside a transaction touched them. Ids are enough to answer "is this
+	// saved?" and to fetch the events deliberately when a caller wants them.
+	// LAZY for the same reason — no request should pay for these unless it asks.
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(name = "user_saved_events", joinColumns = @JoinColumn(name = "user_id"))
+	@Column(name = "event_id")
+	private Set<Long> savedEventIds = new HashSet<>();
+
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(name = "user_event_rsvps", joinColumns = @JoinColumn(name = "user_id"))
+	@Column(name = "event_id")
+	private Set<Long> goingEventIds = new HashSet<>();
+
 	public boolean hasRole(RoleName roleName) {
 		return roles.stream().anyMatch(r -> r.getName().equals(roleName.name()));
 	}

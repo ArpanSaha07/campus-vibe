@@ -30,9 +30,9 @@ export default function ClubProfileComponent({ club }: { club: Club }) {
         <Link href={`/clubs/${club.clubId}`}>
           <h3 className="font-semibold text-ink-900 hover:text-lavender-800">{club.name}</h3>
         </Link>
-        <p className="font-mono text-xs text-ink-600 mt-1">
+        {/* <p className="font-mono text-xs text-ink-600 mt-1">
           {club.followers} followers
-        </p>
+        </p> */}
       </div>
 
       {/* Follow Button */}

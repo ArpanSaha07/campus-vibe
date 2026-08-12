@@ -36,9 +36,9 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
 - [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload.
 - [ ] **P2** Admin Dashboard API: create clubs, assign Club Admins, manage users, moderate events.
-- [ ] **P2** Bookmark events (entity, migration, endpoints).
+- [x] **P2** Bookmark events + RSVPs (entity, migration, endpoints). `user_saved_events` was already in V4 but unmapped; `V9__create_event_rsvps.sql` adds `user_event_rsvps`. Both are mapped as lazy `@ElementCollection` id sets on `User`, served by `MyEventService` / `MyEventController` under `/api/v1/users/me/*`. Saved and going are deliberately independent relations, not one status column. Covered by `MyEventsIT`.
 - [ ] **P2** Follow clubs (entity, migration, endpoints).
-- [ ] **P2** Google Calendar export for an event.
+- [x] **P2** Google Calendar export for an event — **needs no backend**. Done client-side in `frontend/app/lib/google-calendar.ts`: a Google Calendar template link carries the whole event in its query string, so there is no API key, OAuth or endpoint to build. Reusable via `<AddToCalendarLink event={…} />`.
 - [ ] **P3** Notifications.
 - [ ] **P3** Ticket purchasing flow.
 - [ ] **P3** Move `application-test.yml` from `src/main/resources` to `src/test/resources` so test config stops shipping in the production jar. ([BUG-007](../bugs/bugs.md#bug-007))
@@ -47,6 +47,11 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 - [ ] **P1** Fix route protection — `proxy.tsx` is never executed by Next.js (wrong filename *and* wrong export name), and it reads a cookie while the JWT lives in localStorage. Decide the token transport first; a half-wired guard is worse than none. ([BUG-003](../bugs/bugs.md#bug-003))
 - [ ] **P2** Fix `NEXT_PUBLIC_*` in the **production** Docker build — values are inlined at build time, so the deployed frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. No longer affects local dev, which now builds the `dev` stage and reads them at runtime. ([BUG-004](../bugs/bugs.md#bug-004))
+- [x] **P1** Wire the My events page to the backend. `getMyEvents()` now calls `GET /api/v1/users/me/events` and maps through `toMyEvent`; the mock `app/data/my-events.ts` is deleted. Verified end-to-end against Postgres.
+- [ ] **P1** Add an "I'm going" control so users can actually RSVP. `POST`/`DELETE /api/v1/users/me/rsvps` are live and tested, but nothing in the UI calls them yet, so the Going tab can only be populated through the API. Natural home is the event detail page, beside the existing save heart.
+- [ ] **P2** Refresh the My events list after the heart is toggled. `EventLikeButton` updates its own state optimistically, so un-saving on the Saved tab leaves the card visible until reload.
+- [ ] **P2** Give `EventInstance` a real end time. `buildGoogleCalendarUrl` currently assumes every event runs two hours, because Google needs a start/end pair and the model has no end. Every "Add to calendar" link is that guess until the backend carries one.
+- [ ] **P3** Whole-list calendar export ("Add to calendar" for a full tab). Needs an .ics feed — a Google template link carries exactly one event, which is why that control lives on each card rather than in the page header.
 - [ ] **P2** Category filtering on the events listing.
 - [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.

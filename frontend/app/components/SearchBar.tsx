@@ -89,7 +89,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
           placeholder="Search events and clubs"
           aria-label="Search events and clubs"
           aria-expanded={open}
-          className="w-full rounded-full bg-mist-100 border border-transparent py-2 pl-4 pr-10 text-sm text-ink-900 placeholder-ink-600 focus:bg-white focus:border-lavender-300 outline-none transition-colors"
+          className="w-full rounded-full bg-mist-100 border border-transparent py-2 pl-4 pr-10 text-sm text-ink-900 placeholder-ink-600 focus:bg-white outline-none transition-colors"
         />
         <button
           type="submit"
