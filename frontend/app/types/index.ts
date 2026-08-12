@@ -58,6 +58,25 @@ export type Club = {
     // clubcategories: string[];
 };
 
+// AI planner (see .claude/docs/architecture/ai-planner.md).
+// Built from mock data today; this is the shape the RAG endpoint should return,
+// so the page does not have to change when the backend lands.
+export type PlanSlot = {
+  time: string;        // printed label, e.g. '6:00 PM'
+  event: EventInstance;
+  rationale: string;   // why this pick answers the request
+};
+
+export type Plan = {
+  prompt: string;          // the request this plan answers
+  refinements: string[];   // follow-up prompts applied, oldest first
+  title: string;
+  summary: string;
+  slots: PlanSlot[];
+  clubs: Club[];
+  nextSteps: string[];
+};
+
 // Mirrors backend RBAC (see .claude/docs/architecture/user-roles.md and
 // com.campusvibe.user.UserDTO).
 // One User interface for all roles — role-specific data comes from separate endpoints.
@@ -144,6 +163,12 @@ export type ClubPageProps = {
 export type EventPageProps = {
   params: Promise<{
     eventId: string;
+  }>;
+}
+
+export type PlannerPageProps = {
+  searchParams: Promise<{
+    prompt?: string | string[];
   }>;
 }
 

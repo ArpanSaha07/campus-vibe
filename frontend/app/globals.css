@@ -41,6 +41,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Opt-out for a control whose wrapper draws the ring for it (e.g. an input sharing
+   a pill with a button). Focus stays visible — it just moves to the wrapper.
+   Needed because the rule above is unlayered and so outranks `outline-none`. */
+.focus-ring-inherit:focus-visible {
+  outline: none;
+}
+
 /* Mono "printed on the ticket" label */
 .ticket-label {
   font-family: var(--font-mono), monospace;

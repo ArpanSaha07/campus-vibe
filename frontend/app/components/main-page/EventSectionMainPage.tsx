@@ -1,4 +1,4 @@
-import EventCard from "../event/EventCard";
+import EventCard from "@/app/components/event/EventCard";
 import SectionHeading from "@/app/components/ui/SectionHeading";
 import { EventInstance } from "@/app/types";
 

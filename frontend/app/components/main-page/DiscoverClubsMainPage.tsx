@@ -4,7 +4,7 @@ import SectionHeading from "@/app/components/ui/SectionHeading";
 
 export default function FeaturedOrganizers({ clubs }: { clubs: Club[] }) {
   return (
-    <section aria-label="Featured Clubs section on Main Page" className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <section aria-label="Featured Clubs section on Main Page" className="max-w-7xl mx-auto px-4 sm:px-6 pb-8">
       <SectionHeading
         title="Featured clubs"
         subtitle="Follow a club and never miss what they host next."
