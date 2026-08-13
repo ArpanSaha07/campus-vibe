@@ -8,6 +8,11 @@ import EventShareButton from "@/app/components/event/EventShareButton";
 
 // Ticket-stub card: image on top, perforated divider, printed (mono) data below.
 // See .claude/design-guidelines.md — "Signature: the ticket perforation".
+//
+// The whole card is the link. Rather than wrap everything in one <Link> — which
+// would nest the like/share <button>s inside an <a> — the title link stretches
+// itself over the card with an ::after overlay. Anything that needs its own
+// click target sits above that overlay on z-10.
 
 export default function EventCard({ event }: { event: EventInstance }) {
   const isToday =
@@ -17,7 +22,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
   return (
     <div
       aria-label="event-card"
-      className="bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow overflow-hidden group lift"
+      className="relative bg-transparent flex-shrink-0 w-72 rounded-2xl hover:shadow-lg transition-shadow overflow-hidden group lift"
     >
       <div className="relative">
         {/* Image */}
@@ -42,9 +47,10 @@ export default function EventCard({ event }: { event: EventInstance }) {
           <EventShareButton eventId={event.eventId} />
         </div>
 
-        {/* Badges over the image */}
+        {/* Badges over the image. pointer-events-none so they read as decoration
+            and clicks fall through to the card link underneath. */}
         {(almostFull || isToday) && (
-          <div className="absolute top-2 left-2 z-10 flex space-x-1.5">
+          <div className="absolute top-2 left-2 z-10 flex space-x-1.5 pointer-events-none">
             {almostFull && (
               <span className="ticket-label rounded-full bg-berry-100 text-berry-600 px-2.5 py-1">
                 Almost full
@@ -63,7 +69,10 @@ export default function EventCard({ event }: { event: EventInstance }) {
 
       {/* Stub content */}
       <div className="px-4 pt-3 pb-4">
-        <Link href={`/events/${event.eventId}`}>
+        <Link
+          href={`/events/${event.eventId}`}
+          className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lavender-600"
+        >
           <h3 className="font-semibold text-[15px] leading-snug line-clamp-2 text-ink-900 group-hover:text-lavender-800">
             {event.title}
           </h3>

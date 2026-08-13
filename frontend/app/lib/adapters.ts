@@ -1,6 +1,6 @@
 import type { ApiClub, ApiEvent, ApiMyEvent, Club, EventInstance, MyEvent } from "@/app/types";
 
-export const FALLBACK_EVENT_IMAGE = "/frosh1.jpeg";
+export const FALLBACK_EVENT_IMAGE = "/campus-vibe-logo.png";
 export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
 
 /** Maps a backend EventDTO to the EventInstance shape the UI components use. */

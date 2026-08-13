@@ -3,7 +3,9 @@ import { Bricolage_Grotesque, Figtree, Spline_Sans_Mono } from "next/font/google
 import "@/app/globals.css";
 import type { RootLayoutProps } from "@/app/types";
 import { GoogleProvider } from "./components/auth-components/GoogleProvider";
+import AuthModal from "./components/auth-components/AuthModal";
 import { AuthProvider } from "./lib/auth-context";
+import { AuthModalProvider } from "./lib/auth-modal-context";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -35,7 +37,12 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body className={`${bricolage.variable} ${figtree.variable} ${splineMono.variable} antialiased min-h-screen flex flex-col`}>
         <GoogleProvider>
           <AuthProvider>
-            {children}
+            {/* Mounted once here, so any trigger anywhere can raise the auth
+                card without navigating away from the page it interrupted. */}
+            <AuthModalProvider>
+              {children}
+              <AuthModal />
+            </AuthModalProvider>
           </AuthProvider>
         </GoogleProvider>
       </body>

@@ -103,8 +103,24 @@ body {
   box-shadow: var(--shadow-lift);
 }
 
+/* Auth modal card: rises the short distance a dialog should, not a page's worth */
+.auth-modal-card {
+  animation: auth-modal-in 150ms var(--ease-snap) both;
+}
+@keyframes auth-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fade-up {
+  .fade-up,
+  .auth-modal-card {
     animation: none;
   }
   .lift,

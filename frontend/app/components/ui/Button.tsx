@@ -1,13 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "berry";
+type Variant = "primary" | "secondary" | "berry" | "outline";
 type Size = "md" | "lg";
 
 const variantClasses: Record<Variant, string> = {
   primary: "bg-lavender-600 text-white hover:bg-lavender-800",
   secondary: "bg-white text-ink-900 border border-mist-200 hover:bg-lavender-50",
   berry: "bg-berry-600 text-white hover:bg-berry-700",
+  // Border-only hover, no fill change. For buttons that sit beside a filled
+  // one and must not compete with it — the Google button in the auth modal.
+  outline: "bg-white text-ink-900 border border-mist-200 hover:border-lavender-600",
 };
 
 const sizeClasses: Record<Size, string> = {
