@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 
@@ -119,6 +120,25 @@ public class DefaultExceptionHandler {
         ApiError apiError = new ApiError(
                 request.getRequestURI(),
                 message,
+                HttpStatus.BAD_REQUEST.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    // A path variable that cannot be converted — /api/v1/events/dance-party for
+    // a Long id — is a malformed request, not a server fault. Without this the
+    // catch-all below answered 500, which told the caller we had broken when in
+    // fact they had asked for something that could never name a resource.
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleException(MethodArgumentTypeMismatchException e,
+                                                    HttpServletRequest request) {
+        // Deliberately does not echo e.getMessage(): it names the target Java
+        // type and the controller parameter, which is internal detail.
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                "Invalid value for '%s'".formatted(e.getName()),
                 HttpStatus.BAD_REQUEST.value(),
                 LocalDateTime.now()
         );

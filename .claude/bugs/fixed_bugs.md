@@ -6,6 +6,9 @@ Last updated: **2026-08-13**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-024](#bug-024) | Medium | 2026-08-13 | A non-numeric path variable answered 500 instead of 400, app-wide |
+| [BUG-023](#bug-023) | Medium | 2026-08-13 | The event detail page served one hardcoded event for every URL, with a club nobody has |
+| [BUG-022](#bug-022) | High | 2026-08-13 | Every club page showed "Club not found": the detail route read mock data whose slugs no seeded club shares |
 | [BUG-021](#bug-021) | Low | 2026-08-13 | Stale Turbopack cache in the frontend container served pre-edit CSS, so new styles silently did nothing |
 | [BUG-020](#bug-020) | High | 2026-08-12 | Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume (28P01) |
 | [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
@@ -19,6 +22,172 @@ Last updated: **2026-08-13**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-024
+**A non-numeric path variable answered 500 instead of 400** · Medium · FIXED 2026-08-13
+
+**Found:** 2026-08-13, probing the event API while fixing
+[BUG-023](#bug-023).
+
+**Symptom:** `GET /api/v1/events/dance-party` returned **500**:
+
+```json
+{"path":"/api/v1/events/dance-party",
+ "message":"Method parameter 'id': Failed to convert value of type 'java.lang.String' to required type 'java.lang.Long'",
+ "statusCode":500}
+```
+
+**Cause:** Spring raises `MethodArgumentTypeMismatchException` when a path
+variable cannot be converted to the controller's parameter type.
+`DefaultExceptionHandler` had no handler for it, so it fell through to the
+catch-all `@ExceptionHandler(Exception.class)` and was reported as a server
+fault — for what is a malformed request the server understood perfectly well.
+
+Not specific to events: it applied to every `Long` path variable in the app —
+`DELETE /api/v1/events/{id}`, the image upload routes, and anything added later.
+It was reachable from the UI rather than only by hand, because the old hardcoded
+event page linked to a slug id (`dance-party`).
+
+The raw exception message also leaked the target Java type and the controller
+parameter name into the response body.
+
+**Fix:** a `MethodArgumentTypeMismatchException` handler returning **400** with
+`"Invalid value for '%s'".formatted(e.getName())` — the parameter name only, not
+the type detail. Ordering does not matter here: Spring picks the most specific
+handler regardless of declaration order.
+
+**Verification:** `EventLookupIT.nonNumericIdIs400NotAServerError` and
+`aDecimalIdIsAlso400`, plus live checks — `/api/v1/events/dance-party` and
+`/api/v1/events/1.5` both **400**, `/api/v1/events/999999` still **404**, a real
+id still **200**.
+
+---
+
+### BUG-023
+**Event detail page served one hardcoded event, with a club nobody has** · Medium · FIXED 2026-08-13
+
+**Found:** 2026-08-13, split out of [BUG-022](#bug-022) — same root cause, second
+page.
+
+**Symptom:** `app/(main)/events/[eventId]/page.tsx` built its entire event from a
+literal — title, date, location, categories, organizer — and ignored the
+`eventId` in the route, so every event URL rendered the same "Dance Party". Its
+`organizer.name` was `fashion-takes-action`: a slug rather than a name, and one
+no seeded club shares. So the organizer link went nowhere, and
+`<ClubFollowButton clubId={event.organizer.name} />` posted an id the API
+rejects — the label flipped to *Following* and reverted a moment later when the
+404 came back. Before the follow work that button did nothing at all, which is
+why the mismatch had stayed invisible.
+
+**Fix:** the same treatment the club page had in BUG-022, now an established
+pattern rather than a one-off.
+
+- `getEvent` returns `EventInstance | null` — `null` for a 404, rethrowing
+  everything else. It also answers `null` for an id that is not a positive
+  integer, without spending a request: event ids are database bigints, so a slug
+  cannot name one. That is what makes `/events/dance-party` a 404 rather than a
+  round trip ending in [BUG-024](#bug-024).
+- The page is an async Server Component calling `notFound()`, with scoped
+  `not-found.tsx` and `error.tsx` beside it.
+- The organizer block is resolved from the event's real `organizerId` via
+  `getClubById`, giving a working club link, the club's actual name, and a
+  Follow button with an id the API accepts. It reuses `ClubLogo`, so a club
+  without a logo shows its initial instead of the old hardcoded `/frosh1.jpeg`.
+  A missing club degrades that one section rather than 404ing the whole page —
+  the event is real even if its club has been removed.
+- The `/events` listing became a Server Component too, reading `?q=` from the
+  `searchParams` prop. That removed the `useSearchParams` + `Suspense` wrapper
+  and the "Loading events…" flash, and its former inline error branch is now
+  `app/(main)/events/error.tsx`. No `notFound()` there on purpose: `/events`
+  always exists, and an empty result is an empty state, not a 404.
+
+**Verification:** measured against the running stack with a throwaway event
+(since removed). `/events/1` → **200**, `<title>E2E Chess Night · CampusVibe</title>`,
+organizer rendered as *Chess Club* linking to `/clubs/chess-club`;
+`/events/999999`, `/events/dance-party` and `/events/1.5` → real **404**s
+carrying `noindex`, the navbar, and Browse all events; `/events` and
+`/events?q=chess` → **200** with no loading flash. Following from the event page
+wrote `chess-club` to `user_followed_clubs` and **stayed** *Following* — the
+exact symptom this bug was about. With the backend stopped, both pages showed
+their Try again boundary rather than a not-found. 10 new tests in
+`event.test.ts`, 5 in `EventLookupIT`.
+
+---
+
+### BUG-022
+**Every club page showed "Club not found"** · High · FIXED 2026-08-13
+
+**Found:** 2026-08-13, while checking the new Follow button on the club detail
+page. The button could not be reached, because the page it lives on never
+rendered.
+
+**Symptom:** `/clubs/chess-club` — a club that exists, is listed on `/clubs`,
+and is served fine by the API — rendered the empty state:
+
+```
+Club not found
+This club page doesn't exist — it may have been renamed or removed.
+```
+
+**Cause:** `getClubById` in `app/lib/club.tsx` searched `app/data/data.ts`, and
+the two id spaces had never overlapped. Mock: `mcgill-ski-club`,
+`fashion-takes-action`, `eng-frosh`, `startup-montreal`, `tech-montreal`,
+`montreal-artists`. Seeded by `V6` and served by the API: `chess-club`,
+`coding-club`, `debate-club`, and five more. `getAllClubs` *did* call the API,
+so `/clubs` handed out real ids the detail page could not resolve. Every route
+in was affected: each `ClubCard`, each `MyClubCard` on the new My clubs page,
+and the club link on every event card. `GET /api/v1/clubs/{id}` had been
+implemented and serving 200 the whole time (`ClubController.java:55`).
+
+Two further problems were tangled into the same page and fixed with it:
+
+1. **A missing club threw.** `getClubById` threw for an unknown id, and its one
+   caller caught the throw and turned it straight back into `setClub(null)` —
+   an exception that existed only to be swallowed one line later. Anyone can
+   type any slug, so a miss is an ordinary outcome; Next's error-handling guide
+   is explicit that expected errors should be return values.
+2. **The 404 was a soft one.** The page was a Client Component, so `club` began
+   as `null` and both SSR and the first client paint rendered "Club not found" —
+   every *valid* club briefly flashed its own error state — and the response was
+   `200 OK` either way, so a dead club looked fine to a crawler.
+
+**Fix**, in four parts:
+
+- `apiFetch` now throws an `ApiError` carrying `status`. The status was
+  previously lost, which is why `auth-errors.ts:1` has to `JSON.parse` the
+  message back out of the body. `Error.message` is unchanged, so every existing
+  caller and `parseApiError` behave exactly as before.
+- `getClubById` calls the endpoint and returns `Club | null` — `null` only for a
+  404, rethrowing everything else.
+- The page became an async Server Component calling `notFound()`, with the tab
+  state extracted to `ClubEventTabs` (`"use client"`). The check runs in the
+  page body rather than inside a `<Suspense>` boundary, which is what makes the
+  response non-streamed and therefore a real 404 rather than a 200.
+- A scoped `not-found.tsx` carries the previous EmptyState markup verbatim, and
+  a new `error.tsx` handles the genuinely exceptional case. Splitting those two
+  is what stops a backend outage from telling a user their club was deleted.
+
+Server-side fetching was new to this app and needed one piece of plumbing:
+`NEXT_PUBLIC_API_URL` is `http://localhost:8080`, which inside the frontend
+container is that container. `api.tsx` now picks `API_INTERNAL_URL`
+(`http://backend:8080`, set in `docker-compose.yml`) when `window` is undefined.
+It is deliberately not `NEXT_PUBLIC_`: a Docker service name is meaningless to a
+browser and must not be inlined into the client bundle.
+
+**Verification:** `/clubs/chess-club` → **200** with `Chess Club` in the SSR
+HTML, `<title>Chess Club · CampusVibe</title>`, and no "Club not found" visible;
+`/clubs/nonsense` and the stale mock slug `/clubs/tech-montreal` → a real
+**404** carrying `noindex`, the unchanged empty state, and the `(main)` navbar
+and footer. With the backend stopped the page shows "Couldn't load this club"
+and a working Try again, *not* the not-found card. Follow / unfollow works from
+the club page and writes to `user_followed_clubs`, and a My clubs card now
+clicks through to a rendered club page. 7 new tests in `club.test.ts`.
+
+**Left open as [BUG-023](bugs.md#bug-023):** the event detail page has the same
+root cause — a hardcoded event whose `organizer.name` is a slug no club shares —
+and still needs wiring to `GET /api/v1/events/{id}`.
 
 ---
 

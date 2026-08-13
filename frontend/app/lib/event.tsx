@@ -1,4 +1,4 @@
-import { apiFetch } from "@/app/lib/api";
+import { apiFetch, ApiError } from "@/app/lib/api";
 import { toEventInstance, toMyEvent } from "@/app/lib/adapters";
 import type { ApiEvent, ApiMyEvent, EventInstance, MyEvent } from "@/app/types";
 
@@ -7,9 +7,27 @@ export async function listEvents(): Promise<EventInstance[]> {
 	return events.map(toEventInstance);
 }
 
-export async function getEvent(eventId: string): Promise<EventInstance> {
-	const event = await apiFetch<ApiEvent>(`/api/v1/events/${eventId}`);
-	return toEventInstance(event);
+/**
+ * Get an event by its id.
+ *
+ * `null` means no such event, and is not an error — any id can be typed into
+ * the address bar. Anything else still throws, so a 500 or an unreachable
+ * backend stays an exception. The event page depends on that split: `null`
+ * reaches notFound(), a throw reaches error.tsx. Mirrors getClubById.
+ */
+export async function getEvent(eventId: string): Promise<EventInstance | null> {
+	// Event ids are database bigints. A slug or anything else cannot name one,
+	// so it is answered here rather than spent on a request the backend would
+	// reject as a type mismatch anyway.
+	if (!/^\d+$/.test(eventId)) return null;
+
+	try {
+		const event = await apiFetch<ApiEvent>(`/api/v1/events/${eventId}`);
+		return toEventInstance(event);
+	} catch (error) {
+		if (error instanceof ApiError && error.status === 404) return null;
+		throw error;
+	}
 }
 
 /**

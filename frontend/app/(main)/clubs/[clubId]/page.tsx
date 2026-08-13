@@ -1,49 +1,40 @@
-"use client";
-import { use, useState, useEffect } from "react";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import ClubFollowButton from "@/app/components/club/ClubFollowButton";
 import ClubLogo from "@/app/components/club/ClubLogo";
-import EventSection from "@/app/components/main-page/EventSectionMainPage";
+import ClubEventTabs from "@/app/components/club/ClubEventTabs";
 import Button from "@/app/components/ui/Button";
-import EmptyState from "@/app/components/ui/EmptyState";
 
 import { popularEvents } from "@/app/data/data";
-import { Club } from "@/app/types";
 import type { ClubPageProps } from "@/app/types";
 import { getClubById, getTotalEventsForClub } from "@/app/lib/club";
 
-export default function ClubPage({ params }: ClubPageProps) {
-  const { clubId } = use(params);
+// A Server Component on purpose. The club is fetched before anything is sent,
+// so a real club arrives in the first response instead of after a hydration
+// round trip, and an unknown slug gets a genuine 404 rather than a 200 carrying
+// an error message. Both were wrong while this was a client page: `club` began
+// as null, so every valid club briefly rendered its own "not found" state.
 
-  const [club, setClub] = useState<Club | null>(null);
-  const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+export async function generateMetadata({ params }: ClubPageProps): Promise<Metadata> {
+  const { clubId } = await params;
+  const club = await getClubById(clubId).catch(() => null);
+  if (!club) return { title: "Club not found · CampusVibe" };
 
-  useEffect(() => {
-    try {
-      setClub(getClubById(clubId));
-    } catch (error) {
-      setClub(null);
-      console.error(error);
-    }
-  }, [clubId]);
+  return {
+    title: `${club.name} · CampusVibe`,
+    description: club.description || `Events and updates from ${club.name}.`,
+  };
+}
 
-  if (!club) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-        <EmptyState
-          title="Club not found"
-          body="This club page doesn't exist — it may have been renamed or removed."
-          action={<Button href="/clubs" variant="secondary">Browse all clubs</Button>}
-        />
-      </div>
-    );
-  }
+export default async function ClubPage({ params }: ClubPageProps) {
+  const { clubId } = await params;
+  const club = await getClubById(clubId);
 
-  const tabClasses = (active: boolean) =>
-    `px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-      active
-        ? "bg-lavender-600 text-white"
-        : "bg-lavender-100 text-lavender-800 hover:bg-lavender-200"
-    }`;
+  // Called in the page body rather than inside a Suspense boundary: the docs
+  // note a streamed response can no longer change its status, so checking here
+  // is what makes this an actual 404. notFound() returns `never`, so no
+  // `return` is needed and `club` is a Club from this line on.
+  if (!club) notFound();
 
   return (
     <div className="max-w-7xl mx-auto py-10 px-4 sm:px-6 fade-up">
@@ -90,26 +81,9 @@ export default function ClubPage({ params }: ClubPageProps) {
         <p className="text-ink-600 max-w-2xl mt-6 leading-relaxed">{club.description}</p>
       )}
 
-      {/* Events Section */}
-      <div className="mt-10">
-        <h2 className="font-display text-2xl font-bold text-ink-900">Events</h2>
-        <div className="flex gap-3 mt-4">
-          <button onClick={() => setTab("upcoming")} className={tabClasses(tab === "upcoming")}>
-            Upcoming
-          </button>
-          <button onClick={() => setTab("past")} className={tabClasses(tab === "past")}>
-            Past
-          </button>
-        </div>
-
-        {/* Event Cards */}
-        <div className="mt-1">
-          <EventSection
-            title={tab === "upcoming" ? "Upcoming" : "Past"}
-            events={popularEvents} // replace with fetched events per tab
-          />
-        </div>
-      </div>
+      {/* Still mock events for both tabs — the per-club event endpoint is a
+          separate task (todo.md). Only the club itself is wired up here. */}
+      <ClubEventTabs upcomingEvents={popularEvents} pastEvents={popularEvents} />
     </div>
   );
 }
