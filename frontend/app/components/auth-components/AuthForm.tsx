@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/lib/auth-context";
+import { parseApiError } from "@/app/lib/auth-errors";
 
 type Mode = "login" | "register";
 
@@ -29,7 +30,7 @@ export default function AuthForm() {
       }
       router.push("/");
     } catch (err) {
-      setError(parseApiError(err, mode));
+      setError(parseApiError(err, mode === "login" ? "Login failed" : "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -94,16 +95,4 @@ export default function AuthForm() {
       </button>
     </form>
   );
-}
-
-// Backend errors arrive as an ApiError JSON string in Error.message
-function parseApiError(err: unknown, mode: Mode): string {
-  const fallback = mode === "login" ? "Login failed" : "Registration failed";
-  if (!(err instanceof Error) || !err.message) return fallback;
-  try {
-    const parsed = JSON.parse(err.message);
-    return parsed.message || fallback;
-  } catch {
-    return err.message;
-  }
 }

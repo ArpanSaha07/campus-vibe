@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/app/lib/auth-context";
+import { useAuthModal } from "@/app/lib/auth-modal-context";
 import { saveEvent, unsaveEvent } from "@/app/lib/event";
 import { EventInstance } from "@/app/types";
 
@@ -16,14 +17,17 @@ export default function EventLikeButton({
   initiallySaved?: boolean;
 }) {
   const { isAuthenticated } = useAuth();
+  const { openAuth } = useAuthModal();
   const [isSaved, setIsSaved] = useState(initiallySaved);
 
   const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!isAuthenticated) {
-      alert("Please log in to like events.");
+      // The card names what the user was reaching for, rather than asking them
+      // to sign up for nothing in particular.
+      openAuth("signup", "Sign up to save events");
       return;
     }
-    e.preventDefault();
     const next = !isSaved;
     setIsSaved(next); // optimistic
     try {

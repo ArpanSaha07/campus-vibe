@@ -1,11 +1,7 @@
 import type { ApiClub, ApiEvent, ApiMyEvent, Club, EventInstance, MyEvent } from "@/app/types";
 
-export const FALLBACK_EVENT_IMAGE = "/frosh1.jpeg";
-
-// There is deliberately no club-logo fallback image. A club without a logo
-// renders its own initial through <ClubLogo>, which at least identifies the
-// club; the CampusVibe wordmark identified nothing, and cropped into a 64px
-// circle it read as a broken image.
+export const FALLBACK_EVENT_IMAGE = "/campus-vibe-logo.png";
+export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
 
 /** Maps a backend EventDTO to the EventInstance shape the UI components use. */
 export function toEventInstance(api: ApiEvent): EventInstance {
