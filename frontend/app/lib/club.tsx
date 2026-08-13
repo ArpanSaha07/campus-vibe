@@ -13,20 +13,15 @@ export async function getAllClubs(): Promise<Club[]> {
 // }
 
 /**
- * Clubs the signed-in user follows, for the My clubs page.
+ * Clubs the signed-in user follows, for the My clubs page and for the Follow
+ * buttons scattered across the club grids.
  *
- * TODO(backend): the endpoint does not exist yet, so this serves mock data to
- * let the page be built and reviewed first. Swap the body for the call below
- * once GET /api/v1/users/me/clubs lands — the return type is already the shape
- * the page renders, so nothing else has to change.
- *
- *   export async function getMyClubs(): Promise<Club[]> {
- *     const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/users/me/clubs`, { auth: true });
- *     return apiClubs.map(toClub);
- *   }
+ * Already sorted by name server-side, so the grid does not reshuffle between
+ * loads.
  */
 export async function getMyClubs(): Promise<Club[]> {
-    return clubs.slice(0, 6);
+    const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/users/me/clubs`, { auth: true });
+    return apiClubs.map(toClub);
 }
 
 // export function getAllClubs(): Club[] {
@@ -85,9 +80,20 @@ function getEventsByClubId(clubId: string): EventInstance[] {
 //     return user.followedClubs.includes(clubId);
 // }
 
+// Follow state is keyed off the JWT, never off a user id in the path — the
+// backend reads the acting user from the token, so these take only a club id.
+
 export async function followClub(clubId: string): Promise<void> {
-    // Simulate following a club (e.g., API call)
-    console.log(`Followed club with id: ${clubId}`);
+    await apiFetch<void>(`/api/v1/users/me/followed-clubs`, {
+        method: "POST",
+        body: JSON.stringify({ clubId }),
+        auth: true,
+    });
+}
 
-
+export async function unfollowClub(clubId: string): Promise<void> {
+    await apiFetch<void>(`/api/v1/users/me/followed-clubs/${encodeURIComponent(clubId)}`, {
+        method: "DELETE",
+        auth: true,
+    });
 }

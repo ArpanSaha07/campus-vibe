@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-08-12** · Branch: `develop`
+Last updated: **2026-08-13** · Branch: `feature/my-clubs`
 
 Project knowledge — what the code does and why — lives in
 [`.claude/docs/`](../docs/README.md). Read that index before changing a
@@ -37,7 +37,7 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload.
 - [ ] **P2** Admin Dashboard API: create clubs, assign Club Admins, manage users, moderate events.
 - [x] **P2** Bookmark events + RSVPs (entity, migration, endpoints). `user_saved_events` was already in V4 but unmapped; `V9__create_event_rsvps.sql` adds `user_event_rsvps`. Both are mapped as lazy `@ElementCollection` id sets on `User`, served by `MyEventService` / `MyEventController` under `/api/v1/users/me/*`. Saved and going are deliberately independent relations, not one status column. Covered by `MyEventsIT`.
-- [ ] **P2** Follow clubs (entity, migration, endpoints).
+- [x] **P2** Follow clubs (entity, migration, endpoints). **No migration needed** — `user_followed_clubs` has been in V4 since the beginning, just unmapped. Now a lazy `@ElementCollection` of club-id slugs on `User` (`Set<String>`, where the event collections are `Set<Long>`, because `Club.id` is a slug), served by `MyClubService` / `MyClubController`: `GET /api/v1/users/me/clubs`, `POST|DELETE /api/v1/users/me/followed-clubs`. `Club.followers` stays a stored column and moves only when the set actually changes, so a double-click cannot inflate it and V6's seeded counts survive. Covered by `MyClubsIT`.
 - [x] **P2** Google Calendar export for an event — **needs no backend**. Done client-side in `frontend/app/lib/google-calendar.ts`: a Google Calendar template link carries the whole event in its query string, so there is no API key, OAuth or endpoint to build. Reusable via `<AddToCalendarLink event={…} />`.
 - [ ] **P3** Notifications.
 - [ ] **P3** Ticket purchasing flow.
@@ -56,11 +56,13 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P2** Give `EventInstance` a real end time. `buildGoogleCalendarUrl` currently assumes every event runs two hours, because Google needs a start/end pair and the model has no end. Every "Add to calendar" link is that guess until the backend carries one.
 - [ ] **P3** Whole-list calendar export ("Add to calendar" for a full tab). Needs an .ics feed — a Google template link carries exactly one event, which is why that control lives on each card rather than in the page header.
 - [x] **P1** My clubs page (`/my-clubs`) — the route the navbar already linked to. `app/(protected)/my-clubs/page.tsx` plus `MyClubsGrid` / `MyClubCard`: circular logo and name only, both centered, the whole card one link to the club page, drifting to the top-right on hover (`.lift-tr` in `globals.css`). One column on phones, two at `sm`, three at `lg`. **Frontend only** — see the next item.
-- [ ] **P1** Wire the My clubs page to the backend. `getMyClubs()` in `app/lib/club.tsx` returns `clubs.slice(0, 6)` from mock data; the real call is written out in the doc comment above it and needs `GET /api/v1/users/me/clubs`, which depends on [Follow clubs](#backend--features) landing first.
+- [x] **P1** Wire the My clubs page to the backend. `getMyClubs()` now calls `GET /api/v1/users/me/clubs`; the mock `clubs.slice(0, 6)` is gone. Verified end to end against the Docker stack: follow → row in `user_followed_clubs`, club on `/my-clubs`; unfollow → row gone, empty state back.
 - [ ] **P2** Category filtering on the events listing.
 - [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.
-- [ ] **P2** Bookmark and follow UI (depends on the backend endpoints above).
+- [x] **P2** Follow UI. `ClubFollowButton` is wired: signed-out clicks raise the signup card headed *Sign up to follow this club* and write nothing; signed-in clicks toggle optimistically and revert on failure. Follow state is held once in `FollowedClubsProvider` (root layout) rather than per button, so a grid of cards costs one request and every button for the same club agrees. Covered by `ClubFollowButton.test.tsx`.
+- [ ] **P2** Bookmark UI. `EventLikeButton` posts to `/saved-events` but starts from `initiallySaved={false}` unless the caller knows better, so a saved event still shows an empty heart on the events listing. Same fix as the follow button: a provider holding the saved ids, filled from `GET /api/v1/users/me/events`.
+- [ ] **P3** Show the live follower count on club cards and the club page. `Club.followers` is accurate now that follows move it, but `ClubCard` has its count commented out and the club page's number never refreshes after a follow — the provider only tracks ids.
 - [ ] **P3** Custom header style in `layout.tsx`. *(from `frontend/README.md`)*
 - [ ] **P3** Apply `EventCard`'s stretched-link pattern to `MyEventCard`. Only its stub content links to the event, so the image and padding are still dead. Same fix: `relative` root, `after:absolute after:inset-0` on the title `<Link>`, and the heart/calendar controls lifted above it — they cannot be nested inside the `<a>`.
 - [ ] **P3** Stop event cards overlapping in the event section. *(from `frontend/README.md`)*

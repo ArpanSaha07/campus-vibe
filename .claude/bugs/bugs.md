@@ -1,6 +1,6 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-08** · Branch: `ci/github-actions`
+Last updated: **2026-08-13** · Branch: `feature/my-clubs`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-008 … BUG-017, BUG-019 so far). Bug ids are never reused.
@@ -15,8 +15,61 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
+| [BUG-022](#bug-022) | High | Every club page 404s: the detail route reads mock data whose slugs no club in the database shares |
 
 ---
+
+### BUG-022
+**Every club page shows "Club not found"** · High · OPEN
+
+**Found:** 2026-08-13, while checking the new Follow button on the club detail
+page. The button could not be reached because the page it lives on never
+renders.
+
+**Symptom:** `/clubs/chess-club` — a club that exists, is listed on `/clubs`,
+and is served fine by the API — renders the empty state:
+
+```
+Club not found
+This club page doesn't exist — it may have been renamed or removed.
+```
+
+Confirmed in a browser, not from the SSR HTML: the page is a client component,
+so its first paint is the not-found branch either way and `curl` cannot tell the
+two apart.
+
+**Cause:** `getClubById` in `app/lib/club.tsx` searches `app/data/data.ts`, and
+the two id spaces have never overlapped. Mock: `mcgill-ski-club`,
+`fashion-takes-action`, `eng-frosh`, `startup-montreal`, `tech-montreal`,
+`montreal-artists`. Seeded by `V6` and served by the API: `chess-club`,
+`coding-club`, `debate-club`, `drama-troupe`, `entrepreneur-hub`,
+`music-ensemble`, `photography-society`, `science-club`. So `getClubById`
+throws for every club a user can actually reach, and `getAllClubs` — which does
+call the API — hands out real ids that the detail page then cannot resolve.
+
+Every route into the page is affected: each `ClubCard` on `/clubs`, each
+`MyClubCard` on `/my-clubs`, and the club link on every event card.
+
+**Not caused by the follow work**, which only added a button to a page that was
+already unreachable. The API side has been ready the whole time —
+`GET /api/v1/clubs/{id}` is implemented at `ClubController.java:55` and answers
+200 for `chess-club`.
+
+**Fix:** make `getClubById` async and call the endpoint, as the commented-out
+version directly above it already sketches. The page is a client component with
+a `useEffect`, so it can await; only its `catch` needs to distinguish a genuine
+404 from a network failure. `getClubNameById` has the same flaw and title-cases
+the slug as a fallback, which hides it.
+
+**Same root cause, second surface:** `app/(main)/events/[eventId]/page.tsx`
+builds its whole event from a hardcoded literal, whose
+`organizer.name` is the slug `fashion-takes-action` — misnamed, but a slug, and
+one no seeded club shares either. So its club link is a dead end and its
+`<ClubFollowButton clubId={event.organizer.name} />` posts an id the API will
+reject. Until the follow work that button did nothing at all, so nothing showed;
+now the label flips to *Following* and reverts when the 404 comes back. Wiring
+that page to `GET /api/v1/events/{id}` fixes both halves; renaming the field
+alone fixes neither.
 
 ### BUG-001
 **Semantic-only search match returns 0 results** · High · OPEN
