@@ -1,5 +1,4 @@
 import { CalendarPlus } from "lucide-react";
-import { getClubNameById } from "@/app/lib/club";
 import { buildGoogleCalendarUrl } from "@/app/lib/google-calendar";
 import type { EventInstance } from "@/app/types";
 
@@ -13,7 +12,7 @@ export default function AddToCalendarLink({
   event: EventInstance;
   className?: string;
 }) {
-  const href = buildGoogleCalendarUrl(event, getClubNameById(event.organizer));
+  const href = buildGoogleCalendarUrl(event, event.organizerName);
 
   return (
     <a

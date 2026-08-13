@@ -10,6 +10,7 @@ const apiEvent: ApiEvent = {
   location: null,
   price: null,
   organizerId: "chess-club",
+  organizerName: "Chess Club",
   followers: 3,
   images: [],
   promoted: false,
@@ -37,6 +38,30 @@ describe("toEventInstance", () => {
     expect(event.organizer).toBe("chess-club");
     expect(event.dateTime).toBeInstanceOf(Date);
     expect(event.categories).toEqual(["Games"]);
+  });
+
+  // Carried through rather than derived. Cards used to title-case the slug,
+  // which only ever agreed with the real name by coincidence.
+  it("carries the organizer name alongside its id", () => {
+    const event = toEventInstance({
+      ...apiEvent,
+      organizerId: "mcgill-ski-club",
+      organizerName: "McGill Ski Club",
+    });
+    expect(event.organizer).toBe("mcgill-ski-club");
+    expect(event.organizerName).toBe("McGill Ski Club");
+  });
+
+  // The case the old title-casing got wrong: a name that is not its slug with
+  // capitals. Title-casing would have produced 'Mcgill Ski Club' here, and
+  // anything genuinely unrelated to its slug was hopeless.
+  it("keeps a name that does not match its slug", () => {
+    const event = toEventInstance({
+      ...apiEvent,
+      organizerId: "startup-montreal",
+      organizerName: "Making Waves Montreal",
+    });
+    expect(event.organizerName).toBe("Making Waves Montreal");
   });
 
   it("provides safe fallbacks for nullable fields", () => {

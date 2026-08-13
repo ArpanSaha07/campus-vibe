@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +38,40 @@ class EventLookupIT extends AbstractIntegrationTest {
 				.andExpect(jsonPath("$.title", is("Chess night")))
 				// The frontend needs this to link and follow the organizing club.
 				.andExpect(jsonPath("$.organizerId", is("chess-club")));
+	}
+
+	/**
+	 * The name travels with the event so a card can print it without fetching
+	 * the club. The club here is deliberately named nothing like its slug: the
+	 * frontend used to derive the name by title-casing the id, which would give
+	 * `Startup Montreal` and be wrong every time for a club like this one.
+	 */
+	@Test
+	void carriesTheOrganizerNameNotJustItsId() throws Exception {
+		Club club = createClub("startup-montreal", "Making Waves Montreal");
+		Event event = createEvent("Demo night", club, Instant.parse("2026-10-01T18:00:00Z"));
+
+		mockMvc.perform(get("/api/v1/events/" + event.getId()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.organizerId", is("startup-montreal")))
+				.andExpect(jsonPath("$.organizerName", is("Making Waves Montreal")));
+	}
+
+	@Test
+	void theListCarriesOrganizerNamesToo() throws Exception {
+		Club chess = createClub("chess-club", "Chess Club");
+		Club waves = createClub("startup-montreal", "Making Waves Montreal");
+		createEvent("Chess night", chess, Instant.parse("2026-10-01T18:00:00Z"));
+		createEvent("Demo night", waves, Instant.parse("2026-10-02T18:00:00Z"));
+
+		// Reading the name initializes the lazy organizer proxy, so without the
+		// @EntityGraph on EventRepository.findAll this list would be N+1.
+		mockMvc.perform(get("/api/v1/events"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[?(@.title == 'Chess night')].organizerName",
+						contains("Chess Club")))
+				.andExpect(jsonPath("$[?(@.title == 'Demo night')].organizerName",
+						contains("Making Waves Montreal")));
 	}
 
 	@Test

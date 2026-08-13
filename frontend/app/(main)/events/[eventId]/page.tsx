@@ -61,10 +61,10 @@ export default async function EventPage({ params }: EventPageProps) {
   // not yet streaming and can still carry a 404 status.
   if (!event) notFound();
 
-  // The organizer is a club id. Fetched separately because EventDTO carries only
-  // organizerId — no name, no logo. A miss here is not fatal: the event is real
-  // and worth showing even if its club has since been removed, so the organizer
-  // block simply degrades rather than 404ing the whole page.
+  // The event already carries its organizer's id and name, so the block below
+  // renders from those alone. This fetch only enriches it with the logo and the
+  // follower count, which are club-shaped data no event DTO should carry — so a
+  // miss or a failure costs those two details and nothing else.
   const organizer = await getClubById(event.organizer).catch(() => null);
 
   const banner = event.images[0] ?? FALLBACK_EVENT_IMAGE;
@@ -161,28 +161,30 @@ export default async function EventPage({ params }: EventPageProps) {
           )}
 
           {/* Organized By */}
-          {organizer && (
-            <section className="px-5 py-4 bg-mist-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <ClubLogo name={organizer.name} logo={organizer.logo} />
-                <div>
-                  <Link
-                    href={`/clubs/${organizer.clubId}`}
-                    className="font-semibold text-ink-900 hover:text-lavender-800"
-                  >
-                    {organizer.name}
-                  </Link>
+          <section className="px-5 py-4 bg-mist-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              {/* No logo when the club could not be loaded, which ClubLogo
+                  renders as the initial of the name the event already gave us. */}
+              <ClubLogo name={event.organizerName} logo={organizer?.logo} />
+              <div>
+                <Link
+                  href={`/clubs/${event.organizer}`}
+                  className="font-semibold text-ink-900 hover:text-lavender-800"
+                >
+                  {event.organizerName}
+                </Link>
+                {organizer && (
                   <p className="font-mono text-xs text-ink-600 mt-1">
                     {organizer.followers} followers
                   </p>
-                </div>
+                )}
               </div>
-              <div className="flex gap-2">
-                <Button variant="secondary">Contact</Button>
-                <ClubFollowButton clubId={organizer.clubId} />
-              </div>
-            </section>
-          )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary">Contact</Button>
+              <ClubFollowButton clubId={event.organizer} />
+            </div>
+          </section>
 
           <a href="#" className="inline-block text-sm text-ink-600 underline hover:text-ink-900">
             Report this event

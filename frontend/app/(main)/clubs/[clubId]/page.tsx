@@ -36,6 +36,10 @@ export default async function ClubPage({ params }: ClubPageProps) {
   // `return` is needed and `club` is a Club from this line on.
   if (!club) notFound();
 
+  // Counted from the club's own events rather than guessed. This used to be
+  // Math.random(), so the number changed on every load.
+  const totalEvents = await getTotalEventsForClub(club.clubId);
+
   return (
     <div className="max-w-7xl mx-auto py-10 px-4 sm:px-6 fade-up">
       {/* Header */}
@@ -46,7 +50,7 @@ export default async function ClubPage({ params }: ClubPageProps) {
         <div>
           <h1 className="font-display text-3xl font-bold text-ink-900">{club.name}</h1>
           <p className="font-mono text-xs text-ink-600 mt-1">
-            {club.followers} followers · {getTotalEventsForClub(club.clubId)} events
+            {club.followers} followers · {totalEvents} events
           </p>
           <div className="flex gap-3 mt-2 text-sm">
             {club.socialLinks?.facebook && (

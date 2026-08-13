@@ -1,10 +1,11 @@
 import { apiFetch, ApiError } from "@/app/lib/api";
-import { ApiClub, Club, EventInstance } from "@/app/types";
-import { clubs } from "@/app/data/data";
+import { ApiClub, Club } from "@/app/types";
 import { toClub } from "@/app/lib/adapters";
+import { PUBLIC_READ_CACHE } from "@/app/lib/cache";
+import { listEventsByClub } from "@/app/lib/event";
 
 export async function getAllClubs(): Promise<Club[]> {
-  const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/clubs`);
+  const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/clubs`, PUBLIC_READ_CACHE.clubs);
   return apiClubs.map(toClub);
 }
 
@@ -40,7 +41,10 @@ export async function getMyClubs(): Promise<Club[]> {
  */
 export async function getClubById(id: string): Promise<Club | null> {
     try {
-        const apiClub = await apiFetch<ApiClub>(`/api/v1/clubs/${encodeURIComponent(id)}`);
+        const apiClub = await apiFetch<ApiClub>(
+            `/api/v1/clubs/${encodeURIComponent(id)}`,
+            PUBLIC_READ_CACHE.clubs,
+        );
         return toClub(apiClub);
     } catch (error) {
         if (error instanceof ApiError && error.status === 404) return null;
@@ -48,22 +52,12 @@ export async function getClubById(id: string): Promise<Club | null> {
     }
 }
 
-/**
- * Display name for a club id; falls back to a title-cased slug for clubs not in
- * mock data.
- *
- * TODO: still reads mock data, so it title-cases the slug for every real club.
- * Harmless where it is used — three client-side display sites, and the fallback
- * is legible — but it should follow `getClubById` onto the API.
- */
-export function getClubNameById(id: string): string {
-    const club = clubs.find(club => club.clubId === id);
-    if (club) return club.name;
-    return id
-        .split("-")
-        .map(word => (word ? word[0].toUpperCase() + word.slice(1) : word))
-        .join(" ");
-}
+// getClubNameById used to live here: it looked a club up in mock data and, on a
+// miss, title-cased the slug. That guess was right for the seeded clubs only by
+// coincidence — `chess-club` happens to title-case to `Chess Club` — and wrong
+// for anything with an acronym, a lowercase particle, or a name that is not
+// just its slug with capitals. EventDTO now carries organizerName, so the three
+// call sites read it off the event instead of deriving it.
 
 export async function createClub(name: string): Promise<string> {
     const club_name: string = name.trim().toLowerCase().replace(/\s+/g, '-');
@@ -71,25 +65,17 @@ export async function createClub(name: string): Promise<string> {
     return apiFetch<string>(`/api/v1/clubs`, { method: "POST", body: JSON.stringify({ club_name }) });
 }
 
-/** 
- * Get total events for a club by club Id.
- * @param {Club} clubId The name of the club
- * @returns {number} Total number of events for the club
-*/
-export function getTotalEventsForClub(clubId: string): number {
-    
-    return Math.floor(Math.random() * 100); // Random number for demo
+/**
+ * How many events a club has run.
+ *
+ * Previously `Math.floor(Math.random() * 100)`, so the club page printed a
+ * different total on every load. Now counted from the club's own events, which
+ * the events endpoint filters server-side.
+ */
+export async function getTotalEventsForClub(clubId: string): Promise<number> {
+    const events = await listEventsByClub(clubId);
+    return events.length;
 }
-
-function getEventsByClubId(clubId: string): EventInstance[] {
-    return [];
-}
-
-// export async function isUserFollowingClub(clubId: string): Promise<boolean> {
-//     const user: RegularUser = await me();
-//     if (!isRegularUser(user)) return false;
-//     return user.followedClubs.includes(clubId);
-// }
 
 // Follow state is keyed off the JWT, never off a user id in the path — the
 // backend reads the acting user from the token, so these take only a club id.

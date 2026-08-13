@@ -18,6 +18,11 @@ public class EventMapper implements Function<Event, EventDTO> {
                 event.getLocation(),
                 event.getPrice(),
                 event.getOrganizer().getId(),
+                // getId() is served straight off the lazy proxy, but getName()
+                // initializes it. EventRepository's read methods carry an
+                // @EntityGraph for `organizer` so that costs no extra query —
+                // without it this line alone would make every list N+1.
+                event.getOrganizer().getName(),
                 event.getFollowers(),
                 // copy so lazy collections are initialized while the session is open
                 List.copyOf(event.getImages()),

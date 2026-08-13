@@ -1,37 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getMyClubs } from "@/app/lib/club";
+import { useFollowedClubs } from "@/app/lib/followed-clubs-context";
 import MyClubsGrid from "@/app/components/my-clubs/MyClubsGrid";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
-import type { Club } from "@/app/types";
 
 // Sign-in is already enforced by (protected)/layout.tsx, which also supplies
 // the navbar and footer — this page renders the panel only.
+//
+// The list comes from FollowedClubsProvider rather than a fetch of its own.
+// Both used to call GET /users/me/clubs, so opening this page made the same
+// request twice; now the provider owns it and this page reads the result.
 
 export default function MyClubsPage() {
-  const [clubs, setClubs] = useState<Club[] | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    getMyClubs()
-      .then((results) => {
-        if (!cancelled) setClubs(results);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setClubs([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { ready, clubs, failed } = useFollowedClubs();
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8 fade-up">
@@ -49,13 +33,13 @@ export default function MyClubsPage() {
       </p>
 
       <div className="mt-8">
-        {error ? (
+        {!ready ? (
+          <p className="font-mono text-sm text-ink-600">Loading your clubs…</p>
+        ) : failed ? (
           <EmptyState
             title="Your clubs didn't load"
             body="Something went wrong on our end. Refresh to try again."
           />
-        ) : clubs === null ? (
-          <p className="font-mono text-sm text-ink-600">Loading your clubs…</p>
         ) : clubs.length === 0 ? (
           <EmptyState
             title="You're not following any clubs yet"

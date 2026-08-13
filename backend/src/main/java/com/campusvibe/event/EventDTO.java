@@ -12,6 +12,10 @@ public record EventDTO(
         String location,
         String price,
         String organizerId,
+        // The club's display name, alongside its id. Every surface that shows an
+        // event shows who runs it, and without this the frontend had to either
+        // fetch the club per card or guess the name from the slug.
+        String organizerName,
         Integer followers,
         List<String> images,
         Boolean promoted,

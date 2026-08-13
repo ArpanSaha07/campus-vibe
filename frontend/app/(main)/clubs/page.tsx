@@ -1,32 +1,24 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { Club } from "@/app/types";
+import type { Metadata } from "next";
 import { getAllClubs } from "@/app/lib/club";
 import ClubProfileComponent from "@/app/components/club/ClubCard";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
 
-export default function ClubsPage() {
-  const [clubs, setClubs] = useState<Club[] | null>(null);
-  const [error, setError] = useState(false);
+// A Server Component, like /events. The list is fetched before anything is
+// sent, so the grid arrives in the first response instead of after a hydration
+// round trip, and the `Loading clubs…` line is gone with it. getAllClubs is
+// cached for five minutes (app/lib/cache.ts), so repeat visitors do not each
+// cost a backend query.
+//
+// No notFound() here: /clubs always exists, and no clubs is an empty state.
 
-  useEffect(() => {
-    let cancelled = false;
-    getAllClubs()
-      .then((results) => {
-        if (!cancelled) setClubs(results);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setClubs([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export const metadata: Metadata = {
+  title: "Explore clubs · CampusVibe",
+  description: "Find your community and get involved.",
+};
+
+export default async function ClubsPage() {
+  const clubs = await getAllClubs();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 fade-up">
@@ -36,20 +28,7 @@ export default function ClubsPage() {
         Find your community and get involved. Can&apos;t find your club? Start your own page.
       </p>
 
-      {error && (
-        <div className="mt-8">
-          <EmptyState
-            title="Clubs didn't load"
-            body="Something went wrong on our end. Refresh to try again."
-          />
-        </div>
-      )}
-
-      {clubs === null && !error && (
-        <p className="mt-8 font-mono text-sm text-ink-600">Loading clubs…</p>
-      )}
-
-      {clubs && clubs.length === 0 && !error && (
+      {clubs.length === 0 ? (
         <div className="mt-8">
           <EmptyState
             title="No clubs yet"
@@ -57,9 +36,7 @@ export default function ClubsPage() {
             action={<Button href="/create-club">Start a club page</Button>}
           />
         </div>
-      )}
-
-      {clubs && clubs.length > 0 && (
+      ) : (
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 justify-items-center">
           {clubs.map((club) => (
             <ClubProfileComponent key={club.clubId} club={club} />

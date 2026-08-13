@@ -1,9 +1,24 @@
 import { apiFetch, ApiError } from "@/app/lib/api";
 import { toEventInstance, toMyEvent } from "@/app/lib/adapters";
+import { PUBLIC_READ_CACHE } from "@/app/lib/cache";
 import type { ApiEvent, ApiMyEvent, EventInstance, MyEvent } from "@/app/types";
 
 export async function listEvents(): Promise<EventInstance[]> {
-	const events = await apiFetch<ApiEvent[]>(`/api/v1/events`);
+	const events = await apiFetch<ApiEvent[]>(`/api/v1/events`, PUBLIC_READ_CACHE.events);
+	return events.map(toEventInstance);
+}
+
+/**
+ * One club's events, filtered by the backend.
+ *
+ * The club dashboard used to fetch every event in the system and filter it in
+ * the browser, which meant downloading the whole table to show one club's rows.
+ */
+export async function listEventsByClub(clubId: string): Promise<EventInstance[]> {
+	const events = await apiFetch<ApiEvent[]>(
+		`/api/v1/events?organizerId=${encodeURIComponent(clubId)}`,
+		PUBLIC_READ_CACHE.events,
+	);
 	return events.map(toEventInstance);
 }
 
@@ -22,7 +37,10 @@ export async function getEvent(eventId: string): Promise<EventInstance | null> {
 	if (!/^\d+$/.test(eventId)) return null;
 
 	try {
-		const event = await apiFetch<ApiEvent>(`/api/v1/events/${eventId}`);
+		const event = await apiFetch<ApiEvent>(
+			`/api/v1/events/${eventId}`,
+			PUBLIC_READ_CACHE.events,
+		);
 		return toEventInstance(event);
 	} catch (error) {
 		if (error instanceof ApiError && error.status === 404) return null;

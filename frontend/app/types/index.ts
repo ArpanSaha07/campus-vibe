@@ -15,6 +15,13 @@ export type EventInstance = {
   };
   price: string;
   organizer: Club["clubId"];
+  /**
+   * The organizing club's display name, carried alongside its id so a card can
+   * name the club without fetching it. Before this the name was derived by
+   * title-casing the slug against mock data, which was right for the seeded
+   * clubs only by coincidence.
+   */
+  organizerName: string;
   followers: number;
   images: string[];
   promoted: boolean;
@@ -110,6 +117,7 @@ export interface ApiEvent {
   location: string | null;
   price: string | null;
   organizerId: string;
+  organizerName: string;
   followers: number;
   images: string[];
   promoted: boolean;

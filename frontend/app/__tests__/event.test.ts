@@ -23,6 +23,7 @@ const apiEvent: ApiEvent = {
   location: "BHive Café",
   price: null,
   organizerId: "chess-club",
+  organizerName: "Chess Club",
   followers: 3,
   images: [],
   promoted: false,

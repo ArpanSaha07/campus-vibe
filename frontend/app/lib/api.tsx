@@ -56,21 +56,48 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-type FetchOptions = RequestInit & { auth?: boolean };
+type FetchOptions = RequestInit & {
+  auth?: boolean;
+  /**
+   * Seconds to keep this response in Next's data cache. Server-side only —
+   * ignored in the browser, where `next` is not a fetch option.
+   *
+   * Opt-in because fetch is uncached by default in this version, so every
+   * server render of a public page otherwise re-queries the backend.
+   */
+  revalidate?: number;
+  /** Cache tags, so a future mutation can revalidateTag instead of waiting out the TTL. */
+  tags?: string[];
+};
 
 export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {}): Promise<T> {
+  const { auth, revalidate, tags, ...init } = opts;
+
+  // A cached authenticated response is one user's data handed to the next
+  // caller — the cache key is the URL, and the bearer token is not part of it.
+  // Refusing loudly beats a comment nobody reads.
+  if (auth && (revalidate !== undefined || tags !== undefined)) {
+    throw new Error(
+      `Refusing to cache an authenticated response: ${path}. ` +
+        `Per-user data must not enter the shared data cache.`,
+    );
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(opts.headers as Record<string, string> | undefined),
   };
-  if (opts.auth) {
+  if (auth) {
     const token = getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
 
   const res = await fetch(`${baseUrl()}${path}`, {
-    ...opts,
+    ...init,
     headers,
+    ...(revalidate !== undefined || tags !== undefined
+      ? { next: { ...(revalidate !== undefined && { revalidate }), ...(tags && { tags }) } }
+      : {}),
   });
 
   if (!res.ok) {

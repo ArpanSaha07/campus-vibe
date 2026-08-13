@@ -18,6 +18,7 @@ export function toEventInstance(api: ApiEvent): EventInstance {
     },
     price: api.price ?? "Free",
     organizer: api.organizerId,
+    organizerName: api.organizerName,
     followers: api.followers,
     images: api.images.length > 0 ? api.images : [FALLBACK_EVENT_IMAGE],
     promoted: api.promoted,
