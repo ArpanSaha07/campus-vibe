@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-08-08** · Branch: `ci/github-actions`
+Last updated: **2026-08-12** · Branch: `develop`
 
 Project knowledge — what the code does and why — lives in
 [`.claude/docs/`](../docs/README.md). Read that index before changing a
@@ -52,6 +52,8 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P2** Refresh the My events list after the heart is toggled. `EventLikeButton` updates its own state optimistically, so un-saving on the Saved tab leaves the card visible until reload.
 - [ ] **P2** Give `EventInstance` a real end time. `buildGoogleCalendarUrl` currently assumes every event runs two hours, because Google needs a start/end pair and the model has no end. Every "Add to calendar" link is that guess until the backend carries one.
 - [ ] **P3** Whole-list calendar export ("Add to calendar" for a full tab). Needs an .ics feed — a Google template link carries exactly one event, which is why that control lives on each card rather than in the page header.
+- [x] **P1** My clubs page (`/my-clubs`) — the route the navbar already linked to. `app/(protected)/my-clubs/page.tsx` plus `MyClubsGrid` / `MyClubCard`: circular logo and name only, both centered, the whole card one link to the club page, drifting to the top-right on hover (`.lift-tr` in `globals.css`). One column on phones, two at `sm`, three at `lg`. **Frontend only** — see the next item.
+- [ ] **P1** Wire the My clubs page to the backend. `getMyClubs()` in `app/lib/club.tsx` returns `clubs.slice(0, 6)` from mock data; the real call is written out in the doc comment above it and needs `GET /api/v1/users/me/clubs`, which depends on [Follow clubs](#backend--features) landing first.
 - [ ] **P2** Category filtering on the events listing.
 - [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.

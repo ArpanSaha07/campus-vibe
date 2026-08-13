@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-12**
+Last updated: **2026-08-13**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-021](#bug-021) | Low | 2026-08-13 | Stale Turbopack cache in the frontend container served pre-edit CSS, so new styles silently did nothing |
 | [BUG-020](#bug-020) | High | 2026-08-12 | Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume (28P01) |
 | [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
 | [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
@@ -18,6 +19,60 @@ Last updated: **2026-08-12**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-021
+**Stale Turbopack cache in the frontend container served pre-edit CSS** · Low · FIXED 2026-08-13
+
+**Found:** 2026-08-13. The My clubs cards stopped drifting on hover. `globals.css` still
+held `.lift-tr`, `MyClubCard.tsx` still carried the class, and nothing in `git diff`
+explained it.
+
+**Symptom:** the stylesheet Next actually served was the version from *before* the
+`.lift-tr` edit — the rule was absent entirely, and the `prefers-reduced-motion` block
+still listed only the original two selectors:
+
+```
+$ curl -s http://localhost:3000/_next/static/chunks/'[root-of-the-server]__0oeaxs7._.css' | grep lift
+2835:.lift {
+2839:.lift:hover {
+2849:  .lift, .lift:hover {
+```
+
+while inside the container the source was current (`grep -c lift-tr app/globals.css` → 6).
+Source and served output disagreed, which is why reading the code proved nothing.
+
+**Cause:** `.next/` lives in the container's writable layer, and `docker compose up -d` on
+an existing stopped container **starts it rather than recreating it**, so that directory
+survives. The container here had been created on 2026-08-10; `next dev` restarted today at
+13:11 on top of a three-day-old Turbopack persistent cache and reused the CSS chunk it
+found there instead of recompiling from the newer file synced in at 13:01.
+
+The frontend service deliberately has **no bind-mount** — `develop.watch` syncs source in
+instead, to avoid the slow Windows bind-mount into the VM (`docker-compose.yml:112-170`).
+That is the right trade-off, but it means the container's idea of the source and its cache
+can drift apart in a way a bind-mounted setup would not.
+
+**Fix:** drop the cache and restart.
+
+```sh
+docker exec campusvibe-frontend rm -rf .next
+docker restart campusvibe-frontend
+```
+
+**Verification:** the served chunk then contained `.lift-tr`, `.lift-tr:hover,
+.lift-tr:focus-visible`, and the five-selector reduced-motion block. Measured in headless
+Chromium on `/my-clubs`: resting `transition-duration: 0.22s`, hover transform
+`matrix(1, 0, 0, 1, 8, -8)`, 6.8px of it already travelled 80ms in (so it eases rather
+than jumps), and `:focus-visible` producing the same transform.
+
+**Prevention:** when a CSS or config edit appears to have no effect, diff the *served*
+asset against the source before touching the code — the same class of mistake as
+[BUG-013](#bug-013), where `compose watch` synced into an image that could not recompile.
+Remember that plain `docker compose up -d` does not re-sync source into an existing
+container; `docker compose watch` is what propagates edits, and a container restart alone
+keeps whatever cache was already there.
 
 ---
 

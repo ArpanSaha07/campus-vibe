@@ -100,7 +100,7 @@ function MyEventsContent() {
         />
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 mb-30">
         {error ? (
           <EmptyState
             title="Your events didn't load"
