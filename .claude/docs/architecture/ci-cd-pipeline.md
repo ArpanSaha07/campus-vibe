@@ -222,6 +222,42 @@ Lint has been **blocking since 2026-08-05**. The build step sets
 build is deterministic in CI; the real Docker build passes them as build args
 (BUG-004).
 
+### `scripts/verify.mjs` + `.githooks/pre-push` — the same checks, before the push
+
+Added 2026-08-14, after two consecutive pushes broke the Frontend job for two
+different reasons: the checks were never run (BUG-026), and then the checks were
+run and passed in an environment CI does not have (BUG-027).
+
+The second is the one worth understanding. `/clubs` prerendered at build time
+and needed a live backend; the dev machine had one on `:8080`, so the build
+passed locally and failed on a runner that has none. **Running the same commands
+is not enough — the environment has to match too.**
+
+So the build step points `API_INTERNAL_URL` at a **closed port**, chosen by
+bind-testing rather than hardcoded (a port that happened to be occupied would
+let the build fetch something and pass). Any route that fetches during
+`next build` then fails exactly as it does on a runner. `.next` is cleared first,
+because BUG-021 was a stale Turbopack cache serving pre-edit output, and a check
+that trusts that cache can repeat it.
+
+```bash
+git config core.hooksPath .githooks   # once per clone, activates the hook
+cd frontend && npm run verify         # or run it directly any time
+```
+
+The hook scopes work the way `ci.yml` does — only changed components, full tier
+only when the target is `main`, and **fail open** when there is no base to diff
+against. Bypass with `git push --no-verify`.
+
+Backend runs through the same script, which resolves `JAVA_HOME` itself (no JDK
+is on `PATH` on the dev machine) and reads the exit code from the process rather
+than through a pipe — a piped `mvnw` reports the exit status of `tail`, which is
+how a failed build once looked green.
+
+**This does not replace CI.** It runs on one developer's machine, in one
+timezone and locale, with whatever is cached; CI remains the arbiter. It exists
+so the obvious failures are found in the terminal that caused them.
+
 ### `.github/workflows/_database.yml`
 
 Exists separately from the backend job for a specific reason: the backend suite
@@ -690,3 +726,19 @@ Ordered by value, each with the reason it has not been done. Tracked in
   outside `ci.yml` and outside `ci-success`, so a green `CI` never implied a
   working deploy. Added as a known gap and as
   [BUG-018](../../bugs/bugs.md#bug-018). *(main session)*
+- **2026-08-14** — **Moved the first line of defence off the runner and onto the
+  machine that writes the code.** Two consecutive pushes broke the Frontend job:
+  [BUG-026](../../bugs/fixed_bugs.md#bug-026), a type error from checks that
+  were never run, and then [BUG-027](../../bugs/fixed_bugs.md#bug-027), a build
+  that prerendered `/clubs` and needed a backend. The second passed locally
+  **because the dev machine had the backend running**, which is the lesson:
+  running CI's commands is not the same as running them in CI's environment.
+  Added `scripts/verify.mjs` (CI's four frontend steps plus the backend tier, in
+  CI's order, continuing past failures as CI does, with the build pointed at a
+  closed port) and `.githooks/pre-push` to enforce it, scoped and failing open
+  exactly as `ci.yml` does. Proved it works by reverting the `/clubs` fix and
+  confirming the script reproduces the CI failure — same digest — with the
+  backend container still up. Also fixed
+  [BUG-025](../../bugs/fixed_bugs.md#bug-025), without which the local suite
+  reported a permanent false failure and the guardrail would have been ignored.
+  *(main session)*

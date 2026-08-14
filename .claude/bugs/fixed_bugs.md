@@ -6,6 +6,7 @@ Last updated: **2026-08-14**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-025](#bug-025) | Low | 2026-08-14 | `formatDayLabel` followed the host locale while its own labels were hardcoded English, mixing languages in one list |
 | [BUG-027](#bug-027) | High | 2026-08-14 | `/clubs` was prerendered at build time, so `next build` required a live backend and failed CI with ECONNREFUSED |
 | [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
 | [BUG-024](#bug-024) | Medium | 2026-08-13 | A non-numeric path variable answered 500 instead of 400, app-wide |
@@ -24,6 +25,45 @@ Last updated: **2026-08-14**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-025
+**`formatDayLabel` followed the host locale while its own labels were hardcoded English** · Low · FIXED 2026-08-14
+
+**Found:** 2026-08-14, running the frontend CI steps locally. It failed here and
+passed on CI, which is the signature worth recognising.
+
+**Symptom:** `app/__tests__/my-events.test.ts:198`
+
+```
+Expected substring: Aug
+Received string:    mar. 25 aout
+```
+
+**Cause:** `formatDayLabel` returns hardcoded English for the near days —
+`Today`, `Tomorrow`, `Yesterday` — and then formatted the fallback with
+`toLocaleDateString(undefined, …)`, which follows the host. The GitHub runner is
+en-US, this machine is fr-CA.
+
+**The test failure was the smaller half.** The real defect is in the product: a
+My Events list on a French machine renders `Today` directly above `mar. 25
+aout`. Half the labels ignore the locale and half follow it, so the result is
+never right in either language.
+
+**Fix:** pin `en-US` in the formatter, matching the hardcoded labels above it.
+Localising properly means translating those three strings too, and that is a
+different piece of work — noted in the code comment so the next person sees both
+halves together.
+
+**Why it was fixed now rather than left open.** It blocked something else: local
+verification (`scripts/verify.mjs`) reports what CI would report, and a suite
+with one permanent machine-specific failure trains you to skim past the summary.
+A guardrail that always shows a red line is a guardrail that gets ignored. Suite
+is now 130/130 locally and on CI.
+
+**Affected files**
+- `frontend/app/lib/my-events.ts` — the pinned locale
 
 ---
 

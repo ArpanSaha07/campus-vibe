@@ -8,7 +8,8 @@
     "start": "node scripts/start-standalone.mjs",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "verify": "node ../scripts/verify.mjs --frontend"
   },
   "dependencies": {
     "lucide-react": "^0.544.0",
