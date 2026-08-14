@@ -1,7 +1,7 @@
 "use client";
 import { use, useState, useEffect } from "react";
-import Image from "next/image";
 import ClubFollowButton from "@/app/components/club/ClubFollowButton";
+import ClubLogo from "@/app/components/club/ClubLogo";
 import EventSection from "@/app/components/main-page/EventSectionMainPage";
 import Button from "@/app/components/ui/Button";
 import EmptyState from "@/app/components/ui/EmptyState";
@@ -49,21 +49,9 @@ export default function ClubPage({ params }: ClubPageProps) {
     <div className="max-w-7xl mx-auto py-10 px-4 sm:px-6 fade-up">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="w-20 h-20 rounded-full bg-lavender-100 flex items-center justify-center overflow-hidden shrink-0">
-          {club.logo && club.logo.trim() !== "" ? (
-            <Image
-              src={club.logo}
-              alt={`${club.name} logo`}
-              width={96}
-              height={96}
-              className="object-cover"
-            />
-          ) : (
-            <span className="font-display text-2xl font-bold text-lavender-600">
-              {club.name.charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
+        {/* alt is set here, unlike the card call sites: this is the page header,
+            so the name beside it is an <h1> rather than the logo's own label. */}
+        <ClubLogo name={club.name} logo={club.logo} size="lg" alt={`${club.name} logo`} />
         <div>
           <h1 className="font-display text-3xl font-bold text-ink-900">{club.name}</h1>
           <p className="font-mono text-xs text-ink-600 mt-1">

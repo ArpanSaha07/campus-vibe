@@ -1,9 +1,4 @@
-import {
-  FALLBACK_CLUB_LOGO,
-  FALLBACK_EVENT_IMAGE,
-  toClub,
-  toEventInstance,
-} from "@/app/lib/adapters";
+import { FALLBACK_EVENT_IMAGE, toClub, toEventInstance } from "@/app/lib/adapters";
 import type { ApiClub, ApiEvent } from "@/app/types";
 
 const apiEvent: ApiEvent = {
@@ -72,7 +67,9 @@ describe("toClub", () => {
     expect(toClub({ ...apiClub, socialLinks: null }).socialLinks).toEqual({ email: "" });
   });
 
-  it("falls back to the default logo", () => {
-    expect(toClub(apiClub).logo).toBe(FALLBACK_CLUB_LOGO);
+  // Empty rather than a placeholder image: <ClubLogo> reads this as "no logo"
+  // and renders the club's initial instead.
+  it("leaves a missing logo empty for ClubLogo to fall back on", () => {
+    expect(toClub(apiClub).logo).toBe("");
   });
 });

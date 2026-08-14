@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-08-08** · Branch: `ci/github-actions`
+Last updated: **2026-08-13** · Branch: `develop`
 
 Project knowledge — what the code does and why — lives in
 [`.claude/docs/`](../docs/README.md). Read that index before changing a
@@ -34,11 +34,12 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 - [ ] **P1** Add `EventService.update(...)` — there is currently no update path at all, so events can never be edited, and their embeddings go stale. Mirror `ClubService.update`, which correctly re-indexes. ([BUG-006](../bugs/bugs.md#bug-006))
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
+- [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-023](../bugs/bugs.md#bug-023))
 - [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload.
 - [ ] **P2** Admin Dashboard API: create clubs, assign Club Admins, manage users, moderate events.
-- [ ] **P2** Bookmark events (entity, migration, endpoints).
+- [x] **P2** Bookmark events + RSVPs (entity, migration, endpoints). `user_saved_events` was already in V4 but unmapped; `V9__create_event_rsvps.sql` adds `user_event_rsvps`. Both are mapped as lazy `@ElementCollection` id sets on `User`, served by `MyEventService` / `MyEventController` under `/api/v1/users/me/*`. Saved and going are deliberately independent relations, not one status column. Covered by `MyEventsIT`.
 - [ ] **P2** Follow clubs (entity, migration, endpoints).
-- [ ] **P2** Google Calendar export for an event.
+- [x] **P2** Google Calendar export for an event — **needs no backend**. Done client-side in `frontend/app/lib/google-calendar.ts`: a Google Calendar template link carries the whole event in its query string, so there is no API key, OAuth or endpoint to build. Reusable via `<AddToCalendarLink event={…} />`.
 - [ ] **P3** Notifications.
 - [ ] **P3** Ticket purchasing flow.
 - [ ] **P3** Move `application-test.yml` from `src/main/resources` to `src/test/resources` so test config stops shipping in the production jar. ([BUG-007](../bugs/bugs.md#bug-007))
@@ -47,11 +48,22 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 - [ ] **P1** Fix route protection — `proxy.tsx` is never executed by Next.js (wrong filename *and* wrong export name), and it reads a cookie while the JWT lives in localStorage. Decide the token transport first; a half-wired guard is worse than none. ([BUG-003](../bugs/bugs.md#bug-003))
 - [ ] **P2** Fix `NEXT_PUBLIC_*` in the **production** Docker build — values are inlined at build time, so the deployed frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. No longer affects local dev, which now builds the `dev` stage and reads them at runtime. ([BUG-004](../bugs/bugs.md#bug-004))
+- [x] **P1** Wire the My events page to the backend. `getMyEvents()` now calls `GET /api/v1/users/me/events` and maps through `toMyEvent`; the mock `app/data/my-events.ts` is deleted. Verified end-to-end against Postgres.
+- [ ] **P0** Build password reset, or take the screen down. `RecoverPasswordView` tells the user *we sent you a secure link* and sends nothing — `AuthenticationController` has login/register/google only, with no reset-token table and no mail sender. This was a deliberate call to build the UI ahead of the backend, but it is a promise the product currently breaks. Needs: a `password_reset_tokens` migration (single-use, hashed, ~1h expiry), a mail sender, `POST /api/v1/auth/forgot-password` + `POST /api/v1/auth/reset-password`, then swap the marked TODO in `RecoverPasswordView.tsx` for the real call. Reset must answer identically for unknown addresses so it cannot be used to enumerate accounts.
+- [ ] **P2** Converge the two Google sign-in implementations. `GoogleAuthButton` (auth modal, custom-styled, forwards to a hidden GIS button) and `OAuthButtons` (the `/login` page, Google's own rendered button) now both call `initialize`, and GIS keeps only the last config registered. They never mount together today, so nothing is broken — but the `/login` page should adopt `GoogleAuthButton` and `OAuthButtons` should go.
+- [ ] **P3** Point the remaining `/login` links at the auth modal. The Footer's Sign up / Log in and `ProtectedRoute`'s redirect still navigate to the `/login` page, so the app has two different-looking ways to sign in. The navbar and the save-event heart already open the modal.
+- [ ] **P1** Add an "I'm going" control so users can actually RSVP. `POST`/`DELETE /api/v1/users/me/rsvps` are live and tested, but nothing in the UI calls them yet, so the Going tab can only be populated through the API. Natural home is the event detail page, beside the existing save heart.
+- [ ] **P2** Refresh the My events list after the heart is toggled. `EventLikeButton` updates its own state optimistically, so un-saving on the Saved tab leaves the card visible until reload.
+- [ ] **P2** Give `EventInstance` a real end time. `buildGoogleCalendarUrl` currently assumes every event runs two hours, because Google needs a start/end pair and the model has no end. Every "Add to calendar" link is that guess until the backend carries one.
+- [ ] **P3** Whole-list calendar export ("Add to calendar" for a full tab). Needs an .ics feed — a Google template link carries exactly one event, which is why that control lives on each card rather than in the page header.
+- [x] **P1** My clubs page (`/my-clubs`) — the route the navbar already linked to. `app/(protected)/my-clubs/page.tsx` plus `MyClubsGrid` / `MyClubCard`: circular logo and name only, both centered, the whole card one link to the club page, drifting to the top-right on hover (`.lift-tr` in `globals.css`). One column on phones, two at `sm`, three at `lg`. **Frontend only** — see the next item.
+- [ ] **P1** Wire the My clubs page to the backend. `getMyClubs()` in `app/lib/club.tsx` returns `clubs.slice(0, 6)` from mock data; the real call is written out in the doc comment above it and needs `GET /api/v1/users/me/clubs`, which depends on [Follow clubs](#backend--features) landing first.
 - [ ] **P2** Category filtering on the events listing.
 - [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Bookmark and follow UI (depends on the backend endpoints above).
 - [ ] **P3** Custom header style in `layout.tsx`. *(from `frontend/README.md`)*
+- [ ] **P3** Apply `EventCard`'s stretched-link pattern to `MyEventCard`. Only its stub content links to the event, so the image and padding are still dead. Same fix: `relative` root, `after:absolute after:inset-0` on the title `<Link>`, and the heart/calendar controls lifted above it — they cannot be nested inside the `<a>`.
 - [ ] **P3** Stop event cards overlapping in the event section. *(from `frontend/README.md`)*
 - [ ] **P3** Restrict club title input to alphanumeric + spaces on create. *(from `frontend/README.md`)*
 - [ ] **P3** Return a proper not-found page for an unknown club URL. *(from `frontend/README.md`)*

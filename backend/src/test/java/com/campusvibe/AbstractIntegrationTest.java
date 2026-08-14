@@ -50,7 +50,7 @@ public abstract class AbstractIntegrationTest {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(rawPassword));
         for (RoleName roleName : roleNames) {
-            user.getRoles().add(roleRepository.findByName(roleName.name()).orElseThrow());
+            user.addRole(roleRepository.findByName(roleName.name()).orElseThrow());
         }
         return userRepository.save(user);
     }

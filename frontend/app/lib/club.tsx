@@ -12,6 +12,23 @@ export async function getAllClubs(): Promise<Club[]> {
 //   return apiFetch<Club>(`/api/v1/clubs/${id}`);
 // }
 
+/**
+ * Clubs the signed-in user follows, for the My clubs page.
+ *
+ * TODO(backend): the endpoint does not exist yet, so this serves mock data to
+ * let the page be built and reviewed first. Swap the body for the call below
+ * once GET /api/v1/users/me/clubs lands — the return type is already the shape
+ * the page renders, so nothing else has to change.
+ *
+ *   export async function getMyClubs(): Promise<Club[]> {
+ *     const apiClubs = await apiFetch<ApiClub[]>(`/api/v1/users/me/clubs`, { auth: true });
+ *     return apiClubs.map(toClub);
+ *   }
+ */
+export async function getMyClubs(): Promise<Club[]> {
+    return clubs.slice(0, 6);
+}
+
 // export function getAllClubs(): Club[] {
 //     // Simulate fetching clubs from an API
 //     return clubs;

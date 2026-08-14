@@ -37,7 +37,7 @@ class ClubPermissionServiceTest {
         User user = new User();
         user.setId(id);
         for (RoleName roleName : roleNames) {
-            user.getRoles().add(new Role(roleName.name()));
+            user.addRole(new Role(roleName.name()));
         }
         return user;
     }

@@ -1,6 +1,6 @@
-import type { ApiClub, ApiEvent, Club, EventInstance } from "@/app/types";
+import type { ApiClub, ApiEvent, ApiMyEvent, Club, EventInstance, MyEvent } from "@/app/types";
 
-export const FALLBACK_EVENT_IMAGE = "/frosh1.jpeg";
+export const FALLBACK_EVENT_IMAGE = "/campus-vibe-logo.png";
 export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
 
 /** Maps a backend EventDTO to the EventInstance shape the UI components use. */
@@ -27,6 +27,15 @@ export function toEventInstance(api: ApiEvent): EventInstance {
   };
 }
 
+/** Maps a backend MyEventDTO to the shape the My events page renders. */
+export function toMyEvent(api: ApiMyEvent): MyEvent {
+  return {
+    event: toEventInstance(api.event),
+    going: api.going,
+    saved: api.saved,
+  };
+}
+
 /** Maps a backend ClubDTO to the Club shape the UI components use. */
 export function toClub(api: ApiClub): Club {
   return {
@@ -34,7 +43,9 @@ export function toClub(api: ApiClub): Club {
     name: api.name,
     description: api.description ?? "",
     followers: api.followers,
-    logo: api.logo ?? FALLBACK_CLUB_LOGO,
+    // Empty, not a placeholder path: <ClubLogo> turns this into the club's
+    // initial. See the note at the top of this file.
+    logo: api.logo ?? "",
     socialLinks: parseSocialLinks(api.socialLinks),
     featured: api.featured,
     images: api.images,

@@ -2,10 +2,13 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-07**
+Last updated: **2026-08-13**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-022](#bug-022) | High | 2026-08-13 | Copilot Autofix answered a CodeQL note by detaching `savedEventIds` from Hibernate, silently discarding every saved event |
+| [BUG-021](#bug-021) | Low | 2026-08-13 | Stale Turbopack cache in the frontend container served pre-edit CSS, so new styles silently did nothing |
+| [BUG-020](#bug-020) | High | 2026-08-12 | Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume (28P01) |
 | [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
 | [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
 | [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
@@ -17,6 +20,211 @@ Last updated: **2026-08-07**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-022
+**Copilot Autofix detached `savedEventIds` from Hibernate, silently discarding every saved event** · High · FIXED 2026-08-13
+
+**Found:** 2026-08-13 on PR #27 (`develop` → `main`), reviewing why GitHub Advanced
+Security was objecting to the merge.
+
+**Symptom:** saving an event did nothing. `POST /api/v1/users/me/saved-events`
+answered `204 No Content`, the transaction committed, and the row never appeared.
+No exception, no log line. RSVPing still worked, which made it look like a
+My-events display bug rather than a write bug.
+
+CI had already caught it — `Backend / Build and test` passed on run
+`31761396279` and failed on `31761398442`, the next commit:
+
+```
+[ERROR] Tests run: 32, Failures: 2 -- com.campusvibe.user.MyEventsIT
+  savingAndRsvpingSetIndependentFlags:72  Expected: a collection with size <3>
+  savingTheSameEventTwiceIsANoOp:121      Expected: a collection with size <1>
+```
+
+**Cause:** commit `1562eae`, accepted from Copilot Autofix to clear CodeQL alert
+21 (`java/internal-representation-exposure` on `User.getSavedEventIds`). It
+suppressed Lombok's accessor and hand-wrote a defensive copy:
+
+```java
+public Set<Long> getSavedEventIds() {
+    return new HashSet<>(savedEventIds);   // a throwaway copy
+}
+```
+
+That is correct advice for a value object and wrong for a JPA entity. Hibernate
+replaces an `@ElementCollection` field with a `PersistentSet` that records each
+add and remove so it can emit SQL at flush. The service mutated through the
+getter — `requireUser(email).getSavedEventIds().add(eventId)` — so post-fix the
+`add` landed on a `HashSet` that was garbage-collected at the closing brace.
+The generated setter was worse: reassigning the field swaps the `PersistentSet`
+out, forcing a delete-and-reinsert of every row (and on an `@OneToMany` with
+`orphanRemoval`, an outright throw).
+
+Only `savedEventIds` was touched, which is why RSVPs kept working, and why moving
+`goingEventIds` down three lines made CodeQL re-report it as a *new* alert 22.
+
+**The alert was a code-quality note, not a vulnerability** — `severity: note`,
+`security_severity_level: null`, no CVSS. The two genuinely high-severity alerts
+in the same list (`java/spring-disabled-csrf-protection` on
+`SecurityFilterChainConfig.java:37`, and `js/empty-password-in-configuration-file`)
+were pre-existing on `main` and are untouched by this.
+
+**Fix:** hand out an unmodifiable *view* and route every change through a named
+mutator, applied to `savedEventIds`, `goingEventIds` and `roles`:
+
+```java
+public Set<Long> getSavedEventIds() {
+    return Collections.unmodifiableSet(savedEventIds);   // wraps the live PersistentSet
+}
+public void addSavedEvent(Long eventId)    { savedEventIds.add(eventId); }
+public void removeSavedEvent(Long eventId) { savedEventIds.remove(eventId); }
+```
+
+The field is never reassigned and mutations reach the `PersistentSet`, so dirty
+checking still works, while `getRoles().add(...)` now throws
+`UnsupportedOperationException` instead of quietly doing nothing. Seven call
+sites moved to the mutators: `MyEventService` (4), `AuthenticationService:60,80`,
+`ClubAdminRequestService:70`, plus three test helpers.
+
+`roles` was included deliberately even though its alert (16) predates this PR: it
+is the security principal, and the same autofix there would have produced
+role-less registrations and silently failed club-admin promotions — a worse
+outcome than a lost bookmark.
+
+**Verification:** `./mvnw -B verify` — 21 unit + 32 integration tests, 0 failures.
+`MyEventsIT` back to 6/6. The roles path was already covered and stayed green:
+`AuthenticationFlowIT` asserts `$.user.roles` and the JWT claim after register
+(`:36`, `:44`), and `ClubAdminRequestFlowIT:63` asserts `hasRole` on a **reloaded**
+user, which is what proves persistence rather than in-memory state.
+
+**Prevention:** `backend/src/test/java/com/campusvibe/user/UserTest.java` pins the
+decision — it asserts each getter throws on mutation, and that the view reflects a
+later `addSavedEvent`, so it fails against *both* the plain Lombok getter and the
+copy. The comment above the accessors in `User.java` says why, because the next
+person to meet this will be reading that file with an autofix button in front of
+them. [BUG-023](bugs.md#bug-023) tracks the same trap still armed on
+`Club.images` and `Event.images`.
+
+**Open question:** whether `Collections.unmodifiableSet` actually clears alerts
+20/21/22. It is the remedy CodeQL's own help text recommends and the query uses
+value dataflow rather than taint, so it should — but the arbiter is the re-scan on
+push, not this reasoning. If the alerts survive, the fallback is one line: return
+the copy from the getter and keep the mutators, which fixes the data loss either
+way.
+
+---
+
+### BUG-021
+**Stale Turbopack cache in the frontend container served pre-edit CSS** · Low · FIXED 2026-08-13
+
+**Found:** 2026-08-13. The My clubs cards stopped drifting on hover. `globals.css` still
+held `.lift-tr`, `MyClubCard.tsx` still carried the class, and nothing in `git diff`
+explained it.
+
+**Symptom:** the stylesheet Next actually served was the version from *before* the
+`.lift-tr` edit — the rule was absent entirely, and the `prefers-reduced-motion` block
+still listed only the original two selectors:
+
+```
+$ curl -s http://localhost:3000/_next/static/chunks/'[root-of-the-server]__0oeaxs7._.css' | grep lift
+2835:.lift {
+2839:.lift:hover {
+2849:  .lift, .lift:hover {
+```
+
+while inside the container the source was current (`grep -c lift-tr app/globals.css` → 6).
+Source and served output disagreed, which is why reading the code proved nothing.
+
+**Cause:** `.next/` lives in the container's writable layer, and `docker compose up -d` on
+an existing stopped container **starts it rather than recreating it**, so that directory
+survives. The container here had been created on 2026-08-10; `next dev` restarted today at
+13:11 on top of a three-day-old Turbopack persistent cache and reused the CSS chunk it
+found there instead of recompiling from the newer file synced in at 13:01.
+
+The frontend service deliberately has **no bind-mount** — `develop.watch` syncs source in
+instead, to avoid the slow Windows bind-mount into the VM (`docker-compose.yml:112-170`).
+That is the right trade-off, but it means the container's idea of the source and its cache
+can drift apart in a way a bind-mounted setup would not.
+
+**Fix:** drop the cache and restart.
+
+```sh
+docker exec campusvibe-frontend rm -rf .next
+docker restart campusvibe-frontend
+```
+
+**Verification:** the served chunk then contained `.lift-tr`, `.lift-tr:hover,
+.lift-tr:focus-visible`, and the five-selector reduced-motion block. Measured in headless
+Chromium on `/my-clubs`: resting `transition-duration: 0.22s`, hover transform
+`matrix(1, 0, 0, 1, 8, -8)`, 6.8px of it already travelled 80ms in (so it eases rather
+than jumps), and `:focus-visible` producing the same transform.
+
+**Prevention:** when a CSS or config edit appears to have no effect, diff the *served*
+asset against the source before touching the code — the same class of mistake as
+[BUG-013](#bug-013), where `compose watch` synced into an image that could not recompile.
+Remember that plain `docker compose up -d` does not re-sync source into an existing
+container; `docker compose watch` is what propagates edits, and a container restart alone
+keeps whatever cache was already there.
+
+---
+
+### BUG-020
+**Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume** · High · FIXED 2026-08-12
+
+**Found:** 2026-08-12, after rotating the local Postgres password in `docker/.env`.
+`campusvibe-db` came up healthy, `campusvibe-backend` exited 1 during Flyway's very
+first connection attempt.
+
+**Symptom:**
+
+```
+SQL State  : 28P01
+Message    : FATAL: password authentication failed for user "arpan"
+```
+
+The confusing part is that `db` reported **healthy** throughout. Its healthcheck is
+`pg_isready`, which only asks whether the server accepts connections — it never
+authenticates, so a password mismatch is invisible to it. Compose therefore satisfied
+`depends_on: service_healthy` and started the backend straight into the failure.
+
+**Cause:** `POSTGRES_PASSWORD` is read by the Postgres image's entrypoint **only when it
+runs `initdb` on an empty data directory**. The `docker_db_data` volume was initialized
+under the old password, so the `arpan` role kept the old SCRAM verifier while
+`SPRING_DATASOURCE_PASSWORD` (`docker-compose.yml:56`) now carried the new one. Compose
+did recreate the `db` container on the next `up` — its `POSTGRES_PASSWORD` env var
+matched `.env` exactly — but a recreated *container* over a pre-existing *volume* changes
+nothing about the role that already exists inside the database. The env var is an init
+input, not a desired-state declaration.
+
+**Fix:** reset the role in place, over the container's Unix socket. The image's generated
+`pg_hba.conf` keeps `local all all trust`, so the forgotten old password was not needed:
+
+```sh
+docker exec campusvibe-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '"'"'$POSTGRES_PASSWORD'"'"'"'
+```
+
+Both variables expand *inside* the container, so the value comes from the env Compose
+already injected from `.env` and the secret never lands in host argv or shell history.
+Postgres 15 defaults `password_encryption` to `scram-sha-256`, matching the
+`host all all all scram-sha-256` line the image appends, so the new verifier was usable
+by the JDBC driver immediately.
+
+Rejected the obvious alternative, `docker compose down -v`: it re-runs `initdb` with the
+new password and Flyway rebuilds the schema, but it drops the volume — 8 clubs and 1 user
+here, none of it reproducible from migrations.
+
+Verified with a TCP login (`PGPASSWORD=… psql -h 127.0.0.1`), which is the path the
+backend actually uses rather than the trust-based socket, then `compose up -d`: backend
+`Up (healthy)`, `/actuator/health` `{"status":"UP"}`, Flyway logged *Current version of
+schema "public": 8 — no migration necessary*, and `clubs` still held 8 rows.
+
+Also documented the one-shot nature of the variable in `docker/.env.example`, since
+nothing at the point of edit hinted that changing it would not take effect.
+
+**Affected files:** `docker/.env.example` *(comment only — the fix itself was a one-off
+database command, no application or compose change)*
 
 ---
 

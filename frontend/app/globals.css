@@ -41,6 +41,13 @@ body {
   outline-offset: 2px;
 }
 
+/* Opt-out for a control whose wrapper draws the ring for it (e.g. an input sharing
+   a pill with a button). Focus stays visible — it just moves to the wrapper.
+   Needed because the rule above is unlayered and so outranks `outline-none`. */
+.focus-ring-inherit:focus-visible {
+  outline: none;
+}
+
 /* Mono "printed on the ticket" label */
 .ticket-label {
   font-family: var(--font-mono), monospace;
@@ -103,12 +110,57 @@ body {
   box-shadow: var(--shadow-lift);
 }
 
+/* Card drift toward the top-right — My clubs cards.
+   Kept as its own utility rather than folded into .lift because every other
+   card in the app lifts straight up (design-guidelines.md, "Radius & elevation").
+
+   The travel is 8px, not the 2px .lift uses. A diagonal move reads as much
+   smaller than a vertical one of the same length — the eye measures it against
+   the card's whole diagonal — and at 3px the movement was there but invisible.
+   220ms rather than 150ms for the same reason: the longer distance needs the
+   extra time to glide instead of snap. --ease-snap decelerates into the
+   position, so it settles rather than stopping dead.
+
+   The shadow leans down-left, opposite the travel, so the card reads as lifting
+   away from the page toward the top-right instead of merely sliding.
+
+   :focus-visible is matched to :hover so a keyboard user gets the same
+   affordance as a pointer user — the whole card is one link. */
+.lift-tr {
+  transition: transform 220ms var(--ease-snap), box-shadow 220ms var(--ease-snap);
+  will-change: transform;
+}
+.lift-tr:hover,
+.lift-tr:focus-visible {
+  transform: translate(8px, -8px);
+  box-shadow: -6px 16px 32px -12px rgb(32 23 49 / 0.28);
+}
+
+/* Auth modal card: rises the short distance a dialog should, not a page's worth */
+.auth-modal-card {
+  animation: auth-modal-in 150ms var(--ease-snap) both;
+}
+@keyframes auth-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fade-up {
+  .fade-up,
+  .auth-modal-card {
     animation: none;
   }
   .lift,
-  .lift:hover {
+  .lift:hover,
+  .lift-tr,
+  .lift-tr:hover,
+  .lift-tr:focus-visible {
     transition: none;
     transform: none;
   }

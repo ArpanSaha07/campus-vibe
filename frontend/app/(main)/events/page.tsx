@@ -86,8 +86,8 @@ function EventsContent() {
         <div className="mt-8">
           <EmptyState
             title="No events yet"
-            body="Be the first to host one — create an event for your club."
-            action={<Button href="/create-event">Create event</Button>}
+            body="Follow your favorite clubs to get notified about upcoming events."
+            action={<Button href="/clubs">Browse clubs</Button>}
           />
         </div>
       )}

@@ -57,7 +57,7 @@ public class AuthenticationService {
         user.setName(request.name());
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.getRoles().add(defaultRole());
+        user.addRole(defaultRole());
         userRepository.save(user);
         return respondWithToken(user);
     }
@@ -77,7 +77,7 @@ public class AuthenticationService {
             u.setEmail(email);
             u.setName(name != null ? name : email);
             u.setPassword(passwordEncoder.encode("google-login-" + System.nanoTime()));
-            u.getRoles().add(defaultRole());
+            u.addRole(defaultRole());
             return userRepository.save(u);
         });
         return respondWithToken(user);

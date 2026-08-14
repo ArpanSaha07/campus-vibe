@@ -24,6 +24,22 @@ export type EventInstance = {
   // recurrence?
 };
 
+// How the signed-in user relates to an event on the My events page.
+//
+// The two are independent, not one status: a bookmark and a commitment are
+// different promises, and an event can be both. Mirrors the backend's
+// com.campusvibe.user.MyEventDTO.
+export type MyEvent = {
+  event: EventInstance;
+  going: boolean;
+  saved: boolean;
+};
+
+/** Which badge a card shows. "going" wins when both are true. */
+export type MyEventStatus = "going" | "saved";
+
+export type MyEventsTab = "going" | "saved" | "past";
+
 export type Club = {
     clubId: string;
     name: string;
@@ -40,6 +56,25 @@ export type Club = {
     images: string[];
     createdAt: Date;
     // clubcategories: string[];
+};
+
+// AI planner (see .claude/docs/architecture/ai-planner.md).
+// Built from mock data today; this is the shape the RAG endpoint should return,
+// so the page does not have to change when the backend lands.
+export type PlanSlot = {
+  time: string;        // printed label, e.g. '6:00 PM'
+  event: EventInstance;
+  rationale: string;   // why this pick answers the request
+};
+
+export type Plan = {
+  prompt: string;          // the request this plan answers
+  refinements: string[];   // follow-up prompts applied, oldest first
+  title: string;
+  summary: string;
+  slots: PlanSlot[];
+  clubs: Club[];
+  nextSteps: string[];
 };
 
 // Mirrors backend RBAC (see .claude/docs/architecture/user-roles.md and
@@ -83,6 +118,12 @@ export interface ApiEvent {
   categories: string[];
 }
 
+export interface ApiMyEvent {
+  event: ApiEvent;
+  going: boolean;
+  saved: boolean;
+}
+
 export interface ApiClub {
   id: string;
   name: string;
@@ -122,6 +163,12 @@ export type ClubPageProps = {
 export type EventPageProps = {
   params: Promise<{
     eventId: string;
+  }>;
+}
+
+export type PlannerPageProps = {
+  searchParams: Promise<{
+    prompt?: string | string[];
   }>;
 }
 

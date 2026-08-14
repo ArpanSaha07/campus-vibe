@@ -1,21 +1,33 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/app/lib/auth-context";
+import { useAuthModal } from "@/app/lib/auth-modal-context";
 import { saveEvent, unsaveEvent } from "@/app/lib/event";
 import { EventInstance } from "@/app/types";
 
 // Only the event id is needed, so a full EventInstance (as passed by EventCard)
 // or a lightweight { eventId } object (as passed by the event page) both work.
-export default function EventLikeButton({ event }: { event: Pick<EventInstance, "eventId"> }) {
+// `initiallySaved` lets a caller that already knows the answer — the My events
+// page, which fetched the saved list — render the heart filled from the start.
+export default function EventLikeButton({
+  event,
+  initiallySaved = false,
+}: {
+  event: Pick<EventInstance, "eventId">;
+  initiallySaved?: boolean;
+}) {
   const { isAuthenticated } = useAuth();
-  const [isSaved, setIsSaved] = useState(false);
+  const { openAuth } = useAuthModal();
+  const [isSaved, setIsSaved] = useState(initiallySaved);
 
   const handleClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
     if (!isAuthenticated) {
-      alert("Please log in to like events.");
+      // The card names what the user was reaching for, rather than asking them
+      // to sign up for nothing in particular.
+      openAuth("signup", "Sign up to save events");
       return;
     }
-    e.preventDefault();
     const next = !isSaved;
     setIsSaved(next); // optimistic
     try {

@@ -20,7 +20,7 @@ export default function SectionHeading({
       {moreHref && (
         <Link
           href={moreHref}
-          className="shrink-0 text-sm font-semibold text-lavender-600 hover:text-lavender-800"
+          className="shrink-0 text-md font-semibold text-lavender-600 hover:text-lavender-800"
         >
           {moreLabel ?? "See all"} →
         </Link>

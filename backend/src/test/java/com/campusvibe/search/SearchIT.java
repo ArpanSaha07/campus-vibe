@@ -262,7 +262,7 @@ class SearchIT {
             user.setEmail(email);
             user.setPassword(passwordEncoder.encode("password123"));
             for (RoleName roleName : roleNames) {
-                user.getRoles().add(roleRepository.findByName(roleName.name()).orElseThrow());
+                user.addRole(roleRepository.findByName(roleName.name()).orElseThrow());
             }
             return userRepository.save(user);
         });

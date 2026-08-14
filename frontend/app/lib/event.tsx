@@ -1,6 +1,6 @@
 import { apiFetch } from "@/app/lib/api";
-import { toEventInstance } from "@/app/lib/adapters";
-import type { ApiEvent, EventInstance } from "@/app/types";
+import { toEventInstance, toMyEvent } from "@/app/lib/adapters";
+import type { ApiEvent, ApiMyEvent, EventInstance, MyEvent } from "@/app/types";
 
 export async function listEvents(): Promise<EventInstance[]> {
 	const events = await apiFetch<ApiEvent[]>(`/api/v1/events`);
@@ -12,8 +12,15 @@ export async function getEvent(eventId: string): Promise<EventInstance> {
 	return toEventInstance(event);
 }
 
-export async function getUserEvents(): Promise<EventInstance[]> {
-	return apiFetch<EventInstance[]>(`/api/v1/users/me/events`, { auth: true });
+/**
+ * The signed-in user's saved + going events, for the My events page.
+ *
+ * One request serves all three tabs: the response carries each event plus the
+ * user's relationship to it, so Going / Saved / Past are split client-side.
+ */
+export async function getMyEvents(): Promise<MyEvent[]> {
+	const myEvents = await apiFetch<ApiMyEvent[]>(`/api/v1/users/me/events`, { auth: true });
+	return myEvents.map(toMyEvent);
 }
 
 export async function saveEvent(eventId: string): Promise<void> {
