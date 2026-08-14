@@ -28,7 +28,6 @@ A campus events management app to allow campus clubs to post their events in a s
 - Deployment — frontend to Vercel, backend to AWS Elastic Beanstalk, database to
   AWS RDS. The Elastic Beanstalk configuration exists under `docker/`; no
   environment has been provisioned and **CI deploys nothing today**
-- Ticketing, in the style of Eventbrite
 - Notifications
 - Admin dashboard for managing clubs, roles and moderation
 - End-to-end browser tests
