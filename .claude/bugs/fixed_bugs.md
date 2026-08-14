@@ -6,6 +6,7 @@ Last updated: **2026-08-14**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-027](#bug-027) | High | 2026-08-14 | `/clubs` was prerendered at build time, so `next build` required a live backend and failed CI with ECONNREFUSED |
 | [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
 | [BUG-024](#bug-024) | Medium | 2026-08-13 | A non-numeric path variable answered 500 instead of 400, app-wide |
 | [BUG-023](#bug-023) | Medium | 2026-08-13 | The event detail page served one hardcoded event for every URL, with a club nobody has |
@@ -23,6 +24,55 @@ Last updated: **2026-08-14**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-027
+**`/clubs` was prerendered at build time, so `next build` required a live backend** · High · FIXED 2026-08-14
+
+**Found:** 2026-08-14, on the push that fixed [BUG-026](#bug-026). The Frontend
+job got past `type-check` and `test` and then failed in `build`:
+
+```
+Error occurred prerendering page "/clubs".
+[TypeError: fetch failed] { digest: '3227098399',
+  [cause]: AggregateError: { code: 'ECONNREFUSED' } }
+```
+
+**Cause:** converting `/clubs` to a Server Component made it a *static* route —
+it takes no params and reads no request-time API, so Next prerendered it during
+`next build`, which ran `getAllClubs()` against a backend that does not exist on
+a CI runner. The build output named it plainly and was not read carefully
+enough: `/clubs` was the one route listed as `○ (Static)` *with* a revalidate
+window, which is exactly the signature of build-time fetching.
+
+**Why local builds passed and CI did not.** The dev machine had the Docker
+backend up on `localhost:8080` throughout, so the build-time fetch succeeded and
+the route prerendered fine. Verifying a build on a machine where the API happens
+to be running does not test what CI does. Reproduced by pointing
+`API_INTERNAL_URL` at a dead port, which produced the identical digest.
+
+**Fix:** `await connection()` at the top of the page, so rendering waits for a
+real request and never happens at build time.
+
+**Rejected: `export const dynamic = 'force-dynamic'`.** The docs state it is
+equivalent to `fetchCache = 'force-no-store'`, which would strip the
+five-minute cache off every read in this tree and undo the whole point of the
+change that introduced it. `connection()` moves only *when* the render happens
+and leaves the data cache alone.
+
+**Measured, not assumed.** Against a counting proxy in front of the backend,
+three consecutive request-time renders of `/clubs` produced **one** upstream
+`GET /api/v1/clubs`. Caching survived the fix. The page returns 200 and renders
+all 8 seeded clubs server-side.
+
+**The general rule this establishes:** a frontend build must not depend on the
+API being reachable. Any Server Component that fetches and takes no params is a
+candidate for this failure — check the build output for a route marked `○` that
+also has a revalidate window.
+
+**Affected files**
+- `frontend/app/(main)/clubs/page.tsx` — the `connection()` call and its comment
 
 ---
 

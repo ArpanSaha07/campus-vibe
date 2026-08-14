@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { getAllClubs } from "@/app/lib/club";
 import ClubProfileComponent from "@/app/components/club/ClubCard";
 import EmptyState from "@/app/components/ui/EmptyState";
@@ -18,6 +19,21 @@ export const metadata: Metadata = {
 };
 
 export default async function ClubsPage() {
+  // Renders at request time, never at build time.
+  //
+  // Without this the route is statically prerendered, which means getAllClubs()
+  // runs during `next build` — and the build then needs a live backend. CI has
+  // none, so the push failed with ECONNREFUSED on this page. A frontend build
+  // should not depend on an API being up.
+  //
+  // `connection()` rather than `export const dynamic = 'force-dynamic'`: the
+  // docs state force-dynamic is equivalent to `fetchCache = 'force-no-store'`,
+  // which would strip the five-minute cache off every read in this tree and
+  // undo the reason the caching was added. connection() only moves *when* the
+  // render happens; the data cache still applies, so the backend is still
+  // queried at most once per revalidate window rather than once per visitor.
+  await connection();
+
   const clubs = await getAllClubs();
 
   return (
