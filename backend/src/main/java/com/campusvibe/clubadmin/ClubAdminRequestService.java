@@ -67,7 +67,7 @@ public class ClubAdminRequestService {
                 .orElseThrow(() -> new IllegalStateException(
                         "ROLE_CLUB_ADMIN is missing from the roles table; check Flyway migration V7"));
         User user = req.getUser();
-        user.getRoles().add(clubAdminRole);
+        user.addRole(clubAdminRole);
         club.setClubAdminId(user.getId());
         req.setStatus(RequestStatus.APPROVED);
         req.setReviewedAt(Instant.now());

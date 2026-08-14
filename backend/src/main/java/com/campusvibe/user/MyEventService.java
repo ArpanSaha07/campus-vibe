@@ -71,23 +71,23 @@ public class MyEventService {
 	@Transactional
 	public void saveEvent(String email, Long eventId) {
 		requireEventExists(eventId);
-		requireUser(email).getSavedEventIds().add(eventId);
+		requireUser(email).addSavedEvent(eventId);
 	}
 
 	@Transactional
 	public void unsaveEvent(String email, Long eventId) {
-		requireUser(email).getSavedEventIds().remove(eventId);
+		requireUser(email).removeSavedEvent(eventId);
 	}
 
 	@Transactional
 	public void rsvp(String email, Long eventId) {
 		requireEventExists(eventId);
-		requireUser(email).getGoingEventIds().add(eventId);
+		requireUser(email).addGoingEvent(eventId);
 	}
 
 	@Transactional
 	public void cancelRsvp(String email, Long eventId) {
-		requireUser(email).getGoingEventIds().remove(eventId);
+		requireUser(email).removeGoingEvent(eventId);
 	}
 
 	private User requireUser(String email) {

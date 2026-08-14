@@ -1,12 +1,13 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-08** · Branch: `ci/github-actions`
+Last updated: **2026-08-13** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-017, BUG-019 so far). Bug ids are never reused.
+(BUG-008 … BUG-017, BUG-019 … BUG-022 so far). Bug ids are never reused.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-023](#bug-023) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **does not reproduce as of 2026-08-08** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
@@ -375,3 +376,77 @@ nothing for Vercel — nor the reverse.
 - `frontend/next.config.ts` — the `process.env.VERCEL` branch
 - `.claude/docs/architecture/ci-cd-pipeline.md` — corrected 2026-08-07
 - No `vercel.json` exists; that is the gap
+
+---
+
+### BUG-023
+**`Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted** · High · OPEN
+
+**Found:** 2026-08-13, while fixing [BUG-022](fixed_bugs.md#bug-022) on PR #27. That
+bug is this one, already detonated, on a different entity.
+
+**Symptom:** none yet — this is a **latent** bug, armed and waiting for a click.
+Both entities hand out a live Hibernate collection and both are mutated through
+the getter:
+
+```java
+club.getImages().addAll(keys);    // ClubService.java:77
+event.getImages().addAll(keys);   // EventService.java:57
+```
+
+CodeQL has an open `java/internal-representation-exposure` alert on each
+(**alert 14** on `Club.java:44`, **alert 15** on `Event.java:48`). Copilot Autofix
+offers the same one-click fix it offered for `User.savedEventIds`: replace the
+getter with `return new ArrayList<>(images);`. Accepting it makes `addAll` land on
+a throwaway list. Uploaded club logos and event banners would then be written to
+S3, get their keys computed, and **never reach the database** — no exception, no
+log line, and no failing test, because neither service has one covering the image
+path.
+
+**Why it is High rather than a note.** The CodeQL alert itself is `severity: note`
+with **no security-severity score at all** — it is a code-quality query that
+happens to surface in the Security tab. The severity here is not the alert; it is
+that the *remedy on offer* silently destroys data, and the alert's presence is
+what makes someone click it. [BUG-022](fixed_bugs.md#bug-022) is the proof: the
+identical fix was accepted on 2026-08-13 and broke saving events for a day.
+
+**Do not accept Copilot Autofix on alerts 14 and 15.** Apply the pattern already
+used in `User.java` instead:
+
+```java
+@Getter(AccessLevel.NONE)
+@Setter(AccessLevel.NONE)
+private List<String> images = new ArrayList<>();
+
+public List<String> getImages() {
+    return Collections.unmodifiableList(images);   // wraps the live PersistentBag
+}
+
+public void addImages(List<String> keys) {
+    images.addAll(keys);
+}
+```
+
+An unmodifiable view keeps Hibernate's dirty checking intact — it wraps the live
+`PersistentBag` rather than replacing it — while turning `getImages().add(...)`
+into a loud `UnsupportedOperationException` instead of a silent no-op. Reads at
+the DTO boundary already copy (`ClubMapper.java:21`, `EventMapper.java:23` both
+call `List.copyOf`), so those callers are unaffected.
+
+**Add a test with the fix** — the reason BUG-022 was caught in an hour and this
+one is still theoretical is that `MyEventsIT` covered saving and nothing covers
+image upload. `UserTest` (`backend/src/test/java/com/campusvibe/user/UserTest.java`)
+is the template: assert the getter throws on mutation, and assert it reflects a
+later `addImages` call, which is what pins it as a view rather than a copy.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/club/Club.java:41-44` (`images`)
+- `backend/src/main/java/com/campusvibe/event/Event.java:45-48` (`images`)
+- `backend/src/main/java/com/campusvibe/club/ClubService.java:77`
+- `backend/src/main/java/com/campusvibe/event/EventService.java:57`
+- Reference implementation: `backend/src/main/java/com/campusvibe/user/User.java`
+
+**Affected tests:** none exist for either image path — that is the gap.
+`Event.categories` is safe by luck: `EventController.java:61` reassigns via
+`setCategories(...)` rather than mutating, though it inherits the same trap the
+moment anyone writes `getCategories().add(...)`.

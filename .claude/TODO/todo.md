@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-08-12** · Branch: `develop`
+Last updated: **2026-08-13** · Branch: `develop`
 
 Project knowledge — what the code does and why — lives in
 [`.claude/docs/`](../docs/README.md). Read that index before changing a
@@ -34,6 +34,7 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 - [ ] **P1** Add `EventService.update(...)` — there is currently no update path at all, so events can never be edited, and their embeddings go stale. Mirror `ClubService.update`, which correctly re-indexes. ([BUG-006](../bugs/bugs.md#bug-006))
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
+- [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-023](../bugs/bugs.md#bug-023))
 - [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload.
 - [ ] **P2** Admin Dashboard API: create clubs, assign Club Admins, manage users, moderate events.
 - [x] **P2** Bookmark events + RSVPs (entity, migration, endpoints). `user_saved_events` was already in V4 but unmapped; `V9__create_event_rsvps.sql` adds `user_event_rsvps`. Both are mapped as lazy `@ElementCollection` id sets on `User`, served by `MyEventService` / `MyEventController` under `/api/v1/users/me/*`. Saved and going are deliberately independent relations, not one status column. Covered by `MyEventsIT`.
