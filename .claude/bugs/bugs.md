@@ -1,6 +1,6 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-13** · Branch: `feature/my-clubs`
+Last updated: **2026-08-14** · Branch: `feature/my-clubs`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-008 … BUG-017, BUG-019 so far). Bug ids are never reused.
@@ -15,6 +15,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
+| [BUG-025](#bug-025) | Low | `my-events` date test asserts English month names, so it fails on a non-English machine |
 
 ---
 
@@ -375,3 +376,42 @@ nothing for Vercel — nor the reverse.
 - `frontend/next.config.ts` — the `process.env.VERCEL` branch
 - `.claude/docs/architecture/ci-cd-pipeline.md` — corrected 2026-08-07
 - No `vercel.json` exists; that is the gap
+
+---
+
+### BUG-025
+**`my-events` date test asserts English month names, so it fails on a non-English machine** · Low · OPEN
+
+**Found:** 2026-08-14, while running the frontend CI steps locally to reproduce a
+push failure. The type error that actually broke CI was real and is fixed; this
+turned up alongside it and is a different problem.
+
+**Symptom:** `app/__tests__/my-events.test.ts:198` fails locally and passes in CI.
+
+```
+expect(formatDayLabel(new Date(2026, 7, 25), NOW)).toContain("Aug");
+  Expected substring: "Aug"
+  Received string:    "mar. 25 aout"
+```
+
+**Cause:** `formatDayLabel` formats through `Intl`/`toLocaleDateString` without
+pinning a locale, so it follows the host's default. The GitHub runner is en-US
+and produces `Aug`; this development machine is fr-CA and produces `aout`. The
+assertion hardcodes the English form.
+
+**Why it is worth fixing even though CI is green.** A test that passes only on
+en-US hosts is not testing what it claims. It fails for any contributor outside
+that locale, which reads as *your change broke it* when nothing broke — and it
+would hide a genuine regression in the opposite direction, because the failure
+is already dismissed as noise. It also means the product's own date formatting
+has never been checked against a non-English locale, which is the more
+interesting question for a Montreal campus app.
+
+**Fix direction:** pass an explicit locale to the formatter (or to the test), so
+the assertion is about behaviour rather than about the machine. Decide
+deliberately whether the UI should follow the user's locale — if it should, then
+the French output is correct and the *test* is what is wrong.
+
+**Affected files**
+- `frontend/app/__tests__/my-events.test.ts` — the assertion at line 198
+- the `formatDayLabel` implementation it exercises

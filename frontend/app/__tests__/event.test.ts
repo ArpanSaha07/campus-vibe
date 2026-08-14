@@ -1,5 +1,6 @@
 import { ApiError } from "@/app/lib/api";
 import { getEvent } from "@/app/lib/event";
+import { PUBLIC_READ_CACHE } from "@/app/lib/cache";
 import type { ApiEvent } from "@/app/types";
 
 const mockApiFetch = jest.fn();
@@ -40,7 +41,7 @@ describe("getEvent", () => {
 
     const event = await getEvent("12");
 
-    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/events/12");
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/events/12", PUBLIC_READ_CACHE.events);
     expect(event?.eventId).toBe("12");
     expect(event?.title).toBe("Chess Night");
     // The organizer is the club id the follow button and club link both need.

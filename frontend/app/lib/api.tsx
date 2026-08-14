@@ -66,8 +66,16 @@ type FetchOptions = RequestInit & {
    * server render of a public page otherwise re-queries the backend.
    */
   revalidate?: number;
-  /** Cache tags, so a future mutation can revalidateTag instead of waiting out the TTL. */
-  tags?: string[];
+  /**
+   * Cache tags, so a future mutation can revalidateTag instead of waiting out
+   * the TTL.
+   *
+   * `readonly` because the policies in `cache.ts` are declared `as const`, which
+   * makes their tag arrays readonly tuples. Requiring a mutable `string[]` here
+   * would reject the only intended callers. Nothing in this function mutates
+   * them, so accepting the wider type costs nothing.
+   */
+  tags?: readonly string[];
 };
 
 export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {}): Promise<T> {
@@ -96,7 +104,14 @@ export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {
     ...init,
     headers,
     ...(revalidate !== undefined || tags !== undefined
-      ? { next: { ...(revalidate !== undefined && { revalidate }), ...(tags && { tags }) } }
+      ? {
+          next: {
+            ...(revalidate !== undefined && { revalidate }),
+            // Copied because Next types `next.tags` as a mutable string[], while
+            // the option above accepts a readonly one.
+            ...(tags && { tags: [...tags] }),
+          },
+        }
       : {}),
   });
 

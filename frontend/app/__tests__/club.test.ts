@@ -1,5 +1,6 @@
 import { ApiError } from "@/app/lib/api";
 import { getClubById } from "@/app/lib/club";
+import { PUBLIC_READ_CACHE } from "@/app/lib/cache";
 import type { ApiClub } from "@/app/types";
 
 const mockApiFetch = jest.fn();
@@ -35,7 +36,12 @@ describe("getClubById", () => {
 
     const club = await getClubById("chess-club");
 
-    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/clubs/chess-club");
+    // The cache policy is part of the call, not decoration: a club read that
+    // silently lost it would go back to hitting the backend on every render.
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/clubs/chess-club",
+      PUBLIC_READ_CACHE.clubs,
+    );
     expect(club?.clubId).toBe("chess-club");
     expect(club?.name).toBe("Chess Club");
     expect(club?.socialLinks.email).toBe("chess@campus.com");
@@ -46,7 +52,10 @@ describe("getClubById", () => {
 
     await getClubById("chess club/../admin");
 
-    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/clubs/chess%20club%2F..%2Fadmin");
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      "/api/v1/clubs/chess%20club%2F..%2Fadmin",
+      PUBLIC_READ_CACHE.clubs,
+    );
   });
 
   // The distinction the club page depends on: null routes to notFound(), a

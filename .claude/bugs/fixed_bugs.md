@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-13**
+Last updated: **2026-08-14**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
 | [BUG-024](#bug-024) | Medium | 2026-08-13 | A non-numeric path variable answered 500 instead of 400, app-wide |
 | [BUG-023](#bug-023) | Medium | 2026-08-13 | The event detail page served one hardcoded event for every URL, with a club nobody has |
 | [BUG-022](#bug-022) | High | 2026-08-13 | Every club page showed "Club not found": the detail route read mock data whose slugs no seeded club shares |
@@ -22,6 +23,55 @@ Last updated: **2026-08-13**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-026
+**Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]`** · High · FIXED 2026-08-14
+
+**Found:** 2026-08-14, when the push of `482c4dd` failed the Frontend job. The
+commit message for that change said in as many words that the second half had
+not been typechecked. It had not, and this is what was in it.
+
+**Symptom:** `npm run type-check` failed with five instances of TS2345:
+
+```
+app/lib/club.tsx(8,63): error TS2345: Argument of type
+'{ readonly revalidate: 300; readonly tags: readonly ["clubs"]; }'
+is not assignable to parameter of type 'FetchOptions'.
+  Types of property 'tags' are incompatible.
+    The type 'readonly ["clubs"]' is 'readonly' and cannot be
+    assigned to the mutable type 'string[]'.
+```
+
+**Cause:** `PUBLIC_READ_CACHE` in `app/lib/cache.ts` is declared `as const`, so
+its tag arrays are readonly tuples. `FetchOptions.tags` was typed `string[]`,
+which a readonly array cannot satisfy. The two were written in the same change
+and never compiled together.
+
+**Fix:** widen the option to `tags?: readonly string[]` — `apiFetch` only reads
+it — and copy into a mutable array at the `fetch` boundary, because Next types
+`RequestInit['next'].tags` as `string[]` (`next/types/global.d.ts:166`). Copying
+also stops a caller from mutating the shared policy object for every other call
+site.
+
+**Why it reached `main`:** nothing here is subtle; the change was simply pushed
+without running the checks CI runs. The four frontend CI steps are cheap
+(`type-check`, `lint`, `test`, `build`) and reproduce it exactly.
+
+**Also surfaced, and fixed alongside:** three assertions in `club.test.ts` and
+`event.test.ts` still expected `apiFetch` to be called with a bare path and were
+failing on the new second argument. They now assert the cache policy too, so a
+public read that silently loses its policy fails a test instead of quietly going
+back to hitting the backend on every render. A new `app/__tests__/api.test.ts`
+(7 tests) covers the guard that refuses `auth` combined with `revalidate`/`tags`
+— the case where a cached response would hand one user's data to the next
+caller, which had no test at all.
+
+**Affected files**
+- `frontend/app/lib/api.tsx` — the `tags` type and the copy at the fetch call
+- `frontend/app/__tests__/api.test.ts` — new
+- `frontend/app/__tests__/club.test.ts`, `event.test.ts` — updated assertions
 
 ---
 
