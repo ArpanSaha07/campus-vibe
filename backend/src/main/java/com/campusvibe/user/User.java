@@ -1,6 +1,7 @@
 package com.campusvibe.user;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -54,12 +55,22 @@ public class User implements UserDetails {
 	@ElementCollection(fetch = FetchType.LAZY)
 	@CollectionTable(name = "user_saved_events", joinColumns = @JoinColumn(name = "user_id"))
 	@Column(name = "event_id")
+	@Getter(AccessLevel.NONE)
+	@Setter(AccessLevel.NONE)
 	private Set<Long> savedEventIds = new HashSet<>();
 
 	@ElementCollection(fetch = FetchType.LAZY)
 	@CollectionTable(name = "user_event_rsvps", joinColumns = @JoinColumn(name = "user_id"))
 	@Column(name = "event_id")
 	private Set<Long> goingEventIds = new HashSet<>();
+
+	public Set<Long> getSavedEventIds() {
+		return new HashSet<>(savedEventIds);
+	}
+
+	public void setSavedEventIds(Set<Long> savedEventIds) {
+		this.savedEventIds = (savedEventIds == null) ? new HashSet<>() : new HashSet<>(savedEventIds);
+	}
 
 	public boolean hasRole(RoleName roleName) {
 		return roles.stream().anyMatch(r -> r.getName().equals(roleName.name()));
