@@ -1,5 +1,8 @@
 # User Roles & Authorization Architecture (CampusVibe)
 
+**Code as of:** never — this document has not been reconciled with the
+code. See the banner above; do not read a distance into this.
+
 > ⚠ **Part specification, part implementation doc — unverified.** Moved here
 > from `.claude/user-roles.md` on 2026-08-06. Much of it is written as
 > *there should be three roles*, which is a spec for intended behaviour, not a

@@ -4,6 +4,7 @@
 **branch protection is ENABLED on `main`; the pipeline is now a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
+**Code as of:** e12cd19
 
 > **Read this first.** The pipeline is **enforced**. As of 2026-08-07 `main`
 > requires a pull request, requires branches to be up to date, and requires the

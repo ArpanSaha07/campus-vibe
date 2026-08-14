@@ -1,0 +1,226 @@
+# CampusVibe — Completed Tasks
+
+Finished work, moved out of [`todo.md`](todo.md) so the queue stays readable.
+Nothing here needs doing. It is kept because *what was already tried, and why it
+was done that way* is the expensive thing to rediscover.
+
+Last updated: **2026-08-14**
+
+**Two halves, and they answer different questions:**
+
+- **[Completed tasks by topic](#completed-tasks-by-topic)** — the checklist
+  items as they appeared in `todo.md`, still under their original headings. Use
+  this to answer *was this ever done?*
+- **[Completed work log](#completed-work-log)** — dated entries, newest first,
+  each written when the work landed. Use this to answer *what happened on that
+  day, and what did we learn?*
+
+Reasoning about how a subsystem works belongs in
+[`.claude/docs/`](../docs/README.md), not here. Defects belong in
+[`bugs.md`](../bugs/bugs.md) and [`fixed_bugs.md`](../bugs/fixed_bugs.md). This
+file is the record of *work*, and it is append-only — entries are never edited
+to match what later turned out to be true, because the fact that a belief
+changed is itself worth keeping.
+
+---
+
+## Completed tasks by topic
+
+Verbatim from `todo.md`, including the strikethrough and the dates. Relative
+links resolve unchanged — this file sits in the same directory.
+
+
+### Backend / Features
+
+- [x] **P2** Bookmark events + RSVPs (entity, migration, endpoints). `user_saved_events` was already in V4 but unmapped; `V9__create_event_rsvps.sql` adds `user_event_rsvps`. Both are mapped as lazy `@ElementCollection` id sets on `User`, served by `MyEventService` / `MyEventController` under `/api/v1/users/me/*`. Saved and going are deliberately independent relations, not one status column. Covered by `MyEventsIT`.
+- [x] **P2** Follow clubs (entity, migration, endpoints). **No migration needed** — `user_followed_clubs` has been in V4 since the beginning, just unmapped. Now a lazy `@ElementCollection` of club-id slugs on `User` (`Set<String>`, where the event collections are `Set<Long>`, because `Club.id` is a slug), served by `MyClubService` / `MyClubController`: `GET /api/v1/users/me/clubs`, `POST|DELETE /api/v1/users/me/followed-clubs`. `Club.followers` stays a stored column and moves only when the set actually changes, so a double-click cannot inflate it and V6's seeded counts survive. Covered by `MyClubsIT`.
+- [x] **P2** Google Calendar export for an event — **needs no backend**. Done client-side in `frontend/app/lib/google-calendar.ts`: a Google Calendar template link carries the whole event in its query string, so there is no API key, OAuth or endpoint to build. Reusable via `<AddToCalendarLink event={…} />`.
+
+### Frontend / Features
+
+- [x] **P1** Wire the My events page to the backend. `getMyEvents()` now calls `GET /api/v1/users/me/events` and maps through `toMyEvent`; the mock `app/data/my-events.ts` is deleted. Verified end-to-end against Postgres.
+- [x] **P1** My clubs page (`/my-clubs`) — the route the navbar already linked to. `app/(protected)/my-clubs/page.tsx` plus `MyClubsGrid` / `MyClubCard`: circular logo and name only, both centered, the whole card one link to the club page, drifting to the top-right on hover (`.lift-tr` in `globals.css`). One column on phones, two at `sm`, three at `lg`. **Frontend only** — see the next item.
+- [x] **P1** Wire the My clubs page to the backend. `getMyClubs()` now calls `GET /api/v1/users/me/clubs`; the mock `clubs.slice(0, 6)` is gone. Verified end to end against the Docker stack: follow → row in `user_followed_clubs`, club on `/my-clubs`; unfollow → row gone, empty state back.
+- [x] **P2** Follow UI. `ClubFollowButton` is wired: signed-out clicks raise the signup card headed *Sign up to follow this club* and write nothing; signed-in clicks toggle optimistically and revert on failure. Follow state is held once in `FollowedClubsProvider` (root layout) rather than per button, so a grid of cards costs one request and every button for the same club agrees. Covered by `ClubFollowButton.test.tsx`.
+- [x] **P3** Return a proper not-found page for an unknown club URL. *(from `frontend/README.md`)* — `app/(main)/clubs/[clubId]/not-found.tsx` now serves the same empty state as before behind a **real 404** with Next's `noindex`, instead of a 200 that looked fine to a crawler. Came with [BUG-022](../bugs/fixed_bugs.md#bug-022): the page is a Server Component calling `notFound()`, `getClubById` returns `Club | null` rather than throwing, and a sibling `error.tsx` covers the backend-down case so an outage no longer claims the club was deleted.
+- [x] **P2** Wire the event detail page to `GET /api/v1/events/{id}` ([BUG-023](../bugs/fixed_bugs.md#bug-023)). Server Component + `notFound()` with scoped `not-found.tsx` / `error.tsx`; the organizer now resolves from the event's real `organizerId`, so the club link works and the Follow button sticks. `/events` became a Server Component too, reading `?q=` from `searchParams` — no more `useSearchParams` + `Suspense` wrapper or loading flash. Came with [BUG-024](../bugs/fixed_bugs.md#bug-024): a non-numeric path variable answered 500 app-wide, now 400.
+- [x] **P2** Give the event card and the event page a real organizer name without an extra request. `EventDTO` now carries `organizerName` beside `organizerId`, and `getClubNameById` is **deleted** — `EventCard`, `MyEventCard` and `AddToCalendarLink` read it off the event, and the detail page uses it for the name and link. `EventRepository`'s read methods carry `@EntityGraph(attributePaths = "organizer")` so reading the name costs no extra query: measured 13 statements for 6 events with the graph, 17 without. The detail page still fetches the club, but only to add the logo and follower count, and it degrades to name + initial if that fails.
+
+### Infrastructure & CI/CD
+
+- [x] **P1** ~~Run CI's checks locally before pushing~~ — **done 2026-08-14.** Two consecutive pushes broke the Frontend job: a type error from checks that were never run ([BUG-026](../bugs/fixed_bugs.md#bug-026)), then a build that prerendered `/clubs` and needed a live backend ([BUG-027](../bugs/fixed_bugs.md#bug-027)). The second **passed locally because the dev machine had the backend up** — running CI's commands is not the same as running them in CI's environment. `scripts/verify.mjs` runs CI's four frontend steps plus the backend tier, in CI's order, continuing past failures as CI does, with the build pointed at a **closed port** chosen by bind-testing so any build-time fetch fails the way it does on a runner. `.githooks/pre-push` enforces it (`git config core.hooksPath .githooks`; bypass `--no-verify`), scoping components and failing open exactly as `ci.yml` does. **Proved it catches the real bug** by reverting the `/clubs` fix: same digest, backend container still running. Frontend 4 steps + backend fast tier in ~44s.
+- [x] **P0** Backend CI JDK + test execution ([BUG-002](../bugs/bugs.md#bug-002)) — also listed above.
+- [x] **P1** ~~Push and confirm `ci.yml` goes green~~ — **done 2026-08-07.** Run `31141549342` on `00a0933` (`agentic-team-creation`): secret scan, frontend, backend, migration lint and the `CI` gate all **passed** in 1m6s. Full write-up: [`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md).
+- [x] **P1** ~~Run the full tier~~ — **done 2026-08-07, on the merge to `main`.** It failed, correctly: `Database / Apply migrations to a clean database` and `Docker / Wait for the backend` both timed out on `/actuator/health`, which had never existed ([BUG-015](../bugs/fixed_bugs.md#bug-015)). Fixed by adding `spring-boot-starter-actuator`.
+- [x] **P1** ~~Re-run the full tier past the health probe~~ — **done 2026-08-07.** It got there and failed one step further along: the compose secret fail-fast, the stack boot, the API smoke tests and the production frontend image build all passed, and the **Trivy gate** failed with three fixable CRITICALs ([BUG-016](../bugs/fixed_bugs.md#bug-016)). Correct signal, real defects — one vulnerable runtime dependency shipping to browsers, and a devDependency tree that should never have been in the image.
+- [x] **P2** ~~Guard the actuator dependency~~ — **done 2026-08-07.** `ActuatorHealthEndpointTest` (surefire, so it runs in the **fast** tier and fails on the push, not the PR). Two assertions: `/actuator/health` returns 200 with `status: UP` unauthenticated, and `/actuator/env` does **not** return 200 — the second guards the exposure ceiling, since `/actuator/**` is permitAll and anything added to `include` becomes publicly readable. Proved it fires by removing the dependency: same `expected:<200> but was:<500>` as CI, in 5.8s instead of a 3-minute timeout. Costs 8.3s; shares the Spring context with `AbstractIntegrationTest` via identical annotations, so the full tier pays nothing extra.
+- [x] **P2** ~~Give the backend compose service a `healthcheck`~~ — **done 2026-08-07.** busybox `wget` against `/actuator/health`, `start_period: 45s` so a normal slow boot is never counted as a failure. `frontend.depends_on.backend` is now `condition: service_healthy`. **Dev trade-off:** a backend that cannot start now blocks the frontend too; escape hatch is `docker compose up db frontend`, documented inline. `_docker.yml` keeps its HTTP poll rather than switching to container health — the poll also proves port publishing works, which a container-internal check does not — but now prints the container health status on timeout to separate a broken app from a broken port mapping.
+- [x] **P1** *(plan Step 5)* ~~Fix the 5 pre-existing eslint errors, then delete `continue-on-error`~~ — **done 2026-08-05.** Note the plan mislocated them: only **2** were in `app/lib/api.tsx`; the other **3** were `no-explicit-any` in `components/auth-components/OAuthButtons.tsx`. Lint now gates merges; 15 warnings remain and do not fail the build.
+- [x] **P2** *(plan Step 6)* ~~Add `dependabot.yml` and a standalone `codeql.yml`~~ — **done 2026-08-05.** The repo is **public** (`ArpanSaha07/campus-vibe`), so CodeQL is free; if it is ever made private, code scanning needs GitHub Advanced Security and `codeql.yml` should be deleted rather than left red.
+- [x] **P2** *(plan Step 7)* ~~Branch protection on `main`~~ — **enabled 2026-08-07 by Arpan.** Requires a pull request, requires branches up to date, and requires the single check named **`CI`**; the component jobs are correctly *not* required. Two things this settings change implies that no file in the repo records: the required check is matched by **display name**, so renaming the `ci-success` job hangs every PR on *Expected — Waiting for status* and the fix is in GitHub settings rather than a commit; and require-branches-up-to-date means each merge invalidates every other open PR, so the nine Dependabot PRs become nine sequential update-and-rerun cycles. `merge_group` is already wired if that becomes painful.
+- [x] **P2** ~~Add `output: "standalone"` to `frontend/next.config.ts`~~ — **done 2026-08-07**, forced by [BUG-016](../bugs/fixed_bugs.md#bug-016) rather than chosen. The `runner` stage copied the whole `node_modules`, which put `tar` — a build-time dependency of `@tailwindcss/oxide`, marked `dev` in the lockfile — into the shipping image and failed the Trivy CRITICAL gate. Now copies `.next/standalone` + `.next/static` + `public`, runs `node server.js`, and **deletes npm from the stage** (its bundled `tar` was a second CRITICAL that no published Node tag fixes). Bundle is 11 top-level packages; image scans clean of fixable HIGH *and* CRITICAL. Two follow-ons came with it: `npm start` now runs `scripts/start-standalone.mjs`, because `next start` does not work with standalone output and fails by serving unstyled pages rather than erroring; and Jest needed `modulePathIgnorePatterns` for the second `package.json` the standalone build writes.
+
+### Docs
+
+- [x] **P2** ~~Document the API surface and the caching model~~ — **done 2026-08-14.** [`.claude/docs/architecture/api-and-caching.md`](../docs/architecture/api-and-caching.md): the `apiFetch` boundary, the three frontend data paths, Next's data cache and the guard that keeps per-user data out of it, the `@EntityGraph` N+1 fix (13 statements against 17, measured), and the error-status mapping. Records two gaps honestly as *absence rather than decision* — **no backend cache layer** and **no cache invalidation**, since `CACHE_TAGS` is passed on every public read but nothing calls `revalidateTag`. Five controllers were not read and are named as undocumented.
+- [x] **P2** ~~Document the CI/CD implementation and its design decisions~~ — **done 2026-08-06.** [`.claude/docs/architecture/ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md), written under the new [`implementation-docs`](../skills/implementation-docs/SKILL.md) skill. Update it, do not fork it, when the pipeline changes.
+- [x] **P2** ~~Consolidate the knowledge base into one folder~~ — **done 2026-08-06.** [`.claude/docs/README.md`](../docs/README.md) is now the single entry point; implementation docs live in `docs/architecture/`, ADRs in `docs/decisions/`. See [Recently completed](#recently-completed).
+
+### Agentic team
+
+- [x] **Phase 0** — knowledge base ([`docs/`](../docs/README.md)). Done 2026-08-06.
+- [x] **Phase 1** — scaffold + `staff-eng`, `backend`, `frontend` + `/ask`. 2026-08-06.
+- [x] **Phase 2** — the other nine agents + their `members/<name>.md`. 2026-08-06.
+- [x] **Phase 3** — eight commands: `/kickoff`, `/all-hands`, `/ship-check`, `/design-review`, `/retro`, `/standup`, `/board`, `/digest`. 2026-08-06.
+- [x] **Phase 4** — `AUTOMATION.md` switch, [`ROUTINES.md`](../team/ROUTINES.md), `/team`. 2026-08-06. Routine prompts written; **routines deliberately not created yet** — see below.
+
+---
+
+## Completed work log
+
+**2026-08-08 — The Docker job was replayed locally, end to end. The Trivy gate passes; two other things came back different from what is written down.**
+
+- **The [BUG-019](../bugs/fixed_bugs.md#bug-019) fix is confirmed against the gate, not just against version strings.** Every step of `_docker.yml` was run by hand with Docker Desktop up: the fail-fast secret guard still refuses to build a config, the stack boots (db healthy → backend UP → frontend serving), the smoke tests pass (8 clubs, search 1 hit, `/my-club` 403), the production image serves `/` on :3001, and **Trivy 0.73.0 reports 0 fixable CRITICAL on both images, exit 0**. Trivy ran from the `aquasec/trivy` image against the daemon; `install.sh` needs a Linux host, and the *scan target* is what has to match CI, not the installation method.
+- **The backend's fixable-HIGH report was opened for the first time: 10 findings.** This was the precondition for tightening the gate, and it says *not yet*. Six of the ten are netty, and `dependency:tree` puts every one of them behind `awssdk:s3` → `netty-nio-client` — the **async** transport. If the S3 client here is synchronous, an `<exclusion>` removes six findings and some image weight without bumping anything.
+- **[BUG-001](../bugs/bugs.md#bug-001) no longer reproduces, and the reason is not the Boot bump.** `./mvnw -B verify` is **42/42**, `SearchIT` 7/7 — and a control run at `HEAD` in a throwaway worktree, on **Boot 3.5.5**, is also 7/7. Same search sources since 2026-07-30, same cached pgvector image since 2026-07-29, same machine that failed it on 2026-08-05. **Left OPEN on purpose**: an unexplained recovery is not a fix, and the quarantine plan (`@Disabled` on the one method) must *not* be applied now — it would suppress the run that could explain it.
+- **Local state was restored:** the dev `docker/.env` was moved aside for the CI-shaped one and put back byte-for-byte (sha256 verified), the stack was torn down with `-v`, and the control worktree and Trivy cache volume were removed.
+
+**2026-08-07 (c) — The BUG-016 fix broke Vercel, and exposed that Vercel was deploying at all ([BUG-017](../bugs/fixed_bugs.md#bug-017)).**
+
+- **`output: standalone` crashed every Vercel build** with `ENOENT ... .next/next-server.js.nft.json`. Traced through the installed Next 16.3.0: `build/index.js:2817` calls `writeStandaloneDirectory` behind `if (config.output === 'standalone')`, which calls `copyTracedFiles` (`build/utils.js:1106`), which reads that file. **The standalone path is its only caller** — which is why every build before `77bd2e5` passed. Vercel does its own file tracing and does not leave the artifact where that step expects it.
+- **Ruled out the other candidate by reading the call graph, not guessing.** The same commit also bumped `next` 16.2.0 → 16.3.0, so a builder incompatibility with a new minor was equally plausible from the error text. It is not version-specific; the failing read sits behind the `output` check. Local builds could not have told us — the file *is* produced locally under standalone.
+- **Fixed with `output: isVercel ? undefined : "standalone"`.** Self-hosting stays the default and Vercel is the exception, deliberately: the inverse would mean a plain `npm run build` no longer produces what the Docker image ships, and `npm start` would have no bundle to serve. Verified both branches — `VERCEL=1` emits no `standalone/` and succeeds; unset emits `server.js` with 11 packages and no `tar`; the image still boots 200 and scans clean.
+- **The bigger finding: the pipeline docs said *nothing is deployed*, and that was false.** Vercel has been building this repo through its GitHub integration all along — outside `ci.yml`, outside `ci-success`, outside branch protection. **A frontend change can pass `CI` and still fail to deploy.** Now logged as [BUG-018](../bugs/bugs.md#bug-018) with the concrete gaps: no `vercel.json`, and root directory, build command, Node version and every `NEXT_PUBLIC_*` value living only in the dashboard.
+
+**2026-08-07 (b) — The full tier got one step further and found a second real defect ([BUG-016](../bugs/fixed_bugs.md#bug-016)).**
+
+- **Three fixable CRITICALs in the production frontend image**, all `node-pkg`, and all three had *different* causes despite the gate reporting one: `swiper` 12.0.2 (prototype pollution, a genuine runtime dependency shipping to browsers); `tar` 7.4.3 (a **devDependency**, reached via `tailwindcss → @tailwindcss/postcss → @tailwindcss/node → @tailwindcss/oxide`); and `tar` 7.5.16 (**npm's own bundled copy inside `node:24-alpine`**).
+- **The devDependency was in the image because the `runner` stage copied the whole `node_modules`.** A build-time archive extractor was being shipped to production so that Tailwind, which never runs there, could have it.
+- **The third had no base-image fix.** Verified by inspecting the images directly: node 24.19.0 ships npm 11.17.0 with tar 7.5.16, and `node:25-alpine` is *worse* (npm 11.12.1, tar 7.5.11). Only npm 12.0.2 bundles the patched 7.5.19 and no Node release carries it. Resolved by **deleting npm from the `runner` stage** — nothing there invokes it now that the entrypoint is `node server.js`, and a production image should not carry a package manager anyway.
+- **`output: standalone` landed as part of the fix**, not as the planned cleanup. Bundle is 11 top-level packages instead of the full tree.
+- **A trap worth knowing: the standalone switch alone would have turned the gate green without fixing anything.** `swiper` has no `package.json` in a standalone bundle — it is compiled into the client chunks — so Trivy simply stops seeing it while the vulnerable code still reaches every visitor. **Image scanning is now blind to client-side dependencies; Dependabot and `npm audit` are the controls for those.**
+- **Picked up outside the gate:** the non-blocking HIGH report showed 12 findings against `next` 16.2.0 including **CVE-2026-64642, an authentication bypass**. All sat inside the declared `^16.2.0` range, so `npm update next sharp` cleared them (→ 16.3.0 / sharp 0.35.3). The gate never required this; leaving a known auth bypass in place because it was only HIGH would have been the wrong call.
+- **Verified locally:** `tsc` clean, eslint 0 errors / 15 warnings (unchanged), Jest **23/23**, `next build` 14 routes, image boots HTTP 200, and Trivy reports **zero fixable HIGH or CRITICAL**. Confirmed the gate still fires by scanning `node:24-alpine` — exit 1, class `lang-pkgs`. **Not yet run on GitHub; the backend image was not rescanned locally.**
+- **The gate's advice was wrong and is fixed.** It said `Bump the base image`, the one cause that applied to none of the three findings. It now prints the Trivy finding class and how to route `lang-pkgs` (Target under `/app` is ours; under `/usr/local/lib/node_modules` is vendored tooling) versus `os-pkgs`.
+- **Two self-inflicted follow-ons, both fixed:** `next start` does not work with standalone output — it serves unstyled pages instead of erroring — so `npm start` now runs `scripts/start-standalone.mjs`; and that script initially bound the machine interface on Windows because Git Bash exports `HOSTNAME`, which made `localhost` refuse while the banner said `Ready`. The first verification pass looked like a pass only because Docker Desktop's proxy was answering on port 3000. It now pins `HOSTNAME`, as the Dockerfile does.
+
+**2026-08-07 (a) — The full CI tier ran for the first time and found a real defect ([BUG-015](../bugs/fixed_bugs.md#bug-015)).**
+
+- **`/actuator/health` never existed.** `spring-boot-starter-actuator` was not a dependency, so `management.endpoints.web.exposure.include: "health,info"` in `application.yml:36` named endpoints that were never created. `SecurityFilterChainConfig.java:47` already permitted `/actuator/**`, which is what made the gap invisible — every part of the wiring was present except the one that builds the endpoint.
+- **Both full-tier jobs waited on it until timeout.** With no actuator the request falls through to static-resource handling and the global exception handler returns **500** (`No static resource actuator/health.`), so `curl -fsS` fails and the loop exhausts every attempt. The application was healthy the entire time — migrations applied, entities validated, `/ping` and `/api/v1/clubs` both serving.
+- **Fixed with the dependency alone.** No config change: the existing `include` and the existing security permit were already right and went live the moment the endpoint existed. Exposure stays at `health,info`; neither `application-prod.yml` nor `application-test.yml` widens it.
+- **Both wait loops now report the last HTTP status on timeout**, so `000` (connection refused) reads differently from `404`/`500` (serving, but no such endpoint). The docker loop also bails out with container logs the moment `campusvibe-backend` stops running, instead of waiting out 200 seconds.
+- **Verified locally end to end** against `pgvector/pgvector:pg15`: first boot UP in ~6 s, 8 of 8 migrations applied, 0 failed; second boot UP with no re-apply and valid checksums; containerised backend via `backend/Dockerfile` UP in ~15 s serving 8 clubs, `/my-club` 403 unauthenticated; `./mvnw test` 14/14. **Not yet re-run on GitHub.**
+- **This is the case for the full tier.** No unit test could have caught it — nothing else in the repo boots the packaged jar and asks whether it is ready. Had it shipped, a deployment platform would have had no way to know the application had started.
+- **Then guarded, so it cannot recur silently.** `ActuatorHealthEndpointTest` runs in the fast tier and reproduces the exact CI symptom in 5.8s when the dependency is missing (verified by removing it). It also asserts `/actuator/env` is not served, because `/actuator/**` is permitAll — widening the exposure list must break a test rather than quietly publish configuration.
+- **And used, rather than only tested.** `docker-compose.yml` gives the backend a `healthcheck` (busybox `wget`, `start_period: 45s`) and the frontend now waits on `condition: service_healthy` instead of mere container start, so SSR never renders against a backend still running migrations.
+
+**2026-08-06 (c) — Agentic team completed, Phases 2–4.**
+
+- **Nine more agents**, each grounded in verified repo facts rather than generic role descriptions: `pm`, `design`, `security`, `sparring` (opus); `devops`, `qa-automation`, `qa-exploratory`, `ai-eng`, `growth` (sonnet). Twelve total, all with a `members/<name>.md`.
+- **Eight commands.** `/kickoff` runs four sequential rounds — problem, shape, approach, coherence — and **stops for Arpan before anything is assigned**. `/ship-check` needs five independent signoffs and never softens a `BLOCK`. `/standup`, `/board` and `/digest` spawn **no agents at all**: twelve agents each reporting *nothing since yesterday* costs real money and says nothing, and drift is visible in the files anyway.
+- **`WORKING-AGREEMENT.md` gained a ritual cost table** making `/ask` the explicit default. A `/kickoff` for a bug fix spends six agents to reach an answer one would have given.
+- **`AUTOMATION.md`** is the pause switch; routines read it first and **fail closed** if it is missing or unparseable — a misfiring unattended routine is worse than one that does nothing.
+- **[`ROUTINES.md`](../team/ROUTINES.md)** holds both routine prompts, ready to create. **Deliberately not created:** they run as *cloud* sessions that clone the GitHub repo, and `main` has none of this yet, so they would fail daily and train Arpan to ignore them. Prerequisites and the two options for the digest routine's write access are recorded there.
+- **`gh` turned out to be installed and authenticated** (2.97.0, `ArpanSaha07`), contrary to the plan's assumption — so `/team sync` is real rather than degraded. It previews and **requires confirmation before creating any issue**, and refuses to publish an unfixed security finding, because the repository is public.
+- **Verified:** 12 agents, 12 member files, 11 commands; every frontmatter `name` matches its filename; every agent named in a command resolves; all relative links resolve.
+- **Not verified:** nine agents have never run — `.claude/agents/` is scanned at session start, confirmed by `Agent type 'sparring' not found` after creating it.
+
+**2026-08-06 (b) — Agentic team, Phase 1.** Ad-hoc prompting was producing
+unreviewed, disjointed code with nobody holding the whole picture. This is the
+scaffold for a standing team that moves work through *discuss → decide → assign →
+implement → test → review → ship*.
+
+- **[`team/CHARTER.md`](../team/CHARTER.md)** — read by every agent on every spawn. Product, honest current state, the priority order that breaks ties, and the standing constraints that have already bitten this project.
+- **[`ROSTER.md`](../team/ROSTER.md)** — all 12 agents, three built and nine marked planned. Includes the ownership seams where work actually gets dropped, and an escalation ladder ending at Arpan for anything scope-changing, irreversible, or costing money.
+- **[`WORKING-AGREEMENT.md`](../team/WORKING-AGREEMENT.md)** — six-point definition of done, the `APPROVE` / `REQUEST-CHANGES` / `BLOCK` vocabulary, the `file:line` evidence standard, and the rule that **a ritual leaving no trace in `git diff .claude/team/` was theatre**.
+- **`board/sprint.md`** (in-flight only, every row linking back to `todo.md` or a BUG), **`board/deadlines.md`** (the only file the deadline watcher reads), **`digest/latest.md`** (state of the world, read on spawn).
+- **`members/{staff-eng,backend,frontend}.md`** — per-agent memory. Load-bearing, not bookkeeping: agents start cold every spawn, so anything not written here is gone. Pre-seeded with the traps each role keeps hitting.
+- **Three agents** in `.claude/agents/`, all Opus: `staff-eng` (read-only reviewer — it may write to nothing but its own member file, because a reviewer that fixes code cannot then review it), `backend`, `frontend`.
+- **[`/ask`](../commands/ask.md)** — talk to one teammate. Continues an already-spawned agent via `SendMessage` so follow-ups are a real conversation, and relays the full answer, since agent reports are never shown to the user otherwise.
+- **Verified:** structure, frontmatter and every relative link resolve; and every factual claim baked into the agent definitions was spot-checked against the repo — `application.yml:26` migrations path, the deliberately empty `maven-failsafe-plugin` executions block, `application-test.yml:29-31`, and `components/ui/`.
+- **Found while grounding the `frontend` agent:** two of BUG-003's three stated causes are probably stale after the Next 16 upgrade. Recorded in [`bugs.md`](../bugs/bugs.md#bug-003).
+
+**2026-08-06 (a) — Knowledge base consolidated into `.claude/docs/`.** Project
+knowledge was spread across four loose files at `.claude/` root plus one file in
+`docs/` plus one hidden inside a skill folder, with no index — so an agent
+starting cold had no way to know what existed. Now one folder, one entry point.
+
+- **[`.claude/docs/README.md`](../docs/README.md)** *(new)* — the index. Every document gets one line stating what it covers and **how far it can be trusted**. Also lists the standards that deliberately live elsewhere (`design-guidelines.md`, the skills), so this stays the single place to start.
+- **`docs/architecture/`** holds implementation docs; **`docs/decisions/`** holds ADRs. The split is deliberate: an implementation doc is rewritten whenever the code changes, an ADR is frozen the moment it is accepted. Editing an ADR to reflect a change of mind destroys the only record of what was believed at the time.
+- **Moved:** `AUTH_IMPLEMENTATION.md` → `architecture/authentication.md`, `search-implementation.md` → `architecture/search.md`, `user-roles.md` → `architecture/user-roles.md`, `docs/ci-cd-pipeline.md` → `architecture/ci-cd-pipeline.md`, and `skills/llm-integration/llm-api-key-management.md` → `architecture/llm-api-key-management.md`. That last move **fixes two pre-existing broken links** — `todo.md:57` and `frontend/README.md:26` already pointed at `docs/architecture/llm-api-key-management.md`, which did not exist.
+- **Four of the five carry a ⚠ banner.** They predate the standard and were not re-verified against the code, so each says exactly what is and is not trustworthy about it. Moving them unlabelled would have been worse than leaving them scattered — an authoritative-looking folder full of unverified claims is how a stale doc gets believed. Rewrites are tracked under [Docs](#docs).
+- **`V7__multi_role_rbac.sql:1` and `V8__search_embeddings.sql:1` still cite the old paths, permanently.** Flyway checksums the entire migration file, so editing a single comment in an applied migration triggers `Migration checksum mismatch` on every existing database. Recorded in both docs' banners so the mismatch reads as intentional rather than as an oversight. The four *non-migration* references (`ClubController.java:60`, `JWTUtil.java:49`, `SearchRepository.java:11`, `frontend/app/types/index.ts:45`) were updated.
+- **[`implementation-docs`](../skills/implementation-docs/SKILL.md) rewritten** for the agent team: docs now serve two readers, so every doc opens with an *In one paragraph* plain-language summary for Arpan and a *Read this before you change anything here* block for a cold-starting agent. Adds an `Authors` line, makes the implementing agent the writer, and makes `staff-eng` refuse to APPROVE work whose doc omits an open `security` or QA finding.
+- **[`adr.md`](../skills/implementation-docs/adr.md)** *(new)* — ADR format, numbering, and the rule that status only moves to `Accepted` when Arpan says so.
+
+**2026-08-03 — Working `docker compose watch` for all three services
+([BUG-013](../bugs/fixed_bugs.md#bug-013)).** Frontend edits did nothing because
+the container served a production build with no compiler watching — the
+unaddressed follow-up from [BUG-012](../bugs/fixed_bugs.md#bug-012). Two smaller
+faults compounded it: the sync target was one directory too high, and the
+`rebuild` path resolved to `docker/package.json`.
+
+- `frontend/Dockerfile` gained a `dev` stage running `next dev` and a shared `deps` stage; `runner` stays last so production builds are unaffected. Compose selects it via `build.target: dev`.
+- Per-service watch rules: **frontend** syncs source (no restart), `sync+restart` for `next.config.ts`, `rebuild` for `package.json` / `package-lock.json`; **backend** `sync+restart` on the jar after `mvn package`, avoiding a rebuild that would re-send the whole repo as build context; **db** syncs init scripts, documented as near-inert since the schema is Flyway-owned.
+- Verified: `✓ Ready in 746ms`, HTTP 200, and a file copied into the container triggers `✓ Compiled in 108ms` — so inotify works for synced writes and no polling vars are needed.
+- Noted while working: `build.context` is the repo root with **no root `.dockerignore`**, so every image build tars up `node_modules`, `target/` and `.git`. Worth adding, but it must not exclude `backend/target/*.jar`, which `backend/Dockerfile` COPYs. — **Done 2026-08-05**; the jar is re-included by negation.
+
+**2026-08-05 (b) — CI plan steps 5–6 landed; Node aligned on 24.**
+
+- **Frontend lint now gates merges.** Fixed all 5 eslint errors and removed `continue-on-error` from `_frontend.yml`. The plan had them all in `app/lib/api.tsx`; in fact only 2 were (`no-explicit-any` on `apiFetch<T = any>`, and a `@ts-ignore`). The other 3 were `no-explicit-any` in `OAuthButtons.tsx`.
+- **Replaced `(window as any).google` with real types** — new `app/types/google-identity.d.ts` declaring only the GIS surface this app calls, plus a `Window.google?` augmentation. This immediately caught a latent bug the `any` had been hiding: `client_id` was being passed `string | undefined`, because `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is optional and the guard did not narrow into the nested `init()`. Fixed by re-binding after the guard. GIS silently ignores unrecognised keys, so this class of typo produced no runtime error at all.
+- Verified: `tsc --noEmit` clean, **0 lint errors** (15 warnings), **23/23 Jest**.
+- **`.github/dependabot.yml`** *(new)* — maven `/backend`, npm `/frontend`, github-actions `/`, docker `/backend` + `/frontend`; weekly, minor/patch grouped per ecosystem, **majors ungrouped on purpose** so a breaking change cannot be rubber-stamped inside a "minor and patch" PR.
+- **`codeql.yml`** *(new, standalone)* — `javascript-typescript` + `java-kotlin`, `fail-fast: false`, `build-mode: none`. Deliberately **not** part of `ci-success`: CodeQL's extractors trail new language releases and this project is on Java 25, so a broken Java analysis must not block merges. `build-mode: none` also avoids needing CodeQL to drive Maven on JDK 25 at all. Confirmed the repo is **public**, so this is free.
+- **Node 20 → 24** across the project, following the `frontend/Dockerfile` change: `_frontend.yml` `node-version` and a stale base-image comment in `_docker.yml` were the only two references. There is no `engines` field or `.nvmrc` to update — worth adding one if the version should be enforced in one place.
+- **Full tier measured with Docker running:** `./mvnw verify` → **40 tests, 39 pass**. The only failure is BUG-001. An earlier local run had errored on Testcontainers instead — the cause was environmental, not the code: Testcontainers' npipe strategy targets `//./pipe/docker_engine` while the active context is Docker Desktop's `dockerDesktopLinuxEngine`. `DOCKER_HOST=npipe:////./pipe/dockerDesktopLinuxEngine` fixes it locally; CI is unaffected.
+
+**2026-08-05 (a) — CI restructured into one orchestrator (branch `ci/github-actions`).**
+The four standalone workflows below were replaced. **Still nothing has run on
+GitHub.** Plan steps 1–4 of 7.
+
+- **The structural problem they had:** `paths:` filters at the *workflow* level make required status checks impossible. A PR touching only `frontend/` never *starts* `backend-ci`, so a branch-protection rule requiring it waits forever on "Expected — Waiting for status". Since branch protection was already a goal, that layout could never get there.
+- **`ci.yml`** *(new, the only trigger)* — `changes` (dorny/paths-filter, failing **open** on a branch's first push where `github.event.before` is all zeros) → `secret-scan` (gitleaks binary, not the action, which needs a paid licence on org-owned repos) → four component calls → **`ci-success`, named `CI`**. That gate runs `if: always()`, needs every job, and fails only on `failure`/`cancelled` — `skipped` passes. That is precisely what lets job-level path filtering coexist with branch protection. **Require `CI` and nothing else.**
+- **Tiering.** Fast tier on a branch push (compile, unit tests, lint, `tsc`, Jest, migration-file lint, secret scan). Full tier on PR, push-to-`main`, `merge_group` and manual dispatch (adds the `*IT` suites, a real Flyway migrate, and the Docker stack).
+- **`_backend.yml` / `_frontend.yml` / `_database.yml` / `_docker.yml`** *(new, `workflow_call` only)* — the job bodies were **carried over intact**, not rewritten: the migration lint rules, the double-boot checksum/drift check, the compose fail-fast secret guard and the API smoke tests are all unchanged. Added: `permissions: contents: read` and `timeout-minutes` everywhere (the GitHub default is **six hours** per job).
+- **`_docker.yml` gained two things** — it now builds and boots the **production** frontend image (`--target runner`), which nothing built before because compose pins `target: dev`; and it Trivy-scans both images. Verified locally: the prod image builds and serves `/` (`✓ Ready in 167ms`).
+- **Deleted:** `backend-ci.yml`, `frontend-ci.yml`, `database-ci.yml`, `docker-ci.yml`, `frontend-cd.yml`, `.ci/build-publish.sh`.
+- **Unit/integration split** — added `maven-failsafe-plugin` to `backend/pom.xml` and renamed `SearchIntegrationTest` → `SearchIT`, `AuthenticationFlowIntegrationTest` → `AuthenticationFlowIT`, `ClubAdminRequestFlowIntegrationTest` → `ClubAdminRequestFlowIT`. Declaring the plugin is *all* that is needed: `spring-boot-starter-parent` already binds `integration-test` + `verify` in pluginManagement, so adding an execution of our own would have run every IT **twice**. Verified: `./mvnw test` → 14 unit tests, no Spring context, no Docker; `./mvnw verify` → those plus 20 in the three `*IT` classes, each run exactly once.
+- **Root `.dockerignore`** *(new)* — both Dockerfiles use the repo root as build context and there was none (`frontend/.dockerignore` sits one level too deep to apply). Measured: frontend build context **688 KB**; backend **76.03 MB**, which is the jar alone — so the `backend/target/*` + `!backend/target/campusvibe-*.jar` negation works.
+- **`frontend/Dockerfile`** — `npm install` → `npm ci`. CI enforced the lockfile and the image did not, so one commit could resolve two different dependency trees.
+- **`backend/mvnw`** is now mode `100755` in the index, removing a `chmod +x` step from three jobs.
+
+**2026-07-31 — GitHub Actions CI (branch `ci/github-actions`).** Four workflows,
+all YAML-validated locally. **None ran on GitHub; superseded by the entry above.**
+
+- **`backend-ci.yml`** rewritten — JDK 17 → 25 (matching `pom.xml` and `backend/Dockerfile`), `-DskipTests` dropped for `./mvnw -B verify`, Maven caching, surefire reports uploaded on failure, jar uploaded as an artifact. ([BUG-002](../bugs/bugs.md#bug-002))
+- **`frontend-ci.yml`** rewritten — replaced the `npm start &&  sleep 10` step, which asserted nothing and therefore could never fail, with lint + `tsc --noEmit` + Jest + build. Verified locally: type-check clean, **23/23 Jest tests pass**, lint has 5 pre-existing errors so that step is `continue-on-error` for now.
+- **`database-ci.yml`** *(new)* — the migrations were previously never executed in CI at all: the backend suite runs on H2 with `ddl-auto: create-drop` and `flyway.enabled: false`, so Hibernate builds the schema from entities and the SQL files are bypassed. Now lints migration filenames/duplicate versions/secrets/emails, then applies all 8 migrations to a clean pgvector database by booting the real jar — which, because `application.yml` sets `ddl-auto: validate`, simultaneously proves the JPA entities still match the migrated schema. A second boot proves idempotency and checksum validity.
+- **`docker-ci.yml`** *(new)* — builds the jar first (`backend/Dockerfile` COPYs `target/*.jar` rather than building in-image), then builds both images, starts the stack, waits per-service, and smoke-tests `/ping`, `/api/v1/clubs`, club search, and a 401/403 on a protected route. Also asserts compose still **refuses to start** with no `.env`, guarding the `:?` fail-fast on `POSTGRES_PASSWORD` / `JWT_SECRET` — verified locally against a copy of the compose file.
+
+**2026-07-31 — Postgres healthcheck fix + database-lifecycle standards.**
+
+- `docker-compose.yml` healthcheck ran `pg_isready -U arpan` with no `-d`, so it defaulted the dbname to the *username* and logged `FATAL: database "arpan" does not exist` every 10s. The check still passed — a FATAL reply proves the server is listening — so the container reported `healthy` while spamming errors. Added `-d ${POSTGRES_DB:-campusvibe}`. Verified: 0 FATAL lines across multiple cycles, `db_data` volume and all rows intact.
+- `.claude/skills/database-lifecycle/SKILL.md` had **no YAML frontmatter**, so the skill never loaded and none of its rules were ever enforced. Added `name`/`description`, then trimmed 622 → 318 lines (presentation only; no rules dropped).
+- Corrected both files against the actual repo: migration path is `db/migrations` (**plural**, pinned by `application.yml:26`) not `db/migration`; dropped the `_FIRST_NAME`/`_LAST_NAME` bootstrap vars that do not map to the single `name` column; rewrote admin bootstrap around **promoting an existing user**, since the create-and-hash flow does not fit OAuth accounts.
+- Added rules that were missing: never delete an applied migration (with the exact `Detected applied migration not resolved locally` failure and the four recovery options), derived-column ownership for `clubs.embedding` / `events.embedding`, and a Known Deviations table recording V6, V7, and the absent `dev` profile.
+- `PLAN.md` gained a measured Current State audit and a 5-step implementation sequence, each step with its own verification — now tracked under [Database Lifecycle & Seeding](#database-lifecycle--seeding).
+
+**2026-07-30 — LLM API key management (Steps 1-5).** Same build artifact runs
+unchanged in local dev (`docker/.env`) and Elastic Beanstalk (environment
+properties); only the source of values differs.
+
+- `.gitignore` hardened (`.env`, `.env.*`, `!.env.example`, `*.pem`); `docker/.env.example` committed, `docker/.env` gitignored.
+- `docker-compose.yml` restores the `OPENAI_API_KEY` passthrough, with `:?` fail-fast on required secrets and `:-` on the optional OpenAI key.
+- New `com.campusvibe.ai` package: `OpenAiProperties` (typed config, redacted `toString`), `AiClientConfig` (explicit connect/read timeouts), `OpenAiEmbeddingClient` (retries 429/5xx only, treats 401 as misconfiguration, logs token usage, never logs the key or provider error bodies). `OpenAiEmbeddingService` is now a thin adapter still implementing `EmbeddingService`.
+- Committed JWT fallback and DB password defaults removed; `JWTUtil` fails fast on a blank or <32-byte secret ([BUG-010](../bugs/fixed_bugs.md#bug-010)).
+- `Dockerrun.aws.json` converted v2 → v1 so EB environment properties actually reach the container ([BUG-011](../bugs/fixed_bugs.md#bug-011)); `application-prod.yml` and `docker/EB-DEPLOYMENT.md` added.
+- Unused `aws-secretsmanager-jdbc` dependency removed.
+- Fixed en route: duplicate methods blocking compilation ([BUG-009](../bugs/fixed_bugs.md#bug-009)) and compose bind-mounts hiding the app in both containers ([BUG-012](../bugs/fixed_bugs.md#bug-012)).
+
+**Verified end-to-end:** backend boots with a blank key and logs keyword-only
+mode; `/api/v1/clubs/search?q=coding` returns results; compose and the app both
+refuse a missing/short `JWT_SECRET`; no secret in the image, image history, git
+diff, or tracked files. Suite: **40 tests, 39 pass, 1 pre-existing failure**
+([BUG-001](../bugs/bugs.md#bug-001)).

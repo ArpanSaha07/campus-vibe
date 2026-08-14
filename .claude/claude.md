@@ -8,6 +8,39 @@ Target audience: **University students and student clubs**
 
 ---
 
+# Where to look
+
+This file is auto-loaded every session; nothing else is. So this file is a
+**map**, not a library — it stays short on purpose, and points at the file that
+holds each answer. **Read the one file your task needs, not all of them.**
+
+| If you are about to… | Read | Size |
+|---|---|---|
+| Change how a subsystem works | [`.claude/docs/README.md`](docs/README.md) — the index, then the one doc it names | index is small |
+| Pick up work, or add a task | [`.claude/TODO/todo.md`](TODO/todo.md) — open items only | ~26 KB |
+| Check whether something was already built | [`.claude/TODO/tasks-completed.md`](TODO/tasks-completed.md) — finished work, by topic and by date | ~43 KB |
+| Fix or report a defect | [`bugs.md`](bugs/bugs.md) (open) · [`fixed_bugs.md`](bugs/fixed_bugs.md) (resolved, with the reasoning) | large — grep, do not read whole |
+| Touch a migration, seed or role grant | [`skills/database-lifecycle/SKILL.md`](skills/database-lifecycle/SKILL.md) — **mandatory** | — |
+| Build or restyle UI | [`design-guidelines.md`](design-guidelines.md) — binding on all UI work | — |
+| Write frontend code | `frontend/AGENTS.md` — **this is not the Next.js you know**; read `node_modules/next/dist/docs/` first | — |
+
+**Fastest orientation, in order:** this file → *Recently shipped* at the foot of
+`todo.md` (ten lines, tells you where the project actually is) → the one doc or
+section your task needs. That is usually enough. Reading `bugs.md` and
+`tasks-completed.md` end to end is rarely worth the tokens — grep them.
+
+**Before starting anything, verify locally rather than pushing and waiting:**
+`cd frontend && npm run verify` runs exactly what CI runs, in about 45 seconds.
+A `pre-push` hook runs it automatically (`git config core.hooksPath .githooks`).
+
+**Which doc does the code I touched belong to?** `scripts/docs-map.json` maps
+code paths to docs, and `node scripts/check-docs.mjs` reports any area that
+changed without its doc changing. The pre-push hook runs it as a notice — it
+never blocks. Each doc carries a `**Code as of:**` stamp; `never` means it has
+not been reconciled with the code, so read it with the same suspicion.
+
+---
+
 # Tech Stack
 
 ## Frontend
@@ -93,7 +126,6 @@ campusvibe/
 - Personalized profile
 - Notifications (future)
 - Google Calendar export
-- Ticket buying system like EventBrite
 
 ## Club Dashboard
 - Create/edit/delete events
@@ -113,9 +145,7 @@ campusvibe/
 
 ---
 
-# Current Progress
-
-Implemented:
+# Features
 
 - Responsive homepage
 - Hero banner slider
@@ -125,14 +155,10 @@ Implemented:
 - Event page
 - Club page
 - User profile page
-- Login page UI
 - Frontend architecture
 - Spring Boot backend architecture
 - Flyway migrations
 - Docker development environment
-
-In Progress:
-
 - Authentication workflow
 - API integration
 - Database models
@@ -152,8 +178,17 @@ In Progress:
 - Follow Next.js best practices (Server Components, dynamic routing, SSR where appropriate).
 - Prefer reusable Tailwind components over duplicated UI.
 - Follow software industry and development best practices.
-- Always read and update todo.md after completing or discovering a task.
-- Update fixed_bugs.md and bugs.md after fixing or discovering a bug.
+- Always read and update `TODO/todo.md` after completing or discovering a task.
+  **When a task is finished, move it out of `todo.md` into
+  [`TODO/tasks-completed.md`](TODO/tasks-completed.md)** — under its original
+  topic heading, keeping the date and the write-up — and add a line to
+  *Recently shipped* at the foot of `todo.md`. The queue only stays useful if
+  finished work leaves it.
+- Update `bugs/fixed_bugs.md` and `bugs/bugs.md` after fixing or discovering a bug.
+- After finishing a unit of work, record the reasoning in
+  [`.claude/docs/architecture/`](docs/README.md) per the `implementation-docs`
+  skill. *Why* it is shaped this way is the expensive thing to rediscover; the
+  code already says *what*.
 
 ---
 

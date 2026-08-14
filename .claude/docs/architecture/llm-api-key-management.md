@@ -1,5 +1,10 @@
 # LLM API Key Management & AI Architecture Guide
 
+> ⚠ **Unverified against the code.** This is recommended architecture, not a description of the shipped `com.campusvibe.ai` package.
+> It does not follow [`implementation-docs`](../../skills/implementation-docs/SKILL.md).
+
+**Code as of:** never — not reconciled with the code.
+
 ## Purpose
 
 This document describes the recommended architecture and security practices for managing LLM API keys (OpenAI, Anthropic, Gemini, etc.) in CampusVibe.

@@ -72,3 +72,16 @@ if ! node "$repo_root/scripts/verify.mjs" "$@"; then
     echo "Fix the failures above, or bypass with: git push --no-verify"
     exit 1
 fi
+
+# Docs staleness, reported after the tests and never blocking.
+#
+# A stale document does not break anything today, so failing the push over one
+# would only teach us to reach for --no-verify — and that flag also skips the
+# tests above. The check prints what looks out of date and gets out of the way.
+#
+# --quiet so a push with nothing stale adds no output at all.
+if [ -n "$base" ]; then
+    node "$repo_root/scripts/check-docs.mjs" --base "$base" --quiet || true
+else
+    node "$repo_root/scripts/check-docs.mjs" --quiet || true
+fi
