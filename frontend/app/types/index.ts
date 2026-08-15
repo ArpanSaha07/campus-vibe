@@ -99,6 +99,11 @@ export interface User {
   email: string;
   roles: Role[];
   createdAt: string; // ISO-8601 instant from the backend
+  /** Whether the address has been confirmed. Display only — the backend decides
+   *  what an unverified account may do. */
+  emailVerified: boolean;
+  /** How the account signs in. Mirrors the backend `AuthProvider` enum. */
+  authProvider: "LOCAL" | "GOOGLE";
 }
 
 export interface AuthResponse {

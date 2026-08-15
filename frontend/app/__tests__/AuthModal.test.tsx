@@ -200,11 +200,16 @@ describe("AuthModal", () => {
     expect(password).toHaveAttribute("type", "password");
   });
 
-  it("confirms a password reset without sending a request — there is no endpoint yet", async () => {
-    // Assigned rather than spied on: this jsdom environment has no global
-    // fetch to spy on, and the point is to prove nothing tries to call one.
+  it("asks the backend for a reset link and confirms", async () => {
+    // Assigned rather than spied on: this jsdom environment has no global fetch
+    // to spy on.
     const originalFetch = global.fetch;
-    const fetchMock = jest.fn();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      headers: new Headers(),
+      text: async () => "",
+    });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     try {
@@ -213,8 +218,35 @@ describe("AuthModal", () => {
       await userEvent.type(screen.getByLabelText("Email"), "student@campus.com");
       await userEvent.click(screen.getByRole("button", { name: "Send link" }));
 
-      expect(screen.getByRole("heading", { name: "Check your email" })).toBeInTheDocument();
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(
+        await screen.findByRole("heading", { name: "Check your email" })
+      ).toBeInTheDocument();
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0];
+      expect(String(url)).toContain("/api/v1/auth/forgot-password");
+      expect(JSON.parse(String(init.body))).toEqual({ email: "student@campus.com" });
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("shows the same confirmation when the reset request fails", async () => {
+    // The backend answers 204 for unknown addresses on purpose. Surfacing a
+    // client-side failure here would undo that and turn the screen into an
+    // account oracle.
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockRejectedValue(new Error("network down")) as unknown as typeof fetch;
+
+    try {
+      await open({ view: "recover" });
+
+      await userEvent.type(screen.getByLabelText("Email"), "student@campus.com");
+      await userEvent.click(screen.getByRole("button", { name: "Send link" }));
+
+      expect(
+        await screen.findByRole("heading", { name: "Check your email" })
+      ).toBeInTheDocument();
     } finally {
       global.fetch = originalFetch;
     }

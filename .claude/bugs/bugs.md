@@ -1,9 +1,11 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-14** · Branch: `feature/my-clubs`
+Last updated: **2026-08-15** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-008 … BUG-017, BUG-019 … BUG-022 so far). Bug ids are never reused.
+
+**Fixed 2026-08-15 and moved to [`fixed_bugs.md`](fixed_bugs.md): BUG-028, BUG-029, BUG-030, BUG-031** (the four authentication findings).
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -450,3 +452,4 @@ later `addImages` call, which is what pins it as a view rather than a copy.
 `Event.categories` is safe by luck: `EventController.java:61` reassigns via
 `setCategories(...)` rather than mutating, though it inherits the same trap the
 moment anyone writes `getCategories().add(...)`.
+

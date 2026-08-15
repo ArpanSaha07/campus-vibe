@@ -1,6 +1,10 @@
 package com.campusvibe.exception;
 
+import com.campusvibe.auth.EmailNotVerifiedException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,6 +20,8 @@ import java.time.LocalDateTime;
 
 @ControllerAdvice
 public class DefaultExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(DefaultExceptionHandler.class);
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiError> handleException(ResourceNotFoundException e,
@@ -146,12 +152,76 @@ public class DefaultExceptionHandler {
         return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleException(Exception e,
+    // Right password, unconfirmed address. 403 rather than 401 so the client
+    // does not tell the user their password is wrong when it is not.
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ApiError> handleException(EmailNotVerifiedException e,
                                                     HttpServletRequest request) {
         ApiError apiError = new ApiError(
                 request.getRequestURI(),
                 e.getMessage(),
+                HttpStatus.FORBIDDEN.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
+    }
+
+    // Account lockout. 429 rather than 401 so the client can tell 'wrong
+    // password' from 'stop trying for a while', and Retry-After says how long.
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<ApiError> handleException(TooManyAttemptsException e,
+                                                    HttpServletRequest request) {
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                e.getMessage(),
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                LocalDateTime.now()
+        );
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+                .body(apiError);
+    }
+
+    // Constraints on @RequestParam / @PathVariable (a @Validated controller)
+    // surface as this rather than MethodArgumentNotValidException, which only
+    // covers @Valid request bodies. Without this entry the catch-all below
+    // answered 500 for an ordinary malformed query parameter — which is how
+    // GET /api/v1/auth/email-status?email=not-an-email behaved.
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleException(ConstraintViolationException e,
+                                                    HttpServletRequest request) {
+        String message = e.getConstraintViolations().stream()
+                .findFirst()
+                .map(v -> {
+                    String path = v.getPropertyPath().toString();
+                    String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+                    return field + " " + v.getMessage();
+                })
+                .orElse("Validation failed");
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                message,
+                HttpStatus.BAD_REQUEST.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> handleException(Exception e,
+                                                    HttpServletRequest request) {
+        // Logged in full, returned as a fixed string. Echoing e.getMessage()
+        // handed internal detail to the caller for every exception nothing above
+        // maps — a JVM helpful-NPE naming a private field and its type is the
+        // example that prompted this (BUG-029). Anything a client legitimately
+        // needs to act on deserves its own handler and its own status.
+        log.error("Unhandled exception for {} {}", request.getMethod(), request.getRequestURI(), e);
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                "Something went wrong. Please try again.",
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 LocalDateTime.now()
         );

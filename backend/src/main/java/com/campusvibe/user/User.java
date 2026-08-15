@@ -33,8 +33,22 @@ public class User implements UserDetails {
 	@Column(nullable = false, unique = true)
 	private String email;
 
-	@Column(nullable = false)
+	// Nullable since V10: a Google account has no password. Every read of this
+	// field must cope with null — EmailPasswordAuthenticationProvider is the one
+	// that matters, and it rejects rather than calling matches() on null.
+	@Column
 	private String password;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "auth_provider", nullable = false)
+	private AuthProvider authProvider = AuthProvider.LOCAL;
+
+	// Whether the address has been proven. GOOGLE accounts are true on creation
+	// (googleSignIn refuses a token whose email_verified claim is not set);
+	// LOCAL accounts start false and are flipped by redeeming a mailed token.
+	// Only enforced at login when campusvibe.auth.require-verified-email is on.
+	@Column(name = "email_verified", nullable = false)
+	private boolean emailVerified = false;
 
 	// EAGER: the role set is tiny and is needed by getAuthorities() outside any session
 	@ManyToMany(fetch = FetchType.EAGER)

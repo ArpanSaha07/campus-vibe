@@ -68,6 +68,25 @@ services:
 
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
+      # Mail. Unset SPRING_MAIL_HOST means the backend logs messages instead of
+      # sending them, which is the normal local setup — reset and confirmation
+      # links appear in `docker compose logs backend`.
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@campusvibe.local}
+      # Links point at the frontend, so this is a browser-reachable address.
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+
+      AUTH_REQUIRE_VERIFIED_EMAIL: ${AUTH_REQUIRE_VERIFIED_EMAIL:-false}
+      AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
+      AUTH_RATE_LIMIT_IP_REQUESTS: ${AUTH_RATE_LIMIT_IP_REQUESTS:-20}
+      AUTH_RATE_LIMIT_WINDOW: ${AUTH_RATE_LIMIT_WINDOW:-1m}
+      AUTH_RATE_LIMIT_MAX_FAILED_LOGINS: ${AUTH_RATE_LIMIT_MAX_FAILED_LOGINS:-5}
+      AUTH_RATE_LIMIT_LOCKOUT: ${AUTH_RATE_LIMIT_LOCKOUT:-15m}
+      AUTH_RATE_LIMIT_TRUST_XFF: ${AUTH_RATE_LIMIT_TRUST_XFF:-false}
+
       # No AWS credentials here: the SDK's default provider chain resolves an
       # IAM role in production and your local profile in development.
       AWS_S3_MOCK: ${AWS_S3_MOCK:-true}

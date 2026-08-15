@@ -11,6 +11,8 @@ import SignupChoiceView from "@/app/components/auth-components/SignupChoiceView"
 import EmailSignupView from "@/app/components/auth-components/EmailSignupView";
 import LoginView from "@/app/components/auth-components/LoginView";
 import RecoverPasswordView from "@/app/components/auth-components/RecoverPasswordView";
+import ResetPasswordView from "@/app/components/auth-components/ResetPasswordView";
+import VerifyEmailView from "@/app/components/auth-components/VerifyEmailView";
 
 // The auth card. Mounted once at the root so any trigger — the navbar, a like
 // button, anything added later — can raise it without the user losing the page
@@ -148,6 +150,16 @@ export default function AuthModal() {
           )}
           {state.view === "login" && <LoginView onNavigate={navigate} onSuccess={closeAuth} />}
           {state.view === "recover" && <RecoverPasswordView onNavigate={navigate} />}
+          {state.view === "reset-password" && (
+            <ResetPasswordView token={state.token ?? null} onNavigate={navigate} />
+          )}
+          {state.view === "verify-email" && (
+            <VerifyEmailView
+              token={state.token ?? null}
+              onNavigate={navigate}
+              onSuccess={closeAuth}
+            />
+          )}
         </div>
       </div>
     </div>

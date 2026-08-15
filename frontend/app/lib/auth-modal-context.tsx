@@ -13,7 +13,12 @@ export type AuthModalView =
   /** Name/email/password form reached from the signup choice. */
   | "signup-email"
   | "login"
-  | "recover";
+  /** Ask for a reset link. */
+  | "recover"
+  /** Landed from a reset email; carries a token in the URL. */
+  | "reset-password"
+  /** Landed from a confirmation email; carries a token in the URL. */
+  | "verify-email";
 
 /** Every view heads itself with this id so the dialog can point at the heading. */
 export const AUTH_MODAL_TITLE_ID = "auth-modal-title";
@@ -26,12 +31,19 @@ export interface AuthModalState {
    * back to a generic headline when a trigger has nothing specific to say.
    */
   title?: string;
+  /**
+   * Single-use token from a reset or confirmation email. Held in state rather
+   * than left in the URL: AuthModalUrlTrigger strips it immediately, because a
+   * live credential in the address bar survives in history and in anything the
+   * user copies.
+   */
+  token?: string;
 }
 
 interface AuthModalContextType {
   /** null while closed. */
   state: AuthModalState | null;
-  openAuth: (view?: AuthModalView, title?: string) => void;
+  openAuth: (view?: AuthModalView, title?: string, token?: string) => void;
   closeAuth: () => void;
 }
 
@@ -40,9 +52,12 @@ const AuthModalContext = createContext<AuthModalContextType | undefined>(undefin
 export function AuthModalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthModalState | null>(null);
 
-  const openAuth = useCallback((view: AuthModalView = "signup", title?: string) => {
-    setState({ view, title });
-  }, []);
+  const openAuth = useCallback(
+    (view: AuthModalView = "signup", title?: string, token?: string) => {
+      setState({ view, title, token });
+    },
+    []
+  );
 
   const closeAuth = useCallback(() => setState(null), []);
 

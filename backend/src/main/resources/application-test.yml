@@ -9,6 +9,14 @@ campusvibe:
   ai:
     openai:
       api-key: ""
+  auth:
+    # Off by default under test. The suite deliberately makes many failed
+    # sign-in attempts (wrong password, unknown email, tampered token), which
+    # would trip the lockout and fail later tests for a reason that has nothing
+    # to do with what they assert. AuthRateLimitIT switches it back on with its
+    # own small limits.
+    rate-limit:
+      enabled: false
 
 jwt:
   secret: "test-only-secret-0123456789-0123456789-0123456789"

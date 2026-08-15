@@ -8,5 +8,9 @@ public record UserDTO(
 	String name,
 	String email,
 	List<String> roles,
-	Instant createdAt
+	Instant createdAt,
+	// Exposed so the UI can prompt an unverified user to check their inbox.
+	// Not an authorisation signal — the backend decides what unverified may do.
+	boolean emailVerified,
+	String authProvider
 ) {}

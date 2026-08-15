@@ -1044,3 +1044,159 @@ rather than a silent no-op.
 
 **Affected files:** `frontend/app/components/auth-components/OAuthButtons.tsx`,
 `frontend/app/types/google-identity.d.ts` *(new)*
+
+---
+
+## Authentication review, 2026-08-15
+
+Four findings from the review that produced [`authentication.md`](../docs/architecture/authentication.md). All four are fixed and covered by `AuthProviderIT` except where noted.
+
+### BUG-028
+**A malformed Google ID token returns 500 instead of 401** · Medium · FIXED
+
+**Found:** 2026-08-15, probing `POST /api/v1/auth/google` against the Docker
+stack while rewriting [`authentication.md`](../docs/architecture/authentication.md).
+
+**Reproduce:**
+
+```
+curl -X POST http://localhost:8080/api/v1/auth/google \
+  -H 'Content-Type: application/json' -d '{"idToken":"not-a-real-token"}'
+```
+
+Observed: `{"path":"/api/v1/auth/google","message":null,"statusCode":500}`.
+Expected: 401, the same as every other bad token.
+
+**Cause.** The split is *parse* versus *verify*. `GoogleTokenVerifier.verify`
+(`GoogleTokenVerifier.java:34`) catches only `GeneralSecurityException` and
+`IOException`, but Google's `GoogleIdToken.parse` signals a structurally
+malformed token with an unchecked `IllegalArgumentException` — thrown by a
+`Preconditions.checkArgument` with no message, which is why the response body
+carries `message: null`. It escapes to the catch-all handler
+(`DefaultExceptionHandler.java:149`), which maps anything unmapped to 500.
+
+Confirmed by contrast: `aaa.bbb.ccc` has the dots the parser needs, reaches
+verification, and correctly returns 401 `Invalid Google token`.
+
+**Fix:** catch `IllegalArgumentException` alongside the other two in
+`GoogleTokenVerifier.verify` and return `null`, so the existing
+`BadCredentialsException` path produces the 401.
+
+**No test covers the Google endpoint at all**, which is why this survived —
+`AuthenticationFlowIT` has 11 cases and none of them are Google. Add one with
+the fix.
+
+**FIXED 2026-08-15.** `GoogleTokenVerifier.verify` catches
+`IllegalArgumentException` alongside the checked exceptions and returns null, so
+a structurally malformed token takes the same 401 path as any other bad one.
+Covered by `AuthProviderIT.malformedGoogleTokenIsRejectedWith401NotServerError`,
+which uses the exact `not-a-real-token` input from the report.
+
+### BUG-029
+**`GoogleSignInRequest` is unvalidated; a null `idToken` returns 500 and leaks a
+JVM message** · Medium · FIXED
+
+**Found:** 2026-08-15, same probe session as BUG-028.
+
+**Reproduce:**
+
+```
+curl -X POST http://localhost:8080/api/v1/auth/google \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+Observed: 500 with
+`message: Cannot invoke "String.indexOf(int)" because "tokenString" is null`.
+
+**Cause.** `AuthenticationController.google` (`AuthenticationController.java:38-39`)
+is the only one of the three auth endpoints without `@Valid`, and
+`GoogleSignInRequest` carries no constraints — unlike `AuthenticationRequest`
+and `RegisterRequest`, which both use `@NotBlank`. The null reaches Google's
+parser and the resulting helpful-NPE message is echoed to the caller by the
+catch-all handler.
+
+**Two fixes, both wanted:**
+1. `@NotBlank String idToken` on the record, `@Valid` on the parameter — makes
+   it a 400 like every other malformed request.
+2. Stop the catch-all echoing `e.getMessage()` for unmapped exceptions
+   (`DefaultExceptionHandler.java:149`). Any unmapped exception is currently a
+   potential internal-detail disclosure; this one just makes it visible.
+
+**FIXED 2026-08-15**, both halves.
+
+1. `GoogleSignInRequest.idToken` is `@NotBlank` and the controller parameter is
+   `@Valid`, so a missing or blank token is a 400.
+2. The catch-all in `DefaultExceptionHandler` no longer echoes `e.getMessage()`
+   to the caller: it logs the exception at ERROR and returns a fixed
+   `Something went wrong. Please try again.` No unmapped exception can disclose
+   internals now.
+
+A third fix came out of writing the test: `@RequestParam` constraints raise
+`ConstraintViolationException`, which nothing handled, so a malformed
+`?email=` on the new `email-status` endpoint answered **500**. That now maps to
+400. Covered by `missingGoogleTokenIsA400NotA500`, `blankGoogleTokenIsA400` and
+`emailStatusRejectsAMalformedAddress`.
+
+### BUG-030
+**A blank `GOOGLE_CLIENT_ID` accepts a Google ID token issued to any
+application** · High · FIXED
+
+**Found:** 2026-08-15, reading `GoogleTokenVerifier` while rewriting
+[`authentication.md`](../docs/architecture/authentication.md).
+
+**Latent, not live** — the client id is set in this environment. It becomes live
+in any environment that ships without it, which the blank-is-supported
+convention across `docker/.env.example` makes easy to do by accident.
+
+`GoogleTokenVerifier.java:26`:
+
+```java
+.setAudience(clientId == null || clientId.isBlank() ? null : Collections.singletonList(clientId))
+```
+
+A `null` audience makes the underlying `IdTokenVerifier` **skip the audience
+check entirely** rather than reject everything. Signature, issuer and expiry
+still pass, so any valid Google-issued ID token — from any OAuth client
+anywhere — verifies. `POST /api/v1/auth/google` is `permitAll`
+(`SecurityFilterChainConfig.java:43`) and `AuthenticationService.googleSignIn`
+auto-creates a user from the token's email, so the caller is authenticated as
+whatever email their token carries.
+
+**Fix:** fail closed. Reject Google sign-in with 503 or 401 when the client id
+is unconfigured, rather than verifying without an audience. Not yet filed as a
+todo item pending Arpan's decision on priority.
+
+**FIXED 2026-08-15.** `GoogleTokenVerifier` now builds no verifier at all when
+`google.clientId` is blank, logs a startup warning naming the consequence, and
+rejects every token. Fail closed rather than fail open. Covered by
+`AuthProviderIT` (the whole class runs with no client id configured, so every
+Google-endpoint case there is also a regression test for this).
+
+### BUG-031
+**Google sign-in never checks `email_verified`** · High · FIXED
+
+**Found:** 2026-08-15, same review as BUG-030.
+
+`AuthenticationService.java:73-74` reads `email` and `name` from the Google
+payload and nothing else. Line 75 then does
+`userRepository.findByEmail(email).orElseGet(...)`, so a Google sign-in for an
+address that already has an email/password account **logs into that account**.
+
+Together those two facts mean an ID token carrying an *unverified* email that
+matches an existing CampusVibe user authenticates as that user. Google's
+integration guidance is explicit that `email_verified` must be checked before
+trusting the address. Severity is High rather than Critical because obtaining
+such a token requires control of an OAuth client and an unverified Google
+account for the target address.
+
+**Fix:** reject the sign-in when `email_verified` is not true. One condition,
+next to the existing payload reads.
+
+---
+
+**FIXED 2026-08-15.** `AuthenticationService.googleSignIn` rejects the token
+with `BadCredentialsException` unless `payload.getEmailVerified()` is true, and
+does so *before* the find-or-create lookup that matches on email. **Not covered
+by an automated test**: asserting it needs a genuinely signed Google token,
+which cannot be minted in a test. Verified by reading, and by manual sign-in
+continuing to work for a verified account.

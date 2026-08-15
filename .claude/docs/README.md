@@ -36,15 +36,17 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`ci-cd-pipeline.md`](architecture/ci-cd-pipeline.md) | GitHub Actions: the `ci.yml` orchestrator, the four reusable component workflows, tiering, the `ci-success` gate, CodeQL, Dependabot, `.dockerignore` · plus local CI parity (`scripts/verify.mjs`, `.githooks/pre-push`) | ✅ Conforms · **but nothing has run on GitHub yet** |
 | [`llm-api-key-management.md`](architecture/llm-api-key-management.md) | How the OpenAI key flows from `docker/.env` and EB environment properties through `OpenAiProperties` without ever being logged or baked into an image | ⚠ Unverified against the standard |
 | [`user-roles.md`](architecture/user-roles.md) | RBAC: the three roles, multi-role support, JWT claims, endpoint authorisation. **Cited as authority by four source files** | ⚠ Part spec, part as-built |
-| [`authentication.md`](architecture/authentication.md) | Email + verification-code login, Google OAuth via Google Identity Services, client-id handling | ⚠ Written as a plan; may not match the code |
+| [`authentication.md`](architecture/authentication.md) | The two sign-in methods (Google ID token, email + password), JWT issuing and per-request verification, bcrypt, the auth modal · measured endpoint behaviour · **14 known gaps incl. 4 security findings** | ✅ Live · rewritten from the code 2026-08-15 · **not security-reviewed** |
 | [`search.md`](architecture/search.md) | Why hybrid semantic search (embeddings in pgvector + keyword rank) rather than the alternatives | ⚠ Pre-implementation design note |
 
-**On the ⚠ marks.** Four of these five predate the documentation standard and
-were moved into this folder on 2026-08-06 without being re-verified against the
-code. Each carries a banner saying exactly what is and is not trustworthy about
-it. They were moved rather than left scattered because one folder that is
-honestly labelled beats four loose files nobody knows to look for. Rewriting them
-is tracked in [`todo.md`](../TODO/todo.md) under **Docs**.
+**On the ⚠ marks.** These predate the documentation standard and were moved into
+this folder on 2026-08-06 without being re-verified against the code. Each
+carries a banner saying exactly what is and is not trustworthy about it. They
+were moved rather than left scattered because one folder that is honestly
+labelled beats four loose files nobody knows to look for. Rewriting them is
+tracked in [`todo.md`](../TODO/todo.md) under **Docs**. `authentication.md` was
+the first of them to be done, on 2026-08-15; `llm-api-key-management.md`,
+`user-roles.md` and `search.md` remain.
 
 **Not yet written:** the Docker development environment (the `compose watch` and
 multi-stage Dockerfile work), the frontend architecture beyond its data layer,

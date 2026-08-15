@@ -40,11 +40,18 @@ public class SecurityFilterChainConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",
-                                "/api/v1/auth/google"
+                                "/api/v1/auth/google",
+                                // The mailed token is the credential; there is
+                                // no session yet to authenticate these with.
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password",
+                                "/api/v1/auth/verify-email"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
                                 "/actuator/**",
+                                // Asked by the signup form before anyone is signed in.
+                                "/api/v1/auth/email-status",
                                 "/api/v1/clubs/**",
                                 "/api/v1/events/**"
                         ).permitAll()

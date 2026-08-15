@@ -26,6 +26,15 @@ public class EmailPasswordAuthenticationProvider implements AuthenticationProvid
         String rawPassword = authentication.getCredentials().toString();
 
         UserDetails user = userDetailsService.loadUserByUsername(email);
+
+        // A Google account has no password at all (V10), so there is nothing to
+        // compare against. Rejected with the same message as a wrong password:
+        // login must not become a way to ask which provider an address uses.
+        // The signup flow answers that question deliberately, via
+        // GET /api/v1/auth/email-status.
+        if (user.getPassword() == null) {
+            throw new BadCredentialsException("Invalid credentials");
+        }
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new BadCredentialsException("Invalid credentials");
         }

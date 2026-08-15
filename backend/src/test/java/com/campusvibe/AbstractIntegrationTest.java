@@ -55,6 +55,23 @@ public abstract class AbstractIntegrationTest {
         return userRepository.save(user);
     }
 
+    /**
+     * An account created through Google: no password, provider GOOGLE. The
+     * V10 check constraint rejects any other combination, so this is the only
+     * shape a Google row can legally take.
+     */
+    protected User createGoogleUser(String name, String email, RoleName... roleNames) {
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(null);
+        user.setAuthProvider(AuthProvider.GOOGLE);
+        for (RoleName roleName : roleNames) {
+            user.addRole(roleRepository.findByName(roleName.name()).orElseThrow());
+        }
+        return userRepository.save(user);
+    }
+
     protected Club createClub(String id, String name) {
         Club club = new Club();
         club.setId(id);

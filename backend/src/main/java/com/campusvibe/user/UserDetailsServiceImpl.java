@@ -16,8 +16,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // username is email in our system
-        return userRepository.findByEmail(username)
+        // username is email in our system, and emails are stored lowercase (V10),
+        // so the input is folded to match. Without this, logging in as Ada@x.com
+        // fails for an account registered as ada@x.com.
+        String email = username == null ? null : username.trim().toLowerCase(java.util.Locale.ROOT);
+        return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 }

@@ -14,7 +14,14 @@ import { useAuthModal, type AuthModalView } from "@/app/lib/auth-modal-context";
 // modal leaves a URL that re-opens it on the next refresh, and any link the user
 // copied would carry the prompt to whoever they sent it to.
 
-const VIEWS: readonly AuthModalView[] = ["signup", "signup-email", "login", "recover"];
+const VIEWS: readonly AuthModalView[] = [
+  "signup",
+  "signup-email",
+  "login",
+  "recover",
+  "reset-password",
+  "verify-email",
+];
 
 export default function AuthModalUrlTrigger() {
   const searchParams = useSearchParams();
@@ -23,6 +30,7 @@ export default function AuthModalUrlTrigger() {
   const { openAuth } = useAuthModal();
 
   const requested = searchParams.get("auth");
+  const token = searchParams.get("token");
 
   useEffect(() => {
     if (!requested) return;
@@ -32,13 +40,16 @@ export default function AuthModalUrlTrigger() {
     const view = VIEWS.includes(requested as AuthModalView)
       ? (requested as AuthModalView)
       : "login";
-    openAuth(view);
+    openAuth(view, undefined, token ?? undefined);
 
     const rest = new URLSearchParams(searchParams);
     rest.delete("auth");
+    // The token is a live single-use credential. Leaving it in the address bar
+    // puts it in browser history and in any URL the user copies out.
+    rest.delete("token");
     const query = rest.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [requested, searchParams, pathname, router, openAuth]);
+  }, [requested, token, searchParams, pathname, router, openAuth]);
 
   return null;
 }
