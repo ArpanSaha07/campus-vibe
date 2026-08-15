@@ -170,7 +170,14 @@ export function formatDayLabel(date: Date, today: Date = new Date()): string {
   if (dayDiff === 1) return "Tomorrow";
   if (dayDiff === -1) return "Yesterday";
 
-  return date.toLocaleDateString(undefined, {
+  // Pinned rather than following the host locale. The three labels above are
+  // hardcoded English, so an unpinned format produced a mixed-language list on
+  // a non-English machine — `Today` directly above `mar. 25 aout` — and made
+  // the test for this function pass only on an en-US host (BUG-025).
+  //
+  // If the UI is ever localised, this is one of the places to revisit, along
+  // with the Today/Tomorrow/Yesterday strings that make it necessary.
+  return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

@@ -1,6 +1,6 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-13** · Branch: `develop`
+Last updated: **2026-08-14** · Branch: `feature/my-clubs`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-008 … BUG-017, BUG-019 … BUG-022 so far). Bug ids are never reused.

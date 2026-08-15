@@ -31,6 +31,18 @@ public class EventService {
         return eventRepository.findAll().stream().map(eventMapper).toList();
     }
 
+    /**
+     * Events run by one club.
+     *
+     * An organizer id that matches nothing returns an empty list rather than
+     * 404: this is a filter over a collection that does exist, and a club with
+     * no events yet is an ordinary state that must answer the same way.
+     */
+    @Transactional(readOnly = true)
+    public List<EventDTO> listByOrganizer(String organizerId) {
+        return eventRepository.findByOrganizerId(organizerId).stream().map(eventMapper).toList();
+    }
+
     @Transactional(readOnly = true)
     public EventDTO get(Long id) {
         return eventMapper.apply(findEvent(id));

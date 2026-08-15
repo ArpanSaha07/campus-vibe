@@ -23,6 +23,7 @@ const chessEvent = toEventInstance({
   location: "Student Hall",
   price: "Free",
   organizerId: "chess-club",
+  organizerName: "Chess Club",
   followers: 0,
   images: [],
   promoted: false,

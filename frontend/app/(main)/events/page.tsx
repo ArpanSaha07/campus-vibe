@@ -1,39 +1,35 @@
-"use client";
-
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import type { Metadata } from "next";
 import { listEvents } from "@/app/lib/event";
 import { searchEvents } from "@/app/lib/search";
-import { EventInstance } from "@/app/types";
 import EventGrid from "@/app/components/event/EventGrid";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
 
-function EventsContent() {
-  const searchParams = useSearchParams();
-  const q = searchParams.get("q")?.trim() ?? "";
-  const [events, setEvents] = useState<EventInstance[] | null>(null);
-  const [error, setError] = useState(false);
+// A Server Component. `?q=` arrives as the searchParams prop, so the list is
+// fetched and rendered before anything is sent — no useSearchParams, no
+// Suspense wrapper to work around it, and no "Loading events…" flash on a page
+// whose whole job is to show events.
+//
+// There is no notFound() here on purpose: /events always exists. An empty
+// result is an empty state, not a 404 — answering "no events match" with a 404
+// would tell a crawler the search page itself is gone.
 
-  useEffect(() => {
-    let cancelled = false;
-    setEvents(null);
-    setError(false);
-    const load = q ? searchEvents(q, 50) : listEvents();
-    load
-      .then((results) => {
-        if (!cancelled) setEvents(results);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setEvents([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [q]);
+export const metadata: Metadata = {
+  title: "Discover events · CampusVibe",
+  description: "Explore upcoming events on campus and join the fun.",
+};
+
+export default async function DiscoverEvents({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const raw = (await searchParams).q;
+  // A repeated ?q= arrives as an array; take the first rather than rendering
+  // "a,b" as the heading.
+  const q = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+
+  const events = q ? await searchEvents(q, 50) : await listEvents();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 fade-up">
@@ -43,7 +39,7 @@ function EventsContent() {
           <h1 className="font-display text-3xl font-bold text-ink-900 mt-1 mb-2">
             &ldquo;{q}&rdquo;
           </h1>
-          {events && !error && events.length > 0 && (
+          {events.length > 0 && (
             <p className="text-ink-600">
               {events.length} event{events.length === 1 ? "" : "s"} found, best matches first.
             </p>
@@ -59,30 +55,21 @@ function EventsContent() {
         </>
       )}
 
-      {error && (
-        <div className="mt-8">
-          <EmptyState
-            title="Events didn't load"
-            body="Something went wrong on our end. Refresh to try again."
-          />
-        </div>
-      )}
-
-      {events === null && !error && (
-        <p className="mt-8 text-ink-600 font-mono text-sm">Loading events…</p>
-      )}
-
-      {events && events.length === 0 && !error && q && (
+      {events.length === 0 && q && (
         <div className="mt-8">
           <EmptyState
             title={`Nothing matches "${q}"`}
             body="Try different words — search understands meaning, not just exact matches."
-            action={<Button href="/events" variant="secondary">Browse all events</Button>}
+            action={
+              <Button href="/events" variant="secondary">
+                Browse all events
+              </Button>
+            }
           />
         </div>
       )}
 
-      {events && events.length === 0 && !error && !q && (
+      {events.length === 0 && !q && (
         <div className="mt-8">
           <EmptyState
             title="No events yet"
@@ -92,15 +79,7 @@ function EventsContent() {
         </div>
       )}
 
-      {events && events.length > 0 && <EventGrid events={events} />}
+      {events.length > 0 && <EventGrid events={events} />}
     </div>
-  );
-}
-
-export default function DiscoverEvents() {
-  return (
-    <Suspense fallback={<div className="p-10 font-mono text-sm text-ink-600">Loading events…</div>}>
-      <EventsContent />
-    </Suspense>
   );
 }

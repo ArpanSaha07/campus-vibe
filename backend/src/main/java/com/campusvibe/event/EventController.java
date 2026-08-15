@@ -28,9 +28,18 @@ public class EventController {
         this.buckets = buckets;
     }
 
+    /**
+     * All events, or just one club's when organizerId is given.
+     *
+     * A filter on the existing collection rather than a nested
+     * /clubs/{id}/events route: the club dashboard used to fetch every event in
+     * the system and filter client-side, which is the only thing this replaces.
+     */
     @GetMapping
-    public List<EventDTO> list() {
-        return eventService.list();
+    public List<EventDTO> list(@RequestParam(required = false) String organizerId) {
+        return organizerId == null || organizerId.isBlank()
+                ? eventService.list()
+                : eventService.listByOrganizer(organizerId);
     }
 
     @GetMapping("/search")

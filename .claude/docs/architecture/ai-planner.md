@@ -1,5 +1,10 @@
 # CampusVibe AI Planner implementation guide
 
+> ⚠ **Unverified against the code.** This is an implementation *guide*, written before the feature; it says what should be built.
+> It does not follow [`implementation-docs`](../../skills/implementation-docs/SKILL.md).
+
+**Code as of:** never — not reconciled with the code.
+
 ## Purpose
 
 The AI Planner is a login-aware CampusVibe feature that helps users ask natural-language questions and receive personalized event and club recommendations, especially for planning things like weekends, evenings, or activities based on preferences.

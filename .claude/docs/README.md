@@ -5,7 +5,7 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-08-06**
+Last updated: **2026-08-14**
 
 ```
 .claude/docs/
@@ -20,13 +20,20 @@ Written and maintained under
 without adding its line here makes it invisible** — nobody reads a folder, they
 read an index.
 
+**Every doc carries a `**Code as of:**` stamp** naming the commit its claims were
+last checked against. `never` means it has not been reconciled with the code —
+read it with the suspicion its own banner asks for. `node scripts/check-docs.mjs`
+reports which docs are behind, and which areas changed without their doc
+changing; the pre-push hook runs it as a notice and never blocks.
+
 ---
 
 ## Architecture — implementation docs
 
 | Document | Covers | State |
 |---|---|---|
-| [`ci-cd-pipeline.md`](architecture/ci-cd-pipeline.md) | GitHub Actions: the `ci.yml` orchestrator, the four reusable component workflows, tiering, the `ci-success` gate, CodeQL, Dependabot, `.dockerignore` | ✅ Conforms · **but nothing has run on GitHub yet** |
+| [`api-and-caching.md`](architecture/api-and-caching.md) | The `apiFetch` boundary, the three frontend data paths, Next's data cache and the rule that per-user data never enters it, the `@EntityGraph` N+1 fix, error-status mapping | ✅ Live · read from the code and measured |
+| [`ci-cd-pipeline.md`](architecture/ci-cd-pipeline.md) | GitHub Actions: the `ci.yml` orchestrator, the four reusable component workflows, tiering, the `ci-success` gate, CodeQL, Dependabot, `.dockerignore` · plus local CI parity (`scripts/verify.mjs`, `.githooks/pre-push`) | ✅ Conforms · **but nothing has run on GitHub yet** |
 | [`llm-api-key-management.md`](architecture/llm-api-key-management.md) | How the OpenAI key flows from `docker/.env` and EB environment properties through `OpenAiProperties` without ever being logged or baked into an image | ⚠ Unverified against the standard |
 | [`user-roles.md`](architecture/user-roles.md) | RBAC: the three roles, multi-role support, JWT claims, endpoint authorisation. **Cited as authority by four source files** | ⚠ Part spec, part as-built |
 | [`authentication.md`](architecture/authentication.md) | Email + verification-code login, Google OAuth via Google Identity Services, client-id handling | ⚠ Written as a plan; may not match the code |
@@ -40,8 +47,12 @@ honestly labelled beats four loose files nobody knows to look for. Rewriting the
 is tracked in [`todo.md`](../TODO/todo.md) under **Docs**.
 
 **Not yet written:** the Docker development environment (the `compose watch` and
-multi-stage Dockerfile work), the frontend architecture, and the club/event
-domain model.
+multi-stage Dockerfile work), the frontend architecture beyond its data layer,
+and the club/event domain model.
+
+**`architecture/ai-planner.md` exists on disk but has no row above.** It was not
+read while this index was last updated, and describing it from its filename would
+be a guess. Someone who knows it should add its line.
 
 ## Decisions — ADRs
 

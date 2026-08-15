@@ -6,6 +6,7 @@ import { GoogleProvider } from "./components/auth-components/GoogleProvider";
 import AuthModal from "./components/auth-components/AuthModal";
 import { AuthProvider } from "./lib/auth-context";
 import { AuthModalProvider } from "./lib/auth-modal-context";
+import { FollowedClubsProvider } from "./lib/followed-clubs-context";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -40,8 +41,14 @@ export default function RootLayout({ children }: RootLayoutProps) {
             {/* Mounted once here, so any trigger anywhere can raise the auth
                 card without navigating away from the page it interrupted. */}
             <AuthModalProvider>
-              {children}
-              <AuthModal />
+              {/* Inside AuthProvider because it only fetches once a user is
+                  known, and inside AuthModalProvider because a Follow button
+                  needs both: the follow state, and the modal to raise when
+                  there is no one signed in to follow on behalf of. */}
+              <FollowedClubsProvider>
+                {children}
+                <AuthModal />
+              </FollowedClubsProvider>
             </AuthModalProvider>
           </AuthProvider>
         </GoogleProvider>

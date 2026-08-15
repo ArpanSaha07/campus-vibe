@@ -1,5 +1,8 @@
 # Authentication Implementation Guide
 
+**Code as of:** never — this document has not been reconciled with the
+code. See the banner above; do not read a distance into this.
+
 > ⚠ **Unverified — predates the documentation standard.** Moved here from
 > `.claude/AUTH_IMPLEMENTATION.md` on 2026-08-06 without being re-checked against
 > the code. It was written as a *guide to what should be built*, and parts of it
