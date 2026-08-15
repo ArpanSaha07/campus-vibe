@@ -10,7 +10,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.push('/login');
+      // Home with the modal raised, rather than opening it in place: this
+      // component renders null when signed out, so opening it here would put the
+      // card over a blank page. `replace` so Back does not land them straight
+      // back on the route they were just turned away from.
+      router.replace('/?auth=login');
     }
   }, [isAuthenticated, loading, router]);
 

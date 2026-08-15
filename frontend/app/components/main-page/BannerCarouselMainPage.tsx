@@ -36,7 +36,7 @@ export default function BannerCarousel() {
         spaceBetween={10}
         centeredSlides={true}
         autoplay={{
-          delay: 8000,
+          delay: 4000,
           disableOnInteraction: false,
         }}
         pagination={{

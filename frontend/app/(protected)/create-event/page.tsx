@@ -8,7 +8,7 @@ export default async function CreateEventPage() {
   // const user = await getCurrentUser()
 
   // if (!user) {
-  //   redirect('/login')
+  //   redirect('/?auth=login')
   // }
 
   return <CreateEventForm />

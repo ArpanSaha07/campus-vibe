@@ -164,6 +164,8 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-14 | Old `/login` page and its components deleted; auth is the modal only, reached via `/?auth=<view>` |
+| 2026-08-14 | Google sign-in switched on — `NEXT_PUBLIC_GOOGLE_CLIENT_ID` was the only gap |
 | 2026-08-14 | Local CI parity — `scripts/verify.mjs` + `.githooks/pre-push`, proven to catch the real failure |
 | 2026-08-14 | [`api-and-caching.md`](../docs/architecture/api-and-caching.md) — the API boundary and cache model written up |
 | 2026-08-14 | Two CI breaks fixed ([BUG-026](../bugs/fixed_bugs.md#bug-026), [BUG-027](../bugs/fixed_bugs.md#bug-027)) and the locale bug ([BUG-025](../bugs/fixed_bugs.md#bug-025)) |
@@ -172,5 +174,3 @@ The last ten, one line each. Full write-ups, and everything older, in
 | 2026-08-13 | Club follow / unfollow, wired end to end and verified against the database |
 | 2026-08-13 | My clubs page and the shared club logo component |
 | 2026-08-12 | Sign-up and login modal |
-| 2026-08-11 | My events page and the RSVP API |
-| 2026-08-08 | Docker job replayed locally end to end; Trivy gate passes on both images |

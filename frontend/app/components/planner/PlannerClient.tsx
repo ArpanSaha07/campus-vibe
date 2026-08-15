@@ -10,6 +10,7 @@ import PlanTimeline from "@/app/components/planner/PlanTimeline";
 import PlannerLoadingState from "@/app/components/planner/PlannerLoadingState";
 import PlannerPromptInput from "@/app/components/planner/PlannerPromptInput";
 import { useAuth } from "@/app/lib/auth-context";
+import { useAuthModal } from "@/app/lib/auth-modal-context";
 import { buildMockPlan, PLANNER_DELAY_MS, PLANNER_PROMPT_KEY } from "@/app/lib/planner";
 import type { Plan } from "@/app/types";
 
@@ -20,6 +21,7 @@ import type { Plan } from "@/app/types";
  */
 export default function PlannerClient({ initialPrompt }: { initialPrompt: string }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const { openAuth } = useAuthModal();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [refinements, setRefinements] = useState<string[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -84,7 +86,11 @@ export default function PlannerClient({ initialPrompt }: { initialPrompt: string
         <EmptyState
           title="Sign in to see your plan"
           body="The planner builds on your interests, saved events and followed clubs, so it needs to know who you are. Your prompt is saved — you will not have to type it again."
-          action={<Button href="/login">Sign in</Button>}
+          action={
+            <Button onClick={() => openAuth("login", "Sign in to see your plan")}>
+              Sign in
+            </Button>
+          }
         />
       )}
 

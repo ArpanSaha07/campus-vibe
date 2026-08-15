@@ -6,6 +6,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import Button from "@/app/components/ui/Button";
 import Chip from "@/app/components/ui/Chip";
 import { useAuth } from "@/app/lib/auth-context";
+import { useAuthModal } from "@/app/lib/auth-modal-context";
 import { PLANNER_PROMPT_KEY } from "@/app/lib/planner";
 
 /** Chip label → the starting query it drops into the input. */
@@ -29,6 +30,7 @@ export default function PlannerCard() {
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isAuthenticated, loading } = useAuth();
+  const { openAuth } = useAuthModal();
   const router = useRouter();
 
   // Restore a prompt the user typed before being sent off to sign in.
@@ -119,7 +121,10 @@ export default function PlannerCard() {
               <p className="text-sm text-ink-600">
                 Sign in for suggestions built around your interests.
               </p>
-              <Button href="/login" className="shrink-0">
+              <Button
+                onClick={() => openAuth("login", "Sign in for suggestions built around your interests")}
+                className="shrink-0"
+              >
                 Sign in
               </Button>
             </div>

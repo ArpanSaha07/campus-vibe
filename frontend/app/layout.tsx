@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Bricolage_Grotesque, Figtree, Spline_Sans_Mono } from "next/font/google";
 import "@/app/globals.css";
 import type { RootLayoutProps } from "@/app/types";
 import { GoogleProvider } from "./components/auth-components/GoogleProvider";
 import AuthModal from "./components/auth-components/AuthModal";
+import AuthModalUrlTrigger from "./components/auth-components/AuthModalUrlTrigger";
 import { AuthProvider } from "./lib/auth-context";
 import { AuthModalProvider } from "./lib/auth-modal-context";
 import { FollowedClubsProvider } from "./lib/followed-clubs-context";
@@ -48,6 +50,13 @@ export default function RootLayout({ children }: RootLayoutProps) {
               <FollowedClubsProvider>
                 {children}
                 <AuthModal />
+                {/* Suspense because it reads useSearchParams: without a boundary
+                    here, every prerendered route above it would fall back to
+                    client-side rendering. It renders nothing, so the fallback
+                    is nothing. */}
+                <Suspense fallback={null}>
+                  <AuthModalUrlTrigger />
+                </Suspense>
               </FollowedClubsProvider>
             </AuthModalProvider>
           </AuthProvider>

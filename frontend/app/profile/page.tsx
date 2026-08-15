@@ -6,7 +6,7 @@ import EventList from "@/app/components/user-profile-page-components/UserProfile
 export default async function ProfilePage() {
   const user = ""; /* await getCurrentUser(); */
   if (!user) {
-    redirect("/login");
+    redirect("/?auth=login");
   }
 
   return (
