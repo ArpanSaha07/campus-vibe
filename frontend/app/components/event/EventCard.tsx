@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { EventInstance } from "@/app/types";
-import { getClubNameById } from "@/app/lib/club";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import EventShareButton from "@/app/components/event/EventShareButton";
@@ -91,7 +90,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
           <p className="mt-1 text-xs text-ink-600 line-clamp-1">{event.location.name}</p>
 
           <p className="mt-2 text-sm font-semibold text-lavender-600">
-            {getClubNameById(event.organizer)}
+            {event.organizerName}
           </p>
 
           {event.promoted && (

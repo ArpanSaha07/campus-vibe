@@ -121,6 +121,16 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+
+      # Where server-rendered pages reach the backend. NEXT_PUBLIC_API_URL is a
+      # browser address: inside this container `localhost:8080` is the container
+      # itself, so a Server Component fetching it would connect to nothing. The
+      # compose network resolves `backend` to the backend service instead.
+      #
+      # Not NEXT_PUBLIC_ deliberately — a service name means nothing to a
+      # browser, so this must stay out of the client bundle. app/lib/api.tsx
+      # only reads it when `window` is undefined.
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://backend:8080}
     ports:
       - "3000:3000"
     depends_on:

@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Bricolage_Grotesque, Figtree, Spline_Sans_Mono } from "next/font/google";
 import "@/app/globals.css";
 import type { RootLayoutProps } from "@/app/types";
 import { GoogleProvider } from "./components/auth-components/GoogleProvider";
 import AuthModal from "./components/auth-components/AuthModal";
+import AuthModalUrlTrigger from "./components/auth-components/AuthModalUrlTrigger";
 import { AuthProvider } from "./lib/auth-context";
 import { AuthModalProvider } from "./lib/auth-modal-context";
+import { FollowedClubsProvider } from "./lib/followed-clubs-context";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -40,8 +43,21 @@ export default function RootLayout({ children }: RootLayoutProps) {
             {/* Mounted once here, so any trigger anywhere can raise the auth
                 card without navigating away from the page it interrupted. */}
             <AuthModalProvider>
-              {children}
-              <AuthModal />
+              {/* Inside AuthProvider because it only fetches once a user is
+                  known, and inside AuthModalProvider because a Follow button
+                  needs both: the follow state, and the modal to raise when
+                  there is no one signed in to follow on behalf of. */}
+              <FollowedClubsProvider>
+                {children}
+                <AuthModal />
+                {/* Suspense because it reads useSearchParams: without a boundary
+                    here, every prerendered route above it would fall back to
+                    client-side rendering. It renders nothing, so the fallback
+                    is nothing. */}
+                <Suspense fallback={null}>
+                  <AuthModalUrlTrigger />
+                </Suspense>
+              </FollowedClubsProvider>
             </AuthModalProvider>
           </AuthProvider>
         </GoogleProvider>

@@ -1,0 +1,87 @@
+#!/bin/sh
+#
+# Run the checks CI runs, before the code leaves the machine.
+#
+# Two consecutive pushes broke the Frontend job — once because the checks were
+# never run, once because they were run against a dev machine that happened to
+# have the backend up. CI caught both, several minutes after the push. This
+# catches them in the same terminal, before there is anything to catch.
+#
+# ENABLE IT (once per clone):
+#
+#   git config core.hooksPath .githooks
+#
+# The hook is committed rather than living in .git/hooks so it is reviewable
+# and shared; core.hooksPath is what activates it, and stays a local choice.
+#
+# BYPASS:  git push --no-verify
+#
+# stdin gives one line per ref being pushed:
+#   <local ref> <local sha> <remote ref> <remote sha>
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+
+full=""
+base=""
+pushing=""
+
+while read -r _local_ref local_sha remote_ref remote_sha; do
+    # Branch deletion — nothing to verify.
+    case "$local_sha" in
+        *[!0]*) ;;
+        *) continue ;;
+    esac
+
+    pushing="yes"
+
+    # Full tier when the target is main, matching ci.yml: a push to main runs
+    # the integration suites, a feature branch does not.
+    case "$remote_ref" in
+        refs/heads/main) full="--full" ;;
+    esac
+
+    # An all-zero remote sha means the branch is new upstream, so there is no
+    # base to diff against. ci.yml fails OPEN in exactly this case and runs
+    # every component; do the same rather than skip silently.
+    case "$remote_sha" in
+        *[!0]*) base="$remote_sha" ;;
+    esac
+done
+
+if [ -z "$pushing" ]; then
+    exit 0
+fi
+
+if [ -n "$base" ]; then
+    set -- --base "$base"
+else
+    set -- --all
+fi
+
+if [ -n "$full" ]; then
+    set -- "$@" "$full"
+fi
+
+echo "pre-push: verifying before push (git push --no-verify to skip)"
+
+if ! node "$repo_root/scripts/verify.mjs" "$@"; then
+    echo ""
+    echo "pre-push: checks failed - push aborted."
+    echo "Fix the failures above, or bypass with: git push --no-verify"
+    exit 1
+fi
+
+# Docs staleness, reported after the tests and never blocking.
+#
+# A stale document does not break anything today, so failing the push over one
+# would only teach us to reach for --no-verify — and that flag also skips the
+# tests above. The check prints what looks out of date and gets out of the way.
+#
+# --quiet so a push with nothing stale adds no output at all.
+if [ -n "$base" ]; then
+    node "$repo_root/scripts/check-docs.mjs" --base "$base" --quiet || true
+else
+    node "$repo_root/scripts/check-docs.mjs" --quiet || true
+fi

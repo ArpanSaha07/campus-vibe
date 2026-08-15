@@ -13,7 +13,9 @@ export function proxy(request: NextRequest) {
   )
 
   if (isProtected && !token) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    // There is no sign-in page to send them to — auth is a modal. Home carries
+    // the request in the query string and AuthModalUrlTrigger opens it there.
+    return NextResponse.redirect(new URL('/?auth=login', request.url))
   }
 
   return NextResponse.next()

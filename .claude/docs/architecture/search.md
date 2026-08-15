@@ -1,5 +1,8 @@
 # Search — design note
 
+**Code as of:** never — this document has not been reconciled with the
+code. See the banner above; do not read a distance into this.
+
 > ⚠ **A design note, not an implementation doc.** Moved here from
 > `.claude/search-implementation.md` on 2026-08-06. This is the *reasoning that
 > led to* hybrid search — written in second person, before the code existed — and

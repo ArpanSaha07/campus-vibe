@@ -1,5 +1,8 @@
 # Authentication Implementation Guide
 
+**Code as of:** never — this document has not been reconciled with the
+code. See the banner above; do not read a distance into this.
+
 > ⚠ **Unverified — predates the documentation standard.** Moved here from
 > `.claude/AUTH_IMPLEMENTATION.md` on 2026-08-06 without being re-checked against
 > the code. It was written as a *guide to what should be built*, and parts of it
@@ -15,6 +18,13 @@
 > Known-good adjacent facts: the Google client-id type hole was
 > [BUG-014](../../bugs/fixed_bugs.md#bug-014); the JWT transport question is open
 > as [BUG-003](../../bugs/bugs.md#bug-003).
+>
+> **Deleted 2026-08-14 — every reference below to these is dead:** the `/login`
+> page (`app/(auth)/`), `OAuthButtons.tsx`, `AuthForm.tsx` and `AuthCard.tsx`.
+> Auth is a modal now (`AuthModal.tsx` over `LoginView` / `SignupChoiceView` /
+> `EmailSignupView` / `RecoverPasswordView`), raised by `useAuthModal().openAuth`.
+> There is no sign-in route: server-side redirects go to `/?auth=<view>` and
+> `AuthModalUrlTrigger.tsx` turns that parameter into an open modal.
 
 ## Overview
 This document explains the complete authentication implementation for CampusVibe, including email + code verification and Google OAuth 2.0 sign-in.

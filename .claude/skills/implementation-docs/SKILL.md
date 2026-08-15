@@ -66,6 +66,21 @@ commit message and `fixed_bugs.md`.
 code and leaving its doc describing the old behaviour is worse than having no
 doc, because the next reader trusts it.
 
+**You do not have to remember this.** `scripts/check-docs.mjs` maps code paths
+to docs (`scripts/docs-map.json`) and reports, on every `git push`, any area you
+changed whose doc you did not. It is advisory and never blocks — a stale doc
+does not break the build, and a check that blocks would only teach you to reach
+for `--no-verify`, which also skips the tests. Run it yourself any time:
+
+```bash
+node scripts/check-docs.mjs --base origin/main
+```
+
+When it names a doc, there are exactly two honest responses: update the doc, or
+— if the change genuinely does not affect what the doc claims — re-read enough
+to confirm that and move the stamp. Silence is the third option and it is how
+the four `unverified` banners in `docs/architecture/` came to exist.
+
 ---
 
 ## Who writes it
@@ -154,6 +169,23 @@ contributed · whether the implementation is live, partially live, or unverified
 
 A doc describing code that has never run must say so in the first paragraph —
 that is the single most important fact about it.
+
+**Every doc carries a freshness stamp**, on its own line in this block:
+
+```text
+**Code as of:** e12cd19
+```
+
+It means *the code was read at this commit*, and it is what
+`scripts/check-docs.mjs` measures distance from. Two rules keep it honest:
+
+- **Only move it when you have actually re-read the code.** Bumping the stamp
+  because the number looked old converts a useful signal into a lie, and the
+  checker will then report clean forever.
+- **A doc that has never been reconciled with the code writes
+  `**Code as of:** never`,** with a sentence saying so. The checker skips those
+  deliberately — they are already labelled in their own banner, and repeating it
+  on every push is noise that trains you to ignore the whole report.
 
 ### In one paragraph
 

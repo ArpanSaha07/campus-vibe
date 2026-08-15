@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getClubNameById } from "@/app/lib/club";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import { formatEventDateTime, isPastEvent, myEventStatus } from "@/app/lib/my-events";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
@@ -61,7 +60,7 @@ export default function MyEventCard({ myEvent }: { myEvent: MyEvent }) {
           <p className="mt-1 line-clamp-1 text-xs text-ink-600">{event.location.name}</p>
 
           <p className="mt-2 text-sm font-semibold text-lavender-600">
-            by {getClubNameById(event.organizer)}
+            by {event.organizerName}
           </p>
         </Link>
 

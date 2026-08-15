@@ -123,6 +123,14 @@ public class User implements UserDetails {
 	public void removeGoingEvent(Long eventId) {
 		goingEventIds.remove(eventId);
 	}
+	// Club ids are slugs (Club.id is a String), so this collection is typed
+	// String where the event ones are Long. Same reasoning as above otherwise:
+	// ids rather than mapped Club entities, LAZY so an ordinary authenticated
+	// request never loads them. The table is already in place from V4.
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(name = "user_followed_clubs", joinColumns = @JoinColumn(name = "user_id"))
+	@Column(name = "club_id")
+	private Set<String> followedClubIds = new HashSet<>();
 
 	public boolean hasRole(RoleName roleName) {
 		return roles.stream().anyMatch(r -> r.getName().equals(roleName.name()));

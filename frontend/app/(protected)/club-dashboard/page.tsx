@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/app/lib/auth-context";
 import { isClubAdmin } from "@/app/lib/user";
 import { getMyClub } from "@/app/lib/club-admin-requests";
-import { listEvents } from "@/app/lib/event";
+import { listEventsByClub } from "@/app/lib/event";
 import type { Club, EventInstance } from "@/app/types";
 import EventCard from "@/app/components/event/EventCard";
 import SectionHeading from "@/app/components/ui/SectionHeading";
@@ -22,15 +22,16 @@ export default function ClubDashboardPage() {
   useEffect(() => {
     if (loading || !user || !isClubAdmin(user)) return;
     let cancelled = false;
+    // The club has to come first — its id is the filter for the events. What
+    // changed is the second half: this used to fetch every event in the system
+    // and filter in the browser, so a dashboard for one club downloaded the
+    // whole table.
     getMyClub()
-      .then((myClub) => {
+      .then(async (myClub) => {
         if (cancelled) return;
         setClub(myClub);
-        return listEvents().then((all) => {
-          if (!cancelled) {
-            setEvents(all.filter((e) => e.organizer === myClub.clubId));
-          }
-        });
+        const mine = await listEventsByClub(myClub.clubId);
+        if (!cancelled) setEvents(mine);
       })
       .catch(() => {
         if (!cancelled) {

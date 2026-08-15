@@ -2,11 +2,16 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-13**
+Last updated: **2026-08-14**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
-| [BUG-022](#bug-022) | High | 2026-08-13 | Copilot Autofix answered a CodeQL note by detaching `savedEventIds` from Hibernate, silently discarding every saved event |
+| [BUG-025](#bug-025) | Low | 2026-08-14 | `formatDayLabel` followed the host locale while its own labels were hardcoded English, mixing languages in one list |
+| [BUG-027](#bug-027) | High | 2026-08-14 | `/clubs` was prerendered at build time, so `next build` required a live backend and failed CI with ECONNREFUSED |
+| [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
+| [BUG-024](#bug-024) | Medium | 2026-08-13 | A non-numeric path variable answered 500 instead of 400, app-wide |
+| [BUG-023](#bug-023) | Medium | 2026-08-13 | The event detail page served one hardcoded event for every URL, with a club nobody has |
+| [BUG-022](#bug-022) | High | 2026-08-13 | Every club page showed "Club not found": the detail route read mock data whose slugs no seeded club shares |
 | [BUG-021](#bug-021) | Low | 2026-08-13 | Stale Turbopack cache in the frontend container served pre-edit CSS, so new styles silently did nothing |
 | [BUG-020](#bug-020) | High | 2026-08-12 | Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume (28P01) |
 | [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
@@ -23,96 +28,306 @@ Last updated: **2026-08-13**
 
 ---
 
+### BUG-025
+**`formatDayLabel` followed the host locale while its own labels were hardcoded English** · Low · FIXED 2026-08-14
+
+**Found:** 2026-08-14, running the frontend CI steps locally. It failed here and
+passed on CI, which is the signature worth recognising.
+
+**Symptom:** `app/__tests__/my-events.test.ts:198`
+
+```
+Expected substring: Aug
+Received string:    mar. 25 aout
+```
+
+**Cause:** `formatDayLabel` returns hardcoded English for the near days —
+`Today`, `Tomorrow`, `Yesterday` — and then formatted the fallback with
+`toLocaleDateString(undefined, …)`, which follows the host. The GitHub runner is
+en-US, this machine is fr-CA.
+
+**The test failure was the smaller half.** The real defect is in the product: a
+My Events list on a French machine renders `Today` directly above `mar. 25
+aout`. Half the labels ignore the locale and half follow it, so the result is
+never right in either language.
+
+**Fix:** pin `en-US` in the formatter, matching the hardcoded labels above it.
+Localising properly means translating those three strings too, and that is a
+different piece of work — noted in the code comment so the next person sees both
+halves together.
+
+**Why it was fixed now rather than left open.** It blocked something else: local
+verification (`scripts/verify.mjs`) reports what CI would report, and a suite
+with one permanent machine-specific failure trains you to skim past the summary.
+A guardrail that always shows a red line is a guardrail that gets ignored. Suite
+is now 130/130 locally and on CI.
+
+**Affected files**
+- `frontend/app/lib/my-events.ts` — the pinned locale
+
+---
+
+### BUG-027
+**`/clubs` was prerendered at build time, so `next build` required a live backend** · High · FIXED 2026-08-14
+
+**Found:** 2026-08-14, on the push that fixed [BUG-026](#bug-026). The Frontend
+job got past `type-check` and `test` and then failed in `build`:
+
+```
+Error occurred prerendering page "/clubs".
+[TypeError: fetch failed] { digest: '3227098399',
+  [cause]: AggregateError: { code: 'ECONNREFUSED' } }
+```
+
+**Cause:** converting `/clubs` to a Server Component made it a *static* route —
+it takes no params and reads no request-time API, so Next prerendered it during
+`next build`, which ran `getAllClubs()` against a backend that does not exist on
+a CI runner. The build output named it plainly and was not read carefully
+enough: `/clubs` was the one route listed as `○ (Static)` *with* a revalidate
+window, which is exactly the signature of build-time fetching.
+
+**Why local builds passed and CI did not.** The dev machine had the Docker
+backend up on `localhost:8080` throughout, so the build-time fetch succeeded and
+the route prerendered fine. Verifying a build on a machine where the API happens
+to be running does not test what CI does. Reproduced by pointing
+`API_INTERNAL_URL` at a dead port, which produced the identical digest.
+
+**Fix:** `await connection()` at the top of the page, so rendering waits for a
+real request and never happens at build time.
+
+**Rejected: `export const dynamic = 'force-dynamic'`.** The docs state it is
+equivalent to `fetchCache = 'force-no-store'`, which would strip the
+five-minute cache off every read in this tree and undo the whole point of the
+change that introduced it. `connection()` moves only *when* the render happens
+and leaves the data cache alone.
+
+**Measured, not assumed.** Against a counting proxy in front of the backend,
+three consecutive request-time renders of `/clubs` produced **one** upstream
+`GET /api/v1/clubs`. Caching survived the fix. The page returns 200 and renders
+all 8 seeded clubs server-side.
+
+**The general rule this establishes:** a frontend build must not depend on the
+API being reachable. Any Server Component that fetches and takes no params is a
+candidate for this failure — check the build output for a route marked `○` that
+also has a revalidate window.
+
+**Affected files**
+- `frontend/app/(main)/clubs/page.tsx` — the `connection()` call and its comment
+
+---
+
+### BUG-026
+**Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]`** · High · FIXED 2026-08-14
+
+**Found:** 2026-08-14, when the push of `482c4dd` failed the Frontend job. The
+commit message for that change said in as many words that the second half had
+not been typechecked. It had not, and this is what was in it.
+
+**Symptom:** `npm run type-check` failed with five instances of TS2345:
+
+```
+app/lib/club.tsx(8,63): error TS2345: Argument of type
+'{ readonly revalidate: 300; readonly tags: readonly ["clubs"]; }'
+is not assignable to parameter of type 'FetchOptions'.
+  Types of property 'tags' are incompatible.
+    The type 'readonly ["clubs"]' is 'readonly' and cannot be
+    assigned to the mutable type 'string[]'.
+```
+
+**Cause:** `PUBLIC_READ_CACHE` in `app/lib/cache.ts` is declared `as const`, so
+its tag arrays are readonly tuples. `FetchOptions.tags` was typed `string[]`,
+which a readonly array cannot satisfy. The two were written in the same change
+and never compiled together.
+
+**Fix:** widen the option to `tags?: readonly string[]` — `apiFetch` only reads
+it — and copy into a mutable array at the `fetch` boundary, because Next types
+`RequestInit['next'].tags` as `string[]` (`next/types/global.d.ts:166`). Copying
+also stops a caller from mutating the shared policy object for every other call
+site.
+
+**Why it reached `main`:** nothing here is subtle; the change was simply pushed
+without running the checks CI runs. The four frontend CI steps are cheap
+(`type-check`, `lint`, `test`, `build`) and reproduce it exactly.
+
+**Also surfaced, and fixed alongside:** three assertions in `club.test.ts` and
+`event.test.ts` still expected `apiFetch` to be called with a bare path and were
+failing on the new second argument. They now assert the cache policy too, so a
+public read that silently loses its policy fails a test instead of quietly going
+back to hitting the backend on every render. A new `app/__tests__/api.test.ts`
+(7 tests) covers the guard that refuses `auth` combined with `revalidate`/`tags`
+— the case where a cached response would hand one user's data to the next
+caller, which had no test at all.
+
+**Affected files**
+- `frontend/app/lib/api.tsx` — the `tags` type and the copy at the fetch call
+- `frontend/app/__tests__/api.test.ts` — new
+- `frontend/app/__tests__/club.test.ts`, `event.test.ts` — updated assertions
+
+---
+
+### BUG-024
+**A non-numeric path variable answered 500 instead of 400** · Medium · FIXED 2026-08-13
+
+**Found:** 2026-08-13, probing the event API while fixing
+[BUG-023](#bug-023).
+
+**Symptom:** `GET /api/v1/events/dance-party` returned **500**:
+
+```json
+{"path":"/api/v1/events/dance-party",
+ "message":"Method parameter 'id': Failed to convert value of type 'java.lang.String' to required type 'java.lang.Long'",
+ "statusCode":500}
+```
+
+**Cause:** Spring raises `MethodArgumentTypeMismatchException` when a path
+variable cannot be converted to the controller's parameter type.
+`DefaultExceptionHandler` had no handler for it, so it fell through to the
+catch-all `@ExceptionHandler(Exception.class)` and was reported as a server
+fault — for what is a malformed request the server understood perfectly well.
+
+Not specific to events: it applied to every `Long` path variable in the app —
+`DELETE /api/v1/events/{id}`, the image upload routes, and anything added later.
+It was reachable from the UI rather than only by hand, because the old hardcoded
+event page linked to a slug id (`dance-party`).
+
+The raw exception message also leaked the target Java type and the controller
+parameter name into the response body.
+
+**Fix:** a `MethodArgumentTypeMismatchException` handler returning **400** with
+`"Invalid value for '%s'".formatted(e.getName())` — the parameter name only, not
+the type detail. Ordering does not matter here: Spring picks the most specific
+handler regardless of declaration order.
+
+**Verification:** `EventLookupIT.nonNumericIdIs400NotAServerError` and
+`aDecimalIdIsAlso400`, plus live checks — `/api/v1/events/dance-party` and
+`/api/v1/events/1.5` both **400**, `/api/v1/events/999999` still **404**, a real
+id still **200**.
+
+---
+
+### BUG-023
+**Event detail page served one hardcoded event, with a club nobody has** · Medium · FIXED 2026-08-13
+
+**Found:** 2026-08-13, split out of [BUG-022](#bug-022) — same root cause, second
+page.
+
+**Symptom:** `app/(main)/events/[eventId]/page.tsx` built its entire event from a
+literal — title, date, location, categories, organizer — and ignored the
+`eventId` in the route, so every event URL rendered the same "Dance Party". Its
+`organizer.name` was `fashion-takes-action`: a slug rather than a name, and one
+no seeded club shares. So the organizer link went nowhere, and
+`<ClubFollowButton clubId={event.organizer.name} />` posted an id the API
+rejects — the label flipped to *Following* and reverted a moment later when the
+404 came back. Before the follow work that button did nothing at all, which is
+why the mismatch had stayed invisible.
+
+**Fix:** the same treatment the club page had in BUG-022, now an established
+pattern rather than a one-off.
+
+- `getEvent` returns `EventInstance | null` — `null` for a 404, rethrowing
+  everything else. It also answers `null` for an id that is not a positive
+  integer, without spending a request: event ids are database bigints, so a slug
+  cannot name one. That is what makes `/events/dance-party` a 404 rather than a
+  round trip ending in [BUG-024](#bug-024).
+- The page is an async Server Component calling `notFound()`, with scoped
+  `not-found.tsx` and `error.tsx` beside it.
+- The organizer block is resolved from the event's real `organizerId` via
+  `getClubById`, giving a working club link, the club's actual name, and a
+  Follow button with an id the API accepts. It reuses `ClubLogo`, so a club
+  without a logo shows its initial instead of the old hardcoded `/frosh1.jpeg`.
+  A missing club degrades that one section rather than 404ing the whole page —
+  the event is real even if its club has been removed.
+- The `/events` listing became a Server Component too, reading `?q=` from the
+  `searchParams` prop. That removed the `useSearchParams` + `Suspense` wrapper
+  and the "Loading events…" flash, and its former inline error branch is now
+  `app/(main)/events/error.tsx`. No `notFound()` there on purpose: `/events`
+  always exists, and an empty result is an empty state, not a 404.
+
+**Verification:** measured against the running stack with a throwaway event
+(since removed). `/events/1` → **200**, `<title>E2E Chess Night · CampusVibe</title>`,
+organizer rendered as *Chess Club* linking to `/clubs/chess-club`;
+`/events/999999`, `/events/dance-party` and `/events/1.5` → real **404**s
+carrying `noindex`, the navbar, and Browse all events; `/events` and
+`/events?q=chess` → **200** with no loading flash. Following from the event page
+wrote `chess-club` to `user_followed_clubs` and **stayed** *Following* — the
+exact symptom this bug was about. With the backend stopped, both pages showed
+their Try again boundary rather than a not-found. 10 new tests in
+`event.test.ts`, 5 in `EventLookupIT`.
+
+---
+
 ### BUG-022
-**Copilot Autofix detached `savedEventIds` from Hibernate, silently discarding every saved event** · High · FIXED 2026-08-13
+**Every club page showed "Club not found"** · High · FIXED 2026-08-13
 
-**Found:** 2026-08-13 on PR #27 (`develop` → `main`), reviewing why GitHub Advanced
-Security was objecting to the merge.
+**Found:** 2026-08-13, while checking the new Follow button on the club detail
+page. The button could not be reached, because the page it lives on never
+rendered.
 
-**Symptom:** saving an event did nothing. `POST /api/v1/users/me/saved-events`
-answered `204 No Content`, the transaction committed, and the row never appeared.
-No exception, no log line. RSVPing still worked, which made it look like a
-My-events display bug rather than a write bug.
-
-CI had already caught it — `Backend / Build and test` passed on run
-`31761396279` and failed on `31761398442`, the next commit:
+**Symptom:** `/clubs/chess-club` — a club that exists, is listed on `/clubs`,
+and is served fine by the API — rendered the empty state:
 
 ```
-[ERROR] Tests run: 32, Failures: 2 -- com.campusvibe.user.MyEventsIT
-  savingAndRsvpingSetIndependentFlags:72  Expected: a collection with size <3>
-  savingTheSameEventTwiceIsANoOp:121      Expected: a collection with size <1>
+Club not found
+This club page doesn't exist — it may have been renamed or removed.
 ```
 
-**Cause:** commit `1562eae`, accepted from Copilot Autofix to clear CodeQL alert
-21 (`java/internal-representation-exposure` on `User.getSavedEventIds`). It
-suppressed Lombok's accessor and hand-wrote a defensive copy:
+**Cause:** `getClubById` in `app/lib/club.tsx` searched `app/data/data.ts`, and
+the two id spaces had never overlapped. Mock: `mcgill-ski-club`,
+`fashion-takes-action`, `eng-frosh`, `startup-montreal`, `tech-montreal`,
+`montreal-artists`. Seeded by `V6` and served by the API: `chess-club`,
+`coding-club`, `debate-club`, and five more. `getAllClubs` *did* call the API,
+so `/clubs` handed out real ids the detail page could not resolve. Every route
+in was affected: each `ClubCard`, each `MyClubCard` on the new My clubs page,
+and the club link on every event card. `GET /api/v1/clubs/{id}` had been
+implemented and serving 200 the whole time (`ClubController.java:55`).
 
-```java
-public Set<Long> getSavedEventIds() {
-    return new HashSet<>(savedEventIds);   // a throwaway copy
-}
-```
+Two further problems were tangled into the same page and fixed with it:
 
-That is correct advice for a value object and wrong for a JPA entity. Hibernate
-replaces an `@ElementCollection` field with a `PersistentSet` that records each
-add and remove so it can emit SQL at flush. The service mutated through the
-getter — `requireUser(email).getSavedEventIds().add(eventId)` — so post-fix the
-`add` landed on a `HashSet` that was garbage-collected at the closing brace.
-The generated setter was worse: reassigning the field swaps the `PersistentSet`
-out, forcing a delete-and-reinsert of every row (and on an `@OneToMany` with
-`orphanRemoval`, an outright throw).
+1. **A missing club threw.** `getClubById` threw for an unknown id, and its one
+   caller caught the throw and turned it straight back into `setClub(null)` —
+   an exception that existed only to be swallowed one line later. Anyone can
+   type any slug, so a miss is an ordinary outcome; Next's error-handling guide
+   is explicit that expected errors should be return values.
+2. **The 404 was a soft one.** The page was a Client Component, so `club` began
+   as `null` and both SSR and the first client paint rendered "Club not found" —
+   every *valid* club briefly flashed its own error state — and the response was
+   `200 OK` either way, so a dead club looked fine to a crawler.
 
-Only `savedEventIds` was touched, which is why RSVPs kept working, and why moving
-`goingEventIds` down three lines made CodeQL re-report it as a *new* alert 22.
+**Fix**, in four parts:
 
-**The alert was a code-quality note, not a vulnerability** — `severity: note`,
-`security_severity_level: null`, no CVSS. The two genuinely high-severity alerts
-in the same list (`java/spring-disabled-csrf-protection` on
-`SecurityFilterChainConfig.java:37`, and `js/empty-password-in-configuration-file`)
-were pre-existing on `main` and are untouched by this.
+- `apiFetch` now throws an `ApiError` carrying `status`. The status was
+  previously lost, which is why `auth-errors.ts:1` has to `JSON.parse` the
+  message back out of the body. `Error.message` is unchanged, so every existing
+  caller and `parseApiError` behave exactly as before.
+- `getClubById` calls the endpoint and returns `Club | null` — `null` only for a
+  404, rethrowing everything else.
+- The page became an async Server Component calling `notFound()`, with the tab
+  state extracted to `ClubEventTabs` (`"use client"`). The check runs in the
+  page body rather than inside a `<Suspense>` boundary, which is what makes the
+  response non-streamed and therefore a real 404 rather than a 200.
+- A scoped `not-found.tsx` carries the previous EmptyState markup verbatim, and
+  a new `error.tsx` handles the genuinely exceptional case. Splitting those two
+  is what stops a backend outage from telling a user their club was deleted.
 
-**Fix:** hand out an unmodifiable *view* and route every change through a named
-mutator, applied to `savedEventIds`, `goingEventIds` and `roles`:
+Server-side fetching was new to this app and needed one piece of plumbing:
+`NEXT_PUBLIC_API_URL` is `http://localhost:8080`, which inside the frontend
+container is that container. `api.tsx` now picks `API_INTERNAL_URL`
+(`http://backend:8080`, set in `docker-compose.yml`) when `window` is undefined.
+It is deliberately not `NEXT_PUBLIC_`: a Docker service name is meaningless to a
+browser and must not be inlined into the client bundle.
 
-```java
-public Set<Long> getSavedEventIds() {
-    return Collections.unmodifiableSet(savedEventIds);   // wraps the live PersistentSet
-}
-public void addSavedEvent(Long eventId)    { savedEventIds.add(eventId); }
-public void removeSavedEvent(Long eventId) { savedEventIds.remove(eventId); }
-```
+**Verification:** `/clubs/chess-club` → **200** with `Chess Club` in the SSR
+HTML, `<title>Chess Club · CampusVibe</title>`, and no "Club not found" visible;
+`/clubs/nonsense` and the stale mock slug `/clubs/tech-montreal` → a real
+**404** carrying `noindex`, the unchanged empty state, and the `(main)` navbar
+and footer. With the backend stopped the page shows "Couldn't load this club"
+and a working Try again, *not* the not-found card. Follow / unfollow works from
+the club page and writes to `user_followed_clubs`, and a My clubs card now
+clicks through to a rendered club page. 7 new tests in `club.test.ts`.
 
-The field is never reassigned and mutations reach the `PersistentSet`, so dirty
-checking still works, while `getRoles().add(...)` now throws
-`UnsupportedOperationException` instead of quietly doing nothing. Seven call
-sites moved to the mutators: `MyEventService` (4), `AuthenticationService:60,80`,
-`ClubAdminRequestService:70`, plus three test helpers.
-
-`roles` was included deliberately even though its alert (16) predates this PR: it
-is the security principal, and the same autofix there would have produced
-role-less registrations and silently failed club-admin promotions — a worse
-outcome than a lost bookmark.
-
-**Verification:** `./mvnw -B verify` — 21 unit + 32 integration tests, 0 failures.
-`MyEventsIT` back to 6/6. The roles path was already covered and stayed green:
-`AuthenticationFlowIT` asserts `$.user.roles` and the JWT claim after register
-(`:36`, `:44`), and `ClubAdminRequestFlowIT:63` asserts `hasRole` on a **reloaded**
-user, which is what proves persistence rather than in-memory state.
-
-**Prevention:** `backend/src/test/java/com/campusvibe/user/UserTest.java` pins the
-decision — it asserts each getter throws on mutation, and that the view reflects a
-later `addSavedEvent`, so it fails against *both* the plain Lombok getter and the
-copy. The comment above the accessors in `User.java` says why, because the next
-person to meet this will be reading that file with an autofix button in front of
-them. [BUG-023](bugs.md#bug-023) tracks the same trap still armed on
-`Club.images` and `Event.images`.
-
-**Open question:** whether `Collections.unmodifiableSet` actually clears alerts
-20/21/22. It is the remedy CodeQL's own help text recommends and the query uses
-value dataflow rather than taint, so it should — but the arbiter is the re-scan on
-push, not this reasoning. If the alerts survive, the fallback is one line: return
-the copy from the getter and keep the mutators, which fixes the data loss either
-way.
+**Left open as [BUG-023](bugs.md#bug-023):** the event detail page has the same
+root cause — a hardcoded event whose `organizer.name` is a slug no club shares —
+and still needs wiring to `GET /api/v1/events/{id}`.
 
 ---
 

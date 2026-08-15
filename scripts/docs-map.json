@@ -1,0 +1,100 @@
+{
+  "$comment": [
+    "Which architecture doc covers which code. Read by scripts/check-docs.mjs,",
+    "which reports when an area changed and its doc did not.",
+    "",
+    "Prefixes, matched against repo-relative paths from `git diff --name-only`.",
+    "A file may map to more than one doc; every match is reported.",
+    "",
+    "Keep this honest rather than complete: a mapping that fires on changes the",
+    "doc does not actually describe trains you to ignore the warning, which is",
+    "the only failure mode that matters for an advisory check."
+  ],
+
+  "docs": {
+    "api-and-caching.md": {
+      "covers": "The apiFetch boundary, the caching model, DTO mapping, error-status mapping",
+      "paths": [
+        "frontend/app/lib/api.tsx",
+        "frontend/app/lib/cache.ts",
+        "frontend/app/lib/adapters.ts",
+        "frontend/app/lib/club.tsx",
+        "frontend/app/lib/event.tsx",
+        "frontend/app/lib/followed-clubs-context.tsx",
+        "backend/src/main/java/com/campusvibe/event/",
+        "backend/src/main/java/com/campusvibe/club/",
+        "backend/src/main/java/com/campusvibe/exception/"
+      ]
+    },
+
+    "ci-cd-pipeline.md": {
+      "covers": "GitHub Actions, tiering, the ci-success gate, and local CI parity",
+      "paths": [
+        ".github/workflows/",
+        ".githooks/",
+        "scripts/verify.mjs",
+        "scripts/check-docs.mjs",
+        "docker/",
+        ".dockerignore",
+        "frontend/next.config.ts",
+        "frontend/Dockerfile",
+        "backend/Dockerfile"
+      ]
+    },
+
+    "authentication.md": {
+      "covers": "Email + code login, Google OAuth, token handling",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/auth/",
+        "backend/src/main/java/com/campusvibe/jwt/",
+        "frontend/app/lib/auth-context.tsx",
+        "frontend/app/lib/auth-errors.ts",
+        "frontend/app/lib/user.tsx",
+        "frontend/app/components/auth-components/"
+      ]
+    },
+
+    "user-roles.md": {
+      "covers": "RBAC: the three roles, JWT claims, endpoint authorisation",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/security/",
+        "backend/src/main/java/com/campusvibe/clubadmin/",
+        "frontend/app/components/ProtectedRoute.tsx"
+      ]
+    },
+
+    "search.md": {
+      "covers": "Hybrid semantic + keyword search",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/search/",
+        "frontend/app/lib/search.ts",
+        "frontend/app/components/SearchBar.tsx"
+      ]
+    },
+
+    "ai-planner.md": {
+      "covers": "The AI planner feature",
+      "paths": [
+        "frontend/app/lib/planner.ts",
+        "frontend/app/components/planner/"
+      ]
+    },
+
+    "llm-api-key-management.md": {
+      "covers": "How the OpenAI key flows without being logged or baked into an image",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/ai/"
+      ]
+    }
+  },
+
+  "skills": {
+    "database-lifecycle": {
+      "reason": "Migrations, seeding and role grants are governed by a skill, not a doc. Read it before changing these.",
+      "path": ".claude/skills/database-lifecycle/SKILL.md",
+      "paths": [
+        "backend/src/main/resources/db/migrations/"
+      ]
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Button from "@/app/components/ui/Button";
+import AuthTrigger from "@/app/components/auth-components/AuthTrigger";
 
 const linkClasses = "text-mist-200/70 hover:text-white transition-colors";
 
@@ -24,8 +25,8 @@ export default function Footer() {
           <div>
             <h4 className="ticket-label text-lavender-300 mb-3">Your account</h4>
             <ul className="space-y-2">
-              <li><Link href="/login" className={linkClasses}>Sign up</Link></li>
-              <li><Link href="/login" className={linkClasses}>Log in</Link></li>
+              <li><AuthTrigger view="signup" className={linkClasses}>Sign up</AuthTrigger></li>
+              <li><AuthTrigger view="login" className={linkClasses}>Log in</AuthTrigger></li>
               <li><Link href="/profile" className={linkClasses}>Profile</Link></li>
             </ul>
           </div>

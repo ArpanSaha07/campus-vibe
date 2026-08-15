@@ -8,6 +8,7 @@ import { useAuthModal } from "@/app/lib/auth-modal-context";
 import { isAdmin, isClubAdmin } from "@/app/lib/user";
 import SearchBar from "@/app/components/SearchBar";
 import Button from "@/app/components/ui/Button";
+import { Sparkles } from "lucide-react";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -42,6 +43,9 @@ export default function Navbar() {
 
           {/* Desktop Links */}
           <div className="hidden xl:flex space-x-1 items-center text-sm font-medium whitespace-nowrap">
+            <Link href="/planner" className={`${linkClasses} inline-flex items-center gap-1`}>
+              Plan with AI <Sparkles className="h-3 w-3" aria-hidden="true" />
+            </Link>
             <Link href="/events" className={linkClasses}>
               Find events
             </Link>
@@ -81,6 +85,9 @@ export default function Navbar() {
 
           {/* Mobile Right Side */}
           <div className="flex xl:hidden items-center space-x-1 text-sm font-medium">
+            <Link href="/planner" className={`${linkClasses} inline-flex items-center gap-1`}>
+              Plan with AI <Sparkles className="h-3 w-3" aria-hidden="true" />
+            </Link>
             <Link href="/events" className={`${linkClasses} hidden sm:block`}>
               Find events
             </Link>
@@ -100,7 +107,7 @@ export default function Navbar() {
         </div>
 
         {/* Search (second row, below lg) */}
-        <div className="w-full py-2 lg:hidden">
+        <div className="w-full pt-2 pb-4 lg:hidden">
           <SearchBar />
         </div>
 
