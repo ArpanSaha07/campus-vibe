@@ -1,9 +1,11 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-14** · Branch: `feature/my-clubs`
+Last updated: **2026-08-15** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-008 … BUG-017, BUG-019 … BUG-022 so far). Bug ids are never reused.
+
+**Fixed 2026-08-15 and moved to [`fixed_bugs.md`](fixed_bugs.md): BUG-005, BUG-028, BUG-029, BUG-030, BUG-031.**
 
 | ID | Severity | Summary |
 |---|---|---|
@@ -12,7 +14,6 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
-| [BUG-005](#bug-005) | Medium | Unauthenticated search can drive unbounded OpenAI spend |
 | [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
@@ -241,40 +242,6 @@ matching `build.args` in compose.
 
 ---
 
-### BUG-005
-**Unauthenticated search can drive unbounded OpenAI spend** · Medium · OPEN
-
-**Found:** 2026-07-30, during the LLM API key management design review.
-
-**Symptom:** `GET /api/v1/events/search` and `/api/v1/clubs/search` are public and
-issue **one OpenAI embedding call per request** (`SearchService.java:66`). The
-only throttle is a 300 ms client-side debounce
-(`frontend/app/components/SearchBar.tsx:10-11`), trivially bypassed by calling
-the API directly. There is no server-side rate limit, no query-length cap, and no
-cache of query embeddings.
-
-Document embeddings are persisted in pgvector
-(`db/migrations/V8__search_embeddings.sql:8-9`), but **query** embeddings are
-recomputed on every request, including identical repeat queries.
-
-Keeping search public is a deliberate product decision (unauthenticated users must
-be able to browse and search), which is exactly why the compensating controls are
-required rather than optional. See `.claude/skills/llm-integration/SKILL.md`
-("Rate Limiting and Quotas").
-
-**Mitigated so far:** connect/read timeouts and bounded retries were added in
-`ai/client/OpenAiEmbeddingClient.java`, and per-call token usage is now logged, so
-spend is at least observable. The rate limit and cache are still missing.
-
-**Affected files**
-- `backend/src/main/java/com/campusvibe/search/SearchService.java:44-52, 65-67`
-- `backend/src/main/java/com/campusvibe/event/EventController.java:42`, `club/ClubController.java:45`
-- `backend/src/main/java/com/campusvibe/ai/client/OpenAiEmbeddingClient.java`
-
-**Affected tests:** none yet. Needs a rate-limit rejection test (expect `429`).
-
----
-
 ### BUG-006
 **Events are never re-indexed after an edit** · Low · OPEN
 
@@ -450,3 +417,4 @@ later `addImages` call, which is what pins it as a view rather than a copy.
 `Event.categories` is safe by luck: `EventController.java:61` reassigns via
 `setCategories(...)` rather than mutating, though it inherits the same trap the
 moment anyone writes `getCategories().add(...)`.
+

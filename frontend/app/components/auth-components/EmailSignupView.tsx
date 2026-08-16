@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/app/lib/auth-context";
 import { parseApiError } from "@/app/lib/auth-errors";
+import { checkEmailStatus, type AuthProvider } from "@/app/lib/user";
 import {
   hasErrors,
+  validateEmail,
   validateSignup,
   MIN_PASSWORD_LENGTH,
   type AuthFieldErrors,
@@ -27,6 +29,34 @@ export default function EmailSignupView({
   const [fieldErrors, setFieldErrors] = useState<AuthFieldErrors>({});
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Which provider already owns the typed address, once we have asked.
+  const [takenBy, setTakenBy] = useState<AuthProvider | null>(null);
+  // The address the answer above refers to, so an edited field clears it rather
+  // than showing a verdict about an email the user has since changed.
+  const checkedEmail = useRef("");
+
+  /**
+   * Asked when the email field loses focus, so a collision is reported while the
+   * user is still on that field — rather than after they have chosen a password
+   * and pressed Sign up. Failures are swallowed: this is an assist, and register
+   * still rejects a duplicate authoritatively.
+   */
+  async function handleEmailBlur() {
+    const value = email.trim().toLowerCase();
+    if (value === checkedEmail.current) return;
+    checkedEmail.current = value;
+    setTakenBy(null);
+    if (validateEmail(value)) return;
+    try {
+      const status = await checkEmailStatus(value);
+      // Ignore a late answer for an address the user has already moved on from.
+      if (checkedEmail.current !== value) return;
+      setTakenBy(status.exists ? status.provider : null);
+    } catch {
+      // Offline or backend down — say nothing and let submit be the authority.
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,8 +99,41 @@ export default function EmailSignupView({
         label="Email"
         type="email"
         value={email}
-        onChange={setEmail}
+        onChange={(v) => {
+          setEmail(v);
+          if (takenBy) setTakenBy(null);
+        }}
+        onBlur={handleEmailBlur}
         error={fieldErrors.email}
+        hint={
+          takenBy && (
+            <span role="status">
+              {takenBy === "GOOGLE" ? (
+                <>
+                  You already signed up with Google using this address.{" "}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("signup")}
+                    className="font-semibold text-lavender-600 hover:text-lavender-800"
+                  >
+                    Continue with Google
+                  </button>
+                </>
+              ) : (
+                <>
+                  An account with this email already exists.{" "}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate("login")}
+                    className="font-semibold text-lavender-600 hover:text-lavender-800"
+                  >
+                    Log in instead
+                  </button>
+                </>
+              )}
+            </span>
+          )
+        }
         autoComplete="email"
         disabled={loading}
       />

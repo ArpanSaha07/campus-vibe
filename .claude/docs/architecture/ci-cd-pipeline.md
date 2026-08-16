@@ -350,7 +350,8 @@ Container logs dump `if: failure()`; teardown is `if: always()`.
 Standalone. Not called by `ci.yml`, not in `ci-success`, so a CodeQL failure
 never blocks a merge. Matrix over `javascript-typescript` and `java-kotlin` with
 `fail-fast: false`, `build-mode: none`, `queries: security-and-quality`.
-Triggers on push and PR to `main` plus a weekly Monday 07:00 UTC cron.
+Triggers on **push to any branch** (the `push:` key is deliberately bare), PR to
+`main`, and a weekly Monday 07:00 UTC cron.
 
 The scheduled run is the point: it re-scans unchanged code against newly
 published queries, catching vulnerabilities disclosed after the code was last
@@ -358,6 +359,38 @@ touched. Findings land under Security → Code scanning.
 
 This is the only workflow with an elevated permission — `security-events: write`,
 required to upload SARIF.
+
+### `.github/workflows/codeql-triage.yml`
+
+Added 2026-08-16. Reads the alerts a CodeQL run produced and writes a triage
+back — a PR comment when the branch has a PR, the job summary otherwise.
+
+**Why it is a separate workflow.** `codeql.yml` uploads SARIF and exits; the
+alerts do not exist until the code-scanning service has ingested it. Anything
+that reads them has to run afterwards, and `workflow_run` is the only trigger
+that fires at that point. Nothing inside `codeql.yml` could do this job.
+
+**It never writes code, and `security-events` is `read`, not `write`.** A CodeQL
+finding splits three ways — a real defect, code that is correct as written, and a
+false positive needing dismissal — and only the first is safe to automate.
+Dismissal in particular is a judgement about *intent*, so it stays a human action
+on the Security tab. The triage exists to make the queue readable, not to empty
+it.
+
+**Two traps recorded here because both are silent:**
+
+- `workflow_run` only fires for workflow files present on the **default branch**.
+  On a feature branch this file does nothing at all, and the Actions tab shows no
+  reason why. `workflow_dispatch` is there to exercise it before it reaches
+  `main`.
+- `codeql.yml` triggers on both `push` and `pull_request`, so a PR branch
+  analyses the same commit twice. The `concurrency` group is keyed on the
+  analysed SHA rather than the ref so that becomes one triage, not two identical
+  comments.
+
+Checkout uses `workflow_run.head_sha`, not the branch tip: they diverge the
+moment anyone pushes while an analysis is running, and the triage would then
+describe code CodeQL never looked at.
 
 ### `.github/dependabot.yml`
 
@@ -665,6 +698,11 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 ## Change log
 
+- **2026-08-16** — Added `codeql-triage.yml`, so CodeQL findings get read
+  without anyone remembering to look. Triage only: it comments, never commits,
+  and holds `security-events: read` rather than `write` so it cannot dismiss an
+  alert. Also recorded that `codeql.yml` now triggers on push to **every**
+  branch, which is what gives the triage something to hang off. *(main session)*
 - **2026-08-06** — Created. Documents the pipeline as of `88a03b1` plus the
   uncommitted step 5–6 work (blocking lint, Dependabot, CodeQL, Node 24).
   *(main session)*

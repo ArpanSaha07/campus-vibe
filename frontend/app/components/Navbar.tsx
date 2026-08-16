@@ -43,7 +43,7 @@ export default function Navbar() {
 
           {/* Desktop Links */}
           <div className="hidden xl:flex space-x-1 items-center text-sm font-medium whitespace-nowrap">
-            <Link href="/planner" className={`${linkClasses} inline-flex items-center gap-1`}>
+            <Link href="/planner" className={`${linkClasses} inline-flex items-center gap-1 border border-lavender-500 rounded-full hover:border-lavender-600`}>
               Plan with AI <Sparkles className="h-3 w-3" aria-hidden="true" />
             </Link>
             <Link href="/events" className={linkClasses}>
@@ -85,7 +85,7 @@ export default function Navbar() {
 
           {/* Mobile Right Side */}
           <div className="flex xl:hidden items-center space-x-1 text-sm font-medium">
-            <Link href="/planner" className={`${linkClasses} inline-flex items-center gap-1`}>
+            <Link href="/planner" className={`${linkClasses} inline-flex items-center gap-1 border border-lavender-500 rounded-full hover:border-lavender-600`}>
               Plan with AI <Sparkles className="h-3 w-3" aria-hidden="true" />
             </Link>
             <Link href="/events" className={`${linkClasses} hidden sm:block`}>
@@ -96,13 +96,13 @@ export default function Navbar() {
                 Log in
               </button>
             )}
-            <button
+            {/* <button
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               className="p-3 rounded-full hover:bg-lavender-50"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+            </button> */}
           </div>
         </div>
 

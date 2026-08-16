@@ -54,7 +54,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         // blank api-key guarantees no live OpenAI call even if the developer has
         // OPENAI_API_KEY exported.
         "jwt.secret=test-only-secret-0123456789-0123456789-0123456789",
-        "campusvibe.ai.openai.api-key="
+        "campusvibe.ai.openai.api-key=",
+        // This class does not use the "test" profile, so it does not inherit the
+        // profile's rate-limit switch. Without this it would throttle itself on
+        // the default 30/min budget as the suite grows (BUG-005 control).
+        "campusvibe.search.rate-limit.enabled=false"
 })
 @AutoConfigureMockMvc
 @Testcontainers

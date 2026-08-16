@@ -56,6 +56,19 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
+		<!-- Bounded, expiring in-memory counters for auth rate limiting and
+		     account lockout. Version managed by spring-boot-starter-parent. -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+		<!-- Password reset and email verification links. Provides JavaMailSender,
+		     which SmtpMailSender wraps; with no spring.mail.host configured the
+		     application uses LoggingMailSender instead and sends nothing. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>

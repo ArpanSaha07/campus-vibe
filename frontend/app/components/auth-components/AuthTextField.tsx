@@ -13,7 +13,9 @@ export default function AuthTextField({
   type = "text",
   value,
   onChange,
+  onBlur,
   error,
+  hint,
   autoComplete,
   disabled,
   minLength,
@@ -24,7 +26,11 @@ export default function AuthTextField({
   type?: "text" | "email" | "password";
   value: string;
   onChange: (value: string) => void;
+  /** Fires when the field loses focus — used to check email availability. */
+  onBlur?: () => void;
   error?: string;
+  /** Neutral note under the field. Ignored when `error` is set. */
+  hint?: React.ReactNode;
   autoComplete?: string;
   disabled?: boolean;
   minLength?: number;
@@ -51,6 +57,7 @@ export default function AuthTextField({
           type={isPassword && revealed ? "text" : type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           autoComplete={autoComplete}
           disabled={disabled}
           minLength={minLength}
@@ -72,10 +79,12 @@ export default function AuthTextField({
           </button>
         )}
       </div>
-      {error && (
+      {error ? (
         <p id={errorId} className="mt-1.5 text-sm text-alert-600">
           {error}
         </p>
+      ) : (
+        hint && <div className="mt-1.5 text-sm text-ink-600">{hint}</div>
       )}
     </div>
   );

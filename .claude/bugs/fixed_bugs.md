@@ -2,10 +2,12 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-14**
+Last updated: **2026-08-16**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-033](#bug-033) | Medium | 2026-08-16 | Three log statements interpolated caller-supplied text, so a newline could forge log entries |
+| [BUG-032](#bug-032) | Medium | 2026-08-16 | The rate-limit 429 built its JSON by string interpolation, escaping nothing and omitting a field every other error carries |
 | [BUG-025](#bug-025) | Low | 2026-08-14 | `formatDayLabel` followed the host locale while its own labels were hardcoded English, mixing languages in one list |
 | [BUG-027](#bug-027) | High | 2026-08-14 | `/clubs` was prerendered at build time, so `next build` required a live backend and failed CI with ECONNREFUSED |
 | [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
@@ -25,6 +27,84 @@ Last updated: **2026-08-14**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-032
+**The rate-limit 429 built its JSON by string interpolation** · Medium · FIXED 2026-08-16
+
+**Found:** 2026-08-16, by CodeQL on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31)
+(`java/xss`, reported High).
+
+`RateLimitResponses.tooManyRequests` wrote the refusal body like this:
+
+```java
+response.getWriter().write("""
+        {"path":"%s","message":"%s","statusCode":429}"""
+        .formatted(request.getRequestURI(), message.formatted(retryAfterSeconds)));
+```
+
+Two separate defects in three lines.
+
+**1. Nothing is escaped.** `getRequestURI()` is written by whoever made the
+request. A `"` in it closes the JSON string and everything after it is parsed as
+document structure. *Not exploitable as the code stood* — both filters call this
+only from `doFilterInternal`, and their `shouldNotFilter` returns early unless
+the URI **exactly equals** one of six constants, so the value reaching the
+formatter was provably one of those six. That is an invariant held in a different
+method of a different class, though, and the next filter to reuse this helper
+with a prefix match reintroduces the hole silently. CodeQL was reading the sink,
+which is the right thing to read.
+
+**2. The body is the wrong shape.** It emitted three fields; `ApiError` has four.
+A throttled caller got a body missing `localDateTime` that every other error in
+the API carries — the class javadoc claimed the shapes matched, and they did not.
+
+**Fix:** stop writing the body here at all. The filter now hands a
+`TooManyAttemptsException` to `handlerExceptionResolver`, which runs the refusal
+back through the existing `@ControllerAdvice` — same handler, same serializer,
+same shape. There is no hand-rolled JSON left to escape, and no second copy of
+the error format to keep in step. `@Lazy` on the injected resolver keeps the MVC
+infrastructure out of the security chain's construction.
+
+**Covered by a test:** `AuthRateLimitIT.aRefusalHasTheSameBodyAsEveryOtherError`
+asserts all four fields on a real 429. The eight pre-existing rate-limit tests
+pass unchanged, which is the evidence that status, `Retry-After` and `message`
+still come out identical.
+
+---
+
+### BUG-033
+**Caller-supplied text reached three log statements unescaped** · Medium · FIXED 2026-08-16
+
+**Found:** 2026-08-16, same CodeQL run (`java/log-injection`, three instances).
+
+A log line is text. A value containing a newline does not appear *inside* an
+entry — it ends that entry and begins one the caller composed. Three sinks took
+request data straight into a format argument:
+
+- `DefaultExceptionHandler:221` — `request.getRequestURI()` and `getMethod()`.
+  The worst of the three: this is the line someone reads to find out what broke,
+  so it is the last one that should be writable by whoever broke it.
+- `SmtpMailSender:39` — the recipient address, i.e. whatever was typed into the
+  forgot-password form.
+- `LoggingMailSender:25` — recipient, subject and the whole body, which is
+  assembled from the user's own display name.
+
+**Reachability was limited, not absent.** `getRequestURI()` is *not* URL-decoded
+by the servlet container, and Tomcat rejects a raw control character in the
+request line, so the exception-handler sink was hard to drive. The mail sinks had
+no such protection: a display name is stored and echoed verbatim.
+
+**Fix:** `com.campusvibe.common.Logs`. `safe()` replaces the whole `\p{Cntrl}`
+class — CR and LF, and also ESC, since a log tailed in a terminal will interpret
+escape sequences and repaint the operator's screen — then bounds the length,
+because nothing forces a URI to be short. `safeBlock()` is the variant for the
+mail body, whose line breaks are the point: it keeps them and prefixes every
+line, so injected content still cannot pass as an entry of its own.
+
+**Covered by a test:** `LogsTest`, eight cases including the forged-entry and
+terminal-escape ones.
 
 ---
 
@@ -1044,3 +1124,230 @@ rather than a silent no-op.
 
 **Affected files:** `frontend/app/components/auth-components/OAuthButtons.tsx`,
 `frontend/app/types/google-identity.d.ts` *(new)*
+
+---
+
+## Authentication review, 2026-08-15
+
+Four findings from the review that produced [`authentication.md`](../docs/architecture/authentication.md). All four are fixed and covered by `AuthProviderIT` except where noted.
+
+### BUG-028
+**A malformed Google ID token returns 500 instead of 401** · Medium · FIXED
+
+**Found:** 2026-08-15, probing `POST /api/v1/auth/google` against the Docker
+stack while rewriting [`authentication.md`](../docs/architecture/authentication.md).
+
+**Reproduce:**
+
+```
+curl -X POST http://localhost:8080/api/v1/auth/google \
+  -H 'Content-Type: application/json' -d '{"idToken":"not-a-real-token"}'
+```
+
+Observed: `{"path":"/api/v1/auth/google","message":null,"statusCode":500}`.
+Expected: 401, the same as every other bad token.
+
+**Cause.** The split is *parse* versus *verify*. `GoogleTokenVerifier.verify`
+(`GoogleTokenVerifier.java:34`) catches only `GeneralSecurityException` and
+`IOException`, but Google's `GoogleIdToken.parse` signals a structurally
+malformed token with an unchecked `IllegalArgumentException` — thrown by a
+`Preconditions.checkArgument` with no message, which is why the response body
+carries `message: null`. It escapes to the catch-all handler
+(`DefaultExceptionHandler.java:149`), which maps anything unmapped to 500.
+
+Confirmed by contrast: `aaa.bbb.ccc` has the dots the parser needs, reaches
+verification, and correctly returns 401 `Invalid Google token`.
+
+**Fix:** catch `IllegalArgumentException` alongside the other two in
+`GoogleTokenVerifier.verify` and return `null`, so the existing
+`BadCredentialsException` path produces the 401.
+
+**No test covers the Google endpoint at all**, which is why this survived —
+`AuthenticationFlowIT` has 11 cases and none of them are Google. Add one with
+the fix.
+
+**FIXED 2026-08-15.** `GoogleTokenVerifier.verify` catches
+`IllegalArgumentException` alongside the checked exceptions and returns null, so
+a structurally malformed token takes the same 401 path as any other bad one.
+Covered by `AuthProviderIT.malformedGoogleTokenIsRejectedWith401NotServerError`,
+which uses the exact `not-a-real-token` input from the report.
+
+### BUG-029
+**`GoogleSignInRequest` is unvalidated; a null `idToken` returns 500 and leaks a
+JVM message** · Medium · FIXED
+
+**Found:** 2026-08-15, same probe session as BUG-028.
+
+**Reproduce:**
+
+```
+curl -X POST http://localhost:8080/api/v1/auth/google \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+Observed: 500 with
+`message: Cannot invoke "String.indexOf(int)" because "tokenString" is null`.
+
+**Cause.** `AuthenticationController.google` (`AuthenticationController.java:38-39`)
+is the only one of the three auth endpoints without `@Valid`, and
+`GoogleSignInRequest` carries no constraints — unlike `AuthenticationRequest`
+and `RegisterRequest`, which both use `@NotBlank`. The null reaches Google's
+parser and the resulting helpful-NPE message is echoed to the caller by the
+catch-all handler.
+
+**Two fixes, both wanted:**
+1. `@NotBlank String idToken` on the record, `@Valid` on the parameter — makes
+   it a 400 like every other malformed request.
+2. Stop the catch-all echoing `e.getMessage()` for unmapped exceptions
+   (`DefaultExceptionHandler.java:149`). Any unmapped exception is currently a
+   potential internal-detail disclosure; this one just makes it visible.
+
+**FIXED 2026-08-15**, both halves.
+
+1. `GoogleSignInRequest.idToken` is `@NotBlank` and the controller parameter is
+   `@Valid`, so a missing or blank token is a 400.
+2. The catch-all in `DefaultExceptionHandler` no longer echoes `e.getMessage()`
+   to the caller: it logs the exception at ERROR and returns a fixed
+   `Something went wrong. Please try again.` No unmapped exception can disclose
+   internals now.
+
+A third fix came out of writing the test: `@RequestParam` constraints raise
+`ConstraintViolationException`, which nothing handled, so a malformed
+`?email=` on the new `email-status` endpoint answered **500**. That now maps to
+400. Covered by `missingGoogleTokenIsA400NotA500`, `blankGoogleTokenIsA400` and
+`emailStatusRejectsAMalformedAddress`.
+
+### BUG-030
+**A blank `GOOGLE_CLIENT_ID` accepts a Google ID token issued to any
+application** · High · FIXED
+
+**Found:** 2026-08-15, reading `GoogleTokenVerifier` while rewriting
+[`authentication.md`](../docs/architecture/authentication.md).
+
+**Latent, not live** — the client id is set in this environment. It becomes live
+in any environment that ships without it, which the blank-is-supported
+convention across `docker/.env.example` makes easy to do by accident.
+
+`GoogleTokenVerifier.java:26`:
+
+```java
+.setAudience(clientId == null || clientId.isBlank() ? null : Collections.singletonList(clientId))
+```
+
+A `null` audience makes the underlying `IdTokenVerifier` **skip the audience
+check entirely** rather than reject everything. Signature, issuer and expiry
+still pass, so any valid Google-issued ID token — from any OAuth client
+anywhere — verifies. `POST /api/v1/auth/google` is `permitAll`
+(`SecurityFilterChainConfig.java:43`) and `AuthenticationService.googleSignIn`
+auto-creates a user from the token's email, so the caller is authenticated as
+whatever email their token carries.
+
+**Fix:** fail closed. Reject Google sign-in with 503 or 401 when the client id
+is unconfigured, rather than verifying without an audience. Not yet filed as a
+todo item pending Arpan's decision on priority.
+
+**FIXED 2026-08-15.** `GoogleTokenVerifier` now builds no verifier at all when
+`google.clientId` is blank, logs a startup warning naming the consequence, and
+rejects every token. Fail closed rather than fail open. Covered by
+`AuthProviderIT` (the whole class runs with no client id configured, so every
+Google-endpoint case there is also a regression test for this).
+
+### BUG-031
+**Google sign-in never checks `email_verified`** · High · FIXED
+
+**Found:** 2026-08-15, same review as BUG-030.
+
+`AuthenticationService.java:73-74` reads `email` and `name` from the Google
+payload and nothing else. Line 75 then does
+`userRepository.findByEmail(email).orElseGet(...)`, so a Google sign-in for an
+address that already has an email/password account **logs into that account**.
+
+Together those two facts mean an ID token carrying an *unverified* email that
+matches an existing CampusVibe user authenticates as that user. Google's
+integration guidance is explicit that `email_verified` must be checked before
+trusting the address. Severity is High rather than Critical because obtaining
+such a token requires control of an OAuth client and an unverified Google
+account for the target address.
+
+**Fix:** reject the sign-in when `email_verified` is not true. One condition,
+next to the existing payload reads.
+
+---
+
+**FIXED 2026-08-15.** `AuthenticationService.googleSignIn` rejects the token
+with `BadCredentialsException` unless `payload.getEmailVerified()` is true, and
+does so *before* the find-or-create lookup that matches on email. **Not covered
+by an automated test**: asserting it needs a genuinely signed Google token,
+which cannot be minted in a test. Verified by reading, and by manual sign-in
+continuing to work for a verified account.
+
+---
+
+### BUG-005
+**Unauthenticated search can drive unbounded OpenAI spend** · Medium · FIXED
+
+**Found:** 2026-07-30, during the LLM API key management design review.
+
+**Symptom:** `GET /api/v1/events/search` and `/api/v1/clubs/search` are public and
+issue **one OpenAI embedding call per request** (`SearchService.java:66`). The
+only throttle is a 300 ms client-side debounce
+(`frontend/app/components/SearchBar.tsx:10-11`), trivially bypassed by calling
+the API directly. There is no server-side rate limit, no query-length cap, and no
+cache of query embeddings.
+
+Document embeddings are persisted in pgvector
+(`db/migrations/V8__search_embeddings.sql:8-9`), but **query** embeddings are
+recomputed on every request, including identical repeat queries.
+
+Keeping search public is a deliberate product decision (unauthenticated users must
+be able to browse and search), which is exactly why the compensating controls are
+required rather than optional. See `.claude/skills/llm-integration/SKILL.md`
+("Rate Limiting and Quotas").
+
+**Mitigated so far:** connect/read timeouts and bounded retries were added in
+`ai/client/OpenAiEmbeddingClient.java`, and per-call token usage is now logged, so
+spend is at least observable. The rate limit and cache are still missing.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/search/SearchService.java:44-52, 65-67`
+- `backend/src/main/java/com/campusvibe/event/EventController.java:42`, `club/ClubController.java:45`
+- `backend/src/main/java/com/campusvibe/ai/client/OpenAiEmbeddingClient.java`
+
+**Affected tests:** none yet. Needs a rate-limit rejection test (expect `429`).
+
+---
+
+**FIXED 2026-08-15.** Three controls, because none of them is sufficient alone —
+a rate limit still lets a slow steady caller spend indefinitely, a cache does
+nothing against distinct queries, and a length cap does nothing against volume.
+
+1. **Per-IP budget** on `/api/v1/events/search` and `/api/v1/clubs/search`
+   (`SearchRateLimitFilter`, 30/min default). A filter, so a refused request
+   never reaches the provider — a limiter applied after the embedding call would
+   bound the response rate and leave the bill unchanged. Its own budget,
+   separate from the auth limiter: different reason, different numbers, and
+   neither may consume the other's allowance.
+2. **Query length cap** at 200 characters (`SearchLimits.MAX_QUERY_LENGTH`),
+   rejected with 400 rather than truncated. Truncating still pays for the work
+   and silently answers a different question than the one asked.
+3. **Query-embedding cache** (`QueryEmbeddingCache`). Document embeddings
+   already persisted in pgvector; query embeddings were recomputed every
+   request, including the identical repeats a search box produces constantly.
+   Keyed case- and whitespace-insensitively. An **empty** answer is deliberately
+   not cached: caching it would pin search into keyword-only mode for the whole
+   TTL after one provider blip.
+
+**Tests:** `QueryEmbeddingCacheTest` (7 unit, counts provider calls through a
+`CountingEmbeddingService` — the real service returns empty with no API key, so
+a test that cannot see the call count could not tell a working cache from a
+broken one) and `SearchRateLimitIT` (7, Testcontainers + pgvector, because the
+search SQL returns 500 on H2).
+
+**One thing this uncovered:** `SearchIT` does not use the `test` profile, so it
+did not inherit the profile's rate-limit switch and would have begun throttling
+itself as the suite grew. It now disables the search limiter explicitly.
+
+**Still open, deliberately:** there is no global spend ceiling. The per-IP budget
+bounds one caller, not the sum of all of them. The honest control for that is a
+hard monthly cap on the OpenAI project itself, which is tracked separately in
+`todo.md` under AI & Search.

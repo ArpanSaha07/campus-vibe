@@ -15,6 +15,8 @@ const testUser: User = {
   email: "test@campus.com",
   roles: [Role.USER],
   createdAt: "2026-01-01T00:00:00Z",
+    emailVerified: true,
+    authProvider: "LOCAL",
 };
 
 function Probe() {

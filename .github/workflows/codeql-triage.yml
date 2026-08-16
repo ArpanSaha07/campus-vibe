@@ -1,0 +1,155 @@
+name: CodeQL Triage
+
+# Reads the alerts a CodeQL analysis produced and writes a triage back to
+# GitHub, so findings do not sit unread on the Security tab until someone
+# thinks to look.
+#
+# WHY THIS IS A SEPARATE WORKFLOW, not a step inside codeql.yml: that workflow
+# uploads SARIF and finishes. The alerts only exist *after* the code-scanning
+# service has ingested it, so anything reading them has to run afterwards.
+# `workflow_run` is the only trigger that fires at that point.
+#
+# TRIAGE ONLY. This never edits, commits or pushes code. Every CodeQL finding
+# splits three ways — a real defect, code that is correct as written, and a
+# false positive needing dismissal — and only the first is safe to automate.
+# Auto-committing security fixes to a branch nobody is watching is a worse
+# failure than a finding sitting unread for a day.
+#
+# THE ONE THING THAT WILL LOOK BROKEN: `workflow_run` only fires for workflow
+# files that exist on the **default branch**. Until this file is merged to
+# `main` it will never trigger on its own, with nothing in the Actions tab to
+# explain the silence. Use `workflow_dispatch` below to exercise it before then.
+#
+# Shares CLAUDE_CODE_OAUTH_TOKEN with claude-code-review.yml. If that secret is
+# unset or expired this job fails loudly rather than skipping — a security
+# triage that silently stops running is worse than one that is obviously broken.
+
+on:
+  workflow_run:
+    workflows: ["CodeQL"]
+    types: [completed]
+  # Manual runs, and the only way to exercise this before it reaches `main`.
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to triage (defaults to the one you launch from)'
+        required: false
+        type: string
+
+concurrency:
+  # codeql.yml triggers on both `push` and `pull_request`, so a PR branch
+  # analyses the same commit twice. Keying on the SHA collapses that into one
+  # triage rather than two identical comments.
+  group: codeql-triage-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Reading the alerts. Note this is `read`: nothing here may resolve or dismiss
+  # an alert. Dismissal is a judgement about intent and stays a human action on
+  # the Security tab.
+  security-events: read
+  pull-requests: write
+  actions: read
+  id-token: write
+
+jobs:
+  triage:
+    name: Triage CodeQL alerts
+    # A cancelled analysis uploaded nothing, so there is nothing to read. A
+    # failed one may still have uploaded results for the language that worked —
+    # codeql.yml runs the two languages with fail-fast off precisely so that one
+    # extractor breaking does not cost the other's findings.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout the analysed commit
+        uses: actions/checkout@v4
+        with:
+          # The commit CodeQL actually looked at, not the tip of the branch —
+          # they differ as soon as anyone pushes while the analysis is running,
+          # and reading the wrong one produces triage about the wrong code.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 1
+
+      - name: Triage
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANALYSED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ANALYSED_BRANCH: ${{ github.event.inputs.branch || github.event.workflow_run.head_branch || github.ref_name }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowedTools "Bash(gh api:*),Bash(gh pr:*),Bash(echo:*),Read,Grep,Glob"
+          prompt: |
+            Triage the CodeQL alerts for commit $ANALYSED_SHA on branch
+            $ANALYSED_BRANCH of ${{ github.repository }}.
+
+            ## Step 1 — get the alerts, and stop early if there are none
+
+            ```
+            gh api "repos/${{ github.repository }}/code-scanning/alerts?ref=refs/heads/$ANALYSED_BRANCH&state=open&per_page=100"
+            ```
+
+            If that returns no alerts, write one line saying so to
+            $GITHUB_STEP_SUMMARY and STOP. Do not post a comment. A clean push
+            should cost seconds, not a review — and a bot that comments
+            "nothing found" on every push trains people to ignore it.
+
+            ## Step 2 — decide which ones are new
+
+            Alerts whose location is not in this commit's diff are pre-existing.
+            Say so and keep them in a short separate list; the reader needs to
+            know what THIS push introduced. Use:
+            `gh api repos/${{ github.repository }}/commits/$ANALYSED_SHA`
+
+            ## Step 3 — classify each alert into exactly one of three
+
+            Read the flagged code before judging it. Never classify from the
+            rule name alone: whether a finding is real depends on what reaches
+            the sink, which is in the source, not the alert.
+
+            - **Real defect** — the code is wrong and should change. Say what
+              breaks and under what input.
+            - **Correct as written** — the code does this deliberately. Name the
+              reason it is deliberate, from a comment or the surrounding design.
+            - **Not reachable** — the pattern is genuinely there but the input
+              cannot arrive. State the constraint that prevents it AND where
+              that constraint lives; a guarantee held in another file is worth
+              flagging as fragile even when it currently holds.
+
+            Be honest about uncertainty. "I could not tell whether X is
+            reachable" is useful; a confident wrong call is not.
+
+            ## Step 4 — report
+
+            Find a PR for this branch:
+            `gh pr list --head $ANALYSED_BRANCH --json number --jq '.[0].number'`
+
+            - **If there is one**, post ONE comment with `gh pr comment`.
+              Before posting, read existing comments and if a previous triage
+              comment from this workflow is already there, edit it with
+              `gh pr comment --edit-last` instead of adding another.
+            - **If there is not**, write the same content to $GITHUB_STEP_SUMMARY.
+
+            Lead with the count and the single most serious finding. Group by
+            classification, most serious first. For each: rule id, file:line,
+            one sentence on the verdict, and the concrete next action.
+
+            End with a short note that fixes are applied by a human running
+            Claude Code locally on the branch, and that dismissals happen on the
+            Security tab. Do NOT tell the reader to reply @claude — that path is
+            not currently wired up on this repository.
+
+            ## Rules
+
+            - Never edit, commit or push code. You have no write tools; do not
+              try to work around that.
+            - Never dismiss or resolve an alert. That is a human decision.
+            - Report accurately. If you could not read something, say which
+              alert you skipped rather than guessing at it.

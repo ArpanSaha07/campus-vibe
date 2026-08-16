@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { MailCheck } from "lucide-react";
 import { validateEmail } from "@/app/lib/validators/authValidator";
+import { requestPasswordReset } from "@/app/lib/user";
 import Button from "@/app/components/ui/Button";
 import AuthTextField from "@/app/components/auth-components/AuthTextField";
 import { AUTH_MODAL_TITLE_ID, type AuthModalView } from "@/app/lib/auth-modal-context";
 
-// NOT WIRED UP. The backend has no password reset — AuthenticationController
-// exposes login, register and google only, and there is no reset-token table or
-// mail sender behind it. Submitting validates the address and shows the
-// confirmation, but sends nothing. Tracked as a P1 in .claude/TODO/todo.md;
-// the request belongs on the line marked TODO below once the endpoint lands.
+// Asks the backend to mail a reset link.
+//
+// The confirmation below is shown whatever the answer, and the request is not
+// awaited for its result: POST /forgot-password returns 204 for an unknown
+// address, for a Google account, and for a real one alike. Reporting a failure
+// here would undo that on the client and turn this screen into an account
+// oracle. Errors are swallowed for the same reason.
 
 export default function RecoverPasswordView({
   onNavigate,
@@ -21,15 +24,23 @@ export default function RecoverPasswordView({
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const emailError = validateEmail(email);
     setError(emailError);
     if (emailError) return;
-    // TODO: await requestPasswordReset(email.trim()) once
-    // POST /api/v1/auth/forgot-password exists.
-    setSent(true);
+
+    setSending(true);
+    try {
+      await requestPasswordReset(email.trim());
+    } catch {
+      // Deliberately ignored — see the note at the top of this file.
+    } finally {
+      setSending(false);
+      setSent(true);
+    }
   }
 
   if (sent) {
@@ -69,11 +80,12 @@ export default function RecoverPasswordView({
         onChange={setEmail}
         error={error}
         autoComplete="email"
+        disabled={sending}
         autoFocus
       />
 
-      <Button type="submit" size="lg" className="mt-2 w-full">
-        Send link
+      <Button type="submit" size="lg" className="mt-2 w-full" disabled={sending}>
+        {sending ? "Sending..." : "Send link"}
       </Button>
     </form>
   );

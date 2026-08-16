@@ -53,6 +53,54 @@ aws:
 google:
   clientId: ${GOOGLE_CLIENT_ID:}
 
+campusvibe.mail:
+  from: ${MAIL_FROM:no-reply@campusvibe.local}
+  # Links in emails point at the FRONTEND, not the API — a reset link has to
+  # open a page a human can type into. Cannot be derived from the request: the
+  # request arrives from the frontend server, not the browser.
+  app-base-url: ${APP_BASE_URL:http://localhost:3000}
+  reset-token-ttl: ${MAIL_RESET_TOKEN_TTL:1h}
+  verify-token-ttl: ${MAIL_VERIFY_TOKEN_TTL:24h}
+
+# NOTE: spring.mail.host is deliberately NOT declared here.
+#
+# Declaring it with an empty default (${MAIL_HOST:}) *sets* the property to an
+# empty string, which is not the same as leaving it unset: MailConfig's
+# @ConditionalOnProperty then matches and picks SmtpMailSender pointed at host
+# "", and Boot's mail health indicator tries to connect to it and reports the
+# whole application DOWN — /actuator/health answers 503 and the Docker
+# healthcheck never passes.
+#
+# To enable real delivery, set these as environment variables instead:
+#   SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME, SPRING_MAIL_PASSWORD
+# Unset, the application uses LoggingMailSender and writes messages — links
+# included — to this log.
+spring.mail.properties:
+  mail.smtp.auth: true
+  mail.smtp.starttls.enable: true
+
+management.health.mail.enabled: false  # mail is optional; its outage is not ours
+
+campusvibe.auth:
+  # OFF by default. Turning it on refuses sign-in to a LOCAL account whose
+  # address has never been confirmed — a real barrier against throwaway
+  # addresses, at the cost of locking out anyone whose mail never arrives.
+  # A product decision, so it is a switch rather than a default.
+  require-verified-email: ${AUTH_REQUIRE_VERIFIED_EMAIL:false}
+
+campusvibe.auth.rate-limit:
+  # Bounds online password guessing, signup spam and enumeration through
+  # /email-status. In-memory and per instance — see AuthRateLimiter for what
+  # that costs and when it stops being enough.
+  enabled: ${AUTH_RATE_LIMIT_ENABLED:true}
+  ip-requests-per-window: ${AUTH_RATE_LIMIT_IP_REQUESTS:20}
+  window: ${AUTH_RATE_LIMIT_WINDOW:1m}
+  max-failed-logins: ${AUTH_RATE_LIMIT_MAX_FAILED_LOGINS:5}
+  lockout-duration: ${AUTH_RATE_LIMIT_LOCKOUT:15m}
+  # Only true behind a proxy that sets X-Forwarded-For (an ALB). On a directly
+  # exposed app it lets a caller forge an IP per request and bypass the limit.
+  trust-forwarded-header: ${AUTH_RATE_LIMIT_TRUST_XFF:false}
+
 # AI providers. Every value is externalised so the same artifact runs unchanged
 # in local dev (docker/.env) and production (Elastic Beanstalk environment
 # properties) — only the source of the values differs.
@@ -72,6 +120,20 @@ search:
   semantic-weight: 0.7
   keyword-weight: 0.3
   min-score: 0.2
+  # Caches embeddings of search *queries* only, never results (BUG-005).
+  # Document embeddings live in pgvector; these were recomputed per request,
+  # including for the identical repeats a search box produces constantly.
+  query-embedding-cache:
+    max-entries: ${SEARCH_EMBEDDING_CACHE_ENTRIES:1000}
+    ttl: ${SEARCH_EMBEDDING_CACHE_TTL:1h}
+
+campusvibe.search.rate-limit:
+  # Bounds OpenAI spend on the deliberately-public search endpoints (BUG-005).
+  # Separate budget from the auth limiter: different reason, different numbers,
+  # and neither may consume the other's allowance.
+  enabled: ${SEARCH_RATE_LIMIT_ENABLED:true}
+  ip-requests-per-window: ${SEARCH_RATE_LIMIT_IP_REQUESTS:30}
+  window: ${SEARCH_RATE_LIMIT_WINDOW:1m}
 
 jwt:
   # Required — no default. A committed fallback would let any environment that
