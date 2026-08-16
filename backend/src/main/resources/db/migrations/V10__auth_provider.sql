@@ -25,7 +25,10 @@ ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
 -- Emails are matched case-insensitively by the application, so they must be
 -- stored in one form or 'is this address taken?' answers differently depending
 -- on how the user typed it. The UNIQUE constraint from V1 is case-sensitive and
--- would otherwise allow Ada@x.com beside ada@x.com as two accounts.
+-- would otherwise allow Ada@campus.com beside ada@campus.com as two accounts.
+-- (@campus.com deliberately: the migration lint in .github/workflows/_database.yml
+--  rejects any other email-shaped text anywhere in this directory, comments
+--  included, because a migration runs in every environment and is permanent.)
 UPDATE users SET email = lower(email) WHERE email <> lower(email);
 
 ALTER TABLE users ADD CONSTRAINT users_email_is_lowercase CHECK (email = lower(email));
