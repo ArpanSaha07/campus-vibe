@@ -56,11 +56,12 @@ gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 Every pull request into `main` runs an automated check suite on GitHub's servers,
 and as of 2026-08-07 that suite **must pass before anything can merge** — you
 cannot push to `main` directly, and a broken build is stopped by a machine rather
-than caught after the fact. As of 2026-08-16 it runs **once per pull request**
-and nowhere else: it used to also run on every push, which meant the same commit
-was tested two or three times, and the ruleset's up-to-date requirement makes the
-post-merge run provably redundant. A push to a working branch is now covered by
-the `pre-push` hook on your own machine instead. **These workflows deploy
+than caught after the fact. As of 2026-08-16 each commit is tested **once**: a
+push to a working branch gets a fast, scoped run from `branch-checks.yml`, a pull
+request gets everything from `ci.yml`, and a branch that already has an open PR
+skips the push run rather than doing both. Nothing runs after a merge to main,
+because the ruleset's up-to-date requirement makes that provably redundant.
+**These workflows deploy
 nothing** — there is no AWS
 account or registry yet — but that is not the same as nothing being deployed:
 **Vercel builds and previews the frontend on its own**, triggered by GitHub
@@ -75,11 +76,14 @@ visitor's browser alongside an entire build toolchain nobody meant to deploy.
 
 - **`.github/workflows/ci.yml`** is the only file with real triggers. Everything
   named `_*.yml` is a reusable workflow that runs only when `ci.yml` calls it.
-- **Do not add a `push:` trigger back to `ci.yml`.** It looks like a gap and is
-  not; the reasoning, and the one ruleset setting that would invalidate it, are
-  in [The trigger model](#the-trigger-model-and-why-there-are-no-tiers-any-more).
-  `codeql.yml` is the deliberate exception — its main run is the code-scanning
-  baseline, not a duplicate.
+- **Do not add a `push:` trigger back to `ci.yml`.** Branch pushes are covered by
+  `branch-checks.yml`, on purpose and under a different check name — a second run
+  emitting `CI` could satisfy the merge gate having skipped the expensive jobs.
+  See [The trigger model](#the-trigger-model-two-workflows-two-check-names).
+  `codeql.yml` is the one deliberate exception to the no-`push` rule; its main
+  run is the code-scanning baseline, not a duplicate.
+- **Nothing outside `ci.yml` may define a job whose display name is `CI`.**
+  `grep -rn "name: CI$" .github/workflows/` should return exactly one line.
 - **`ci-success` is load-bearing, and now literally so.** It is the required
   status check on `main`, it runs `if: always()`, and it treats `skipped` as a
   pass. That is what lets job-level path filtering coexist with branch
@@ -115,19 +119,25 @@ The resolution: **one workflow, filtering at the job level, behind a gate job
 that always reports.**
 
 ```
-ci.yml     on: pull_request → main | merge_group | workflow_dispatch
-│
-├─ changes        did anything that is not documentation change?
-├─ secret-scan    gitleaks over commit history          always
-│
-├─ backend    → _backend.yml  ┐
-├─ frontend   → _frontend.yml │  all four, in parallel,
-├─ database   → _database.yml │  unless the change is docs-only
-├─ docker     → _docker.yml   ┘
-│
+ci.yml            on: pull_request → main | merge_group | workflow_dispatch
+│                 THE MERGE GATE. Everything, unfiltered.
+├─ changes            did anything that is not documentation change?
+├─ secret-scan    →   _secret-scan.yml
+├─ backend        →   _backend.yml   ┐
+├─ frontend       →   _frontend.yml  │ all four, in parallel,
+├─ database       →   _database.yml  │ unless the change is docs-only
+├─ docker         →   _docker.yml    ┘
 └─ ci-success  ← named `CI`. THE required check. Require this and nothing else.
 
-codeql.yml    standalone, on main + PR + weekly. NOT part of the gate.
+branch-checks.yml on: push, branches-ignore main / dependabot / merge queue
+│                 THE ITERATION LOOP. Fast, scoped, never gates anything.
+├─ should-run         open PR for this branch? then skip — ci.yml has it
+├─ secret-scan    →   _secret-scan.yml
+├─ backend        →   _backend.yml   (run-integration-tests: false)
+├─ frontend       →   _frontend.yml
+└─ database       →   _database.yml  (run-migrate: false)
+
+codeql.yml        standalone, on main + PR + weekly. NOT part of the gate.
 ```
 
 ### Why path filtering is coarse
@@ -158,19 +168,42 @@ the frontend has no compile-time knowledge of the backend's types. That gap is
 closed separately by the contract test — see
 [`contracts/api-dto-fields.json`](#contractsapi-dto-fieldsjson--the-api-contract).
 
-### The trigger model, and why there are no tiers any more
+### The trigger model: two workflows, two check names
 
-**Until 2026-08-16 this ran on `push` as well**, with a two-tier split: a
-feature-branch push got a fast subset, a PR got everything. It had a defect that
-outgrew the benefit. GitHub fires `push` *and* `pull_request` for the same
-commit, so every commit on a branch with an open PR was tested twice, and again
-after the merge. Measured over the last twenty CI runs: **12 commits ran twice,
-one ran three times.** Dependabot was hit hardest, because it pushes a branch and
-opens a PR — five ecosystems, weekly.
+GitHub fires `push` *and* `pull_request` for the same commit, so when both live
+in one workflow every commit on a branch with an open PR is tested twice, and
+again after the merge. Measured over twenty CI runs on 2026-08-16: **12 commits
+ran twice, one ran three times.** Dependabot was hit hardest, because it pushes a
+branch and opens a PR — five ecosystems, weekly.
 
-Dropping `push` collapsed the tiering with it: every remaining trigger was
-full-tier, so the fast branch became unreachable and was deleted rather than left
-to rot. `_backend.yml` and `_database.yml` no longer take a `full-tier` input.
+The first fix was to delete `push` from `ci.yml`. That stopped the duplication
+and overshot: a branch with no PR then ran **nothing at all**, which is how a
+push to `ci/github-actions` sailed through untested. Branch pushes are now
+handled by `branch-checks.yml`.
+
+**Why a second workflow and not a `push:` trigger on `ci.yml` — this is the part
+worth understanding before changing any of it.** A required status check is
+matched by **name**. `ci.yml` emits `CI`, the single context the ruleset
+requires. If a push-triggered run also emitted `CI`, two runs would produce that
+context on one commit, and the run that satisfies the gate could be the push run
+— which deliberately skips the integration suites, the real Flyway migration and
+the whole Docker stack. A green gate on an untested merge is the worst outcome
+available here. Separate workflow, separate check name, no ambiguity: **nothing
+outside `ci.yml` may ever be named `CI`.**
+
+**How the double run stays dead.** `branch-checks.yml`'s first job asks whether
+the branch already has an open PR (`gh pr list --head`) and skips everything if
+so, because `ci.yml` is already testing that commit more thoroughly. The branch
+name reaches that script through `env`, never `${{ }}` interpolation — a branch
+name is chosen by whoever pushes — and the lookup fails **open**, so an API
+hiccup runs the checks rather than skipping them.
+
+**Tiering came back, renamed.** `_backend.yml` takes `run-integration-tests` and
+`_database.yml` takes `run-migrate`, both defaulting to **true** so a caller that
+forgets one gets more testing rather than less. These are the `full-tier` input
+under a better name: `full-tier` described *which CI tier the caller was in*,
+which is why it read as meaningless the moment the tiers were rearranged; the new
+names describe what the flag actually does.
 
 **`main` is governed by the `Protect main` ruleset** (repository ruleset id
 `20558306`, active, targeting `~DEFAULT_BRANCH`). Note that rulesets do **not**
@@ -193,12 +226,18 @@ re-prove the same commit seconds later. If `strict_required_status_checks_policy
 is ever turned off, that reasoning dies and `push: branches: [main]` has to come
 back. Do not restore it before then thinking it is a gap; it is not.
 
-**What this costs.** A push to a feature branch or to `develop` now runs nothing
-on GitHub. The replacement is `scripts/verify.mjs` via `.githooks/pre-push`,
-which runs the same lint, type-check, test and build for both components before
-the push leaves the machine. `git push --no-verify` bypasses it, and the PR is
-what closes that hole — so the integration suites first run at the PR, not on the
-push that broke them.
+**What this costs.** While a PR is open, every push to that branch runs the
+**full** suite through `pull_request: synchronize`, not the fast one. That is
+inherent rather than chosen: the required `CI` check has to exist on the head
+SHA, so each new commit must be re-gated. `branch-checks.yml` therefore helps
+before the PR is opened, which is most of a branch's life if PRs are opened when
+work is ready rather than left open for days. The concurrency group cancels
+superseded PR runs, so a burst of pushes collapses to one full run.
+
+The integration suites, the real migration and the Docker stack still first run
+at the PR. `scripts/verify.mjs` via `.githooks/pre-push` remains the only check
+that runs *before* the push — and it needs `git config core.hooksPath .githooks`
+in each clone, which is a local setting and cannot be committed.
 
 ---
 
@@ -259,15 +298,63 @@ exactly what lets job-level path filtering coexist with branch protection. A
 preceding step prints every component's result, so the log answers *why did
 nothing run* without opening the job graph.
 
+### `.github/workflows/branch-checks.yml` — the iteration loop
+
+Triggers on `push` with `branches-ignore: [main, 'dependabot/**',
+'gh-readonly-queue/**']`. Three exclusions, three different reasons: `main`
+because the merge result was already tested, `dependabot/**` because Dependabot
+opens a PR in the same breath so branch checks there are always superseded, and
+the queue branches because `ci.yml` covers them via `merge_group`.
+
+**Job `should-run`** is the whole point of the file. It asks
+`gh pr list --head "$BRANCH" --state open` and, if the branch has a PR, sets
+`skip=true` so every later job is skipped — `ci.yml` is already testing that
+commit more thoroughly. Then it path-filters per component, restoring the
+scoping that `ci.yml` deliberately does not use.
+
+Per-component globs are fragile: an incomplete one skips a job and reports green.
+That is unacceptable on a merge gate and fine here, because the PR runs
+everything unfiltered regardless — the worst a wrong glob costs on a branch is
+later feedback, never a missed failure. This is the same trade-off read two ways,
+and the reason the two workflows filter differently.
+
+Two safety details worth keeping: the branch name reaches the shell through
+`env` rather than `${{ }}` interpolation (a branch name is attacker-chosen), and
+the PR lookup ends in `|| echo 0` so an API failure runs the checks instead of
+skipping them.
+
+Calls `_backend.yml` with `run-integration-tests: false` and `_database.yml` with
+`run-migrate: false`. Never calls `_docker.yml`. Nothing here may be named `CI`.
+
+### `.github/workflows/_secret-scan.yml`
+
+Extracted from `ci.yml` on 2026-08-16 when `branch-checks.yml` needed the same
+scan. Copying it would have put the pinned gitleaks version in two files, and the
+copy nobody edits is the one that rots — a stale scanner in the job whose entire
+purpose is catching the one mistake a follow-up commit cannot undo.
+
+Unscoped in both callers: a credential can be committed to any file, so filtering
+it by component would be filtering the wrong thing.
+
 ### `.github/workflows/_backend.yml`
 
-`workflow_call`, no inputs. JDK 25 temurin, `cache: maven`, 20-minute timeout,
-and a single `./mvnw -B verify` — surefire and failsafe together.
+`workflow_call` with one optional input, `run-integration-tests` (default
+**true**). JDK 25 temurin, `cache: maven`, 20-minute timeout. True runs
+`./mvnw -B verify`; false adds `-DskipITs`, dropping only the failsafe classes.
+The jar is packaged either way, so downstream jobs are unaffected.
 
-It took a `full-tier: boolean` input until 2026-08-16, applied in shell rather
-than a GitHub expression to dodge an empty-string falsiness trap. Both are gone:
-with `push` no longer a trigger, every caller passed `true` and the `-DskipITs`
-branch was unreachable.
+Defaulting to true matters: `ci.yml` calls this with no arguments, so a caller
+that forgets the input gets more testing rather than less.
+
+The check is an `if` in bash, not a GitHub expression, and that is not style. An
+empty string is falsy in GitHub expressions, so the tempting
+`inputs.run-integration-tests && '' || '-DskipITs'` evaluates wrong in the *true*
+branch and silently skips the suites it meant to run.
+
+This input existed as `full-tier`, was deleted on 2026-08-16 when `ci.yml`
+stopped triggering on push, and returned hours later with `branch-checks.yml`.
+The name changed on the way back because `full-tier` described which CI tier the
+caller was in — a policy — so it read as meaningless the moment the tiers moved.
 
 Test reports upload `if: always()`; the jar uploads with
 `if-no-files-found: error`.
@@ -586,7 +673,8 @@ fail on the push rather than on the PR — expired with the fast tier on
 |---|---|---|---|
 | One orchestrator + reusable `_*.yml` | Component scoping and a single required check are both needed | Four independent workflows with workflow-level `paths:` | Branch protection becomes impossible again |
 | `ci-success` gate treating `skipped` as pass | GitHub cannot require a check that never started | Requiring each component job | A frontend-only PR waits forever on `Expected — Waiting for status` |
-| One run per PR, none on push or main | `push` + `pull_request` double-fire on the same commit; the ruleset's strict policy makes the merge result identical to what the PR tested | Fast tier on push, full on PR | Half of all CI minutes spent re-testing commits already tested |
+| Branch pushes in a separate workflow, not a `push:` trigger on `ci.yml` | A required check is matched by name; two runs emitting `CI` make it ambiguous which one gated the merge | Add `push` back and branch on `github.event_name` | The gate could go green on a run that skipped the integration, migration and Docker jobs |
+| Skip branch checks when the branch has an open PR | `push` + `pull_request` double-fire on the same commit | Let both run | Half of all CI minutes spent re-testing commits already tested |
 | Fail **open** when detection is unreliable | `github.event.before` is all zeros on a branch's first push | Treating no-diff as no-change | A branch's first push silently tests nothing |
 | Any `.github/workflows/**` edit runs everything | The pipeline cannot be trusted to scope its own change | Filtering workflow edits like any other path | A broken workflow edit merges untested |
 | `permissions: contents: read` at every workflow top level | Default token scope is far wider than any job needs | Repo default | Every job carries write scope it never uses |
@@ -826,6 +914,18 @@ Ordered by value, each with the reason it has not been done. Tracked in
 ---
 
 ## Change log
+
+- **2026-08-16 (c)** — **Branch pushes test again, without the double run
+  returning.** Dropping `push` from `ci.yml` had overshot: a branch with no PR
+  ran nothing, which a push to `ci/github-actions` demonstrated. Added
+  `branch-checks.yml` — its own workflow deliberately, because a required check
+  is matched by name and a second run emitting `CI` could satisfy the gate
+  having skipped the expensive jobs. It skips itself when the branch already has
+  an open PR, so no commit is tested twice. `run-integration-tests` and
+  `run-migrate` bring back the old tiering under names that describe behaviour
+  rather than policy, defaulting to true. Secret scanning moved to
+  `_secret-scan.yml` so its pinned scanner version has one home instead of two.
+  *(main session)*
 
 - **2026-08-16 (b)** — **Coarsened path filtering, and added a real API
   contract.** Per-component globs are a hand-written dependency graph whose

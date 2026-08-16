@@ -42,8 +42,9 @@ while read -r _local_ref local_sha remote_ref remote_sha; do
     # ever relaxed.
     #
     # Feature branches stay fast on purpose: this is an iteration loop, and the
-    # *IT suites need Testcontainers. They run on the PR. To check them before
-    # opening one: node scripts/verify.mjs --all --full
+    # *IT suites need Testcontainers. They run on the PR, and branch-checks.yml
+    # skips them for the same reason. To check them before opening a PR:
+    # node scripts/verify.mjs --all --full
     case "$remote_ref" in
         refs/heads/main) full="--full" ;;
     esac

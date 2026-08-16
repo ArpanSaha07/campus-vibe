@@ -20,23 +20,27 @@ name: CI
 # which is the `ci-success` job below. Never require the component jobs — that
 # reintroduces the deadlock this design exists to avoid.
 #
-# WHY THERE IS NO `push:` TRIGGER
+# WHY THERE IS NO `push:` TRIGGER — AND WHY ADDING ONE WOULD BE A BUG
 #
 # There used to be, and it made every commit on a branch with an open PR run
 # twice — measured at 12 of the last 20 commits, one of them three times.
 # Dependabot suffered worst, since it pushes a branch AND opens a PR.
 #
-# Dropping `push` also removes the need to re-test after a merge. The ruleset
-# sets `strict_required_status_checks_policy: true`, so a PR branch must be up
-# to date with main before it can merge — which means what the PR tested IS the
-# merge result. A main run would re-prove it seconds later. If that strict
-# setting is ever turned off, this reasoning dies with it and `push:
-# branches: [main]` has to come back.
+# It must not come back here, for a reason beyond cost. A required status check
+# is matched by NAME. This workflow emits `CI`, the single context the ruleset
+# requires. A second run producing `CI` on the same commit makes it ambiguous
+# which one satisfies the gate — and if that were a push run, the gate could go
+# green on a commit whose integration suites, Flyway migration and Docker stack
+# never ran.
 #
-# The cost is that a push to a feature branch or to develop now runs nothing.
-# `scripts/verify.mjs`, via `.githooks/pre-push`, runs the same lint,
-# type-check, test and build for BOTH components before the push leaves the
-# machine — `git push --no-verify` is the hole, and the PR closes it.
+# Branch pushes are handled by branch-checks.yml instead: its own workflow, its
+# own check name, and a job that skips everything when the branch already has an
+# open PR so no commit is ever tested twice.
+#
+# Nothing runs after a merge to main. The ruleset sets
+# `strict_required_status_checks_policy: true`, so a PR branch must be up to
+# date with main before merging — what the PR tested IS the merge result. If
+# that strict setting is ever turned off, this reasoning dies with it.
 
 on:
   pull_request:
@@ -147,58 +151,13 @@ jobs:
           CODE: ${{ steps.filter.outputs.code }}
 
   # ---------------------------------------------------------------------------
-  # Runs on every component. A leaked credential is the one failure that cannot
-  # be undone by a follow-up commit.
+  # Runs whatever changed, including on a docs-only PR: a leaked credential is
+  # the one failure a follow-up commit cannot undo, and it can be in any file.
+  # Shared with branch-checks.yml so the pinned scanner version has one home.
   # ---------------------------------------------------------------------------
   secret-scan:
     name: Secret scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      # Pinned deliberately. This previously resolved `latest` from the GitHub
-      # API at run time, on the reasoning that a stale tag could never break the
-      # pipeline. That trades integrity for availability, and integrity wins in
-      # a step that pipes a downloaded tarball into `sudo tar` inside a job
-      # holding repository credentials: whatever upstream published five minutes
-      # ago would execute as root, unreviewed. Dependabot does not watch this,
-      # so bump it by hand when there is a reason to.
-      GITLEAKS_VERSION: 8.30.1
-    steps:
-      # Full history: the scan below walks commits, not the working tree, and
-      # the default depth of 1 would leave it nothing to walk. 87 commits at the
-      # time of writing — the fetch costs a couple of seconds.
-      - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      # The binary, not gitleaks/gitleaks-action@v2 — that action requires a
-      # paid GITLEAKS_LICENSE for organisation-owned repositories and fails
-      # closed without one.
-      - name: Install gitleaks
-        run: |
-          set -euo pipefail
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | sudo tar -xz -C /usr/local/bin gitleaks
-          gitleaks version
-
-      # `git` scans commit history, not the working tree. Two reasons:
-      #
-      #   1. A secret that was committed and later deleted is still compromised.
-      #      Only a history scan sees it. Scanning the tree would report the
-      #      repo as clean while the credential sits one `git log -p` away.
-      #   2. `dir` has no gitignore awareness, so it also reads build output —
-      #      locally it scanned 99 MB of frontend/.next and returned 7 findings,
-      #      every one of them a Next.js manifest key. History has none of that.
-      #
-      # Verified locally at gitleaks 8.30.1: 68 commits, 1.56 MB, 428 ms.
-      #
-      # --redact keeps any match out of the log, which is world-readable on a
-      # public repo. A genuine false positive belongs in .gitleaksignore at the
-      # repo root — with a comment justifying it — never in a loosened flag.
-      - name: Scan commit history
-        run: gitleaks git . --redact --verbose --no-banner
+    uses: ./.github/workflows/_secret-scan.yml
 
   # ---------------------------------------------------------------------------
   # Components. All four run together or not at all — the only thing that skips

@@ -5,12 +5,25 @@ name: Backend
 
 on:
   workflow_call:
+    inputs:
+      run-integration-tests:
+        description: >-
+          false skips the failsafe *IT suites (-DskipITs), which need a Spring
+          context or a Testcontainers pgvector container. Unit tests always run,
+          and the jar is packaged either way, so downstream jobs are unaffected.
+        type: boolean
+        required: false
+        default: true
 
-# The `full-tier` input is gone as of 2026-08-16. It existed to skip the *IT
-# suites on a feature-branch push; ci.yml no longer triggers on push at all, so
-# every caller was passing true and the -DskipITs branch was unreachable. A
-# dormant second code path in a test pipeline is a liability — it rots, and the
-# day someone re-enables it they get a tier nobody has run in months.
+# History, because this input came back after being deleted. It existed as
+# `full-tier` until 2026-08-16, was removed when ci.yml stopped triggering on
+# push (every caller then passed true, so the branch was unreachable), and
+# returned the same day with branch-checks.yml, which needs the cheap variant.
+#
+# Two things changed in the second version. It defaults to **true**, so a caller
+# that forgets it gets more testing rather than less. And it is named for a
+# behaviour rather than a policy — `full-tier` described which CI tier you were
+# in, so it read as meaningless the moment the tiers were rearranged.
 
 permissions:
   contents: read
@@ -42,12 +55,24 @@ jobs:
 
       # mvnw is mode 100755 in the index, so no chmod step is needed.
       #
-      # Tests are deliberately never skipped: skipping them is what let a
+      # Tests are never skipped wholesale: skipping them is what let a
       # non-compiling merge and a failing search test reach the branch unnoticed.
-      # This runs surefire (unit) and failsafe (*IT) together — the *IT classes
-      # need a Spring context (H2) or a Testcontainers pgvector container.
+      # Only the *IT classes can be dropped, and only on a branch push — the PR
+      # runs them before anything can merge.
+      #
+      # Written as an `if` in bash rather than a GitHub expression on purpose:
+      # an empty string is falsy in GitHub expressions, so the tempting
+      # `inputs.run-integration-tests && '' || '-DskipITs'` evaluates wrong in
+      # the true branch and silently skips the suites it meant to run.
       - name: Build and test
-        run: ./mvnw -B verify
+        run: |
+          if [ "${{ inputs.run-integration-tests }}" = "true" ]; then
+            echo "Running unit and integration tests."
+            ./mvnw -B verify
+          else
+            echo "Running unit tests only. The *IT suites run on the pull request."
+            ./mvnw -B verify -DskipITs
+          fi
 
       # Uploaded even on failure — otherwise the only way to see which
       # assertion broke is to reproduce the whole run locally.

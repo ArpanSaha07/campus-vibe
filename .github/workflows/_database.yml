@@ -14,12 +14,23 @@ name: Database
 # seconds, so it fails fast on a bad filename before `migrate` spends a Maven
 # build and a Postgres container proving the same change is broken.
 #
-# The `full-tier` input is gone as of 2026-08-16. It gated `migrate` off on a
-# feature-branch push; ci.yml no longer triggers on push at all, so every caller
-# passed true and the gate was always open.
-
 on:
   workflow_call:
+    inputs:
+      run-migrate:
+        description: >-
+          false runs only the no-database lint job. The `migrate` job costs a
+          Maven build plus a Postgres container, which is not worth spending on
+          every branch push.
+        type: boolean
+        required: false
+        default: true
+
+# This input existed as `full-tier` until 2026-08-16, was removed when ci.yml
+# stopped triggering on push, and returned the same day for branch-checks.yml.
+# It now defaults to **true** so a caller that forgets it gets the full check
+# rather than the cheap one, and is named for what it does rather than for which
+# CI tier the caller happens to be in.
 
 permissions:
   contents: read
@@ -112,6 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: lint-migrations
+    if: inputs.run-migrate
 
     services:
       postgres:

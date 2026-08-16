@@ -24,11 +24,11 @@
  *
  * .github/workflows/_backend.yml: ./mvnw -B verify.
  *
- * This script matters more than it used to. As of 2026-08-16 CI triggers only
- * on a pull request to main, so a push to a feature branch or to develop runs
- * nothing on GitHub at all — this is the only check between an edit and the PR.
- * By default it still skips the integration suites, which is the right trade for
- * an iteration loop; pass --full to run them before opening the PR.
+ * Two workflows mirror this split. branch-checks.yml runs the same scoped, fast
+ * checks on a push; ci.yml runs everything on a pull request to main. This
+ * script is what catches the failure BEFORE the push, which is still the only
+ * place it costs nothing. By default it skips the integration suites — the same
+ * trade branch-checks.yml makes — so pass --full to run them before opening a PR.
  *
  * WHY NODE AND NOT A SHELL SCRIPT
  *
@@ -73,8 +73,9 @@ const full = has("--full");
 // ---------------------------------------------------------------------------
 // Which components changed
 //
-// Mirrors the `dorny/paths-filter` block in ci.yml, including its two
-// deliberate choices: a change under .github/workflows/ runs everything
+// Mirrors the `dorny/paths-filter` block in branch-checks.yml — not ci.yml,
+// which deliberately filters coarsely because it gates merges. Both of its
+// choices are copied here: a change under .github/workflows/ runs everything
 // (the pipeline cannot be trusted to scope itself), and an unknown base fails
 // OPEN rather than silently skipping every component.
 // ---------------------------------------------------------------------------
