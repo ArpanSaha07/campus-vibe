@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout the analysed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # The commit CodeQL actually looked at, not the tip of the branch —
           # they differ as soon as anyone pushes while the analysis is running,
