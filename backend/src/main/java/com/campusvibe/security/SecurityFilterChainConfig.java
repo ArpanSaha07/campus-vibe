@@ -34,6 +34,17 @@ public class SecurityFilterChainConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // CSRF protection guards credentials the browser attaches on its
+                // own — cookies, Basic auth. This API authenticates from an
+                // Authorization header that page script has to set deliberately,
+                // and a cross-site form cannot set headers, so there is nothing
+                // for a token to protect. The session policy below is the other
+                // half of that: with no session there is nothing to ride.
+                //
+                // This stops being true the moment the JWT moves to a cookie
+                // ([BUG-003], the httpOnly work). Re-enable CSRF in the same
+                // change — a cookie the browser sends automatically is exactly
+                // the case this line assumes does not exist.
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth

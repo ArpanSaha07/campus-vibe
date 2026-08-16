@@ -312,6 +312,22 @@ prompted the change. The practical consequence for this document: **an unmapped
 exception is now opaque to clients by design**, so anything a caller must act on
 needs its own handler and its own status rather than relying on the message.
 
+**Every handler has its own name**, as of 2026-08-16. They were thirteen
+overloads of `handleException` distinguished only by parameter type. Spring
+dispatches on the `@ExceptionHandler` annotation and never on the signature, so
+the overloading bought nothing and cost two things: a reader had to match brace
+to signature to see which one ran, and a stack trace said `handleException`
+thirteen times. CodeQL flagged it as `java/confusing-method-signature`, which was
+right for a duller reason than it thought. Two handlers whose message is a fixed
+string also dropped their unused exception parameter — legal, because the
+annotation already names the type.
+
+**The catch-all scrubs the URI before logging it**
+([BUG-033](../../bugs/fixed_bugs.md#bug-033)). `Logs.safe` strips control
+characters and bounds the length. The reasoning is in the bug entry; the point
+for this document is that **any new log line carrying request data must go
+through `Logs`**, and the catch-all is the line that most needs it.
+
 **Undocumented here:** `AuthenticationController`, `UserController`,
 `ClubAdminRequestController`, `SearchController` and `MyEventController` are part
 of the same API surface but were not read for this document. Auth is covered by
@@ -540,6 +556,15 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- **2026-08-16** — Acted on the CodeQL findings from
+  [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31). The one with a
+  consequence for this document is
+  [BUG-032](../../bugs/fixed_bugs.md#bug-032): the 429 written by the rate-limit
+  filters was hand-built JSON carrying three of `ApiError`'s four fields, so the
+  error shape this document describes was not in fact uniform across statuses. It
+  now goes back through `@ControllerAdvice` and is. Also recorded the handler
+  renames and the log scrubbing
+  ([BUG-033](../../bugs/fixed_bugs.md#bug-033)). *(main session)*
 - **2026-08-15 (b)** — Search spend controls for
   [BUG-005](../../bugs/fixed_bugs.md#bug-005): a per-IP budget on the two public
   search endpoints, a 200-character query cap, and `QueryEmbeddingCache` around

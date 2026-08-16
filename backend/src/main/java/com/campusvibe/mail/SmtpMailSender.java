@@ -1,5 +1,6 @@
 package com.campusvibe.mail;
 
+import com.campusvibe.common.Logs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.SimpleMailMessage;
@@ -36,7 +37,11 @@ public class SmtpMailSender implements MailSender {
             // mail server is down tells the caller the address exists, and
             // leaves the user with nothing to do. The recipient is logged, the
             // body is not — it carries a working reset link.
-            log.error("Failed to send mail to {} (subject: {})", to, subject, e);
+            //
+            // The recipient is whatever the caller typed into a form, so it is
+            // scrubbed before it reaches the log: see Logs.safe.
+            log.error("Failed to send mail to {} (subject: {})",
+                    Logs.safe(to), Logs.safe(subject), e);
         }
     }
 }

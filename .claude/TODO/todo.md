@@ -134,6 +134,8 @@ findings.**
 - [ ] **P3** **Facebook / Meta sign-in.** Requested 2026-08-15. Low priority, and deliberately sequenced *after* the `auth_provider` migration above — adding a third identity provider while the schema still cannot tell providers apart would make the identity model worse, not better.
 - [ ] **P3** Auth event audit log (sign-in, failure, reset, role change). Cheap to add; most valuable once there is traffic worth reading.
 - [ ] **P3** Account deletion and data export. Needed before any real-user launch under GDPR-like rules; no legal deadline yet.
+- [ ] **P3** **Triage the standing CodeQL alerts that are not defects.** Eight new alerts on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31) were fixed in code on 2026-08-16 ([BUG-032](../bugs/fixed_bugs.md#bug-032), [BUG-033](../bugs/fixed_bugs.md#bug-033)); what remains is the set that is *correct as written* and needs dismissing with a reason, so the queue stops hiding real findings behind noise. Three groups: **(a)** `java/sensitive-log` on `LoggingMailSender` — it logs reset links on purpose, and that is the entire reason the bean exists; the real mitigation is the production-mail item above, not a code change. **(b)** `js/empty-password-in-configuration-file` on `application-test.yml` — H2 in-memory, user `sa`, no password, which is the standard for it. **(c)** `java/internal-representation-exposure` on `Club.images` / `Event.images` — accepting the offered autofix here **breaks every write**, which is already logged as [BUG-023](../bugs/bugs.md#bug-023); dismiss it explicitly so nobody accepts it later. Dismissal is a repo-level action on the Security tab, so it is Arpan's call rather than something to do unasked.
+- [ ] **P3** Clear the four `js/unused-local-variable` alerts (`useCreateClubForm.ts`, `auth-context.tsx`, `GoogleProvider.tsx`, `auth-context.test.tsx`). Dead bindings, not defects — worth doing in one pass while touching those files rather than on their own.
 - [ ] **P2** Authorisation review for the Club Dashboard and Admin Dashboard endpoints as they are built — enforce server-side, never rely on UI restrictions.
 - [ ] **P2** Rotate the local dev `JWT_SECRET` before any real deployment, and use a *different* value in production.
 
@@ -179,6 +181,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-16 | CodeQL findings on PR #31 cleared: 429 refusals go back through `@ControllerAdvice` ([BUG-032](../bugs/fixed_bugs.md#bug-032)), request data scrubbed before logging ([BUG-033](../bugs/fixed_bugs.md#bug-033)) |
 | 2026-08-15 | Search spend controls ([BUG-005](../bugs/fixed_bugs.md#bug-005)): per-IP budget, query length cap, query-embedding cache |
 | 2026-08-15 | CSP and security headers on the frontend; bcrypt cost pinned |
 | 2026-08-15 | Password reset and email verification, end to end, with a mail abstraction |
@@ -188,4 +191,3 @@ The last ten, one line each. Full write-ups, and everything older, in
 | 2026-08-14 | Google sign-in switched on — `NEXT_PUBLIC_GOOGLE_CLIENT_ID` was the only gap |
 | 2026-08-14 | Local CI parity — `scripts/verify.mjs` + `.githooks/pre-push`, proven to catch the real failure |
 | 2026-08-14 | [`api-and-caching.md`](../docs/architecture/api-and-caching.md) — the API boundary and cache model written up |
-| 2026-08-14 | Two CI breaks fixed ([BUG-026](../bugs/fixed_bugs.md#bug-026), [BUG-027](../bugs/fixed_bugs.md#bug-027)) and the locale bug ([BUG-025](../bugs/fixed_bugs.md#bug-025)) |

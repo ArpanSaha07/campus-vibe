@@ -71,6 +71,26 @@ class AuthRateLimitIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void aRefusalHasTheSameBodyAsEveryOtherError() throws Exception {
+        // The 429 comes from a servlet filter, which runs before the
+        // @ControllerAdvice that shapes every other error. It used to build its
+        // JSON by hand and emit three of ApiError's four fields; a client
+        // parsing errors uniformly would have found localDateTime missing on
+        // this one status alone.
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(get("/api/v1/auth/email-status").param("email", "nobody@campus.com"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/api/v1/auth/email-status").param("email", "nobody@campus.com"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.path", is("/api/v1/auth/email-status")))
+                .andExpect(jsonPath("$.statusCode", is(429)))
+                .andExpect(jsonPath("$.message", not(emptyOrNullString())))
+                .andExpect(jsonPath("$.localDateTime", notNullValue()));
+    }
+
+    @Test
     void theBudgetIsSharedAcrossTheAuthEndpoints() throws Exception {
         // Three enumeration probes plus two registration attempts is five; the
         // sixth request is refused whichever endpoint it lands on. An attacker

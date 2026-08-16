@@ -38,11 +38,15 @@ public class SearchRateLimitFilter extends OncePerRequestFilter {
 
     private final SearchRateLimitProperties properties;
     private final ClientIpResolver clientIp;
+    private final RateLimitResponses responses;
     private final IpBudget budget;
 
-    public SearchRateLimitFilter(SearchRateLimitProperties properties, ClientIpResolver clientIp) {
+    public SearchRateLimitFilter(SearchRateLimitProperties properties,
+                                 ClientIpResolver clientIp,
+                                 RateLimitResponses responses) {
         this.properties = properties;
         this.clientIp = clientIp;
+        this.responses = responses;
         this.budget = new IpBudget(properties.ipRequestsPerWindow(), properties.window());
     }
 
@@ -62,7 +66,7 @@ public class SearchRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        RateLimitResponses.tooManyRequests(request, response, budget.retryAfterSeconds(),
+        responses.tooManyRequests(request, response, budget.retryAfterSeconds(),
                 "Too many searches. Try again in %d seconds.");
     }
 

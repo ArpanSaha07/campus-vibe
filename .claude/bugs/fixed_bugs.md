@@ -2,10 +2,12 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-14**
+Last updated: **2026-08-16**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-033](#bug-033) | Medium | 2026-08-16 | Three log statements interpolated caller-supplied text, so a newline could forge log entries |
+| [BUG-032](#bug-032) | Medium | 2026-08-16 | The rate-limit 429 built its JSON by string interpolation, escaping nothing and omitting a field every other error carries |
 | [BUG-025](#bug-025) | Low | 2026-08-14 | `formatDayLabel` followed the host locale while its own labels were hardcoded English, mixing languages in one list |
 | [BUG-027](#bug-027) | High | 2026-08-14 | `/clubs` was prerendered at build time, so `next build` required a live backend and failed CI with ECONNREFUSED |
 | [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
@@ -25,6 +27,84 @@ Last updated: **2026-08-14**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-032
+**The rate-limit 429 built its JSON by string interpolation** · Medium · FIXED 2026-08-16
+
+**Found:** 2026-08-16, by CodeQL on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31)
+(`java/xss`, reported High).
+
+`RateLimitResponses.tooManyRequests` wrote the refusal body like this:
+
+```java
+response.getWriter().write("""
+        {"path":"%s","message":"%s","statusCode":429}"""
+        .formatted(request.getRequestURI(), message.formatted(retryAfterSeconds)));
+```
+
+Two separate defects in three lines.
+
+**1. Nothing is escaped.** `getRequestURI()` is written by whoever made the
+request. A `"` in it closes the JSON string and everything after it is parsed as
+document structure. *Not exploitable as the code stood* — both filters call this
+only from `doFilterInternal`, and their `shouldNotFilter` returns early unless
+the URI **exactly equals** one of six constants, so the value reaching the
+formatter was provably one of those six. That is an invariant held in a different
+method of a different class, though, and the next filter to reuse this helper
+with a prefix match reintroduces the hole silently. CodeQL was reading the sink,
+which is the right thing to read.
+
+**2. The body is the wrong shape.** It emitted three fields; `ApiError` has four.
+A throttled caller got a body missing `localDateTime` that every other error in
+the API carries — the class javadoc claimed the shapes matched, and they did not.
+
+**Fix:** stop writing the body here at all. The filter now hands a
+`TooManyAttemptsException` to `handlerExceptionResolver`, which runs the refusal
+back through the existing `@ControllerAdvice` — same handler, same serializer,
+same shape. There is no hand-rolled JSON left to escape, and no second copy of
+the error format to keep in step. `@Lazy` on the injected resolver keeps the MVC
+infrastructure out of the security chain's construction.
+
+**Covered by a test:** `AuthRateLimitIT.aRefusalHasTheSameBodyAsEveryOtherError`
+asserts all four fields on a real 429. The eight pre-existing rate-limit tests
+pass unchanged, which is the evidence that status, `Retry-After` and `message`
+still come out identical.
+
+---
+
+### BUG-033
+**Caller-supplied text reached three log statements unescaped** · Medium · FIXED 2026-08-16
+
+**Found:** 2026-08-16, same CodeQL run (`java/log-injection`, three instances).
+
+A log line is text. A value containing a newline does not appear *inside* an
+entry — it ends that entry and begins one the caller composed. Three sinks took
+request data straight into a format argument:
+
+- `DefaultExceptionHandler:221` — `request.getRequestURI()` and `getMethod()`.
+  The worst of the three: this is the line someone reads to find out what broke,
+  so it is the last one that should be writable by whoever broke it.
+- `SmtpMailSender:39` — the recipient address, i.e. whatever was typed into the
+  forgot-password form.
+- `LoggingMailSender:25` — recipient, subject and the whole body, which is
+  assembled from the user's own display name.
+
+**Reachability was limited, not absent.** `getRequestURI()` is *not* URL-decoded
+by the servlet container, and Tomcat rejects a raw control character in the
+request line, so the exception-handler sink was hard to drive. The mail sinks had
+no such protection: a display name is stored and echoed verbatim.
+
+**Fix:** `com.campusvibe.common.Logs`. `safe()` replaces the whole `\p{Cntrl}`
+class — CR and LF, and also ESC, since a log tailed in a terminal will interpret
+escape sequences and repaint the operator's screen — then bounds the length,
+because nothing forces a URI to be short. `safeBlock()` is the variant for the
+mail body, whose line breaks are the point: it keeps them and prefixes every
+line, so injected content still cannot pass as an entry of its own.
+
+**Covered by a test:** `LogsTest`, eight cases including the forged-entry and
+terminal-escape ones.
 
 ---
 

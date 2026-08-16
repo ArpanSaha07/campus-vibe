@@ -158,7 +158,14 @@ ceiling makes the truncation impossible rather than invisible.
 
 #### `security/SecurityFilterChainConfig.java`
 The filter chain. CSRF disabled — correct for a stateless bearer-token API with
-no cookie auth. Three POST endpoints are `permitAll`; `/actuator/**`,
+no cookie auth, and the reasoning is now written next to the line rather than
+implied by it, because CodeQL flags it (`java/spring-disabled-csrf-protection`)
+and every reader after this one deserves the answer in place. In short: CSRF
+tokens defend credentials the *browser* attaches unprompted, and a cross-site
+form cannot set an `Authorization` header. **The condition under which this stops
+being true is written down**: moving the JWT into a cookie
+([BUG-003](../../bugs/bugs.md#bug-003)) must re-enable CSRF in the same change.
+Three POST endpoints are `permitAll`; `/actuator/**`,
 `/api/v1/auth/email-status` and public club/event reads are `permitAll` for
 GET; everything else requires authentication.
 
@@ -523,6 +530,16 @@ attempts on purpose and would otherwise lock itself out and fail for reasons
 unrelated to what it asserts. `AuthRateLimitIT` switches it back on with its
 own small limits.
 
+**The refusal is produced by `@ControllerAdvice`, not by the filter.** A filter
+runs before `DispatcherServlet`, so the obvious implementation — write the JSON
+in the filter — is what the first version did, and it drifted from the shape
+every other error uses ([BUG-032](../../bugs/fixed_bugs.md#bug-032)).
+`RateLimitResponses` now hands a `TooManyAttemptsException` to
+`handlerExceptionResolver` and lets the existing advice answer it. **If you add
+another filter that must refuse a request, do the same** rather than writing a
+second body by hand; there is exactly one place that knows what an error looks
+like, and it is not the filter.
+
 ## Measured behaviour
 
 Probed against the Docker stack on 2026-08-15 at `01e3b30`. These are observed
@@ -742,6 +759,13 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- 2026-08-16 — **CodeQL findings from [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31)
+  worked through.** Two touch this document: the rate-limit refusal no longer
+  writes its own JSON ([BUG-032](../../bugs/fixed_bugs.md#bug-032)), and the
+  reason CSRF is disabled is now stated in the code with the condition that
+  revokes it. Neither was a live vulnerability — the XSS finding was unreachable
+  because of a constraint held two classes away — but both were the kind of
+  latent shape that becomes one on the next edit.
 - 2026-08-06 — moved from `.claude/AUTH_IMPLEMENTATION.md`, unverified.
 - 2026-08-14 — banner noting the `/login` page and its components were deleted.
 - 2026-08-15 (d) — **Password reset and email verification shipped.** V11 adds

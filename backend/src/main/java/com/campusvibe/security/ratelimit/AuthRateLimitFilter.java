@@ -36,10 +36,14 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     private final AuthRateLimiter rateLimiter;
     private final ClientIpResolver clientIp;
+    private final RateLimitResponses responses;
 
-    public AuthRateLimitFilter(AuthRateLimiter rateLimiter, ClientIpResolver clientIp) {
+    public AuthRateLimitFilter(AuthRateLimiter rateLimiter,
+                               ClientIpResolver clientIp,
+                               RateLimitResponses responses) {
         this.rateLimiter = rateLimiter;
         this.clientIp = clientIp;
+        this.responses = responses;
     }
 
     @Override
@@ -58,7 +62,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        RateLimitResponses.tooManyRequests(request, response,
+        responses.tooManyRequests(request, response,
                 rateLimiter.retryAfterSeconds(),
                 "Too many attempts. Try again in %d seconds.");
     }
