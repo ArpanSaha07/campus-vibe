@@ -9,8 +9,12 @@ name: CI
 # required status checks impossible: a PR touching only frontend/ never STARTS
 # backend-ci, so a branch-protection rule requiring it waits forever on
 # "Expected — Waiting for status". Filtering at the JOB level instead, behind a
-# single always-run gate job, keeps the work component-scoped while still
-# producing exactly one check that always reports.
+# single always-run gate job, still produces exactly one check that always
+# reports.
+#
+# That filtering is now coarse on purpose: everything runs, or — on a change
+# with no code in it — nothing does. See the `changes` job for why per-component
+# globs were the wrong shape for this repository.
 #
 # BRANCH PROTECTION: the `Protect main` ruleset requires exactly one check, "CI",
 # which is the `ci-success` job below. Never require the component jobs — that
@@ -52,17 +56,30 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Which components does this change actually touch?
+  # Did this change touch anything that could possibly affect a build?
+  #
+  # This asks the question the SAFE way round. It used to filter per component —
+  # `backend/**` runs the backend job, `frontend/**` runs the frontend job — and
+  # that requires a hand-written dependency graph to be complete. A glob that is
+  # merely *incomplete* does not fail; it silently skips a job and reports green,
+  # which is the one failure mode a CI system must not have.
+  #
+  # Inverted, the burden changes from "prove this component is affected" to
+  # "prove nothing is affected", and the only list to maintain is of paths that
+  # provably cannot influence a build. A file that is not on that list runs
+  # everything — so the cost of forgetting to update this is wasted minutes,
+  # never a missed failure.
+  #
+  # Affordable because the repository is public (Actions minutes are free) and CI
+  # runs once per PR rather than on every push. Before that it would have been
+  # roughly twelve minutes per commit and nobody would have read the results.
   # ---------------------------------------------------------------------------
   changes:
-    name: Detect changed components
+    name: Detect whether any code changed
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      backend: ${{ steps.decide.outputs.backend }}
-      frontend: ${{ steps.decide.outputs.frontend }}
-      db: ${{ steps.decide.outputs.db }}
-      docker: ${{ steps.decide.outputs.docker }}
+      code: ${{ steps.decide.outputs.code }}
 
     steps:
       - name: Checkout repository
@@ -72,7 +89,7 @@ jobs:
 
       # `merge_group` and `workflow_dispatch` give paths-filter no base commit to
       # diff against. Fail OPEN: run everything. A wasted full run is the cheap
-      # mistake; silently skipping every component is the expensive one.
+      # mistake; silently skipping every job is the expensive one.
       #
       # `pull_request` needs no such handling — paths-filter diffs against the
       # base branch, which always exists.
@@ -84,62 +101,50 @@ jobs:
           case "${EVENT_NAME}" in
             workflow_dispatch|merge_group)
               force=true
-              echo "Running every component: event is ${EVENT_NAME}, which has no base to diff against."
+              echo "Running everything: event is ${EVENT_NAME}, which has no base to diff against."
               ;;
           esac
           echo "all=$force" >> "$GITHUB_OUTPUT"
         env:
           EVENT_NAME: ${{ github.event_name }}
 
+      # Everything, minus the paths that cannot influence a build. Adding to the
+      # exclusion list is a claim that a file is inert — verify it before
+      # believing it. Markdown qualifies today only because nothing imports it;
+      # adopting MDX in the frontend would make `**/*.md` build input and this
+      # exclusion wrong.
       - name: Filter paths
         id: filter
         if: steps.force.outputs.all != 'true'
         uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         with:
           filters: |
-            backend:
-              - 'backend/**'
-              - '.github/workflows/_backend.yml'
-            frontend:
-              - 'frontend/**'
-              - '.github/workflows/_frontend.yml'
-            db:
-              - 'backend/src/main/resources/db/migrations/**'
-              - 'backend/src/main/java/**'
-              - 'backend/pom.xml'
-              - '.github/workflows/_database.yml'
-            docker:
-              - 'backend/**'
-              - 'frontend/**'
-              - 'docker/**'
-              - '.dockerignore'
-              - '.github/workflows/_docker.yml'
-            # A change to the pipeline itself is the one case where the pipeline
-            # cannot be trusted to scope itself, so it runs everything.
-            workflows:
-              - '.github/workflows/**'
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!.claude/**'
+              - '!.vscode/**'
+              - '!LICENSE'
+              - '!.gitattributes'
 
       - name: Combine
         id: decide
         run: |
           set -euo pipefail
-          all='${{ steps.force.outputs.all }}'
-          wf='${{ steps.filter.outputs.workflows }}'
-
-          decide() {
-            if [ "$all" = "true" ] || [ "$wf" = "true" ] || [ "$1" = "true" ]; then
-              echo true
-            else
-              echo false
-            fi
-          }
-
-          {
-            echo "backend=$(decide '${{ steps.filter.outputs.backend }}')"
-            echo "frontend=$(decide '${{ steps.filter.outputs.frontend }}')"
-            echo "db=$(decide '${{ steps.filter.outputs.db }}')"
-            echo "docker=$(decide '${{ steps.filter.outputs.docker }}')"
-          } | tee -a "$GITHUB_OUTPUT"
+          # `!= false` rather than `== true`, deliberately. If the filter step is
+          # skipped, or a future version of the action changes its output, the
+          # value is empty and this still runs everything. The only way to skip
+          # is for the filter to say so explicitly.
+          if [ "$ALL" = "true" ] || [ "$CODE" != "false" ]; then
+            echo "code=true" | tee -a "$GITHUB_OUTPUT"
+            echo "Running every job."
+          else
+            echo "code=false" | tee -a "$GITHUB_OUTPUT"
+            echo "Documentation-only change: no build, test or image job will run."
+          fi
+        env:
+          ALL: ${{ steps.force.outputs.all }}
+          CODE: ${{ steps.filter.outputs.code }}
 
   # ---------------------------------------------------------------------------
   # Runs on every component. A leaked credential is the one failure that cannot
@@ -196,31 +201,35 @@ jobs:
         run: gitleaks git . --redact --verbose --no-banner
 
   # ---------------------------------------------------------------------------
-  # Components. Each is skipped when its paths are untouched; `ci-success`
-  # below treats a skip as a pass.
+  # Components. All four run together or not at all — the only thing that skips
+  # them is a change with no code in it. They run in parallel, so the wall-clock
+  # cost is the slowest one (docker, ~3 min) rather than their sum.
+  #
+  # `ci-success` below treats a skip as a pass, which is what lets a docs-only
+  # PR satisfy the required check without running a build.
   # ---------------------------------------------------------------------------
   backend:
     name: Backend
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/_backend.yml
 
   frontend:
     name: Frontend
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/_frontend.yml
 
   database:
     name: Database
     needs: changes
-    if: needs.changes.outputs.db == 'true'
+    if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/_database.yml
 
   docker:
     name: Docker
     needs: changes
-    if: needs.changes.outputs.docker == 'true'
+    if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/_docker.yml
 
   # ---------------------------------------------------------------------------

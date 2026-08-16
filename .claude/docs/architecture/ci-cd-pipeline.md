@@ -117,18 +117,46 @@ that always reports.**
 ```
 ci.yml     on: pull_request → main | merge_group | workflow_dispatch
 │
-├─ changes        which components did this touch?
+├─ changes        did anything that is not documentation change?
 ├─ secret-scan    gitleaks over commit history          always
 │
-├─ backend    → _backend.yml     if backend paths changed
-├─ frontend   → _frontend.yml    if frontend paths changed
-├─ database   → _database.yml    if db paths changed
-├─ docker     → _docker.yml      if docker paths changed
+├─ backend    → _backend.yml  ┐
+├─ frontend   → _frontend.yml │  all four, in parallel,
+├─ database   → _database.yml │  unless the change is docs-only
+├─ docker     → _docker.yml   ┘
 │
 └─ ci-success  ← named `CI`. THE required check. Require this and nothing else.
 
 codeql.yml    standalone, on main + PR + weekly. NOT part of the gate.
 ```
+
+### Why path filtering is coarse
+
+Until 2026-08-16 each component had its own globs: `backend/**` ran the backend
+job, `frontend/**` ran the frontend job. That asks the question the fragile way
+round. Per-component globs are a **hand-written dependency graph**, and an
+incomplete one does not fail — it skips a job and reports green. A CI system can
+survive almost any defect except silently not running.
+
+Inverted, the burden moves from *prove this component is affected* to *prove
+nothing is affected*, and the only list to maintain is of paths that provably
+cannot influence a build (`**/*.md`, `.claude/**`, `.vscode/**`, `LICENSE`,
+`.gitattributes`). Anything not on that list runs everything, so forgetting to
+update it costs minutes rather than coverage. The `decide` step tests
+`!= 'false'` rather than `== 'true'`, so an empty or unexpected filter output
+also runs everything.
+
+Two things make this affordable, and if either stops being true it is worth
+revisiting: the repository is **public**, so Actions minutes are free, and CI
+runs **once per PR**. Under the old push-triggered pipeline this would have been
+roughly twelve minutes per commit, and nobody reads a CI system that slow. The
+jobs run in parallel, so a code PR costs the slowest job rather than their sum.
+
+**What this does not fix**, and is worth knowing before assuming it did: running
+the frontend job on a backend change would never have caught API drift, because
+the frontend has no compile-time knowledge of the backend's types. That gap is
+closed separately by the contract test — see
+[`contracts/api-dto-fields.json`](#contractsapi-dto-fieldsjson--the-api-contract).
 
 ### The trigger model, and why there are no tiers any more
 
@@ -186,18 +214,20 @@ run rather than a queue of superseded ones. `cancel-in-progress` is restricted t
 `pull_request`: a merge-queue run is gating a specific merge, and cancelling it
 fails that merge.
 
-**Job `changes`** decides scope.
+**Job `changes`** answers one question: did anything that is not documentation
+change? It has a single output, `code`.
 
 - Step `force` detects the two events where change detection cannot be trusted —
   `workflow_dispatch` and `merge_group`, neither of which gives paths-filter a
   base commit to diff against. Either sets `all=true` and everything runs. (It
   used to also handle a branch's first push, whose `github.event.before` is all
   zeros; that case left with the `push` trigger.)
-- Step `filter` runs `dorny/paths-filter`, skipped entirely when `all=true`. On
-  `pull_request` it diffs against the base branch, which always exists.
-- Step `decide` ORs the force flag, the `workflows` filter and each component
-  filter, writing the result with `tee -a "$GITHUB_OUTPUT"` so the decision is
-  visible in the log rather than silently piped away.
+- Step `filter` runs `dorny/paths-filter` with one inverted filter — `'**'` minus
+  the inert paths — skipped entirely when `all=true`. On `pull_request` it diffs
+  against the base branch, which always exists.
+- Step `decide` writes the result with `tee -a "$GITHUB_OUTPUT"` so the decision
+  is visible in the log rather than silently piped away, and prints which of the
+  two outcomes it chose.
 
 **Job `secret-scan`** checks out with `fetch-depth: 0`, installs a **pinned**
 gitleaks binary and runs `gitleaks git . --redact --verbose --no-banner`. Runs on
@@ -440,6 +470,42 @@ it.
 Checkout uses `workflow_run.head_sha`, not the branch tip: they diverge the
 moment anyone pushes while an analysis is running, and the triage would then
 describe code CodeQL never looked at.
+
+### `contracts/api-dto-fields.json` — the API contract
+
+One list of JSON field names per DTO, read by a test on **each** side:
+`backend/.../contract/ApiContractTest.java` and
+`frontend/app/__tests__/api-contract.test.ts`.
+
+**The gap it closes.** `frontend/app/types/index.ts` is a hand-written mirror of
+the backend records — no OpenAPI generation, no shared package, three types
+carrying a *Mirrors the backend…* comment and nothing enforcing it. Renaming a
+field in `EventDTO` broke the frontend with **nothing failing anywhere**: the
+backend suite passed, the frontend suite passed, and the defect reached a
+browser. Neither suite could catch it alone, because neither side knows the
+other's types. Path filtering was never the cause and running more jobs was
+never the cure.
+
+**How it works.** Both tests compare against the same file, so agreeing with it
+is what makes them agree with each other.
+
+- Backend: Jackson **introspection**, not serialisation of an instance — it needs
+  no populated object and reports a field even when its value would be null. A
+  test that built instances would silently stop checking any field left unset.
+- Frontend: two layers. `Record<keyof ApiEvent, true>` is a compile-time
+  exhaustiveness check — remove a field from the interface and the object has an
+  excess property, add one and it is missing a key, so `npm run type-check` fails
+  by name before any test runs. The assertion against the contract file is the
+  runtime layer, and the one that catches interface-versus-record drift.
+- Each side also asserts it mirrors **every** type the contract names, so adding
+  a DTO to the file without a mirror fails rather than passing silently.
+
+**Changing the API** means editing this file in the same commit as the code. Both
+tests fail until both sides match, and the failure names the field and the side
+that has not caught up.
+
+Verified by simulating a rename (`organizerName` → `organiserName`) in the
+contract: the backend test failed and the frontend test failed, independently.
 
 ### `.github/dependabot.yml`
 
@@ -761,7 +827,16 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 ## Change log
 
-- **2026-08-16** — **Halved the CI bill without losing a check.** `ci.yml` and
+- **2026-08-16 (b)** — **Coarsened path filtering, and added a real API
+  contract.** Per-component globs are a hand-written dependency graph whose
+  failure mode is a silent skip reporting green, so they were replaced by one
+  inverted filter: everything runs unless the change is provably inert. Free
+  because the repo is public and CI now runs once per PR. Separately — and this
+  is the gap that actually mattered — `contracts/api-dto-fields.json` plus a test
+  on each side now pins the six DTOs the frontend hand-mirrors. Nothing had ever
+  checked them, and running more CI jobs would not have: the frontend has no
+  compile-time knowledge of the backend's types. *(main session)*
+- **2026-08-16 (a)** — **Halved the CI bill without losing a check.** `ci.yml` and
   `codeql.yml` both listened to `push` and `pull_request` with no branch filter,
   so GitHub fired both for the same commit: 12 of the last 20 CI commits ran
   twice, one three times, and CodeQL analysed every branch on every push.
