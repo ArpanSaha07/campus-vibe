@@ -32,7 +32,7 @@ changing; the pre-push hook runs it as a notice and never blocks.
 
 | Document | Covers | State |
 |---|---|---|
-| [`api-and-caching.md`](architecture/api-and-caching.md) | The `apiFetch` boundary, the three frontend data paths, Next's data cache and the rule that per-user data never enters it, the `@EntityGraph` N+1 fix, error-status mapping | ✅ Live · read from the code and measured |
+| [`api-and-caching.md`](architecture/api-and-caching.md) | The `apiFetch` boundary, the three frontend data paths, Next's data cache and the rule that per-user data never enters it, the `@EntityGraph` N+1 fix, error-status mapping · **plus the storage-layer model: what owns what, where new data belongs, and why a client query library is deferred** | ✅ Live · read from the code and measured |
 | [`ci-cd-pipeline.md`](architecture/ci-cd-pipeline.md) | GitHub Actions: the `ci.yml` orchestrator, the four reusable component workflows, tiering, the `ci-success` gate, CodeQL, Dependabot, `.dockerignore` · plus local CI parity (`scripts/verify.mjs`, `.githooks/pre-push`) | ✅ Conforms · **but nothing has run on GitHub yet** |
 | [`llm-api-key-management.md`](architecture/llm-api-key-management.md) | How the OpenAI key flows from `docker/.env` and EB environment properties through `OpenAiProperties` without ever being logged or baked into an image | ⚠ Unverified against the standard |
 | [`user-roles.md`](architecture/user-roles.md) | RBAC: the three roles, multi-role support, JWT claims, endpoint authorisation. **Cited as authority by four source files** | ⚠ Part spec, part as-built |

@@ -1,11 +1,17 @@
 # API & Caching — Implementation & Design Decisions
 
-**Status:** 2026-08-14 · branch `feature/my-clubs` · **live and verified
-end-to-end against the running Docker stack.** Every claim below was read from
-the code or measured; the two places where a rationale could not be recovered say
-so.
+**Status:** 2026-08-14, extended 2026-08-15 · branch `develop` · **live and
+verified end-to-end against the running Docker stack.** Every claim below was
+read from the code or measured; the two places where a rationale could not be
+recovered say so.
 **Authors:** main session.
-**Code as of:** e12cd19
+**Code as of:** `e12cd19` for the backend sections. The **storage layers**,
+**rules** and **client-query-library** sections were written on 2026-08-15
+against the working tree at that date — `api.tsx`, `cache.ts`,
+`followed-clubs-context.tsx`, the Server/Client split across every `page.tsx`,
+and a grep confirming no `Cache-Control` or `ETag` anywhere in
+`backend/src/main` were all re-read. The backend controller and repository
+sections were **not** re-read and still describe `e12cd19`.
 
 ## In one paragraph
 
@@ -78,6 +84,90 @@ There is no Spring `@Cacheable`, no Redis, no HTTP `Cache-Control` on API
 responses — all three verified absent by grep across `backend/src/main` and
 `next.config.ts`. That is a real gap rather than a considered position, and it is
 recorded below.
+
+---
+
+## Storage layers, and what owns what
+
+### The principle
+
+**No single browser storage mechanism is right for all of it.** Each layer has a
+job, and the failure mode when one is used for another's job is always the same:
+two copies of the truth that disagree. The corollary matters more than the rule —
+**every piece of data has exactly one authoritative owner**, and every other copy
+is a cache that must be able to be thrown away without losing anything.
+
+What CampusVibe actually runs today, in full:
+
+| Layer | Holds | Notes |
+|---|---|---|
+| PostgreSQL | Everything authoritative | The only source of truth |
+| Next data cache | Public club and event reads, 5 min | The **only** data cache in the system |
+| React context | The followed-clubs list, once per session | `followed-clubs-context.tsx`, the only client cache |
+| `localStorage` | **One item: the JWT** | And that is the thing that should not be there |
+| Caffeine (backend) | Auth rate-limit and lockout counters | Not a data cache — see the note under *No backend cache layer* |
+
+There is **no Redis, no IndexedDB, no client query library, and no HTTP caching**
+on API responses. Three of those are correct for the current scale; the fourth
+(HTTP caching) is a real gap, recorded below.
+
+### The shape of it
+
+```text
+                     PostgreSQL  ← source of truth
+                          │
+                   Spring Boot API
+                    (no Cache-Control,
+                     no ETag — a gap)
+                          │
+        ┌─────────────────┴─────────────────┐
+        │                                   │
+  Server Component                    Client Component
+  apiFetch + policy                   apiFetch, auth: true
+        │                                   │
+  Next data cache                     never cached
+  5 min, shared,                      (guard throws)
+  tag-invalidatable                         │
+        │                             React context for
+  /clubs, /events,                    the one list read
+  detail pages                        by many buttons
+                                            │
+                                     localStorage: JWT only
+```
+
+The asymmetry is the whole design. Public data is cached because it is the same
+for everyone; per-user data is never cached because it is not, and `apiFetch`
+enforces that rather than trusting anyone to remember.
+
+### Where a new piece of data belongs
+
+Ask in this order. Most answers are the first two.
+
+| The data | Where | Why |
+|---|---|---|
+| Session credential | httpOnly cookie *(today: `localStorage`)* | Must not be readable by page scripts, and the server needs it before rendering. The gap is [BUG-003](../../bugs/bugs.md#bug-003) |
+| Saved events, followed clubs, RSVPs | PostgreSQL | Must follow the user to another device and survive a cleared browser |
+| Roles, club-admin links | PostgreSQL | Authorisation input; the JWT carries role *names* only, and ownership is re-checked per request |
+| `email_verified`, `auth_provider` | PostgreSQL | Account facts, not display state |
+| Club and event lists, detail pages | Next data cache, 5 min | Public, identical for everyone, changes a few times a day |
+| Search results | Nothing | Unbounded query space; caching fills the store with entries never asked for twice. Deliberately absent from `cache.ts` |
+| Planner prompt across a sign-in redirect | `sessionStorage` (`planner.ts`) | Survives one navigation, dies with the tab — which is the intended lifetime |
+| Planner results | Page state | Not persisted. If *Save plan* is ever built, that is PostgreSQL, on an explicit user action |
+| A grid-vs-list toggle, a dismissed banner | `localStorage` | None exist yet. When one does, this is where it goes — small, non-sensitive, disposable, no cross-device meaning |
+| Anything the server must know before rendering | Cookie | `localStorage` is invisible to a Server Component. This is not a preference, it is a hard constraint |
+
+### PostgreSQL is the source of truth
+
+Browser storage is never authoritative for any of: users, clubs, events, saved
+events, followed clubs, RSVPs, roles and club-admin relationships, verification
+state, or auth tokens. All of it is server-owned, and every one of those is
+re-read from the database on the request that depends on it — including the
+principal itself, which `JWTAuthenticationFilter` loads by id on every
+authenticated request rather than trusting the claims.
+
+That last one is not incidental. It is the only reason deleting a user
+immediately invalidates their token, and it is currently the system's *only*
+revocation mechanism.
 
 ---
 
@@ -189,14 +279,32 @@ records a non-obvious security fact: the `permitAll` entry for
 
 ### `backend/.../DefaultExceptionHandler.java` — status mapping
 
-A `@ControllerAdvice` mapping nine exception types onto statuses, with a
-catch-all `Exception` handler returning 500. Two entries carry reasoning worth
-preserving: `AccessDeniedException` exists so `@PreAuthorize` denials return 403
-rather than falling through to the catch-all as 500s, and
-`MethodArgumentTypeMismatchException` (`:134`) does the same for a malformed path
-variable ([BUG-024](../../bugs/fixed_bugs.md#bug-024)). The latter deliberately
-does not echo `e.getMessage()`, which names the target Java type and the
-controller parameter.
+A `@ControllerAdvice` mapping twelve exception types onto statuses, with a
+catch-all `Exception` handler returning 500. *(Re-read 2026-08-15; three
+handlers were added by the authentication work.)*
+
+The entries that carry reasoning worth preserving:
+
+- `AccessDeniedException` exists so `@PreAuthorize` denials return 403 rather
+  than falling through to the catch-all as 500s.
+- `MethodArgumentTypeMismatchException` does the same for a malformed path
+  variable ([BUG-024](../../bugs/fixed_bugs.md#bug-024)), and deliberately does
+  not echo `e.getMessage()`, which names the target Java type and the controller
+  parameter.
+- `ConstraintViolationException` → 400, added 2026-08-15. `@Valid` covers request
+  bodies only, so a constraint on a `@RequestParam` raises this instead and was
+  answering **500** for an ordinary malformed query string
+  ([BUG-029](../../bugs/fixed_bugs.md#bug-029)).
+- `TooManyAttemptsException` → 429 with `Retry-After`, and
+  `EmailNotVerifiedException` → 403. Both from the auth work; see
+  [`authentication.md`](authentication.md).
+
+**The catch-all no longer echoes `e.getMessage()`.** It logs the exception at
+ERROR and returns a fixed string. Echoing handed internal detail to the caller
+for anything unmapped — a JVM helpful-NPE naming a private field is what
+prompted the change. The practical consequence for this document: **an unmapped
+exception is now opaque to clients by design**, so anything a caller must act on
+needs its own handler and its own status rather than relying on the message.
 
 **Undocumented here:** `AuthenticationController`, `UserController`,
 `ClubAdminRequestController`, `SearchController` and `MyEventController` are part
@@ -261,7 +369,79 @@ resolves.
 
 **No backend cache layer.** *Rationale not recorded* — this appears to be
 absence rather than a decision. Nothing in the code or the commit history argues
-against `@Cacheable`; it was simply never added.
+against `@Cacheable`; it was simply never added. Note the Caffeine caches added
+2026-08-15 in `security/ratelimit/` are **not** a counter-example: they hold
+rate-limit counters, not query results, and nothing reads application data
+through them.
+
+**No client query library (TanStack Query and equivalents), deferred not
+rejected.** *Decided 2026-08-15.* The obvious targets — clubs, events, detail
+pages, search — are already Server Components reading through the Next data
+cache, so adopting one there would move rendering off the server to acquire a
+cache that already exists. It would be a regression, not an upgrade.
+
+Where it would genuinely pay is the client surface: `followed-clubs-context.tsx`
+is roughly two hundred lines hand-rolling exactly what `useQuery` plus
+`useMutation` with optimistic rollback provide, four client pages each repeat
+`useState(null)` + `useEffect` + an error flag, and `todo.md` has a **second**
+bespoke provider queued for saved events.
+
+It is still deferred, because that surface is not fixed yet. **The `localStorage`
+JWT is the reason those pages are client-rendered at all** — a Server Component
+cannot read the token, so every authenticated page is forced into the browser.
+Move auth to a cookie ([BUG-003](../../bugs/bugs.md#bug-003)) and several of them
+can become Server Components, which changes what is left to serve. Adopting a
+query library first would mean fitting it to a shape about to change.
+
+**Trigger to revisit:** after the cookie migration lands, or sooner if a third
+hand-rolled client cache is about to be written — at that point the duplication
+outweighs the dependency.
+
+---
+
+## Rules for changing this area
+
+Placement rules, meant to be checkable against a diff. The entry-point bullets at
+the top of this document cover the `apiFetch` boundary itself; these cover where
+data is allowed to live.
+
+### Do
+
+- Give every new piece of data **one authoritative owner**, and treat every other
+  copy as disposable.
+- Put anything that must follow a user across devices in **PostgreSQL**.
+- Reach for a **Server Component + a policy from `cache.ts`** for public reads.
+  It is the cheapest path and already the majority of the app.
+- Add new cache policies **to `cache.ts`**, not as a literal `revalidate` at a
+  call site.
+- Choose a TTL from how fast that resource actually changes. Club descriptions
+  and a live event's status do not want the same number.
+- Keep authorisation in **Spring Security**. A frontend check is a UI affordance,
+  never a boundary.
+- Ask *does the server need this before it renders?* before choosing
+  `localStorage` — if yes, it is a cookie or it is account data.
+
+### Don't
+
+- **Do not put fetched events, clubs, profiles or search results in
+  `localStorage`.** It buys one avoided request and takes on expiry,
+  invalidation, cross-tab divergence and a second serialisation format. Nothing
+  in the app does this today; keep it that way.
+- **Do not combine `auth: true` with `revalidate` or `tags`.** `apiFetch` throws
+  (`api.tsx:88`). The throw is the feature.
+- **Do not put application data in cookies.** They ride along on matching
+  requests, so a cached list there is paid for on every call.
+- **Do not treat `localStorage` as a second database**, and do not add a second
+  item to it before the JWT has left.
+- **Do not add Redis to look production-shaped.** The honest triggers are more
+  than one backend instance (which the rate limiter already names), a measured
+  database bottleneck, or expensive computed results worth sharing.
+- **Do not persist AI planner responses** without a product decision to. The
+  prompt survives a redirect in `sessionStorage`; the results do not survive at
+  all, on purpose.
+- **Do not assume an httpOnly cookie is free.** Moving the JWT there brings CSRF
+  into scope, and CSRF is currently disabled — correctly, for a bearer-token API.
+  The two changes go together or neither goes.
 
 ---
 
@@ -327,11 +507,27 @@ Prioritised, each with the trigger for doing it.
    first). Only becomes load-bearing behind a CDN or with more than one frontend
    instance. **Trigger:** an actual deployment target existing — there is none
    today.
+6. **Reconsider a client query library** (P3, deliberately deferred — see Design
+   decisions). Not for the public pages, which are Server Components already.
+   For the client surface, where `followed-clubs-context.tsx` and four pages
+   hand-roll it. **Trigger:** the cookie migration landing, or a third bespoke
+   client cache being about to be written.
 
 ---
 
 ## Change log
 
+- **2026-08-15** — Added *Storage layers, and what owns what* (the principle,
+  the real layer inventory, the shape of the data paths, a placement table and
+  the source-of-truth statement) and *Rules for changing this area*. Recorded the
+  decision to **defer a client query library** with its trigger, and noted that
+  the new Caffeine rate-limit caches are not a data cache. Ideas adapted from a
+  generic guidelines note; only the parts true of this codebase were kept —
+  its TanStack-for-everything recommendation was rejected on the grounds that
+  the pages it names are already server-rendered. Also re-read
+  `DefaultExceptionHandler` and corrected the status-mapping section: three
+  handlers were added by the authentication work, and the catch-all no longer
+  echoes exception messages to callers. *(main session)*
 - **2026-08-14** — Created. Documents the API boundary, the caching model
   introduced in `482c4dd`, and the constraints the `localStorage` JWT imposes on
   both. Written after the caching work was verified end-to-end: the guard has
