@@ -36,8 +36,14 @@ while read -r _local_ref local_sha remote_ref remote_sha; do
 
     pushing="yes"
 
-    # Full tier when the target is main, matching ci.yml: a push to main runs
-    # the integration suites, a feature branch does not.
+    # Integration suites when the target is main. Largely vestigial now — the
+    # `Protect main` ruleset requires a PR, so a direct push to main should be
+    # refused before it gets here — but harmless, and correct if the ruleset is
+    # ever relaxed.
+    #
+    # Feature branches stay fast on purpose: this is an iteration loop, and the
+    # *IT suites need Testcontainers. They run on the PR. To check them before
+    # opening one: node scripts/verify.mjs --all --full
     case "$remote_ref" in
         refs/heads/main) full="--full" ;;
     esac

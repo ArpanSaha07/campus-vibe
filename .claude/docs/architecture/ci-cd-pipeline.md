@@ -1,10 +1,18 @@
 # CI/CD Pipeline — Implementation & Design Decisions
 
-**Status:** 2026-08-07 · branch `ci/github-actions` ·
-**branch protection is ENABLED on `main`; the pipeline is now a real merge
+**Status:** 2026-08-16 · branch `develop` ·
+**`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** e12cd19
+**Code as of:** trigger rework of 2026-08-16
+
+> **Note, 2026-08-16.** The dated banner below is kept as a record of where the
+> pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:
+> `main` is no longer unmergeable (29 PRs have merged), BUG-016 and BUG-017 were
+> confirmed green on GitHub, and the fast/full tiering it refers to no longer
+> exists. The current model is [The trigger
+> model](#the-trigger-model-and-why-there-are-no-tiers-any-more). This banner has
+> not otherwise been re-audited line by line.
 
 > **Read this first.** The pipeline is **enforced**. As of 2026-08-07 `main`
 > requires a pull request, requires branches to be up to date, and requires the
@@ -45,13 +53,15 @@ gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 
 ## In one paragraph
 
-Every push and pull request runs an automated check suite on GitHub's servers,
-and as of 2026-08-07 that suite **must pass before anything can merge into
-`main`** — you can no longer push to `main` directly, and a broken build is now
-stopped by a machine rather than caught after the fact. It is deliberately
-two-speed: a push to a working branch gets a roughly three-minute answer, while
-a pull request runs the full twelve-minute suite including a real database and
-the full Docker stack. **These workflows deploy nothing** — there is no AWS
+Every pull request into `main` runs an automated check suite on GitHub's servers,
+and as of 2026-08-07 that suite **must pass before anything can merge** — you
+cannot push to `main` directly, and a broken build is stopped by a machine rather
+than caught after the fact. As of 2026-08-16 it runs **once per pull request**
+and nowhere else: it used to also run on every push, which meant the same commit
+was tested two or three times, and the ruleset's up-to-date requirement makes the
+post-merge run provably redundant. A push to a working branch is now covered by
+the `pre-push` hook on your own machine instead. **These workflows deploy
+nothing** — there is no AWS
 account or registry yet — but that is not the same as nothing being deployed:
 **Vercel builds and previews the frontend on its own**, triggered by GitHub
 rather than by anything here, so it can fail on a commit this suite calls green.
@@ -60,15 +70,16 @@ three dependency upgrades that break the frontend build, a missing health
 endpoint that would have left any deployment platform unable to tell whether the
 app had started, and a vulnerable slider library that was shipping to every
 visitor's browser alongside an entire build toolchain nobody meant to deploy.
-The one thing to know before acting on it: **`main` cannot currently be merged
-into at all**, because the known search bug (BUG-001) fails the full tier that
-every pull request now has to pass. Fixing or quarantining that one test is the
-next thing that has to happen.
 
 ## Read this before you change anything here
 
 - **`.github/workflows/ci.yml`** is the only file with real triggers. Everything
   named `_*.yml` is a reusable workflow that runs only when `ci.yml` calls it.
+- **Do not add a `push:` trigger back to `ci.yml`.** It looks like a gap and is
+  not; the reasoning, and the one ruleset setting that would invalidate it, are
+  in [The trigger model](#the-trigger-model-and-why-there-are-no-tiers-any-more).
+  `codeql.yml` is the deliberate exception — its main run is the code-scanning
+  baseline, not a duplicate.
 - **`ci-success` is load-bearing, and now literally so.** It is the required
   status check on `main`, it runs `if: always()`, and it treats `skipped` as a
   pass. That is what lets job-level path filtering coexist with branch
@@ -104,38 +115,62 @@ The resolution: **one workflow, filtering at the job level, behind a gate job
 that always reports.**
 
 ```
-ci.yml     on: pull_request | push | merge_group | workflow_dispatch
+ci.yml     on: pull_request → main | merge_group | workflow_dispatch
 │
-├─ changes        which components did this touch? which tier?
-├─ secret-scan    gitleaks over commit history          every tier
+├─ changes        which components did this touch?
+├─ secret-scan    gitleaks over commit history          always
 │
 ├─ backend    → _backend.yml     if backend paths changed
 ├─ frontend   → _frontend.yml    if frontend paths changed
 ├─ database   → _database.yml    if db paths changed
-├─ docker     → _docker.yml      if docker paths changed AND full tier
+├─ docker     → _docker.yml      if docker paths changed
 │
 └─ ci-success  ← named `CI`. THE required check. Require this and nothing else.
 
-codeql.yml    standalone, on main + weekly. NOT part of the gate.
+codeql.yml    standalone, on main + PR + weekly. NOT part of the gate.
 ```
 
-The second idea is **tiering**. A push to a feature branch is an iteration loop
-and gets a roughly three-minute answer. A pull request is the merge gate and can
-afford twelve minutes.
+### The trigger model, and why there are no tiers any more
 
-| | branch push (fast) | PR · push to `main` · merge queue · dispatch (full) |
-|---|---|---|
-| Secret scan | ✅ | ✅ |
-| Migration file lint | ✅ | ✅ |
-| Backend compile + unit tests | ✅ | ✅ |
-| Frontend lint · tsc · Jest · build | ✅ | ✅ |
-| Backend `*IT` integration suites | — | ✅ |
-| Flyway migrate on real Postgres, twice | — | ✅ |
-| Docker stack build + boot + API smoke | — | ✅ |
-| Trivy image scan | — | ✅ |
+**Until 2026-08-16 this ran on `push` as well**, with a two-tier split: a
+feature-branch push got a fast subset, a PR got everything. It had a defect that
+outgrew the benefit. GitHub fires `push` *and* `pull_request` for the same
+commit, so every commit on a branch with an open PR was tested twice, and again
+after the merge. Measured over the last twenty CI runs: **12 commits ran twice,
+one ran three times.** Dependabot was hit hardest, because it pushes a branch and
+opens a PR — five ecosystems, weekly.
 
-`main` re-runs the full suite because a merge result can differ from the PR head
-that was tested.
+Dropping `push` collapsed the tiering with it: every remaining trigger was
+full-tier, so the fast branch became unreachable and was deleted rather than left
+to rot. `_backend.yml` and `_database.yml` no longer take a `full-tier` input.
+
+**`main` is governed by the `Protect main` ruleset** (repository ruleset id
+`20558306`, active, targeting `~DEFAULT_BRANCH`). Note that rulesets do **not**
+answer on the classic `/branches/main/protection` endpoint — that returns 404
+here, which reads as *unprotected* if you do not know to look at
+`/repos/{owner}/{repo}/rulesets`. It enforces:
+
+| Rule | Effect |
+|---|---|
+| `pull_request` | No direct pushes to main; 0 approvals required (solo repo) |
+| `required_status_checks` | Exactly one context: **`CI`** — the `ci-success` job |
+| `strict_required_status_checks_policy: true` | The PR branch must be up to date with main before merging |
+| `deletion` | main cannot be deleted |
+| `non_fast_forward` | main cannot be force-pushed |
+
+**The strict policy is why no CI runs on main, and this is the load-bearing
+sentence in this section.** Because a PR branch must be current with main before
+it can merge, what the PR tested *is* the merge result — a main run would
+re-prove the same commit seconds later. If `strict_required_status_checks_policy`
+is ever turned off, that reasoning dies and `push: branches: [main]` has to come
+back. Do not restore it before then thinking it is a gap; it is not.
+
+**What this costs.** A push to a feature branch or to `develop` now runs nothing
+on GitHub. The replacement is `scripts/verify.mjs` via `.githooks/pre-push`,
+which runs the same lint, type-check, test and build for both components before
+the push leaves the machine. `git push --no-verify` bypasses it, and the PR is
+what closes that hole — so the integration suites first run at the PR, not on the
+push that broke them.
 
 ---
 
@@ -146,29 +181,36 @@ that was tested.
 The only workflow with real triggers. Everything named `_*.yml` is reusable and
 fires only when this file calls it.
 
-Concurrency is `ci-${{ github.ref }}` with `cancel-in-progress` set to
-`github.ref != 'refs/heads/main'`. Superseded runs on a feature branch are noise;
-on `main` they are history, and every commit that lands should have a completed
-run against it.
+Concurrency is keyed on the PR number, so a rapid series of pushes leaves one
+run rather than a queue of superseded ones. `cancel-in-progress` is restricted to
+`pull_request`: a merge-queue run is gating a specific merge, and cancelling it
+fails that merge.
 
-**Job `changes`** decides scope and tier.
+**Job `changes`** decides scope.
 
-- Step `force` detects the cases where change detection cannot be trusted:
-  `workflow_dispatch`, `merge_group`, or a push whose `github.event.before` is
-  all zeros (a branch's first push — there is no base commit to diff against).
-  Any of those sets `all=true` and everything runs.
-- Step `filter` runs `dorny/paths-filter@v3`, skipped entirely when `all=true`.
+- Step `force` detects the two events where change detection cannot be trusted —
+  `workflow_dispatch` and `merge_group`, neither of which gives paths-filter a
+  base commit to diff against. Either sets `all=true` and everything runs. (It
+  used to also handle a branch's first push, whose `github.event.before` is all
+  zeros; that case left with the `push` trigger.)
+- Step `filter` runs `dorny/paths-filter`, skipped entirely when `all=true`. On
+  `pull_request` it diffs against the base branch, which always exists.
 - Step `decide` ORs the force flag, the `workflows` filter and each component
   filter, writing the result with `tee -a "$GITHUB_OUTPUT"` so the decision is
   visible in the log rather than silently piped away.
-- Output `full-tier` is a pure expression:
-  `github.event_name != 'push' || github.ref == 'refs/heads/main'`.
 
-**Job `secret-scan`** checks out with `fetch-depth: 0`, installs the gitleaks
-binary (version resolved from the GitHub releases API at run time), and runs
-`gitleaks git . --redact --verbose --no-banner`. Runs in every tier, on every
-change, regardless of which paths were touched — a leaked credential is the one
-failure a follow-up commit cannot undo.
+**Job `secret-scan`** checks out with `fetch-depth: 0`, installs a **pinned**
+gitleaks binary and runs `gitleaks git . --redact --verbose --no-banner`. Runs on
+every change regardless of which paths were touched — a leaked credential is the
+one failure a follow-up commit cannot undo.
+
+The version was previously resolved from the GitHub releases API at run time, on
+the reasoning that a stale tag could never break the pipeline. That was reversed
+on 2026-08-16: the step pipes a downloaded tarball into `sudo tar` inside a job
+holding repository credentials, so whatever upstream published minutes earlier
+would execute as root, unreviewed. Availability was the wrong thing to optimise
+there. Dependabot does not watch raw downloads, so `GITLEAKS_VERSION` is bumped
+by hand.
 
 **Job `ci-success`**, display name `CI`. The load-bearing piece:
 
@@ -184,27 +226,18 @@ steps:
 `always()` makes it report even when every component skipped. The failure test
 counts only `failure` and `cancelled`, so `skipped` passes. That combination is
 exactly what lets job-level path filtering coexist with branch protection. A
-preceding step prints every component's result and the tier, so the log answers
-*why did nothing run* without opening the job graph.
+preceding step prints every component's result, so the log answers *why did
+nothing run* without opening the job graph.
 
 ### `.github/workflows/_backend.yml`
 
-`workflow_call` with one required input, `full-tier: boolean`. JDK 25 temurin,
-`cache: maven`, 20-minute timeout.
+`workflow_call`, no inputs. JDK 25 temurin, `cache: maven`, 20-minute timeout,
+and a single `./mvnw -B verify` — surefire and failsafe together.
 
-The tier is applied in shell rather than in a GitHub expression:
-
-```yaml
-run: |
-  if [ "${{ inputs.full-tier }}" = "true" ]; then
-    ./mvnw -B verify
-  else
-    ./mvnw -B verify -DskipITs
-  fi
-```
-
-Both branches run `verify`, so the jar is packaged either way. `-DskipITs` is
-failsafe's own property — nothing extra is needed to make it work.
+It took a `full-tier: boolean` input until 2026-08-16, applied in shell rather
+than a GitHub expression to dodge an empty-string falsiness trap. Both are gone:
+with `push` no longer a trigger, every caller passed `true` and the `-DskipITs`
+branch was unreachable.
 
 Test reports upload `if: always()`; the jar uploads with
 `if-no-files-found: error`.
@@ -212,8 +245,8 @@ Test reports upload `if: always()`; the jar uploads with
 ### `.github/workflows/_frontend.yml`
 
 Node **24**, matching `frontend/Dockerfile`. `npm ci` → lint → type-check →
-`npm test -- --ci` → `npm run build`. Runs identically in both tiers — the whole
-job is under two minutes, so there is nothing worth deferring.
+`npm test -- --ci` → `npm run build`. Never had a tier — the whole job is under
+two minutes, so there was never anything worth deferring.
 
 Every step carries `if: '!cancelled()'`, so one push reports every problem at
 once instead of one per re-run.
@@ -246,9 +279,14 @@ git config core.hooksPath .githooks   # once per clone, activates the hook
 cd frontend && npm run verify         # or run it directly any time
 ```
 
-The hook scopes work the way `ci.yml` does — only changed components, full tier
-only when the target is `main`, and **fail open** when there is no base to diff
-against. Bypass with `git push --no-verify`.
+The hook scopes work the way `ci.yml` does — only changed components, and
+**fail open** when there is no base to diff against. Bypass with
+`git push --no-verify`.
+
+It matters more than it used to. Since CI stopped triggering on `push`, this is
+the only thing standing between an edit and the pull request. It still skips the
+backend integration suites by default, which is the right trade for an iteration
+loop; `node scripts/verify.mjs --all --full` runs them before opening a PR.
 
 Backend runs through the same script, which resolves `JAVA_HOME` itself (no JDK
 is on `PATH` on the dev machine) and reads the exit code from the process rather
@@ -267,14 +305,14 @@ Hibernate builds the schema from the entities and **the migration files are
 never executed**. A migration could be malformed, misnumbered or drifted from the
 entities and the entire backend suite would still pass.
 
-Two jobs, tiered independently:
+Two jobs, split so the cheap one fails first:
 
-- **`lint-migrations`** — no database, seconds, **both tiers**. Enforces
+- **`lint-migrations`** — no database, seconds. Enforces
   `V<n>__<snake_case>.sql`, rejects duplicate version numbers, greps for
   real-looking email addresses and for password/secret/api-key/token literals,
-  and warns on `INSERT INTO users`. A bad filename should be caught on the push
-  that introduced it, not on the PR.
-- **`migrate`** — full tier only. Boots the packaged jar twice against a
+  and warns on `INSERT INTO users`. It runs first so a bad filename fails in
+  seconds rather than after a Maven build and a Postgres container.
+- **`migrate`** — boots the packaged jar twice against a
   `pgvector/pgvector:pg15` service container.
 
 The double boot is the important part. First boot on an empty schema applies
@@ -294,8 +332,9 @@ different things and previously produced the same message.
 
 ### `.github/workflows/_docker.yml`
 
-The most expensive job, full tier only. The only place that exercises the
-Dockerfiles, the compose wiring and container-to-container networking.
+The most expensive job, and the only place that exercises the Dockerfiles, the
+compose wiring and container-to-container networking. Affordable now that CI
+runs once per PR rather than on every push.
 
 In order:
 
@@ -350,8 +389,16 @@ Container logs dump `if: failure()`; teardown is `if: always()`.
 Standalone. Not called by `ci.yml`, not in `ci-success`, so a CodeQL failure
 never blocks a merge. Matrix over `javascript-typescript` and `java-kotlin` with
 `fail-fast: false`, `build-mode: none`, `queries: security-and-quality`.
-Triggers on **push to any branch** (the `push:` key is deliberately bare), PR to
-`main`, and a weekly Monday 07:00 UTC cron.
+Triggers on push to **`main` only**, PR to `main`, and a weekly Monday 07:00 UTC
+cron.
+
+**The main run is not a duplicate of the PR run, and must not be removed** when
+tidying triggers elsewhere. Code scanning decides which alerts are *new on this
+PR* by diffing against the most recent analysis of the default branch. With no
+main analysis there is nothing to diff against and PR triage degrades to
+reporting every alert in a touched file as new. It was a bare `push:` until
+2026-08-16, meaning both languages were analysed on every push to every branch on
+top of the PR run — the single largest source of wasted minutes in the repo.
 
 The scheduled run is the point: it re-scans unchanged code against newly
 published queries, catching vulnerabilities disclosed after the code was last
@@ -383,10 +430,12 @@ it.
   On a feature branch this file does nothing at all, and the Actions tab shows no
   reason why. `workflow_dispatch` is there to exercise it before it reaches
   `main`.
-- `codeql.yml` triggers on both `push` and `pull_request`, so a PR branch
-  analyses the same commit twice. The `concurrency` group is keyed on the
-  analysed SHA rather than the ref so that becomes one triage, not two identical
-  comments.
+- The job is restricted to `workflow_run.event == 'pull_request'`. `codeql.yml`
+  also analyses `main` to keep the baseline fresh, but those alerts were already
+  triaged on the PR that introduced them, so triaging again after the merge
+  spends an agent run producing a report with no PR to post to. The
+  `concurrency` group is still keyed on the analysed SHA rather than the ref, as
+  a second guard against duplicate comments.
 
 Checkout uses `workflow_run.head_sha`, not the branch tip: they diverge the
 moment anyone pushes while an analysis is running, and the triage would then
@@ -447,14 +496,19 @@ Measured 2026-08-07: `./mvnw test` → **16 tests in 15.5 s**, no Docker.
 `./mvnw verify` → **42 tests** expected, each run exactly once — 40 measured on
 2026-08-05 plus the two new actuator cases; not re-measured since.
 
-`ActuatorHealthEndpointTest` is the one deliberate exception to *the fast tier
-loads no Spring context*. It costs 8.3 s of the 15.5 s, and it is worth that
-because it guards the readiness contract both full-tier jobs poll — the fast
-tier is the only place that can fail on the push that breaks it rather than on
-the PR ([BUG-015](../../bugs/fixed_bugs.md#bug-015)). Its annotations match
-`AbstractIntegrationTest` exactly, so the TestContext cache reuses one context
-and the full tier pays nothing extra. Keep new `@SpringBootTest` classes out of
-surefire unless they earn their place the same way.
+`ActuatorHealthEndpointTest` is the one deliberate exception to *surefire loads
+no Spring context*. It costs 8.3 s, and it is worth that because it guards the
+readiness contract the database and docker jobs both poll
+([BUG-015](../../bugs/fixed_bugs.md#bug-015)) — a unit test that fails in
+seconds beats a container job that times out after ten minutes saying only that
+nothing became healthy. Its annotations match `AbstractIntegrationTest` exactly,
+so the TestContext cache reuses one context and failsafe pays nothing extra.
+Keep new `@SpringBootTest` classes out of surefire unless they earn their place
+the same way.
+
+*(Its original justification — that the fast tier was the only place that could
+fail on the push rather than on the PR — expired with the fast tier on
+2026-08-16. The test is still worth its 8.3 s for the reason above.)*
 
 ---
 
@@ -466,7 +520,7 @@ surefire unless they earn their place the same way.
 |---|---|---|---|
 | One orchestrator + reusable `_*.yml` | Component scoping and a single required check are both needed | Four independent workflows with workflow-level `paths:` | Branch protection becomes impossible again |
 | `ci-success` gate treating `skipped` as pass | GitHub cannot require a check that never started | Requiring each component job | A frontend-only PR waits forever on `Expected — Waiting for status` |
-| Fast tier on push, full on PR | A branch push is an iteration loop; a PR is the merge gate | Full suite everywhere | ~12 min per push; people stop reading CI |
+| One run per PR, none on push or main | `push` + `pull_request` double-fire on the same commit; the ruleset's strict policy makes the merge result identical to what the PR tested | Fast tier on push, full on PR | Half of all CI minutes spent re-testing commits already tested |
 | Fail **open** when detection is unreliable | `github.event.before` is all zeros on a branch's first push | Treating no-diff as no-change | A branch's first push silently tests nothing |
 | Any `.github/workflows/**` edit runs everything | The pipeline cannot be trusted to scope its own change | Filtering workflow edits like any other path | A broken workflow edit merges untested |
 | `permissions: contents: read` at every workflow top level | Default token scope is far wider than any job needs | Repo default | Every job carries write scope it never uses |
@@ -531,10 +585,19 @@ all, which is exactly the fragility the design tolerates rather than depends on.
 Security findings are advisory input to a human; the things that *must* stop a
 merge — secrets, tests, migrations — live in `ci.yml`.
 
-**Why the tier check is shell, not a GitHub expression.** An empty string is
-falsy in GitHub expressions, so the tempting
-`inputs.full-tier && '' || '-DskipITs'` evaluates wrong in the true branch. An
-explicit `if` in bash has no such trap.
+**Why actions are pinned to SHAs.** A tag is mutable: `actions/checkout@v4`
+resolves to whatever that tag points at today, so a compromised or retagged
+release executes in a job holding repository credentials with no diff to review.
+SHAs are immutable, and Dependabot watches the `github-actions` ecosystem, so
+they stay current without manual work. The same reasoning drove pinning gitleaks
+and trivy, which are downloaded and executed as root — trivy previously ran an
+install script piped from the upstream `main` branch.
+
+*(This replaced a note on why the fast/full tier check was written in shell
+rather than a GitHub expression — an empty string is falsy in GitHub
+expressions, so `inputs.full-tier && '' || '-DskipITs'` evaluated wrong. Kept
+here because the trap is real and worth knowing; the code it applied to is
+gone.)*
 
 **Why the database job boots the real jar instead of the Flyway CLI.** Booting
 exercises the exact code path production uses, and `ddl-auto: validate` makes a
@@ -697,6 +760,19 @@ Ordered by value, each with the reason it has not been done. Tracked in
 ---
 
 ## Change log
+
+- **2026-08-16** — **Halved the CI bill without losing a check.** `ci.yml` and
+  `codeql.yml` both listened to `push` and `pull_request` with no branch filter,
+  so GitHub fired both for the same commit: 12 of the last 20 CI commits ran
+  twice, one three times, and CodeQL analysed every branch on every push.
+  `ci.yml` is now `pull_request` to main only — safe because the `Protect main`
+  ruleset sets `strict_required_status_checks_policy: true`, which is now
+  written down here as the load-bearing reason. Tiering went with the `push`
+  trigger, since every surviving event was full-tier. `codeql.yml` keeps a
+  main run, and the section says why so nobody prunes the code-scanning
+  baseline. Also pinned every action to a SHA and gitleaks/trivy to versions,
+  reversing the earlier deliberate choice to resolve gitleaks at run time.
+  *(main session)*
 
 - **2026-08-16** — Added `codeql-triage.yml`, so CodeQL findings get read
   without anyone remembering to look. Triage only: it comments, never commits,

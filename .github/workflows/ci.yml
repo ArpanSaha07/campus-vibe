@@ -12,27 +12,47 @@ name: CI
 # single always-run gate job, keeps the work component-scoped while still
 # producing exactly one check that always reports.
 #
-# BRANCH PROTECTION: require only the check named "CI". Never require the
-# component jobs — that reintroduces the deadlock this design exists to avoid.
+# BRANCH PROTECTION: the `Protect main` ruleset requires exactly one check, "CI",
+# which is the `ci-success` job below. Never require the component jobs — that
+# reintroduces the deadlock this design exists to avoid.
+#
+# WHY THERE IS NO `push:` TRIGGER
+#
+# There used to be, and it made every commit on a branch with an open PR run
+# twice — measured at 12 of the last 20 commits, one of them three times.
+# Dependabot suffered worst, since it pushes a branch AND opens a PR.
+#
+# Dropping `push` also removes the need to re-test after a merge. The ruleset
+# sets `strict_required_status_checks_policy: true`, so a PR branch must be up
+# to date with main before it can merge — which means what the PR tested IS the
+# merge result. A main run would re-prove it seconds later. If that strict
+# setting is ever turned off, this reasoning dies with it and `push:
+# branches: [main]` has to come back.
+#
+# The cost is that a push to a feature branch or to develop now runs nothing.
+# `scripts/verify.mjs`, via `.githooks/pre-push`, runs the same lint,
+# type-check, test and build for BOTH components before the push leaves the
+# machine — `git push --no-verify` is the hole, and the PR closes it.
 
 on:
   pull_request:
-  push:
+    branches: [main]
   merge_group:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # Superseded runs on a feature branch are noise. On main they are history —
-  # every commit that lands should have a completed run against it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Keyed on the PR, so a rapid series of pushes leaves one run rather than a
+  # queue of superseded ones. Merge-queue runs are never cancelled: each one is
+  # gating a specific merge, and cancelling it fails that merge.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Which components does this change actually touch, and how hard do we test?
+  # Which components does this change actually touch?
   # ---------------------------------------------------------------------------
   changes:
     name: Detect changed components
@@ -43,52 +63,38 @@ jobs:
       frontend: ${{ steps.decide.outputs.frontend }}
       db: ${{ steps.decide.outputs.db }}
       docker: ${{ steps.decide.outputs.docker }}
-      # Fast tier = a plain push to a feature branch: compile, unit tests, lint,
-      # type-check, migration lint, secret scan. Roughly three minutes, which is
-      # the point — a branch push is an iteration loop.
-      #
-      # Full tier = pull_request, push to main, merge_group, manual dispatch. It
-      # adds the integration suites, a real Flyway migrate and the Docker stack.
-      # main re-runs everything because a merge result can differ from the PR
-      # head that was tested, and because main is what would eventually deploy.
-      full-tier: ${{ github.event_name != 'push' || github.ref == 'refs/heads/main' }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      # dorny/paths-filter diffs a push against github.event.before, which is
-      # all zeros on the first push to a new branch — there is no base to
-      # compare with. Fail OPEN in that case: run everything. A wasted full run
-      # on a branch's first push is the cheap mistake; silently skipping every
-      # component is the expensive one.
+      # `merge_group` and `workflow_dispatch` give paths-filter no base commit to
+      # diff against. Fail OPEN: run everything. A wasted full run is the cheap
+      # mistake; silently skipping every component is the expensive one.
+      #
+      # `pull_request` needs no such handling — paths-filter diffs against the
+      # base branch, which always exists.
       - name: Decide whether change detection can be trusted
         id: force
         run: |
           set -euo pipefail
           force=false
-          case "${{ github.event_name }}" in
+          case "${EVENT_NAME}" in
             workflow_dispatch|merge_group)
               force=true
-              reason="event is ${{ github.event_name }}"
-              ;;
-            push)
-              before="${{ github.event.before }}"
-              if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
-                force=true
-                reason="first push to this branch; no base commit to diff against"
-              fi
+              echo "Running every component: event is ${EVENT_NAME}, which has no base to diff against."
               ;;
           esac
-          if [ "$force" = "true" ]; then
-            echo "Running every component: ${reason:-unknown}"
-          fi
           echo "all=$force" >> "$GITHUB_OUTPUT"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
 
       - name: Filter paths
         id: filter
         if: steps.force.outputs.all != 'true'
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         with:
           filters: |
             backend:
@@ -136,37 +142,39 @@ jobs:
           } | tee -a "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
-  # Runs in every tier, on every component. A leaked credential is the one
-  # failure that cannot be undone by a follow-up commit.
+  # Runs on every component. A leaked credential is the one failure that cannot
+  # be undone by a follow-up commit.
   # ---------------------------------------------------------------------------
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Pinned deliberately. This previously resolved `latest` from the GitHub
+      # API at run time, on the reasoning that a stale tag could never break the
+      # pipeline. That trades integrity for availability, and integrity wins in
+      # a step that pipes a downloaded tarball into `sudo tar` inside a job
+      # holding repository credentials: whatever upstream published five minutes
+      # ago would execute as root, unreviewed. Dependabot does not watch this,
+      # so bump it by hand when there is a reason to.
+      GITLEAKS_VERSION: 8.30.1
     steps:
       # Full history: the scan below walks commits, not the working tree, and
       # the default depth of 1 would leave it nothing to walk. 87 commits at the
       # time of writing — the fetch costs a couple of seconds.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # The binary, not gitleaks/gitleaks-action@v2 — that action requires a
       # paid GITLEAKS_LICENSE for organisation-owned repositories and fails
-      # closed without one. The version is resolved at run time rather than
-      # pinned so a stale tag can never break the pipeline.
+      # closed without one.
       - name: Install gitleaks
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version=$(curl -sSfL \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
-            | jq -r .tag_name | sed 's/^v//')
-          echo "gitleaks version: $version"
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" \
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | sudo tar -xz -C /usr/local/bin gitleaks
           gitleaks version
 
@@ -196,8 +204,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     uses: ./.github/workflows/_backend.yml
-    with:
-      full-tier: ${{ needs.changes.outputs.full-tier == 'true' }}
 
   frontend:
     name: Frontend
@@ -205,24 +211,21 @@ jobs:
     if: needs.changes.outputs.frontend == 'true'
     uses: ./.github/workflows/_frontend.yml
 
-  # Called in both tiers. The workflow gates its own expensive `migrate` job on
-  # full-tier and always runs the seconds-long migration file lint.
   database:
     name: Database
     needs: changes
     if: needs.changes.outputs.db == 'true'
     uses: ./.github/workflows/_database.yml
-    with:
-      full-tier: ${{ needs.changes.outputs.full-tier == 'true' }}
 
   docker:
     name: Docker
     needs: changes
-    if: needs.changes.outputs.docker == 'true' && needs.changes.outputs.full-tier == 'true'
+    if: needs.changes.outputs.docker == 'true'
     uses: ./.github/workflows/_docker.yml
 
   # ---------------------------------------------------------------------------
-  # THE required status check. Require this one, and only this one, on main.
+  # THE required status check — the `CI` context named in the `Protect main`
+  # ruleset. Require this one, and only this one.
   #
   # `always()` is what makes it report even when every component skipped, and
   # the failure test below counts only real failures and cancellations —
@@ -244,8 +247,6 @@ jobs:
           echo "frontend:    ${{ needs.frontend.result }}"
           echo "database:    ${{ needs.database.result }}"
           echo "docker:      ${{ needs.docker.result }}"
-          echo
-          echo "tier: ${{ needs.changes.outputs.full-tier == 'true' && 'full' || 'fast' }}"
 
       - name: Fail if any component failed or was cancelled
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

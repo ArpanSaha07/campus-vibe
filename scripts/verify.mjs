@@ -22,9 +22,13 @@
  * order, each running even when an earlier one failed (`if: '!cancelled()'`),
  * so one run reports every problem instead of one problem per run.
  *
- * .github/workflows/_backend.yml: ./mvnw -B verify, with -DskipITs on the fast
- * tier (a feature-branch push) and the integration suites on the full tier
- * (main).
+ * .github/workflows/_backend.yml: ./mvnw -B verify.
+ *
+ * This script matters more than it used to. As of 2026-08-16 CI triggers only
+ * on a pull request to main, so a push to a feature branch or to develop runs
+ * nothing on GitHub at all — this is the only check between an edit and the PR.
+ * By default it still skips the integration suites, which is the right trade for
+ * an iteration loop; pass --full to run them before opening the PR.
  *
  * WHY NODE AND NOT A SHELL SCRIPT
  *
