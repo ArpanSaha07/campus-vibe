@@ -1,0 +1,216 @@
+name: Branch checks
+
+# Fast feedback on a branch push. The iteration loop, not the merge gate.
+#
+# WHY THIS IS A SEPARATE WORKFLOW AND NOT A `push:` TRIGGER ON ci.yml
+#
+# This is the important part, and it is not tidiness. A required status check is
+# matched by NAME. `ci.yml` emits the check named `CI`, which is the single
+# context the `Protect main` ruleset requires. If a push-triggered run also
+# emitted `CI`, two runs would produce the same context on the same commit — and
+# the one that ends up satisfying the gate could be the push run, which
+# deliberately skips the integration suites, the real Flyway migration and the
+# whole Docker stack. A green gate on an untested merge is the worst failure
+# this pipeline could have.
+#
+# Separate workflow, separate check name, no ambiguity. Nothing in this file may
+# ever be named `CI`.
+#
+# HOW THIS AVOIDS RUNNING THE SAME COMMIT TWICE
+#
+# GitHub fires `push` and `pull_request` for the same commit when the branch has
+# an open PR. The `should-run` job below asks whether one exists and skips
+# everything if so, because `ci.yml` is already testing that commit far more
+# thoroughly. Dropping `push` from ci.yml alone was not enough — it left a branch
+# with no PR running nothing at all, which is the gap this file closes.
+#
+# WHAT IT DELIBERATELY DOES NOT RUN
+#
+# Backend *IT suites, the real Flyway migration, and the Docker stack. Those
+# are minutes each and the pull request runs all of them before anything can
+# merge. This is meant to answer in about three, or nobody reads it.
+
+on:
+  push:
+    branches-ignore:
+      # Nothing runs after a merge to main: the PR that merged had to be up to
+      # date with main first (strict_required_status_checks_policy), so what it
+      # tested IS the merge result.
+      - main
+      # Dependabot pushes a branch and opens a PR in the same breath, so branch
+      # checks there are pure waste — the PR run always supersedes them.
+      - 'dependabot/**'
+      # Merge-queue branches; ci.yml handles those through `merge_group`.
+      - 'gh-readonly-queue/**'
+
+concurrency:
+  # A branch push is an iteration loop, so superseded runs are noise rather than
+  # history. Unlike ci.yml, nothing here gates a merge, so cancelling is free.
+  group: branch-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Only to ask whether this branch already has an open PR.
+  pull-requests: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Should any of this run at all, and if so for which components?
+  # ---------------------------------------------------------------------------
+  should-run:
+    name: Detect changed components
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      skip: ${{ steps.pr.outputs.skip }}
+      backend: ${{ steps.decide.outputs.backend }}
+      frontend: ${{ steps.decide.outputs.frontend }}
+      db: ${{ steps.decide.outputs.db }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Skip if this branch already has an open pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Through env, never interpolated into the script body: a branch name
+          # is chosen by whoever pushes, and `${{ }}` inside a run block is a
+          # shell-injection sink.
+          BRANCH: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          # Fails OPEN, twice over. If the API is unreachable `|| echo 0` gives a
+          # zero, and if it somehow returns nothing the `:-0` default does. Both
+          # mean 'no PR found', so the checks run. Wasted minutes are the cheap
+          # mistake here; skipping silently is the expensive one.
+          #
+          # Note `set -e` is deliberately NOT used in this step. Under it, an
+          # unexpected non-numeric answer would abort the job, and a failed gate
+          # job skips everything downstream — failing closed, which is the exact
+          # opposite of what this is for.
+          open=$(gh pr list --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || echo 0)
+          open=${open:-0}
+          case "$open" in
+            ''|*[!0-9]*) open=0 ;;
+          esac
+          if [ "$open" -gt 0 ]; then
+            echo "Branch has $open open pull request(s); CI is testing this commit in full."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No open pull request for $BRANCH — running branch checks."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Per-component scoping, restored here and deliberately NOT used in
+      # ci.yml. A glob that is merely incomplete skips a job and reports green,
+      # which is unacceptable on a merge gate but fine on an iteration loop: the
+      # pull request runs everything unfiltered regardless, so the worst a wrong
+      # glob costs here is later feedback, never a missed failure.
+      - name: Filter paths
+        id: filter
+        if: steps.pr.outputs.skip != 'true'
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'contracts/**'
+              - '.github/workflows/_backend.yml'
+            frontend:
+              - 'frontend/**'
+              - 'contracts/**'
+              - '.github/workflows/_frontend.yml'
+            db:
+              - 'backend/src/main/resources/db/migrations/**'
+              - 'backend/src/main/java/**'
+              - 'backend/pom.xml'
+              - '.github/workflows/_database.yml'
+            # The pipeline cannot be trusted to scope its own change.
+            workflows:
+              - '.github/workflows/**'
+
+      # dorny/paths-filter cannot diff a branch's FIRST push: `github.event.before`
+      # is all zeros, so there is no base commit. Fail open there too.
+      - name: Combine
+        id: decide
+        env:
+          SKIP: ${{ steps.pr.outputs.skip }}
+          BEFORE: ${{ github.event.before }}
+          WORKFLOWS: ${{ steps.filter.outputs.workflows }}
+          BACKEND: ${{ steps.filter.outputs.backend }}
+          FRONTEND: ${{ steps.filter.outputs.frontend }}
+          DB: ${{ steps.filter.outputs.db }}
+        run: |
+          set -euo pipefail
+          if [ "$SKIP" = "true" ]; then
+            { echo "backend=false"; echo "frontend=false"; echo "db=false"; } | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          all=false
+          case "$BEFORE" in
+            ''|0000000000000000000000000000000000000000)
+              all=true
+              echo "First push to this branch; no base commit to diff against. Running everything."
+              ;;
+          esac
+          if [ "$WORKFLOWS" = "true" ]; then
+            all=true
+            echo "A workflow file changed. Running everything."
+          fi
+
+          decide() {
+            if [ "$all" = "true" ] || [ "$1" = "true" ]; then echo true; else echo false; fi
+          }
+
+          {
+            echo "backend=$(decide "$BACKEND")"
+            echo "frontend=$(decide "$FRONTEND")"
+            echo "db=$(decide "$DB")"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Unscoped on purpose: a credential can be committed to any file, so filtering
+  # this by component would be filtering the wrong thing. It is also the only
+  # check here whose failure a follow-up commit cannot undo, which is why it
+  # runs on a push rather than waiting for the pull request.
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan
+    needs: should-run
+    if: needs.should-run.outputs.skip != 'true'
+    uses: ./.github/workflows/_secret-scan.yml
+
+  # ---------------------------------------------------------------------------
+  # The cheap half of the suite.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend
+    needs: should-run
+    if: needs.should-run.outputs.backend == 'true'
+    uses: ./.github/workflows/_backend.yml
+    with:
+      # Unit tests only. The *IT suites need Testcontainers and run on the PR.
+      run-integration-tests: false
+
+  frontend:
+    name: Frontend
+    needs: should-run
+    if: needs.should-run.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend.yml
+
+  database:
+    name: Database
+    needs: should-run
+    if: needs.should-run.outputs.db == 'true'
+    uses: ./.github/workflows/_database.yml
+    with:
+      # Migration filename and content lint only — seconds, no database. The
+      # real Flyway run against Postgres is a pull-request job.
+      run-migrate: false

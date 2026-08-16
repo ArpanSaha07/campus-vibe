@@ -1,0 +1,47 @@
+{
+  "$comment": [
+    "THE API CONTRACT. One list of field names per DTO, read by tests on BOTH",
+    "sides of the wire:",
+    "",
+    "  backend/src/test/java/com/campusvibe/contract/ApiContractTest.java",
+    "  frontend/app/__tests__/api-contract.test.ts",
+    "",
+    "WHY THIS FILE EXISTS. frontend/app/types/index.ts is a hand-maintained",
+    "mirror of these records - there is no OpenAPI generation and no shared",
+    "package. Before this file, renaming a field in EventDTO broke the frontend",
+    "and nothing failed: the backend suite passed, the frontend suite passed,",
+    "and the defect surfaced in a browser. Neither side could catch it alone,",
+    "because neither side knows the other's types.",
+    "",
+    "HOW TO CHANGE THE API. Edit this file in the SAME commit as the code. Both",
+    "tests will fail until both sides match it, which is the point - the failure",
+    "names the field and the side that has not caught up yet.",
+    "",
+    "Names are the JSON keys on the wire, so they are what the frontend sees.",
+    "Order does not matter; both tests sort before comparing."
+  ],
+
+  "EventDTO": [
+    "id", "title", "description", "dateTime", "createdAt", "location", "price",
+    "organizerId", "organizerName", "followers", "images", "promoted",
+    "capacity", "registered", "categories"
+  ],
+
+  "ClubDTO": [
+    "id", "name", "description", "followers", "logo", "socialLinks",
+    "featured", "images", "createdAt"
+  ],
+
+  "UserDTO": [
+    "id", "name", "email", "roles", "createdAt", "emailVerified", "authProvider"
+  ],
+
+  "MyEventDTO": ["event", "going", "saved"],
+
+  "AuthenticationResponse": ["token", "user"],
+
+  "ClubAdminRequestDTO": [
+    "id", "userId", "userName", "userEmail", "clubId", "clubName", "message",
+    "status", "requestedAt", "reviewedAt"
+  ]
+}

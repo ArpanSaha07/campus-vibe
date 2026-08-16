@@ -60,15 +60,22 @@ jobs:
     # failed one may still have uploaded results for the language that worked —
     # codeql.yml runs the two languages with fail-fast off precisely so that one
     # extractor breaking does not cost the other's findings.
+    #
+    # Restricted to the pull_request analysis. codeql.yml also analyses main to
+    # keep the code-scanning baseline fresh, but every alert in that run was
+    # already triaged on the PR that introduced it — triaging again after the
+    # merge spends an agent run on a report with no PR to post to and nobody to
+    # read it.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion != 'cancelled'
+      (github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Checkout the analysed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The commit CodeQL actually looked at, not the tip of the branch —
           # they differ as soon as anyone pushes while the analysis is running,
@@ -77,7 +84,7 @@ jobs:
           fetch-depth: 1
 
       - name: Triage
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1.0.193
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANALYSED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}

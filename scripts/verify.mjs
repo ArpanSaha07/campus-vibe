@@ -22,9 +22,13 @@
  * order, each running even when an earlier one failed (`if: '!cancelled()'`),
  * so one run reports every problem instead of one problem per run.
  *
- * .github/workflows/_backend.yml: ./mvnw -B verify, with -DskipITs on the fast
- * tier (a feature-branch push) and the integration suites on the full tier
- * (main).
+ * .github/workflows/_backend.yml: ./mvnw -B verify.
+ *
+ * Two workflows mirror this split. branch-checks.yml runs the same scoped, fast
+ * checks on a push; ci.yml runs everything on a pull request to main. This
+ * script is what catches the failure BEFORE the push, which is still the only
+ * place it costs nothing. By default it skips the integration suites — the same
+ * trade branch-checks.yml makes — so pass --full to run them before opening a PR.
  *
  * WHY NODE AND NOT A SHELL SCRIPT
  *
@@ -69,8 +73,9 @@ const full = has("--full");
 // ---------------------------------------------------------------------------
 // Which components changed
 //
-// Mirrors the `dorny/paths-filter` block in ci.yml, including its two
-// deliberate choices: a change under .github/workflows/ runs everything
+// Mirrors the `dorny/paths-filter` block in branch-checks.yml — not ci.yml,
+// which deliberately filters coarsely because it gates merges. Both of its
+// choices are copied here: a change under .github/workflows/ runs everything
 // (the pipeline cannot be trusted to scope itself), and an unknown base fails
 // OPEN rather than silently skipping every component.
 // ---------------------------------------------------------------------------

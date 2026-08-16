@@ -91,18 +91,13 @@ export default function Navbar() {
             <Link href="/events" className={`${linkClasses} hidden sm:block`}>
               Find events
             </Link>
-            {!isAuthenticated && (
-              <button onClick={() => openAuth("login")} className={linkClasses}>
-                Log in
-              </button>
-            )}
-            {/* <button
+            <button
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               className="p-3 rounded-full hover:bg-lavender-50"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button> */}
+            </button>
           </div>
         </div>
 
@@ -120,26 +115,25 @@ export default function Navbar() {
             <Link href="/clubs" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
               Find clubs
             </Link>
-            <Link href="/create-event" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-              Create event
-            </Link>
             {isAuthenticated ? (
               <>
-                <Link href="/dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                  Dashboard
-                </Link>
                 {user && isClubAdmin(user) && (
-                  <Link href="/club-dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                    My club
-                  </Link>
+                  <>
+                    <Link href="/create-event" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                      Create event
+                    </Link>
+                    <Link href="/club-dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                      My club
+                    </Link>
+                  </>
                 )}
                 {user && isAdmin(user) && (
-                  <Link href="/admin" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                    Admin
+                  <Link href="/dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                    Dashboard
                   </Link>
                 )}
                 <Link href="/profile" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                  Profile
+                  My profile
                 </Link>
                 <button
                   onClick={logout}
@@ -149,15 +143,26 @@ export default function Navbar() {
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  openAuth("signup");
-                }}
-                className="block w-full text-left px-3 py-2 rounded-xl font-semibold text-lavender-600 hover:bg-lavender-50"
-              >
-                Sign up
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openAuth("login");
+                  }}
+                  className="block w-full text-left px-3 py-2 rounded-xl hover:bg-lavender-50"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openAuth("signup");
+                  }}
+                  className="block w-full text-left px-3 py-2 rounded-xl font-semibold text-lavender-600 hover:bg-lavender-50"
+                >
+                  Sign up
+                </button>
+              </>
             )}
           </div>
         )}

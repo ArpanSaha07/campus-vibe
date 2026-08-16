@@ -15,8 +15,18 @@ name: CodeQL
 # start failing on permissions — delete it rather than leaving it red.
 
 on:
+  # DO NOT delete this main run, even though ci.yml deliberately has no `push`
+  # trigger. It is not a duplicate of the pull_request run below — it is the
+  # code-scanning BASELINE. GitHub decides which alerts are 'new on this PR' by
+  # diffing against the most recent analysis of the default branch; with no
+  # main analysis there is nothing to diff against, and PR triage degrades to
+  # reporting every alert in the file as new.
+  #
+  # It also used to be a bare `push:`, which meant every language was analysed
+  # on every push to every branch, on top of the PR run. That was the largest
+  # single source of wasted minutes in this repository.
   push:
-
+    branches: [main]
   pull_request:
     branches: [main]
   schedule:
@@ -55,7 +65,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # build-mode: none analyses source directly instead of observing a
       # compile. It yields somewhat fewer results than a built analysis, and
@@ -63,13 +73,13 @@ jobs:
       # to drive Maven on JDK 25, which is exactly the fragility this workflow
       # is designed to tolerate rather than depend on.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3.37.7
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-and-quality
 
       - name: Analyze
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3.37.7
         with:
           category: /language:${{ matrix.language }}

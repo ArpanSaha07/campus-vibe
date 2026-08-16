@@ -6,13 +6,24 @@ name: Backend
 on:
   workflow_call:
     inputs:
-      full-tier:
+      run-integration-tests:
         description: >-
-          true  - ./mvnw verify: surefire unit tests AND failsafe *IT suites.
-          false - ./mvnw verify -DskipITs: unit tests only. The jar is still
-                  packaged either way, so downstream jobs are unaffected.
+          false skips the failsafe *IT suites (-DskipITs), which need a Spring
+          context or a Testcontainers pgvector container. Unit tests always run,
+          and the jar is packaged either way, so downstream jobs are unaffected.
         type: boolean
-        required: true
+        required: false
+        default: true
+
+# History, because this input came back after being deleted. It existed as
+# `full-tier` until 2026-08-16, was removed when ci.yml stopped triggering on
+# push (every caller then passed true, so the branch was unreachable), and
+# returned the same day with branch-checks.yml, which needs the cheap variant.
+#
+# Two things changed in the second version. It defaults to **true**, so a caller
+# that forgets it gets more testing rather than less. And it is named for a
+# behaviour rather than a policy — `full-tier` described which CI tier you were
+# in, so it read as meaningless the moment the tiers were rearranged.
 
 permissions:
   contents: read
@@ -31,12 +42,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Must match backend/pom.xml <java.version> and backend/Dockerfile.
       # JDK 17 cannot compile this project at all. (BUG-002)
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: 'temurin'
           java-version: '25'
@@ -44,17 +55,22 @@ jobs:
 
       # mvnw is mode 100755 in the index, so no chmod step is needed.
       #
-      # Tests are deliberately never skipped wholesale: skipping them is what
-      # let a non-compiling merge and a failing search test reach the branch
-      # unnoticed. The fast tier drops only the *IT classes, which need a
-      # Spring context (H2) or a Testcontainers pgvector container.
+      # Tests are never skipped wholesale: skipping them is what let a
+      # non-compiling merge and a failing search test reach the branch unnoticed.
+      # Only the *IT classes can be dropped, and only on a branch push — the PR
+      # runs them before anything can merge.
+      #
+      # Written as an `if` in bash rather than a GitHub expression on purpose:
+      # an empty string is falsy in GitHub expressions, so the tempting
+      # `inputs.run-integration-tests && '' || '-DskipITs'` evaluates wrong in
+      # the true branch and silently skips the suites it meant to run.
       - name: Build and test
         run: |
-          if [ "${{ inputs.full-tier }}" = "true" ]; then
-            echo "Full tier: unit tests + integration tests."
+          if [ "${{ inputs.run-integration-tests }}" = "true" ]; then
+            echo "Running unit and integration tests."
             ./mvnw -B verify
           else
-            echo "Fast tier: unit tests only. *IT suites run on the PR."
+            echo "Running unit tests only. The *IT suites run on the pull request."
             ./mvnw -B verify -DskipITs
           fi
 
@@ -62,7 +78,7 @@ jobs:
       # assertion broke is to reproduce the whole run locally.
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backend-test-reports
           path: |
@@ -72,7 +88,7 @@ jobs:
           retention-days: 7
 
       - name: Upload jar
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: backend-jar
           path: backend/target/campusvibe-*.jar
