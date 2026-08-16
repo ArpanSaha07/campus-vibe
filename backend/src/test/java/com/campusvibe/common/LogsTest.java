@@ -32,6 +32,17 @@ class LogsTest {
     }
 
     @Test
+    void crLfAndOtherControlCharactersAreAllHandledTogether() {
+        // Pins the redundancy in Logs.safe. CR and LF are stripped by an
+        // explicit replace *and* by the \p{Cntrl} class that follows; ESC is
+        // only caught by the class. If someone removes the explicit pair as
+        // dead code this still passes — which is the point of the comment
+        // there — but this at least fixes the contract the pair exists to keep
+        // visible to CodeQL.
+        assertThat(Logs.safe("a\rb\ncd")).isEqualTo("a_b_c_d");
+    }
+
+    @Test
     void ordinaryTextIsUntouched() {
         assertThat(Logs.safe("/api/v1/auth/login")).isEqualTo("/api/v1/auth/login");
         assertThat(Logs.safe("ann@campus.com")).isEqualTo("ann@campus.com");
