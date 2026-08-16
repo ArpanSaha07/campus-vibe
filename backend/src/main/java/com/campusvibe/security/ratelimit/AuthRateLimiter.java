@@ -33,15 +33,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AuthRateLimiter {
 
     private final RateLimitProperties properties;
-    private final Cache<String, AtomicInteger> ipHits;
+    private final IpBudget ipBudget;
     private final Cache<String, AtomicInteger> failedLogins;
 
     public AuthRateLimiter(RateLimitProperties properties) {
         this.properties = properties;
-        this.ipHits = Caffeine.newBuilder()
-                .expireAfterWrite(properties.window())
-                .maximumSize(100_000)
-                .build();
+        this.ipBudget = new IpBudget(properties.ipRequestsPerWindow(), properties.window());
         this.failedLogins = Caffeine.newBuilder()
                 // Refreshed on each failure, so the lock window runs from the
                 // most recent attempt rather than the first.
@@ -53,8 +50,7 @@ public class AuthRateLimiter {
     /** @return true if this request is within the per-IP budget. */
     public boolean tryConsumeForIp(String ip) {
         if (!properties.enabled()) return true;
-        AtomicInteger hits = ipHits.get(ip, k -> new AtomicInteger());
-        return hits.incrementAndGet() <= properties.ipRequestsPerWindow();
+        return ipBudget.tryConsume(ip);
     }
 
     /** @return true if this address is currently locked out. */
@@ -87,7 +83,7 @@ public class AuthRateLimiter {
 
     /** Seconds a caller should wait, for the Retry-After header. */
     public long retryAfterSeconds() {
-        return Math.max(1, properties.window().toSeconds());
+        return ipBudget.retryAfterSeconds();
     }
 
     public long lockoutSeconds() {
@@ -96,7 +92,7 @@ public class AuthRateLimiter {
 
     /** Test seam: forget everything. Never called by application code. */
     public void reset() {
-        ipHits.invalidateAll();
+        ipBudget.reset();
         failedLogins.invalidateAll();
     }
 }

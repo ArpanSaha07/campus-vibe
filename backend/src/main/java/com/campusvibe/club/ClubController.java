@@ -2,12 +2,15 @@ package com.campusvibe.club;
 
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
+import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
+import jakarta.validation.constraints.Size;
 import com.campusvibe.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,6 +18,7 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
+@Validated // needed for constraints on @RequestParam, unlike @Valid on a body
 @RequestMapping("/api/v1/clubs")
 public class ClubController {
 
@@ -37,7 +41,8 @@ public class ClubController {
     }
 
     @GetMapping("/search")
-    public List<ClubDTO> search(@RequestParam String q,
+    public List<ClubDTO> search(
+            @RequestParam @Size(max = SearchLimits.MAX_QUERY_LENGTH) String q,
                                 @RequestParam(defaultValue = "20") int limit) {
         if (q == null || q.isBlank()) {
             return List.of();

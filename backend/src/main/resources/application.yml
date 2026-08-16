@@ -120,6 +120,20 @@ search:
   semantic-weight: 0.7
   keyword-weight: 0.3
   min-score: 0.2
+  # Caches embeddings of search *queries* only, never results (BUG-005).
+  # Document embeddings live in pgvector; these were recomputed per request,
+  # including for the identical repeats a search box produces constantly.
+  query-embedding-cache:
+    max-entries: ${SEARCH_EMBEDDING_CACHE_ENTRIES:1000}
+    ttl: ${SEARCH_EMBEDDING_CACHE_TTL:1h}
+
+campusvibe.search.rate-limit:
+  # Bounds OpenAI spend on the deliberately-public search endpoints (BUG-005).
+  # Separate budget from the auth limiter: different reason, different numbers,
+  # and neither may consume the other's allowance.
+  enabled: ${SEARCH_RATE_LIMIT_ENABLED:true}
+  ip-requests-per-window: ${SEARCH_RATE_LIMIT_IP_REQUESTS:30}
+  window: ${SEARCH_RATE_LIMIT_WINDOW:1m}
 
 jwt:
   # Required — no default. A committed fallback would let any environment that

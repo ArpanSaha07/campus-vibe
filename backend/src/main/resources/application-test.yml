@@ -17,6 +17,11 @@ campusvibe:
     # own small limits.
     rate-limit:
       enabled: false
+  search:
+    # Same reasoning as the auth limiter: SearchIT issues many searches in a
+    # row and would otherwise throttle itself. SearchRateLimitIT turns it on.
+    rate-limit:
+      enabled: false
 
 jwt:
   secret: "test-only-secret-0123456789-0123456789-0123456789"

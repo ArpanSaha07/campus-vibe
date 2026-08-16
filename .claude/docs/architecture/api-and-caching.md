@@ -105,11 +105,17 @@ What CampusVibe actually runs today, in full:
 | Next data cache | Public club and event reads, 5 min | The **only** data cache in the system |
 | React context | The followed-clubs list, once per session | `followed-clubs-context.tsx`, the only client cache |
 | `localStorage` | **One item: the JWT** | And that is the thing that should not be there |
-| Caffeine (backend) | Auth rate-limit and lockout counters | Not a data cache — see the note under *No backend cache layer* |
+| Caffeine (backend) | Auth and search rate-limit counters, lockout counters, **query embeddings** | Only the last is a data cache, and only of provider output — never of results |
 
 There is **no Redis, no IndexedDB, no client query library, and no HTTP caching**
 on API responses. Three of those are correct for the current scale; the fourth
 (HTTP caching) is a real gap, recorded below.
+
+The one backend cache that holds provider output rather than counters is
+`QueryEmbeddingCache` (2026-08-15, [BUG-005](../../bugs/fixed_bugs.md#bug-005)).
+It sits around the **embedding call only**, never around the ranked results —
+results change whenever an event is added and must not be served stale, whereas
+the embedding of the string *chess club* is the same forever.
 
 ### The shape of it
 
@@ -476,6 +482,18 @@ nothing structural prevents the next divergence.
 grep. Every cache hit today is Next's in-process data cache, which means a second
 frontend instance shares nothing with the first.
 
+**No global ceiling on search spend.** The per-IP budget added for
+[BUG-005](../../bugs/fixed_bugs.md#bug-005) bounds one caller, not the sum of
+them: a thousand IPs each staying under 30/min is still a thousand times the
+cost. The honest control is a hard monthly cap on the OpenAI project itself,
+which is a dashboard setting rather than code and is tracked in
+[`todo.md`](../../TODO/todo.md) under *AI & Search*.
+
+**Rate-limit counters are per instance.** Both the auth and search budgets live
+in memory, so they reset on restart and a second backend instance would enforce
+its own copy — doubling every effective limit. Accepted while there is one
+instance; that is the trigger to move them to Redis.
+
 **Admin and dashboard over-fetch.** Whole lists are pulled for two counts, and
 all events for eight. Against 8 clubs and 0 events this is not measurable, and it
 is recorded rather than fixed.
@@ -494,9 +512,14 @@ Prioritised, each with the trigger for doing it.
    `/users/me` waterfall, and closes the XSS path. Do it with
    [BUG-003](../../bugs/bugs.md#bug-003) rather than separately. **Trigger:** the
    next time signed-in page latency or route protection comes up.
-2. **Call `revalidateTag` from the write paths** (P2). The tags already exist, so
-   this is small. **Trigger:** the first complaint that a new event does not
-   appear, or the first real club admin.
+2. **Call `revalidateTag` from the write paths** (P2). The tags already exist,
+   but the writes do not go through Next — the create forms are Client
+   Components posting straight to Spring Boot, so Next never learns that
+   anything changed. Doing this needs a Next Route Handler or Server Action for
+   the client to call after a successful write, which is a small piece of
+   design rather than a one-liner, and it adds an endpoint that can evict the
+   cache. **Trigger:** the first complaint that a new event does not appear, or
+   the first real club admin.
 3. **Batch the `images`/`categories` collections** (P3) with a batch size or a
    second entity graph. **Trigger:** event count reaching the low hundreds, where
    2n statements start to show.
@@ -517,7 +540,14 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
-- **2026-08-15** — Added *Storage layers, and what owns what* (the principle,
+- **2026-08-15 (b)** — Search spend controls for
+  [BUG-005](../../bugs/fixed_bugs.md#bug-005): a per-IP budget on the two public
+  search endpoints, a 200-character query cap, and `QueryEmbeddingCache` around
+  the provider call. Recorded two limits that came with them and are not fixed —
+  no global spend ceiling, and per-instance counters. Also noted why
+  `revalidateTag` is not the one-liner it looks like: the write paths do not go
+  through Next at all. *(main session)*
+- **2026-08-15 (a)** — Added *Storage layers, and what owns what* (the principle,
   the real layer inventory, the shape of the data paths, a placement table and
   the source-of-truth statement) and *Rules for changing this area*. Recorded the
   decision to **defer a client query library** with its trigger, and noted that

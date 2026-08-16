@@ -1200,3 +1200,74 @@ does so *before* the find-or-create lookup that matches on email. **Not covered
 by an automated test**: asserting it needs a genuinely signed Google token,
 which cannot be minted in a test. Verified by reading, and by manual sign-in
 continuing to work for a verified account.
+
+---
+
+### BUG-005
+**Unauthenticated search can drive unbounded OpenAI spend** · Medium · FIXED
+
+**Found:** 2026-07-30, during the LLM API key management design review.
+
+**Symptom:** `GET /api/v1/events/search` and `/api/v1/clubs/search` are public and
+issue **one OpenAI embedding call per request** (`SearchService.java:66`). The
+only throttle is a 300 ms client-side debounce
+(`frontend/app/components/SearchBar.tsx:10-11`), trivially bypassed by calling
+the API directly. There is no server-side rate limit, no query-length cap, and no
+cache of query embeddings.
+
+Document embeddings are persisted in pgvector
+(`db/migrations/V8__search_embeddings.sql:8-9`), but **query** embeddings are
+recomputed on every request, including identical repeat queries.
+
+Keeping search public is a deliberate product decision (unauthenticated users must
+be able to browse and search), which is exactly why the compensating controls are
+required rather than optional. See `.claude/skills/llm-integration/SKILL.md`
+("Rate Limiting and Quotas").
+
+**Mitigated so far:** connect/read timeouts and bounded retries were added in
+`ai/client/OpenAiEmbeddingClient.java`, and per-call token usage is now logged, so
+spend is at least observable. The rate limit and cache are still missing.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/search/SearchService.java:44-52, 65-67`
+- `backend/src/main/java/com/campusvibe/event/EventController.java:42`, `club/ClubController.java:45`
+- `backend/src/main/java/com/campusvibe/ai/client/OpenAiEmbeddingClient.java`
+
+**Affected tests:** none yet. Needs a rate-limit rejection test (expect `429`).
+
+---
+
+**FIXED 2026-08-15.** Three controls, because none of them is sufficient alone —
+a rate limit still lets a slow steady caller spend indefinitely, a cache does
+nothing against distinct queries, and a length cap does nothing against volume.
+
+1. **Per-IP budget** on `/api/v1/events/search` and `/api/v1/clubs/search`
+   (`SearchRateLimitFilter`, 30/min default). A filter, so a refused request
+   never reaches the provider — a limiter applied after the embedding call would
+   bound the response rate and leave the bill unchanged. Its own budget,
+   separate from the auth limiter: different reason, different numbers, and
+   neither may consume the other's allowance.
+2. **Query length cap** at 200 characters (`SearchLimits.MAX_QUERY_LENGTH`),
+   rejected with 400 rather than truncated. Truncating still pays for the work
+   and silently answers a different question than the one asked.
+3. **Query-embedding cache** (`QueryEmbeddingCache`). Document embeddings
+   already persisted in pgvector; query embeddings were recomputed every
+   request, including the identical repeats a search box produces constantly.
+   Keyed case- and whitespace-insensitively. An **empty** answer is deliberately
+   not cached: caching it would pin search into keyword-only mode for the whole
+   TTL after one provider blip.
+
+**Tests:** `QueryEmbeddingCacheTest` (7 unit, counts provider calls through a
+`CountingEmbeddingService` — the real service returns empty with no API key, so
+a test that cannot see the call count could not tell a working cache from a
+broken one) and `SearchRateLimitIT` (7, Testcontainers + pgvector, because the
+search SQL returns 500 on H2).
+
+**One thing this uncovered:** `SearchIT` does not use the `test` profile, so it
+did not inherit the profile's rate-limit switch and would have begun throttling
+itself as the suite grew. It now disables the search limiter explicitly.
+
+**Still open, deliberately:** there is no global spend ceiling. The per-IP budget
+bounds one caller, not the sum of all of them. The honest control for that is a
+hard monthly cap on the OpenAI project itself, which is tracked separately in
+`todo.md` under AI & Search.

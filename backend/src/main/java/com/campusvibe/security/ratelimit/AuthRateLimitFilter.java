@@ -4,8 +4,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -37,11 +35,11 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     );
 
     private final AuthRateLimiter rateLimiter;
-    private final RateLimitProperties properties;
+    private final ClientIpResolver clientIp;
 
-    public AuthRateLimitFilter(AuthRateLimiter rateLimiter, RateLimitProperties properties) {
+    public AuthRateLimitFilter(AuthRateLimiter rateLimiter, ClientIpResolver clientIp) {
         this.rateLimiter = rateLimiter;
-        this.properties = properties;
+        this.clientIp = clientIp;
     }
 
     @Override
@@ -55,37 +53,13 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        if (rateLimiter.tryConsumeForIp(clientIp(request))) {
+        if (rateLimiter.tryConsumeForIp(clientIp.resolve(request))) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        long retryAfter = rateLimiter.retryAfterSeconds();
-        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-        response.setHeader("Retry-After", String.valueOf(retryAfter));
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("""
-                {"path":"%s","message":"Too many attempts. Try again in %d seconds.",\
-                "statusCode":429}""".formatted(request.getRequestURI(), retryAfter));
-    }
-
-    /**
-     * X-Forwarded-For is read only when explicitly trusted. Behind an ALB the
-     * remote address is the load balancer and every caller would share one
-     * bucket; on a directly exposed app, trusting the header lets a caller
-     * forge a new IP per request and bypass the limit completely. Neither
-     * default is safe everywhere, so it is configuration, and the safe one is
-     * the default.
-     */
-    private String clientIp(HttpServletRequest request) {
-        if (properties.trustForwardedHeader()) {
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                // Left-most entry is the original client; the rest are proxies.
-                return forwarded.split(",")[0].trim();
-            }
-        }
-        String remote = request.getRemoteAddr();
-        return remote != null ? remote : "unknown";
+        RateLimitResponses.tooManyRequests(request, response,
+                rateLimiter.retryAfterSeconds(),
+                "Too many attempts. Try again in %d seconds.");
     }
 }

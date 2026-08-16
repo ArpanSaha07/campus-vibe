@@ -18,20 +18,20 @@ import java.util.stream.Collectors;
 @Service
 public class SearchService {
 
-    private final EmbeddingService embeddingService;
+    private final QueryEmbeddingCache queryEmbeddingCache;
     private final SearchRepository searchRepository;
     private final EventRepository eventRepository;
     private final ClubRepository clubRepository;
     private final EventMapper eventMapper;
     private final ClubMapper clubMapper;
 
-    public SearchService(EmbeddingService embeddingService,
+    public SearchService(QueryEmbeddingCache queryEmbeddingCache,
                          SearchRepository searchRepository,
                          EventRepository eventRepository,
                          ClubRepository clubRepository,
                          EventMapper eventMapper,
                          ClubMapper clubMapper) {
-        this.embeddingService = embeddingService;
+        this.queryEmbeddingCache = queryEmbeddingCache;
         this.searchRepository = searchRepository;
         this.eventRepository = eventRepository;
         this.clubRepository = clubRepository;
@@ -62,7 +62,11 @@ public class SearchService {
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
     }
 
+    // Through the cache, not the provider directly: identical repeat queries are
+    // the common case for a search box, and each miss is a billed API call
+    // (BUG-005). Document indexing still calls EmbeddingService directly - those
+    // embeddings are written to pgvector once and never re-requested.
     private Optional<String> queryEmbedding(String query) {
-        return embeddingService.embed(query).map(SearchIndexService::toVectorLiteral);
+        return queryEmbeddingCache.embed(query).map(SearchIndexService::toVectorLiteral);
     }
 }

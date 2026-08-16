@@ -647,8 +647,12 @@ Ordered by how much they matter. Items 1, 2, 8, 9 and 12 were **fixed on
    long for a token with no refresh mechanism.
 
 7. **The JWT lives in `localStorage`** (`api.tsx:42-57`), readable by any script
-   on the page. Tracked as [BUG-003](../../bugs/bugs.md#bug-003); there is no
-   CSP on the frontend.
+   on the page. Tracked as [BUG-003](../../bugs/bugs.md#bug-003). A
+   Content-Security-Policy was added 2026-08-15 (`next.config.ts`) and narrows
+   what an injected script may load and where it may send anything it takes —
+   but **it does not fix this**, and `'unsafe-inline'` on `script-src` (Next
+   inlines bootstrap scripts) weakens it further. Only the cookie migration
+   fixes it.
 
 8. ~~[BUG-028](../../bugs/bugs.md#bug-028) — malformed Google token → 500.~~
    **Fixed** — `GoogleTokenVerifier.verify` now catches the parser's unchecked
@@ -681,7 +685,10 @@ Ordered by how much they matter. Items 1, 2, 8, 9 and 12 were **fixed on
     and all three constraints are present there. Closing this properly means
     the `_database.yml` CI job asserting them, or Testcontainers for this class.
 
-13. **bcrypt cost is undeclared** (`SecurityConfig.java:18`), so it is whatever
+13. ~~bcrypt cost is undeclared.~~ **Fixed 2026-08-15** — pinned at 10 in
+    `SecurityConfig.BCRYPT_COST`, with a note that raising it is safe for
+    existing hashes but does not re-hash on login. Superseded text:
+    **bcrypt cost was undeclared** (`SecurityConfig.java:18`), so it is whatever
     the Spring Security default is at the version in use — fine today, but it
     is a security parameter left implicit and unpinned.
 

@@ -2,9 +2,12 @@ package com.campusvibe.event;
 
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
+import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -13,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
+@Validated // needed for constraints on @RequestParam, unlike @Valid on a body
 @RequestMapping("/api/v1/events")
 public class EventController {
     private final EventService eventService;
@@ -43,7 +47,8 @@ public class EventController {
     }
 
     @GetMapping("/search")
-    public List<EventDTO> search(@RequestParam String q,
+    public List<EventDTO> search(
+            @RequestParam @Size(max = SearchLimits.MAX_QUERY_LENGTH) String q,
                                  @RequestParam(defaultValue = "20") int limit) {
         if (q == null || q.isBlank()) {
             return List.of();
