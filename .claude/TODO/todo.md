@@ -246,6 +246,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-17 | Flyway migration lint moved out of `_database.yml` into `scripts/lint-migrations.mjs`, wired into `verify.mjs` so `pre-push` catches it; CI now calls the same script |
 | 2026-08-17 | Club governance items 1–4: `club_admin_assignments` (V12–V14), `CLUB_OWNER`/`CLUB_ADMIN`, `ROLE_CLUB_ADMIN` deleted, per-request authorisation, read-only `/manage/[clubId]` dashboard — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-16 | CI runs once per PR instead of 2–3× per commit; tiering removed with the `push` trigger; every action pinned to a SHA, gitleaks and trivy to versions |
 | 2026-08-16 | CodeQL findings on PR #31 cleared: 429 refusals go back through `@ControllerAdvice` ([BUG-032](../bugs/fixed_bugs.md#bug-032)), request data scrubbed before logging ([BUG-033](../bugs/fixed_bugs.md#bug-033)) |

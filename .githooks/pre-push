@@ -7,6 +7,13 @@
 # have the backend up. CI caught both, several minutes after the push. This
 # catches them in the same terminal, before there is anything to catch.
 #
+# The Flyway migration lint joined the same list on 2026-08-17, after a real
+# address in a V13 comment failed the Database workflow on GitHub. Migrations
+# are the worst artifact to catch late: they run in every environment and are
+# immutable once applied, so amending one after it has been shared means a new
+# migration rather than an edit. verify.mjs runs scripts/lint-migrations.mjs —
+# the same script the workflow runs — before it spends anything on Maven.
+#
 # ENABLE IT (once per clone):
 #
 #   git config core.hooksPath .githooks

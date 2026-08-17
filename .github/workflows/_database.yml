@@ -2,13 +2,22 @@ name: Database
 
 # Reusable. Called only by ci.yml.
 #
-# Why this exists separately from the backend job: the backend test suite runs
-# on in-memory H2 with `ddl-auto: create-drop` and `flyway.enabled: false`
-# (application-test.yml), so Hibernate builds the schema from the entities and
-# the migrations are never executed. Only SearchIT touches real Postgres. That
-# means a migration could be malformed, out of order, or drifted from the
-# entities and the whole backend suite would still pass. This runs them for
-# real.
+# Why this exists separately from the backend job.
+#
+# Until 2026-08-17 the reason was that the backend suite ran entirely on
+# in-memory H2 with `flyway.enabled: false`, so the migrations were never
+# executed at all (only SearchIT touched real Postgres). That is no longer
+# true: every *IT now runs against real Postgres + pgvector through
+# PostgresTestContainer, with Flyway on and `ddl-auto: validate`.
+#
+# It still earns its place for two things the backend job cannot do:
+#
+#   - it migrates a genuinely EMPTY database, in order, from V1. The IT suites
+#     reuse one container across the run, so they prove the end state is
+#     reachable, not that a cold start from nothing is.
+#   - `lint-migrations` needs neither a database nor a JDK and finishes in
+#     seconds, so a bad filename or a leaked address fails before any Maven
+#     build is spent proving the same thing.
 #
 # Two jobs, still split: `lint-migrations` needs no database and finishes in
 # seconds, so it fails fast on a bad filename before `migrate` spends a Maven
@@ -52,67 +61,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      # The rules live in scripts/lint-migrations.mjs, not inline here.
+      #
+      # They were inline shell until 2026-08-17, which meant they could only
+      # ever fail on GitHub — minutes after a push, on the one artifact that is
+      # expensive to amend once applied. The script is now also run by
+      # scripts/verify.mjs, so the .githooks/pre-push hook catches the same
+      # breaches before the push leaves the machine. One implementation, so the
+      # local check and this one cannot drift apart.
+      #
+      # Node is preinstalled on ubuntu-latest, so there is no setup step.
       - name: Check naming, versioning and forbidden content
-        run: |
-          set -uo pipefail
-          failed=0
-
-          if [ ! -d "$MIGRATIONS_DIR" ]; then
-            echo "::error::Migrations directory not found: $MIGRATIONS_DIR"
-            echo "Flyway is pinned to classpath:db/migrations (PLURAL) in application.yml."
-            exit 1
-          fi
-
-          echo "--- Migration files ---"
-          ls -1 "$MIGRATIONS_DIR"
-          echo
-
-          # Rule: V<version>__<snake_case_description>.sql
-          for f in "$MIGRATIONS_DIR"/*.sql; do
-            base=$(basename "$f")
-            if ! echo "$base" | grep -Eq '^V[0-9]+__[a-z0-9_]+\.sql$'; then
-              echo "::error file=$f::Bad migration name '$base'. Expected V<n>__<snake_case>.sql"
-              failed=1
-            fi
-          done
-
-          # Rule: never reuse a version number. Flyway refuses to start on a
-          # duplicate, but the error only appears at runtime.
-          dupes=$(ls -1 "$MIGRATIONS_DIR"/*.sql \
-            | xargs -n1 basename \
-            | sed -E 's/^V([0-9]+)__.*/\1/' \
-            | sort | uniq -d)
-          if [ -n "$dupes" ]; then
-            echo "::error::Duplicate migration version(s): $dupes"
-            failed=1
-          fi
-
-          # Rule: no personal data or secrets in migrations. A migration runs in
-          # EVERY environment including production, and is immutable once
-          # applied, so anything committed here is permanent.
-          if grep -rniE '[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}' "$MIGRATIONS_DIR" \
-               | grep -viE '@campus\.(com|edu)' ; then
-            echo "::error::Real-looking email address found in a migration."
-            echo "Personal accounts are bootstrapped from environment variables, never seeded in SQL."
-            failed=1
-          fi
-
-          if grep -rniE "(password|secret|api[_-]?key|token)\s*(=|:)\s*['\"][^'\"]{6,}" "$MIGRATIONS_DIR"; then
-            echo "::error::Possible secret literal in a migration."
-            failed=1
-          fi
-
-          # Advisory only: user rows belong to sign-up / OAuth / the bootstrap
-          # runner, never to Flyway.
-          if grep -rniE 'INSERT\s+INTO\s+users' "$MIGRATIONS_DIR"; then
-            echo "::warning::A migration inserts into users. User accounts must not be seeded through Flyway."
-          fi
-
-          if [ "$failed" -ne 0 ]; then
-            echo "Migration lint failed."
-            exit 1
-          fi
-          echo "Migration lint passed."
+        run: node scripts/lint-migrations.mjs
 
   # ---------------------------------------------------------------------------
   # Applies the migrations for real, against the same image used in dev and

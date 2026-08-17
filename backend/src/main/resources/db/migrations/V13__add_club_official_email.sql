@@ -1,9 +1,14 @@
 -- The club's official email address.
 --
--- This belongs to the organisation (robotics@ssmu.ca), not to whoever happens
--- to be running the club this year. It is the durable channel for verifying
--- administrator changes, delivering security notifications, and recovering a
--- club whose owner graduated without transferring ownership.
+-- This belongs to the organisation (robotics@campus.com), not to whoever
+-- happens to be running the club this year. It is the durable channel for
+-- verifying administrator changes, delivering security notifications, and
+-- recovering a club whose owner graduated without transferring ownership.
+--
+-- (@campus.com deliberately: the migration lint rejects any other email-shaped
+--  text anywhere in this directory, comments included, because a migration runs
+--  in every environment and is immutable once applied. Same note as V10.
+--  Run it locally with: node scripts/lint-migrations.mjs)
 --
 -- Distinct from the contact email inside clubs.social_links, which is the
 -- public "get in touch" address a club owner may edit freely. Only a platform
