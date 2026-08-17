@@ -1,4 +1,4 @@
-import { hasRole, isAdmin, isClubAdmin, isRegularUser } from "@/app/lib/user";
+import { hasRole, isAdmin, isRegularUser } from "@/app/lib/user";
 import { Role, type User } from "@/app/types";
 
 function userWith(roles: Role[]): User {
@@ -18,15 +18,6 @@ describe("role helpers", () => {
     const user = userWith([Role.USER]);
     expect(hasRole(user, Role.USER)).toBe(true);
     expect(isRegularUser(user)).toBe(true);
-    expect(isClubAdmin(user)).toBe(false);
-    expect(isAdmin(user)).toBe(false);
-  });
-
-  it("club admins also keep ROLE_USER", () => {
-    const user = userWith([Role.USER, Role.CLUB_ADMIN]);
-    expect(hasRole(user, Role.USER)).toBe(true);
-    expect(isClubAdmin(user)).toBe(true);
-    expect(isRegularUser(user)).toBe(false);
     expect(isAdmin(user)).toBe(false);
   });
 
@@ -39,13 +30,22 @@ describe("role helpers", () => {
   it("handles null user safely", () => {
     expect(hasRole(null, Role.USER)).toBe(false);
     expect(isAdmin(null)).toBe(false);
-    expect(isClubAdmin(null)).toBe(false);
     expect(isRegularUser(null)).toBe(false);
   });
 
   it("role values match the backend role names", () => {
     expect(Role.USER).toBe("ROLE_USER");
-    expect(Role.CLUB_ADMIN).toBe("ROLE_CLUB_ADMIN");
     expect(Role.ADMIN).toBe("ROLE_ADMIN");
+  });
+
+  /**
+   * ROLE_CLUB_ADMIN was removed in V14 — club authority is a per-club
+   * assignment read from the server, not a claim on the account. This pins the
+   * enum shut so it cannot come back by habit: a role in the token outlives the
+   * access it describes, which is the bug the whole change exists to fix.
+   */
+  it("has no club-admin platform role", () => {
+    expect(Object.values(Role)).toEqual(["ROLE_USER", "ROLE_ADMIN"]);
+    expect(Object.values(Role)).not.toContain("ROLE_CLUB_ADMIN");
   });
 });

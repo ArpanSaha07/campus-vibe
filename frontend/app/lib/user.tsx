@@ -102,13 +102,21 @@ export function isAdmin(user: User | null): boolean {
 	return hasRole(user, Role.ADMIN);
 }
 
-export function isClubAdmin(user: User | null): boolean {
-	return hasRole(user, Role.CLUB_ADMIN);
-}
+/**
+ * There is deliberately no `isClubAdmin(user)`.
+ *
+ * Club authority is a relationship with one club, so no property of the user
+ * object can answer "may they manage a club" — and the old version answered it
+ * from a JWT claim that outlived the access it described, so a removed
+ * administrator still saw the dashboard link until their token expired.
+ *
+ * Use `useManagedClubs()` instead, which asks the server. As always this is for
+ * visibility only; the backend re-checks every request.
+ */
 
-/** A user with no elevated roles. */
+/** A user with no elevated platform roles. */
 export function isRegularUser(user: User | null): boolean {
-	return hasRole(user, Role.USER) && !isClubAdmin(user) && !isAdmin(user);
+	return hasRole(user, Role.USER) && !isAdmin(user);
 }
 
 export function logOut(): void {

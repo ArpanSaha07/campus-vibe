@@ -17,6 +17,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * The platform-admin bootstrap path: a student asks to run an ownerless club,
+ * an admin approves, and the student becomes its CLUB_OWNER.
+ *
+ * <p>Approval used to grant the account-wide ROLE_CLUB_ADMIN and stamp
+ * clubs.club_admin_id. It now writes one club_admin_assignments row and touches
+ * the user's roles not at all — which is what the JWT assertions below check.
+ */
 class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
 
     private String json(Object body) throws Exception {
@@ -35,7 +43,7 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void fullApprovalFlowGrantsRoleAndClubOwnership() throws Exception {
+    void fullApprovalFlowMakesRequesterTheClubOwner() throws Exception {
         User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
         User admin = createUser("Root", "root@campus.com", "password123",
                 RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
@@ -51,38 +59,46 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].userEmail", is("uma@campus.com")))
                 .andExpect(jsonPath("$[0].clubId", is("chess-club")));
 
-        // Admin approves
         mockMvc.perform(post("/api/v1/club-admin-requests/" + requestId + "/approve")
                         .header("Authorization", bearer(admin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("APPROVED")))
                 .andExpect(jsonPath("$.reviewedAt", notNullValue()));
 
-        // User now has ROLE_CLUB_ADMIN and owns the club
-        User reloaded = userRepository.findById(user.getId()).orElseThrow();
-        assertTrue(reloaded.hasRole(RoleName.ROLE_CLUB_ADMIN));
-        assertTrue(reloaded.hasRole(RoleName.ROLE_USER));
-        Club club = clubRepository.findById("chess-club").orElseThrow();
-        assertEquals(user.getId(), club.getClubAdminId());
+        // Authority is the assignment, scoped to this one club, and it records
+        // which platform admin granted it.
+        ClubAdminAssignment assignment = clubAdminAssignmentRepository
+                .findByClubIdAndUserIdAndStatus("chess-club", user.getId(), AssignmentStatus.ACTIVE)
+                .orElseThrow();
+        assertEquals(ClubRole.CLUB_OWNER, assignment.getRole());
+        assertNotNull(assignment.getActivatedAt());
+        assertEquals(admin.getId(), assignment.getInvitedByUserId());
 
-        // A fresh login token carries the new role
+        // The account's platform roles are untouched — becoming a club owner is
+        // not a promotion, and nothing about it belongs in the token.
+        User reloaded = userRepository.findById(user.getId()).orElseThrow();
+        assertEquals(roleNamesOf(user), roleNamesOf(reloaded));
+
         String loginResponse = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", "uma@campus.com", "password", "password123"))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         String token = objectMapper.readTree(loginResponse).get("token").asText();
-        assertTrue(jwtUtil.getRoles(token).contains("ROLE_CLUB_ADMIN"));
+        assertEquals(java.util.List.of("ROLE_USER"), jwtUtil.getRoles(token));
 
-        // /my-club resolves ownership from the database
-        mockMvc.perform(get("/api/v1/clubs/my-club")
+        // The club shows up in the caller's managed list, with the role held.
+        mockMvc.perform(get("/api/v1/users/me/managed-clubs")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is("chess-club")));
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].clubId", is("chess-club")))
+                .andExpect(jsonPath("$[0].role", is("CLUB_OWNER")))
+                .andExpect(jsonPath("$[0].officialEmail", nullValue()));
     }
 
     @Test
-    void rejectionLeavesUserWithoutRole() throws Exception {
+    void rejectionGrantsNothing() throws Exception {
         User user = createUser("Vic", "vic@campus.com", "password123", RoleName.ROLE_USER);
         User admin = createUser("Root", "root2@campus.com", "password123",
                 RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
@@ -95,9 +111,11 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("REJECTED")));
 
-        User reloaded = userRepository.findById(user.getId()).orElseThrow();
-        assertFalse(reloaded.hasRole(RoleName.ROLE_CLUB_ADMIN));
-        assertNull(clubRepository.findById("art-club").orElseThrow().getClubAdminId());
+        assertTrue(clubAdminAssignmentRepository
+                .findByClubIdAndUserIdAndStatus("art-club", user.getId(), AssignmentStatus.ACTIVE)
+                .isEmpty());
+        assertFalse(clubAdminAssignmentRepository.existsByClubIdAndRoleAndStatus(
+                "art-club", ClubRole.CLUB_OWNER, AssignmentStatus.ACTIVE));
     }
 
     @Test
@@ -116,12 +134,10 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void requestForClubThatAlreadyHasAdminIsRejected() throws Exception {
-        User owner = createUser("Owner", "owner@campus.com", "password123",
-                RoleName.ROLE_USER, RoleName.ROLE_CLUB_ADMIN);
+    void requestForClubThatAlreadyHasAnOwnerIsRejected() throws Exception {
+        User owner = createUser("Owner", "owner@campus.com", "password123", RoleName.ROLE_USER);
         Club club = createClub("run-club", "Run Club");
-        club.setClubAdminId(owner.getId());
-        clubRepository.save(club);
+        makeClubOwner(club, owner);
 
         User user = createUser("Xena", "xena@campus.com", "password123", RoleName.ROLE_USER);
         mockMvc.perform(post("/api/v1/club-admin-requests")
@@ -162,13 +178,36 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * A second approval for a club that gained an owner while the request sat
+     * in the queue must fail rather than depose the sitting owner.
+     */
+    @Test
+    void approvingAStaleRequestCannotDeposeTheSittingOwner() throws Exception {
+        User first = createUser("Ada", "ada@campus.com", "password123", RoleName.ROLE_USER);
+        User second = createUser("Bo", "bo@campus.com", "password123", RoleName.ROLE_USER);
+        User admin = createUser("Root", "root5@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+        Club club = createClub("row-club", "Row Club");
+
+        long staleRequest = submitRequest(second, "row-club");
+        makeClubOwner(club, first); // someone else takes the club in the meantime
+
+        mockMvc.perform(post("/api/v1/club-admin-requests/" + staleRequest + "/approve")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isBadRequest());
+
+        ClubAdminAssignment owner = clubAdminAssignmentRepository
+                .findByClubIdAndRoleAndStatus("row-club", ClubRole.CLUB_OWNER, AssignmentStatus.ACTIVE)
+                .orElseThrow();
+        assertEquals(first.getId(), owner.getUser().getId());
+    }
+
     @Test
     void clubAdminCanManageOnlyTheirOwnClub() throws Exception {
-        User clubAdmin = createUser("Cam", "cam@campus.com", "password123",
-                RoleName.ROLE_USER, RoleName.ROLE_CLUB_ADMIN);
+        User clubAdmin = createUser("Cam", "cam@campus.com", "password123", RoleName.ROLE_USER);
         Club owned = createClub("own-club", "Own Club");
-        owned.setClubAdminId(clubAdmin.getId());
-        clubRepository.save(owned);
+        makeClubOwner(owned, clubAdmin);
         createClub("other-club", "Other Club");
 
         Map<String, Object> eventForOwnClub = Map.of(
@@ -197,7 +236,7 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
                         .content(json(eventForOwnClub)))
                 .andExpect(status().isForbidden());
 
-        // Admin bypasses ownership
+        // Admin bypasses club scope
         User admin = createUser("Root", "root4@campus.com", "password123",
                 RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
         mockMvc.perform(post("/api/v1/events")
@@ -207,13 +246,41 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * The point of the whole rewrite: revoking an assignment takes effect on
+     * the next request, against a token issued before the revocation.
+     */
+    @Test
+    void revokingAnAssignmentEndsAccessWithoutReissuingTheToken() throws Exception {
+        User clubAdmin = createUser("Rex", "rex@campus.com", "password123", RoleName.ROLE_USER);
+        Club club = createClub("dev-club", "Dev Club");
+        ClubAdminAssignment assignment = makeClubAdmin(club, clubAdmin);
+
+        String token = bearer(clubAdmin); // issued while they still had authority
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/clubs/dev-club")
+                        .header("Authorization", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("description", "We ship."))))
+                .andExpect(status().isOk());
+
+        assignment.revoke(null);
+        clubAdminAssignmentRepository.save(assignment);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/clubs/dev-club")
+                        .header("Authorization", token) // the very same token
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("description", "Still here?"))))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void clubUpdateIsOwnershipGuarded() throws Exception {
-        User clubAdmin = createUser("Gus", "gus@campus.com", "password123",
-                RoleName.ROLE_USER, RoleName.ROLE_CLUB_ADMIN);
+        User clubAdmin = createUser("Gus", "gus@campus.com", "password123", RoleName.ROLE_USER);
         Club owned = createClub("cook-club", "Cook Club");
-        owned.setClubAdminId(clubAdmin.getId());
-        clubRepository.save(owned);
+        makeClubOwner(owned, clubAdmin);
         createClub("bake-club", "Bake Club");
 
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders

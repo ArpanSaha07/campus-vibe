@@ -5,11 +5,9 @@ import com.campusvibe.s3.S3Service;
 import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
 import jakarta.validation.constraints.Size;
-import com.campusvibe.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,12 +48,10 @@ public class ClubController {
         return searchService.searchClubs(q.trim(), Math.clamp(limit, 1, 50));
     }
 
-    @GetMapping("/my-club")
-    @PreAuthorize("hasRole('CLUB_ADMIN')")
-    public ClubDTO myClub(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
-        return clubService.getManagedClub(user.getId());
-    }
+    // GET /my-club is gone. It could only ever answer with one club, and it
+    // gated on the platform-wide ROLE_CLUB_ADMIN, which no longer exists.
+    // Its replacement is GET /api/v1/users/me/managed-clubs in
+    // ClubAdminController: a list, with the caller's role in each club.
 
     @GetMapping("/{id}")
     public ClubDTO get(@PathVariable String id) {

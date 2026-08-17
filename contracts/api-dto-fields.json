@@ -43,5 +43,15 @@
   "ClubAdminRequestDTO": [
     "id", "userId", "userName", "userEmail", "clubId", "clubName", "message",
     "status", "requestedAt", "reviewedAt"
+  ],
+
+  "ClubAdminDTO": [
+    "assignmentId", "userId", "userName", "userEmail", "role", "status",
+    "createdAt", "activatedAt"
+  ],
+
+  "ManagedClubDTO": [
+    "clubId", "clubName", "logo", "followers", "role", "officialEmail",
+    "officialEmailVerified"
   ]
 }

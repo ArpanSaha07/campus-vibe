@@ -2,7 +2,9 @@ package com.campusvibe.contract;
 
 import com.campusvibe.auth.AuthenticationResponse;
 import com.campusvibe.club.ClubDTO;
+import com.campusvibe.clubadmin.ClubAdminDTO;
 import com.campusvibe.clubadmin.ClubAdminRequestDTO;
+import com.campusvibe.clubadmin.ManagedClubDTO;
 import com.campusvibe.event.EventDTO;
 import com.campusvibe.user.MyEventDTO;
 import com.campusvibe.user.UserDTO;
@@ -59,6 +61,8 @@ class ApiContractTest {
         CONTRACTED.put("MyEventDTO", MyEventDTO.class);
         CONTRACTED.put("AuthenticationResponse", AuthenticationResponse.class);
         CONTRACTED.put("ClubAdminRequestDTO", ClubAdminRequestDTO.class);
+        CONTRACTED.put("ClubAdminDTO", ClubAdminDTO.class);
+        CONTRACTED.put("ManagedClubDTO", ManagedClubDTO.class);
     }
 
     private final ObjectMapper mapper = new ObjectMapper();

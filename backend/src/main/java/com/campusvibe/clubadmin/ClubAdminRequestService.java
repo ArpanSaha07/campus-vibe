@@ -5,9 +5,6 @@ import com.campusvibe.club.ClubRepository;
 import com.campusvibe.exception.DuplicateResourceException;
 import com.campusvibe.exception.RequestValidationException;
 import com.campusvibe.exception.ResourceNotFoundException;
-import com.campusvibe.user.Role;
-import com.campusvibe.user.RoleName;
-import com.campusvibe.user.RoleRepository;
 import com.campusvibe.user.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +17,17 @@ public class ClubAdminRequestService {
 
     private final ClubAdminRequestRepository requestRepository;
     private final ClubRepository clubRepository;
-    private final RoleRepository roleRepository;
+    private final ClubAdminAssignmentRepository assignmentRepository;
+    private final ClubAdminService clubAdminService;
 
     public ClubAdminRequestService(ClubAdminRequestRepository requestRepository,
                                    ClubRepository clubRepository,
-                                   RoleRepository roleRepository) {
+                                   ClubAdminAssignmentRepository assignmentRepository,
+                                   ClubAdminService clubAdminService) {
         this.requestRepository = requestRepository;
         this.clubRepository = clubRepository;
-        this.roleRepository = roleRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.clubAdminService = clubAdminService;
     }
 
     @Transactional
@@ -35,8 +35,13 @@ public class ClubAdminRequestService {
         Club club = clubRepository.findById(request.clubId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Club with id [%s] not found".formatted(request.clubId())));
-        if (club.getClubAdminId() != null) {
-            throw new RequestValidationException("Club [%s] already has a club admin".formatted(club.getId()));
+        // Only ownerless clubs can be requested. Once a club has an owner, new
+        // administrators come from that owner inviting them, not from a
+        // platform admin appointing them over the owner's head.
+        if (assignmentRepository.existsByClubIdAndRoleAndStatus(
+                club.getId(), ClubRole.CLUB_OWNER, AssignmentStatus.ACTIVE)) {
+            throw new RequestValidationException(
+                    "Club [%s] already has an owner — ask them for an invitation".formatted(club.getId()));
         }
         if (requestRepository.existsByUserIdAndClubIdAndStatus(user.getId(), club.getId(), RequestStatus.PENDING)) {
             throw new DuplicateResourceException("You already have a pending request for this club");
@@ -56,19 +61,26 @@ public class ClubAdminRequestService {
         return requests.stream().map(this::toDto).toList();
     }
 
+    /**
+     * Installs the requester as the club's first owner.
+     *
+     * <p>This is the platform-admin bootstrap of §9: clubs launch with nobody in
+     * charge, and this is how the first person gets there. It no longer grants
+     * any account-wide role — authority is the {@code club_admin_assignments}
+     * row alone, scoped to this one club.
+     *
+     * <p>Transactional because the assignment and the request's status must
+     * move together. A club with an owner but a still-PENDING request would
+     * invite a second approval; an APPROVED request with no assignment would
+     * leave the requester locked out of the club they were just given.
+     */
     @Transactional
-    public ClubAdminRequestDTO approve(Long requestId) {
+    public ClubAdminRequestDTO approve(Long requestId, Long approvedByUserId) {
         ClubAdminRequest req = findPending(requestId);
-        Club club = req.getClub();
-        if (club.getClubAdminId() != null) {
-            throw new RequestValidationException("Club [%s] already has a club admin".formatted(club.getId()));
-        }
-        Role clubAdminRole = roleRepository.findByName(RoleName.ROLE_CLUB_ADMIN.name())
-                .orElseThrow(() -> new IllegalStateException(
-                        "ROLE_CLUB_ADMIN is missing from the roles table; check Flyway migration V7"));
-        User user = req.getUser();
-        user.addRole(clubAdminRole);
-        club.setClubAdminId(user.getId());
+        // assignFirstOwner re-checks for a sitting owner and throws if there is
+        // one — the request may have sat in the queue while the club was
+        // claimed through another route.
+        clubAdminService.assignFirstOwner(req.getClub(), req.getUser(), approvedByUserId);
         req.setStatus(RequestStatus.APPROVED);
         req.setReviewedAt(Instant.now());
         return toDto(req);

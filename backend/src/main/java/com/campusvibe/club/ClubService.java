@@ -31,13 +31,6 @@ public class ClubService {
         return clubMapper.apply(findClub(id));
     }
 
-    @Transactional(readOnly = true)
-    public ClubDTO getManagedClub(Long userId) {
-        return clubRepository.findByClubAdminId(userId)
-                .map(clubMapper)
-                .orElseThrow(() -> new ResourceNotFoundException("No club is assigned to this user"));
-    }
-
     @Transactional
     public ClubDTO create(Club club) {
         if (clubRepository.existsById(club.getId())) {

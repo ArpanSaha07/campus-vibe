@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/auth-context";
 import { useAuthModal } from "@/app/lib/auth-modal-context";
-import { isAdmin, isClubAdmin } from "@/app/lib/user";
+import { isAdmin } from "@/app/lib/user";
+import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import SearchBar from "@/app/components/SearchBar";
 import Button from "@/app/components/ui/Button";
 import { Sparkles } from "lucide-react";
@@ -14,6 +15,12 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { openAuth } = useAuthModal();
+
+  // Asked of the server rather than read off the user's roles. Managing a club
+  // is a relationship with that club, and it can be revoked while the user's
+  // token still says otherwise — so the nav follows the assignment list.
+  const { clubs: managedClubs } = useManagedClubs();
+  const managesAClub = managedClubs.length > 0;
 
   const linkClasses =
     "px-3 py-2 rounded-full text-ink-900 hover:bg-lavender-50 hover:text-lavender-800 transition-colors";
@@ -55,11 +62,13 @@ export default function Navbar() {
 
             {isAuthenticated ? (
               <>
-                {user && isClubAdmin(user) && (
+                {managesAClub && (
                   <Link href="/create-event" className={linkClasses}>Create event</Link>
                 )}
-                {user && isClubAdmin(user) && (
-                  <Link href="/club-dashboard" className={linkClasses}>My club</Link>
+                {managesAClub && (
+                  <Link href="/manage" className={linkClasses}>
+                    {managedClubs.length > 1 ? "My clubs' dashboards" : "Manage club"}
+                  </Link>
                 )}
                 {user && isAdmin(user) && (
                   <Link href="/admin" className={linkClasses}>Admin</Link>
@@ -117,13 +126,13 @@ export default function Navbar() {
             </Link>
             {isAuthenticated ? (
               <>
-                {user && isClubAdmin(user) && (
+                {managesAClub && (
                   <>
                     <Link href="/create-event" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
                       Create event
                     </Link>
-                    <Link href="/club-dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                      My club
+                    <Link href="/manage" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                      Manage club
                     </Link>
                   </>
                 )}

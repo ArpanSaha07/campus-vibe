@@ -3,6 +3,16 @@
 **Code as of:** never — this document has not been reconciled with the
 code. See the banner above; do not read a distance into this.
 
+> ⛔ **Superseded on club roles, 2026-08-17.** Everything this file says about
+> `ROLE_CLUB_ADMIN`, `Club.club_admin_id`, one-club-per-admin, the Club Admin
+> Request approval steps and `/club-dashboard` is **no longer true of the
+> code**. `ROLE_CLUB_ADMIN` was deleted in `V14`, club authority moved to
+> `club_admin_assignments`, and the dashboard moved to `/manage/[clubId]`.
+>
+> Read [`club-administration.md`](club-administration.md) instead. What remains
+> accurate here: `ROLE_USER` / `ROLE_ADMIN`, the JWT shape, and the principle
+> that the backend enforces every check.
+
 > ⚠ **Part specification, part implementation doc — unverified.** Moved here
 > from `.claude/user-roles.md` on 2026-08-06. Much of it is written as
 > *there should be three roles*, which is a spec for intended behaviour, not a

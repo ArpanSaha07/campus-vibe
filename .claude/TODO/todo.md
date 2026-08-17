@@ -41,11 +41,59 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P1** Add `EventService.update(...)` — there is currently no update path at all, so events can never be edited, and their embeddings go stale. Mirror `ClubService.update`, which correctly re-indexes. ([BUG-006](../bugs/bugs.md#bug-006))
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
 - [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-023](../bugs/bugs.md#bug-023))
-- [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload.
-- [ ] **P2** Admin Dashboard API: create clubs, assign Club Admins, manage users, moderate events.
+- [ ] **P1** **Event lifecycle status — `DRAFT` / `PUBLISHED` / `ARCHIVED`.** `events` has no status column today (`Event.java`), so the club dashboard can only split by `date_time` into upcoming and past, and there is no way to draft an event before announcing it or to retire one without deleting it. Deliberately kept out of the club-governance work on 2026-08-17 so that feature stayed scoped; it is the next thing the club dashboard's Events tab needs.
+
+  **The work:** migration adding `events.status TEXT NOT NULL DEFAULT 'PUBLISHED' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED'))` (default `PUBLISHED` so every existing row stays visible), an `EventStatus` enum on `Event`, a publish/unpublish/archive action on `EventService`, and status tabs on `/manage/[clubId]/events`.
+
+  **The trap that makes this P1 rather than P2:** *every* public read path must filter to `PUBLISHED`, or drafts leak onto the homepage, the club page, and search. That means `EventRepository` list queries, `SearchRepository.hybridSearchEventIds`, and `SearchIndexService` (a draft should not be indexed at all, and archiving should evict it). Getting the column in without covering all four is worse than not having it. Pair it with `EventService.update` (BUG-006), which is a prerequisite anyway — there is no update path to set the status through.
+- [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload. *(Authorisation for these landed 2026-08-17 — `@clubPermissionService.canManageClub` now covers every club admin, not just one per club. What is still missing is `EventService.update` above, delete, and the upload endpoints being reachable from `/manage/[clubId]`.)*
+- [ ] **P2** Admin Dashboard API: create clubs, manage users, moderate events. *(Assigning the first club owner is done — approving a club-admin request writes the `CLUB_OWNER` assignment. Setting `official_email` is listed under Club governance.)*
 - [ ] **P3** Notifications.
 - [ ] **P3** Ticket purchasing flow.
 - [ ] **P3** Move `application-test.yml` from `src/main/resources` to `src/test/resources` so test config stops shipping in the production jar. ([BUG-007](../bugs/bugs.md#bug-007))
+
+## Club governance
+
+Spec: [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md)
+(15 MVP items) · As-built:
+[`club-administration.md`](../docs/architecture/club-administration.md)
+
+**Items 1–4 shipped 2026-08-17** — assignment table, the two club roles, the
+one-owner invariant, administrator listing and the `/manage/[clubId]` dashboard.
+The rest, in the spec's order:
+
+- [ ] **P1** *(items 5–7)* **Invite and remove club admins.** The owner-facing
+  half of the Administrators tab, which today lists people and offers no
+  actions. Invite by email address (works whether or not they have an account
+  yet — the acceptance link routes through sign-up when they do not). Extend
+  `AuthTokenService` with club-scoped purposes rather than writing new token
+  handling: it already does CSPRNG, hash-at-rest, single-use and expiry, and
+  those are exactly §27's requirements. Removal marks the row `REVOKED`, never
+  deletes it. **Owner-only** — gate on `@clubPermissionService.isClubOwner`,
+  which exists and is tested but has no caller yet.
+- [ ] **P1** *(item 6)* **Platform-admin UI for `official_email`.** The column
+  landed in V13 and **nothing can write it**, so every club has `NULL` and the
+  official-email verification the invite flow is supposed to use has nothing to
+  verify against. Small, and it unblocks the security half of items 5 and 8.
+- [ ] **P2** *(item 8)* **Ownership transfer.** Owner authorises → official club
+  email confirms → incoming owner accepts → one transaction demotes and
+  promotes. The partial unique index means a half-finished transfer fails loudly
+  rather than leaving a club with zero or two owners. Also implement §36:
+  an owner may not remove themselves, only transfer.
+- [ ] **P2** *(items 9–10)* **Audit log + Activity tab.** `club_audit_logs`,
+  written through one central `ClubAuditService` rather than scattered inserts,
+  immutable from the dashboard (a `BEFORE UPDATE OR DELETE` trigger makes that a
+  database property rather than a convention). Worth doing alongside transfer
+  and removal, since those are the actions most worth recording. The `Activity`
+  item is deliberately absent from `ManageSidebar` until this exists.
+- [ ] **P3** *(items 11–13)* **Notification separation.** Club-operational mail
+  to the official club email, personal mail to the user, optional personal
+  copies for admins, and the §17 security notices that cannot be opted out of.
+  Blocked on the notification system generally, which does not exist.
+- [ ] **P3** *(item 14)* **Annual administrator review.** Prompt only — never
+  auto-remove anyone on a date (§43).
+- [ ] **P3** *(item 15)* **Platform-admin ownership recovery.** Needs
+  `official_email` to be real first, and needs an admin account to exist.
 
 ## Frontend / Features
 
@@ -90,6 +138,10 @@ Reference: [`.claude/skills/database-lifecycle/PLAN.md`](../skills/database-life
 Ordered — each task unblocks the ones below it. *(Step N)* maps to PLAN.md's
 Implementation Sequence.
 
+- [x] **P1** ~~Integration tests ran on H2, so entity/migration drift was never caught~~ — **done 2026-08-17.** Every `*IT` now runs against real PostgreSQL + pgvector via `PostgresTestContainer`, with Flyway on and `ddl-auto: validate`. Plain `*Test` unit suites stay on H2 and need no Docker.
+- [ ] **P2** **`docker compose up` can silently run a stale backend jar.** `backend/Dockerfile` does `COPY backend/target/campusvibe-0.0.1-SNAPSHOT.jar`, and the `develop.watch` rule syncs that jar in — but **only while `docker compose watch` is actually running**. Recreate the container any other way and it falls back to whatever jar was baked into the image, with no warning. On 2026-08-17 that produced `Schema-validation: missing column [club_admin_id] in table [clubs]`: an image jar from three days earlier meeting a database the newer jar had already migrated. Nothing about the error names the real cause.
+
+  **Options:** build the jar inside the Dockerfile (multi-stage, slower but self-consistent); or stamp the jar's build time into `/actuator/info` and have the healthcheck or a compose profile compare it; or, cheapest, document `docker compose build backend` as a required step after any `mvn package` and say so in the README. The failure is confusing enough — and now reachable on every migration — to be worth more than a docs line.
 - [ ] **P1** *(Step 1)* **Create the `dev` profile.** Smallest task here, and it gates every other one: a `@Profile("dev")` seeder written before this exists compiles, deploys, and silently never runs — no error. Add `backend/src/main/resources/application-dev.yml`; add `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}` to the `backend` service in `docker-compose.yml`; add the var to `docker/.env.example`. Verify the banner logs `The following 1 profile is active: "dev"`, and that `application-test.yml` never pulls it in.
 - [ ] **P1** *(Step 2)* **Admin bootstrap runner.** There is currently **no admin account in the system** — the single user holds `ROLE_USER` only. This blocks `POST /api/v1/search/reindex` (`@PreAuthorize("hasRole('ADMIN')")`) and every Admin Dashboard endpoint listed under Backend / Features. Add `bootstrap/BootstrapProperties.java` + `bootstrap/AdminBootstrapRunner.java` as an `ApplicationRunner` — never `@PostConstruct`, which can race Flyway on a cold start. Must support **promote-existing-user** as the primary mode: OAuth accounts have no password to hash. Grant idempotently (`user_roles` PK is `(user_id, role_id)` → `ON CONFLICT DO NOTHING`); never revoke. Add `APP_BOOTSTRAP_ADMIN_{ENABLED,EMAIL,PASSWORD}` to compose, `.env.example` (blank / `false`), and `.env`.
 - [ ] **P1** **Backfill club embeddings.** All 8 clubs have `embedding IS NULL`, so the semantic half of club search cannot match anything — only the keyword path works today. A single `POST /api/v1/search/reindex` once an admin exists. Distinct from [BUG-001](../bugs/bugs.md#bug-001) (events, repository-level) but the symptoms look identical, so confirm embeddings are non-null *before* debugging ranking.
@@ -194,6 +246,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-17 | Club governance items 1–4: `club_admin_assignments` (V12–V14), `CLUB_OWNER`/`CLUB_ADMIN`, `ROLE_CLUB_ADMIN` deleted, per-request authorisation, read-only `/manage/[clubId]` dashboard — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-16 | CI runs once per PR instead of 2–3× per commit; tiering removed with the `push` trigger; every action pinned to a SHA, gitleaks and trivy to versions |
 | 2026-08-16 | CodeQL findings on PR #31 cleared: 429 refusals go back through `@ControllerAdvice` ([BUG-032](../bugs/fixed_bugs.md#bug-032)), request data scrubbed before logging ([BUG-033](../bugs/fixed_bugs.md#bug-033)) |
 | 2026-08-15 | Search spend controls ([BUG-005](../bugs/fixed_bugs.md#bug-005)): per-IP budget, query length cap, query-embedding cache |

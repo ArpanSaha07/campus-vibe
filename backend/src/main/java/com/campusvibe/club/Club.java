@@ -31,9 +31,21 @@ public class Club {
 
     private String socialLinks; // JSON string of { email, website, facebook, instagram }
 
-    // One club <-> one club admin; ownership checks go through ClubPermissionService
-    @Column(name = "club_admin_id")
-    private Long clubAdminId;
+    // The organisation's own address, and the trust anchor for administrator
+    // changes. Distinct from the contact email inside socialLinks above, which
+    // is public and owner-editable; this one only a platform ADMIN may write,
+    // which is enforced by ClubUpdateRequest having no field for it at all.
+    // Null for every club created before V13.
+    @Column(name = "official_email")
+    private String officialEmail;
+
+    @Column(name = "official_email_verified_at")
+    private Instant officialEmailVerifiedAt;
+
+    // Club administration used to live here as a single club_admin_id. It is
+    // now a club_admin_assignments row per administrator, so that a club can
+    // have an owner plus several admins and a user can manage more than one
+    // club. See com.campusvibe.clubadmin.ClubAdminAssignment.
 
     @Column(nullable = false)
     private Boolean featured = false;

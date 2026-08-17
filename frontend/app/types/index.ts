@@ -84,14 +84,28 @@ export type Plan = {
   nextSteps: string[];
 };
 
-// Mirrors backend RBAC (see .claude/docs/architecture/user-roles.md and
-// com.campusvibe.user.UserDTO).
-// One User interface for all roles — role-specific data comes from separate endpoints.
+// Platform-wide roles, mirroring com.campusvibe.user.RoleName. These describe
+// the account and travel in the JWT.
+//
+// ROLE_CLUB_ADMIN is deliberately absent. Managing a club is a relationship
+// with that club, not an attribute of the account — see ClubRole below and
+// .claude/docs/architecture/club_admin_governance.md.
 export enum Role {
   USER = "ROLE_USER",
-  CLUB_ADMIN = "ROLE_CLUB_ADMIN",
   ADMIN = "ROLE_ADMIN",
 }
+
+/**
+ * Authority over one specific club, mirroring com.campusvibe.clubadmin.ClubRole.
+ *
+ * Never infer this from `User.roles` — it is not there. It comes from
+ * `getManagedClubs()`, and the backend re-checks it on every request regardless
+ * of what the UI decided to show.
+ */
+export type ClubRole = "CLUB_OWNER" | "CLUB_ADMIN";
+
+/** Mirrors com.campusvibe.clubadmin.AssignmentStatus. Only ACTIVE grants anything. */
+export type AssignmentStatus = "PENDING" | "ACTIVE" | "REVOKED" | "EXPIRED";
 
 export interface User {
   id: number;
@@ -147,6 +161,30 @@ export interface ApiClub {
   featured: boolean;
   images: string[];
   createdAt: string;
+}
+
+/** A club the signed-in user may manage. Mirrors ManagedClubDTO. */
+export interface ManagedClub {
+  clubId: string;
+  clubName: string;
+  logo: string | null;
+  followers: number;
+  role: ClubRole;
+  /** Null until a platform admin sets one — club admins cannot change it. */
+  officialEmail: string | null;
+  officialEmailVerified: boolean;
+}
+
+/** One member of a club's management team. Mirrors ClubAdminDTO. */
+export interface ClubAdmin {
+  assignmentId: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  role: ClubRole;
+  status: AssignmentStatus;
+  createdAt: string;
+  activatedAt: string | null;
 }
 
 export interface ClubAdminRequest {

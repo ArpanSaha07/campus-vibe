@@ -6,7 +6,9 @@ import type {
   ApiEvent,
   ApiMyEvent,
   AuthResponse,
+  ClubAdmin,
   ClubAdminRequest,
+  ManagedClub,
   User,
 } from "@/app/types";
 
@@ -109,6 +111,27 @@ const clubAdminRequestFields: Record<keyof ClubAdminRequest, true> = {
   reviewedAt: true,
 };
 
+const clubAdminFields: Record<keyof ClubAdmin, true> = {
+  assignmentId: true,
+  userId: true,
+  userName: true,
+  userEmail: true,
+  role: true,
+  status: true,
+  createdAt: true,
+  activatedAt: true,
+};
+
+const managedClubFields: Record<keyof ManagedClub, true> = {
+  clubId: true,
+  clubName: true,
+  logo: true,
+  followers: true,
+  role: true,
+  officialEmail: true,
+  officialEmailVerified: true,
+};
+
 /** Backend DTO name → the TypeScript interface mirroring it. */
 const MIRRORS: Record<string, Record<string, true>> = {
   EventDTO: eventFields,
@@ -117,6 +140,8 @@ const MIRRORS: Record<string, Record<string, true>> = {
   MyEventDTO: myEventFields,
   AuthenticationResponse: authResponseFields,
   ClubAdminRequestDTO: clubAdminRequestFields,
+  ClubAdminDTO: clubAdminFields,
+  ManagedClubDTO: managedClubFields,
 };
 
 describe("API contract", () => {
