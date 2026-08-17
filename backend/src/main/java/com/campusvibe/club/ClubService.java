@@ -43,7 +43,14 @@ public class ClubService {
         if (clubRepository.existsById(club.getId())) {
             throw new DuplicateResourceException("Club with id [%s] already exists".formatted(club.getId()));
         }
-        Club saved = clubRepository.save(club);
+        // saveAndFlush, not save. Club.id is assigned rather than generated, so
+        // Hibernate has no reason to issue the INSERT before the transaction
+        // commits. indexClub writes the embedding through a raw JDBC UPDATE,
+        // which is not a JPA query and so does not trigger a flush either — it
+        // would match zero rows and report nothing, leaving every club created
+        // here invisible to semantic search. Events avoid this by accident:
+        // their IDENTITY id forces the INSERT immediately.
+        Club saved = clubRepository.saveAndFlush(club);
         searchIndexService.indexClub(saved);
         return clubMapper.apply(saved);
     }

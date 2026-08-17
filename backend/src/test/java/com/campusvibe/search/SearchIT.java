@@ -142,6 +142,29 @@ class SearchIT {
     void reset() {
         EMBEDDINGS_ENABLED.set(true);
         eventRepository.deleteAll();
+        // These three clubs used to arrive from V6__insert_mock_clubs.sql, so
+        // this suite silently depended on demo data that Flyway happened to
+        // insert. V12 retired that seed, and mock data is no longer a migration
+        // concern at all, so the fixture belongs to the test that needs it.
+        // Created rather than replaced: nothing here deletes clubs, so a club
+        // another suite owns is left alone.
+        ensureClub("coding-club", "Coding Club",
+                "A community of passionate programmers learning and building together");
+        ensureClub("chess-club", "Chess Club",
+                "Master the game of kings. All skill levels welcome");
+        ensureClub("music-ensemble", "Music Ensemble",
+                "Play, compose, and jam with fellow musicians");
+    }
+
+    private void ensureClub(String id, String name, String description) {
+        if (clubRepository.existsById(id)) {
+            return;
+        }
+        Club club = new Club();
+        club.setId(id);
+        club.setName(name);
+        club.setDescription(description);
+        clubRepository.save(club);
     }
 
     private Event createIndexedEvent(String title, String description, String organizerId) {
@@ -213,7 +236,7 @@ class SearchIT {
     }
 
     @Test
-    void clubSearchFindsSeededClubs() throws Exception {
+    void clubSearchMatchesOnDescription() throws Exception {
         clubRepository.findAll().forEach(searchIndexService::indexClub);
 
         mockMvc.perform(get("/api/v1/clubs/search").param("q", "programmers"))

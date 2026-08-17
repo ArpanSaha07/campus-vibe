@@ -6,6 +6,7 @@ Last updated: **2026-08-16**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-034](#bug-034) | High | 2026-08-16 | Every club ever created had `embedding` NULL — the index UPDATE ran before Hibernate had inserted the row |
 | [BUG-033](#bug-033) | Medium | 2026-08-16 | Three log statements interpolated caller-supplied text, so a newline could forge log entries |
 | [BUG-032](#bug-032) | Medium | 2026-08-16 | The rate-limit 429 built its JSON by string interpolation, escaping nothing and omitting a field every other error carries |
 | [BUG-025](#bug-025) | Low | 2026-08-14 | `formatDayLabel` followed the host locale while its own labels were hardcoded English, mixing languages in one list |
@@ -71,6 +72,50 @@ infrastructure out of the security chain's construction.
 asserts all four fields on a real 429. The eight pre-existing rate-limit tests
 pass unchanged, which is the evidence that status, `Retry-After` and `message`
 still come out identical.
+
+---
+
+### BUG-034
+**Club search embeddings were never written** · High · FIXED 2026-08-16
+
+**Found:** 2026-08-16, while replacing the `V6` mock-club seed with a dev seeder
+during AWS production preparation. The seeder creates clubs through
+`ClubService`, precisely so embeddings are populated on the normal write path —
+and `count(embedding)` still came back `0` of `8`.
+
+**Symptom:** every club in the database had `embedding IS NULL`, so the semantic
+half of hybrid club search matched nothing. Keyword search still worked, which is
+why this never looked broken. No error, no warning, no failing test.
+
+**Cause:** `ClubService.create` did
+
+```java
+Club saved = clubRepository.save(club);
+searchIndexService.indexClub(saved);   // UPDATE clubs SET embedding = ... WHERE id = ?
+```
+
+`Club.id` is an **assigned** String slug, not a generated key. Hibernate has no
+reason to contact the database before commit, so the INSERT sits in the action
+queue. `indexClub` writes through `JdbcTemplate`, and a raw JDBC statement is not
+a JPA query, so it does not trigger a flush either. The UPDATE therefore ran
+against a row that did not exist yet, matched zero rows, and reported success —
+`JdbcTemplate.update` returns a count nobody was checking.
+
+**Why events escaped it.** `Event.id` is `GenerationType.IDENTITY`. Hibernate
+cannot obtain an IDENTITY key without executing the INSERT, so by the time
+`indexEvent` runs the row is really there. Identical-looking code, opposite
+outcome, decided entirely by the id strategy — which is why reading
+`EventService` as proof that the pattern works is misleading.
+
+**Fix:** `clubRepository.saveAndFlush(club)` in `ClubService.create`. The
+`update` path was already correct: it targets a row that exists.
+
+**Verified:** local `clubs` went from `0/8` to `8/8` rows carrying an embedding.
+
+**Left alone deliberately:** `SearchIndexService` still ignores the update count.
+Making it warn on a zero-row index write would have caught this years earlier and
+is worth doing, but it is a change to shared indexing behaviour and belongs in
+its own commit — noted in `todo.md`.
 
 ---
 
