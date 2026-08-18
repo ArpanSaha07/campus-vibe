@@ -8,7 +8,6 @@ import com.campusvibe.user.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -25,7 +24,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ClubAdminListingIT extends AbstractIntegrationTest {
 
     @Autowired private ClubAdminService clubAdminService;
-    @Autowired private JdbcTemplate jdbcTemplate;
 
     @Test
     void adminsListShowsOwnerFirstThenAdmins() throws Exception {

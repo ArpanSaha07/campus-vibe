@@ -34,17 +34,20 @@ public class ClubOwnershipService {
     private final ClubOwnershipTransferRepository transferRepository;
     private final ClubAdminAssignmentRepository assignmentRepository;
     private final ClubRepository clubRepository;
+    private final ClubAuditService auditService;
     private final MailSender mailSender;
     private final AppMailProperties mailProperties;
 
     public ClubOwnershipService(ClubOwnershipTransferRepository transferRepository,
                                 ClubAdminAssignmentRepository assignmentRepository,
                                 ClubRepository clubRepository,
+                                ClubAuditService auditService,
                                 MailSender mailSender,
                                 AppMailProperties mailProperties) {
         this.transferRepository = transferRepository;
         this.assignmentRepository = assignmentRepository;
         this.clubRepository = clubRepository;
+        this.auditService = auditService;
         this.mailSender = mailSender;
         this.mailProperties = mailProperties;
     }
@@ -134,6 +137,11 @@ public class ClubOwnershipService {
         }
 
         User successor = successorRow.getUser();
+        auditService.recordTransfer(club, actor, ClubAuditAction.OWNERSHIP_TRANSFER_REQUESTED, saved,
+                ClubAuditService.metadata(
+                        "targetName", successor.getName(),
+                        "outgoingBecomes", outgoingBecomes.name()));
+
         mailSender.send(successor.getEmail(),
                 "%s wants to hand you %s".formatted(actor.getName(), club.getName()),
                 """
@@ -181,6 +189,9 @@ public class ClubOwnershipService {
         transferRepository.save(transfer);
 
         Club club = transfer.getClub();
+        auditService.recordTransfer(club, actor, ClubAuditAction.OWNERSHIP_TRANSFER_CANCELLED, transfer,
+                ClubAuditService.metadata("targetName", transfer.getToUser().getName()));
+
         mailSender.send(transfer.getToUser().getEmail(),
                 "The handover of %s was cancelled".formatted(club.getName()),
                 """
@@ -207,6 +218,15 @@ public class ClubOwnershipService {
                 .forEach(transfer -> {
                     transfer.resolveAs(TransferStatus.CANCELLED);
                     transferRepository.save(transfer);
+                    // No actor: nobody cancelled this, it was voided
+                    // by the successor leaving. Recording the remover
+                    // here would read as them cancelling a handover
+                    // they may not have known about.
+                    auditService.recordTransfer(transfer.getClub(), null,
+                            ClubAuditAction.OWNERSHIP_TRANSFER_CANCELLED, transfer,
+                            ClubAuditService.metadata(
+                                    "targetName", transfer.getToUser().getName(),
+                                    "reason", "SUCCESSOR_REMOVED"));
                 });
     }
 
@@ -277,6 +297,12 @@ public class ClubOwnershipService {
 
         User outgoing = transfer.getFromUser();
         boolean stayed = transfer.getOutgoingBecomes() == ClubOwnershipTransfer.OutgoingOwner.CLUB_ADMIN;
+        auditService.recordTransfer(club, user, ClubAuditAction.OWNERSHIP_TRANSFER_COMPLETED, transfer,
+                ClubAuditService.metadata(
+                        "fromName", outgoing.getName(),
+                        "toName", user.getName(),
+                        "outgoingBecomes", transfer.getOutgoingBecomes().name()));
+
         mailSender.send(outgoing.getEmail(),
                 "%s is now the owner of %s".formatted(user.getName(), club.getName()),
                 """
@@ -323,6 +349,9 @@ public class ClubOwnershipService {
 
         transfer.resolveAs(TransferStatus.DECLINED);
         transferRepository.save(transfer);
+
+        auditService.recordTransfer(club, user, ClubAuditAction.OWNERSHIP_TRANSFER_DECLINED, transfer,
+                ClubAuditService.metadata("targetName", user.getName()));
 
         mailSender.send(transfer.getFromUser().getEmail(),
                 "%s declined ownership of %s".formatted(user.getName(), club.getName()),

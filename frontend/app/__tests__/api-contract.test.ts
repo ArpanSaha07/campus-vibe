@@ -8,6 +8,7 @@ import type {
   AuthResponse,
   ClubAdmin,
   ClubAdminRequest,
+  ClubAuditLog,
   ClubInvitation,
   ManagedClub,
   OwnershipTransfer,
@@ -149,6 +150,17 @@ const ownershipTransferFields: Record<keyof OwnershipTransfer, true> = {
   createdAt: true,
 };
 
+const clubAuditLogFields: Record<keyof ClubAuditLog, true> = {
+  id: true,
+  action: true,
+  entityType: true,
+  entityId: true,
+  actorUserId: true,
+  actorName: true,
+  metadata: true,
+  createdAt: true,
+};
+
 const managedClubFields: Record<keyof ManagedClub, true> = {
   clubId: true,
   clubName: true,
@@ -170,6 +182,7 @@ const MIRRORS: Record<string, Record<string, true>> = {
   ClubAdminDTO: clubAdminFields,
   ClubInvitationDTO: clubInvitationFields,
   OwnershipTransferDTO: ownershipTransferFields,
+  ClubAuditLogDTO: clubAuditLogFields,
   ManagedClubDTO: managedClubFields,
 };
 

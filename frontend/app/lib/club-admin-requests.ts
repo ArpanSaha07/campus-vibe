@@ -2,6 +2,7 @@ import { apiFetch } from "@/app/lib/api";
 import type {
   ClubAdmin,
   ClubAdminRequest,
+  ClubAuditLog,
   ClubInvitation,
   ManagedClub,
   OutgoingOwner,
@@ -181,5 +182,32 @@ export async function declineOwnership(transferId: number): Promise<void> {
   await apiFetch<void>(
     `/api/v1/users/me/ownership-transfers/${transferId}/decline`,
     { method: "POST", auth: true },
+  );
+}
+
+// --- the activity log -------------------------------------------------------
+
+/**
+ * A page of a club's activity log, newest first.
+ *
+ * Readable by the whole management team, per §19 — an admin who cannot see what
+ * changed cannot notice a change they did not expect.
+ *
+ * `before` is the smallest id already seen, not an offset. Entries are appended
+ * constantly, and an offset repeats a row whenever one arrives between two page
+ * requests.
+ */
+export async function listClubAuditLogs(
+  clubId: string,
+  options: { before?: number; limit?: number } = {},
+): Promise<ClubAuditLog[]> {
+  const params = new URLSearchParams();
+  if (options.before !== undefined) params.set("before", String(options.before));
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  const query = params.toString();
+
+  return apiFetch<ClubAuditLog[]>(
+    `/api/v1/clubs/${encodeURIComponent(clubId)}/audit-logs${query ? `?${query}` : ""}`,
+    { auth: true },
   );
 }

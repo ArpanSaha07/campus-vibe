@@ -61,6 +61,11 @@
     "createdAt"
   ],
 
+  "ClubAuditLogDTO": [
+    "id", "action", "entityType", "entityId", "actorUserId", "actorName",
+    "metadata", "createdAt"
+  ],
+
   "ManagedClubDTO": [
     "clubId", "clubName", "logo", "followers", "role", "officialEmail",
     "officialEmailVerified"

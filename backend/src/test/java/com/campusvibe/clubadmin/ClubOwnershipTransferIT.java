@@ -15,7 +15,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -58,7 +57,6 @@ class ClubOwnershipTransferIT extends AbstractIntegrationTest {
 
     @Autowired private MailSender mailSender;
     @Autowired private ClubOwnershipTransferRepository transferRepository;
-    @Autowired private JdbcTemplate jdbcTemplate;
 
     private RecordingMailSender mail() {
         return (RecordingMailSender) mailSender;

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -57,6 +58,7 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected ClubAdminAssignmentRepository clubAdminAssignmentRepository;
     @Autowired protected ClubOwnershipTransferRepository clubOwnershipTransferRepository;
     @Autowired protected PasswordEncoder passwordEncoder;
+    @Autowired protected JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void resetDatabaseAndSeedRoles() {
@@ -64,6 +66,13 @@ public abstract class AbstractIntegrationTest {
         // go first. Transfers before assignments only for readability -- they
         // reference no assignment -- but keeping the order 'most dependent
         // first' means a new table can be added at the top without thought.
+        // TRUNCATE, not deleteAll: club_audit_logs carries a BEFORE UPDATE OR
+        // DELETE trigger that refuses row deletion outright (governance §22),
+        // and TRUNCATE fires statement-level triggers only. That is the
+        // deliberate escape hatch for exactly this -- resetting a test
+        // database -- and nothing in the application issues it.
+        jdbcTemplate.execute("TRUNCATE TABLE club_audit_logs");
+
         clubOwnershipTransferRepository.deleteAll();
         clubAdminAssignmentRepository.deleteAll();
         clubAdminRequestRepository.deleteAll();

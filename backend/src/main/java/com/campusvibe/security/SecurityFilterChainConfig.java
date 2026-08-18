@@ -70,7 +70,9 @@ public class SecurityFilterChainConfig {
                                 // Same reasoning: it names the sitting owner and
                                 // their chosen successor, which is the club's
                                 // business and nobody else's.
-                                "/api/v1/clubs/*/ownership-transfer").authenticated()
+                                "/api/v1/clubs/*/ownership-transfer",
+                                // The club's own history of who did what.
+                                "/api/v1/clubs/*/audit-logs").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
                                 "/actuator/**",

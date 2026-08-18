@@ -58,10 +58,11 @@ Spec: [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md
 (15 MVP items) · As-built:
 [`club-administration.md`](../docs/architecture/club-administration.md)
 
-**Items 1–4 shipped 2026-08-17**, **items 5, 7 and 8 shipped 2026-08-18** —
-assignment table, the two club roles, the one-owner invariant, administrator
-listing, the `/manage/[clubId]` dashboard, invite/accept/decline/remove, and
-ownership transfer. The rest, in the spec's order:
+**Items 1–4 shipped 2026-08-17**, **items 5, 7, 8, 9 and 10 shipped
+2026-08-18** — assignment table, the two club roles, the one-owner invariant,
+administrator listing, the `/manage/[clubId]` dashboard,
+invite/accept/decline/remove, ownership transfer, and the append-only activity
+log. The rest, in the spec's order:
 
 - [ ] **P1** *(item 6)* **Platform-admin UI for `official_email`.** The column
   landed in V13 and **nothing can write it**, so every club has `NULL`. Two
@@ -80,12 +81,21 @@ ownership transfer. The rest, in the spec's order:
   invitation expiry below. An offer nobody answers sits PENDING forever and
   holds the club's one transfer slot; the owner can withdraw it, but nothing
   does so on its own.
-- [ ] **P2** *(items 9–10)* **Audit log + Activity tab.** `club_audit_logs`,
-  written through one central `ClubAuditService` rather than scattered inserts,
-  immutable from the dashboard (a `BEFORE UPDATE OR DELETE` trigger makes that a
-  database property rather than a convention). Worth doing alongside transfer
-  and removal, since those are the actions most worth recording. The `Activity`
-  item is deliberately absent from `ManageSidebar` until this exists.
+- [ ] **P2** *(items 9–10, follow-up)* **Log club-page edits and event changes.**
+  The audit log covers administration and ownership only, so a club with a stable
+  team has an empty Activity tab — and §21's own UI example shows exactly the
+  entries that are missing. `ClubAuditService.record` and the `CLUB` / `EVENT`
+  entity types already exist; what is needed is call sites in `ClubService` and
+  `EventService`. Pairs with `EventService.update` (BUG-006), which has to touch
+  those paths regardless.
+- [ ] **P2** **A platform admin cannot open a club dashboard.** `ClubPermissionService`
+  answers yes for `ROLE_ADMIN` on every club-scoped endpoint, but the frontend
+  guard in `manage/[clubId]/layout.tsx` checks the caller's *assignments*, which a
+  platform admin has none of. So the API works and the UI says "You don't manage
+  this club". Pre-existing and harmless until 2026-08-18, when the bootstrap
+  runner made a platform admin exist for the first time. Settle it with §15
+  recovery, which is the workflow that actually needs an admin inside a club they
+  do not belong to.
 - [ ] **P3** *(items 11–13)* **Notification separation.** Club-operational mail
   to the official club email, personal mail to the user, optional personal
   copies for admins, and the §17 security notices that cannot be opted out of.
@@ -245,6 +255,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-18 | Club governance items 9–10: append-only `club_audit_logs` (V17, enforced by trigger) and the Activity tab in the manage sidebar — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-18 | `dev` profile (`application-dev.yml`, `SPRING_PROFILES_ACTIVE` in compose) and the admin bootstrap runner — the system can finally have a platform admin, which unblocks `/search/reindex` and the Admin Dashboard track |
 | 2026-08-18 | Club governance item 8: ownership transfer — `club_ownership_transfers` (V16), the outgoing owner chooses whether they stay, one transaction demotes and promotes — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-18 | Club governance items 5 and 7: invite an admin by address (V15 — nullable `user_id`, `invited_email`), accept/decline at `/invitations`, remove and cancel from the Administrators tab — [`club-administration.md`](../docs/architecture/club-administration.md) |

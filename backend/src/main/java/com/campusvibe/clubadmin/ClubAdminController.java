@@ -32,11 +32,14 @@ public class ClubAdminController {
 
     private final ClubAdminService clubAdminService;
     private final ClubOwnershipService ownershipService;
+    private final ClubAuditService auditService;
 
     public ClubAdminController(ClubAdminService clubAdminService,
-                               ClubOwnershipService ownershipService) {
+                               ClubOwnershipService ownershipService,
+                               ClubAuditService auditService) {
         this.clubAdminService = clubAdminService;
         this.ownershipService = ownershipService;
+        this.auditService = auditService;
     }
 
     // --- the club's team ----------------------------------------------------
@@ -90,6 +93,27 @@ public class ClubAdminController {
                        Authentication authentication) {
         User actor = (User) authentication.getPrincipal();
         clubAdminService.revoke(clubId, assignmentId, actor);
+    }
+
+    /**
+     * The club's activity log, newest first.
+     *
+     * <p>Visible to the whole management team, per §19 and §30: an admin who
+     * cannot see what changed cannot notice a change they did not expect, which
+     * is most of what an audit log is for. Read-only — there is no write, edit
+     * or delete endpoint, and the database refuses the last two regardless.
+     *
+     * @param before the smallest id already seen, for the next page. A keyset
+     *               cursor rather than an offset, because entries are appended
+     *               constantly and an offset repeats a row whenever one arrives
+     *               between two requests.
+     */
+    @GetMapping("/api/v1/clubs/{clubId}/audit-logs")
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #clubId)")
+    public List<ClubAuditLogDTO> auditLogs(@PathVariable String clubId,
+                                           @RequestParam(required = false) Long before,
+                                           @RequestParam(required = false) Integer limit) {
+        return auditService.page(clubId, before, limit);
     }
 
     // --- handing the club on --------------------------------------------------

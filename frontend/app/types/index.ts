@@ -236,6 +236,44 @@ export interface OwnershipTransfer {
   createdAt: string;
 }
 
+/**
+ * What an audit entry records. Mirrors com.campusvibe.clubadmin.ClubAuditAction.
+ *
+ * The backend sends the raw action and lets the frontend word it, so fixing a
+ * typo in the sentence does not mean redeploying the API.
+ */
+export type ClubAuditAction =
+  | "CLUB_ADMIN_INVITED"
+  | "CLUB_ADMIN_ADDED"
+  | "CLUB_ADMIN_DECLINED"
+  | "CLUB_ADMIN_REMOVED"
+  | "OWNERSHIP_TRANSFER_REQUESTED"
+  | "OWNERSHIP_TRANSFER_COMPLETED"
+  | "OWNERSHIP_TRANSFER_DECLINED"
+  | "OWNERSHIP_TRANSFER_CANCELLED";
+
+/** Mirrors com.campusvibe.clubadmin.AuditEntityType. */
+export type AuditEntityType =
+  | "CLUB"
+  | "EVENT"
+  | "CLUB_ADMIN_ASSIGNMENT"
+  | "CLUB_OWNERSHIP_TRANSFER";
+
+/** One line of a club's activity log. Mirrors ClubAuditLogDTO. */
+export interface ClubAuditLog {
+  id: number;
+  action: ClubAuditAction;
+  entityType: AuditEntityType;
+  entityId: string | null;
+  /** Null when the entry has no human behind it, or the account is gone. */
+  actorUserId: number | null;
+  /** The actor's name as it was at the time, not as it is now. */
+  actorName: string;
+  /** Snapshotted context for rendering the line. Absent keys are normal. */
+  metadata: Record<string, string> | null;
+  createdAt: string;
+}
+
 export interface ClubAdminRequest {
   id: number;
   userId: number;

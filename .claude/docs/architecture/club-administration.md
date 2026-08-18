@@ -5,13 +5,13 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** 36b6104, plus the uncommitted working tree adding ownership
-transfer.
+**Code as of:** the uncommitted working tree adding the activity log; ownership
+transfer and the admin bootstrap are committed ahead of it.
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
 *design*, written before the code and covering fifteen MVP items. **This file
-describes what actually shipped, which is items 1–5, 7 and 8 of that list.**
+describes what actually shipped, which is items 1–5 and 7–10 of that list.**
 Where the two disagree, this one describes reality.
 
 ---
@@ -34,7 +34,10 @@ session proves more than a forwarded secret would. An owner can also hand the
 club on: they offer it to one of their admins, choose whether they stay or
 leave, and the successor accepts on that same screen — at which point one
 transaction demotes one and promotes the other, so the club is never left with
-nobody or two people in charge. The activity log is still not built.
+nobody or two people in charge. All of it lands in an activity log the whole
+team can read and nobody can rewrite — the database refuses an update or a
+delete on that table outright, so the guarantee does not rest on the application
+behaving itself.
 
 ---
 
@@ -52,6 +55,11 @@ nobody or two people in charge. The activity log is still not built.
   club. It is held by a partial unique index *and* by a service-layer check.
   Both are tested; do not remove either. The service check gives a message a
   user can act on, the index survives a race between two approvals.
+- **`club_audit_logs` is append-only, enforced by a trigger.** `UPDATE` and
+  `DELETE` raise an exception (§22). Tests reset it with `TRUNCATE`, which
+  fires statement-level triggers only — that is the intended and only escape
+  hatch, and nothing in the application issues it. The table has no foreign
+  keys, so the history outlives the club and the accounts it names.
 - **The ordering inside `ClubOwnershipService.accept` is deliberate.** The old
   owner is demoted *and flushed* before the new one is promoted, because
   `one_active_owner_per_club` is a partial unique index and PostgreSQL checks
@@ -135,6 +143,13 @@ club predates the column.
 `user_roles` and then `roles`. V7 inserts that row and cannot be edited, so on a
 fresh database it is created there and removed here.
 
+**`V17__create_club_audit_logs.sql`** — the activity log, plus the
+`refuse_club_audit_log_mutation` trigger that makes it append-only. No foreign
+keys anywhere in the table, deliberately: a key would make the history only as
+durable as the thing it describes, and a club being deleted is when its history
+is most worth having. `metadata` is `jsonb`, mapped as `Map<String, String>` so
+every value is already something safe to display.
+
 **`V16__create_club_ownership_transfers.sql`** — a handover waiting on the
 successor. Could not be a PENDING `CLUB_OWNER` row in
 `club_admin_assignments`, because the successor is already an ACTIVE
@@ -176,6 +191,17 @@ invitation lifecycle: `invite`, `listInvitations`, `acceptInvitation`,
 stated exception — `claimableBy`, which decides whether an invitation belongs to
 the caller, because no `@PreAuthorize` expression can answer that without the
 row in hand.
+
+**`ClubAuditService.java`** — the one place audit entries are written (§35).
+Writes join the caller's transaction rather than opening their own: an action
+that happened without being logged is a hole in the record, and one logged
+without happening is a lie. Also serves the paged read.
+
+**`ClubAuditLog.java`**, **`ClubAuditAction.java`**, **`AuditEntityType.java`**,
+**`ClubAuditLogDTO.java`**, **`ClubAuditLogRepository.java`** — the entity, the
+eight actions recorded so far, and a repository with no update or delete on it.
+The DTO carries the raw action and metadata rather than a rendered sentence, so
+fixing the wording is a frontend change.
 
 **`ClubOwnershipService.java`** — `offer`, `cancel`, `cancelTransfersTo`,
 `accept`, `decline`. Its own service, per §34, because it is the only thing in
@@ -253,6 +279,13 @@ the same list rather than a section of its own: the owner's question is "who is
 on my team", and someone invited last Tuesday who has not answered belongs in
 that answer.
 
+**`.../activity/page.tsx`** — the club's history, newest first, with Load more.
+`describe()` turns an entry into a sentence in the browser, so the wording lives
+beside the rest of the copy and an entry written a year ago is described in
+today's words. It has a default branch for an action this build does not know
+about — a newer backend, or a retired action — because showing the raw name
+beats crashing the page.
+
 **`app/(protected)/invitations/page.tsx`** — where the invitation email lands.
 Outside `/manage` deliberately: the person opening the link may manage nothing
 at all, and `/manage` is not in their navbar.
@@ -285,6 +318,9 @@ hidden from them.
 | Invitations are PENDING rows in `club_admin_assignments`, not a second table | An invitation and an assignment differ by one field; acceptance is a status change rather than a copy between tables that could half-fail | The separate `club_admin_invitations` table §23.4 offers | Two tables to keep in step, and a window where a row exists in both or neither |
 | An invitation may name an address with no account | The incoming treasurer is frequently not on CampusVibe in August; a user picker can only offer accounts that already exist | Existing accounts only | The owner is told to go and chase a signup before they can do the thing they came to do |
 | Claiming an invitation requires a confirmed address | Sign-up does not require confirming one, so the address on an account proves nothing by itself | Matching the account's email string alone | Registering someone's address first is enough to steal their invitation |
+| The audit log is append-only by database trigger | §22 requires that a club admin cannot delete the entry recording what they did | Repository discipline — expose no delete | The guarantee lives in code review, and the person likeliest to add a delete is the one the rule constrains |
+| `club_audit_logs` has no foreign keys | A key makes the history only as durable as what it describes, and a club being deleted is when its history matters most | `club_id REFERENCES clubs ON DELETE CASCADE` | Deleting a club destroys the record of how it was run |
+| Actor and target names are snapshotted, not joined | The line must still read after the account is renamed or deleted, and should say what it said that day | Joining `users` at read time | A rename silently rewrites history; a deleted account blanks it |
 | A pending transfer is its own table, not a PENDING CLUB_OWNER row | The successor already holds a live assignment row, which `one_live_assignment_per_club_user` makes unique per (club, user) | Relaxing that index to include `role` | "One live relationship per person per club" stops holding, and the invitation logic that leans on it gets subtler |
 | Ownership passes only to an existing active admin | The successor has already accepted an invitation, so they proved their address and agreed to be involved | Offering to any address, like invitations | "Should this person help run the club" and "should they own it" collapse into one click |
 | The outgoing owner picks whether they stay | §8 asks for it, and the graduating case and the continuing-exec case are genuinely different | Always demote to CLUB_ADMIN | Someone handing over because they are leaving stays listed on a club they left |
@@ -385,14 +421,28 @@ list must not make the app believe the user manages nothing.
   `databaseAllowsANewOwnerOnceTheOldRowIsRevoked` and
   `databaseRefusesTwoLiveAssignmentsForOneUser`. Running the ITs now needs a
   working Docker daemon; the `*Test` unit suites still do not.
-- ~~**MVP items 5–15 are not built.**~~ **Items 5, 7 and 8 landed 2026-08-18** —
-  invitation by address, acceptance, decline, removal, cancellation, and
-  ownership transfer. Still unbuilt: **items 9–15** — audit log, Activity tab,
-  notification separation, annual review, platform-admin recovery.
+- ~~**MVP items 5–15 are not built.**~~ **Items 5, 7, 8, 9 and 10 landed
+  2026-08-18** — invitation by address, acceptance, decline, removal,
+  cancellation, ownership transfer, the audit log and the Activity tab. Still
+  unbuilt: **items 6 and 11–15** — official-email verification, notification
+  separation, annual review, platform-admin recovery.
 - **Ownership transfer skips §8's official-email confirmation,** for the same
   reason invitations skip §6's: there is no address to confirm against. What
   remains is owner authorisation plus incoming acceptance, which is two of the
   three factors §8 asks for. The third arrives with item 6.
+- **A platform admin cannot open any club's dashboard**, though the backend lets
+  them call every endpoint on it. `ClubPermissionService` answers yes for
+  `ROLE_ADMIN`, but the frontend guard in `manage/[clubId]/layout.tsx` checks
+  the caller's *assignments*, and a platform admin has none — so `/manage/x`
+  shows "You don't manage this club" while `curl` against the same club
+  succeeds. Pre-existing, and invisible until 2026-08-18 when the bootstrap
+  runner made a platform admin exist for the first time. It blocks nothing today
+  and is the natural thing to settle alongside §15 recovery, which is the
+  workflow that actually needs an admin inside a club they do not belong to.
+- **The audit log records administration and ownership only.** Club-page edits
+  and event changes are not logged, so a club whose team has been stable has an
+  empty Activity tab — §21's own example shows both, and they arrive with
+  `EventService.update` (BUG-006), which that work has to touch anyway.
 - **There is still no way out of an ownerless club.** Transfer needs a sitting
   owner to start it, so a club whose owner's account is deleted, or which never
   had one, cannot acquire one except through the club-admin-request queue — and
@@ -465,6 +515,15 @@ list must not make the app believe the user manages nothing.
   [`club_admin_governance.md`](club_admin_governance.md): the assignment table,
   the two club roles, the one-owner invariant, the authorisation rewrite, and
   the read-only `/manage/[clubId]` dashboard. Implementing agent.
+- 2026-08-18 — MVP items 9 and 10: the club activity log. `club_audit_logs`
+  (V17) is append-only by database trigger, has no foreign keys so it outlives
+  what it describes, and snapshots the actor's name so a rename cannot rewrite
+  history. Eight administration and ownership actions are recorded through one
+  `ClubAuditService`, inside the caller's transaction. The Activity tab is now
+  in `ManageSidebar`, paged with a keyset cursor. 14 tests in `ClubAuditLogIT`,
+  including that the database itself refuses an UPDATE or a DELETE — verified
+  against the running stack with psql, not only through the application.
+  Implementing agent.
 - 2026-08-18 — MVP item 8: ownership transfer. `club_ownership_transfers` (V16)
   holds a handover while it waits, because the successor already has a live
   assignment row and the index forbids a second. The outgoing owner chooses

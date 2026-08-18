@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, LayoutDashboard, Users, ExternalLink } from "lucide-react";
+import {
+  CalendarDays,
+  ExternalLink,
+  History,
+  LayoutDashboard,
+  Users,
+} from "lucide-react";
 
 /**
  * The club-management rail.
@@ -13,14 +19,17 @@ import { CalendarDays, LayoutDashboard, Users, ExternalLink } from "lucide-react
  * what exists; per §3.2 they may see the team, they just cannot change it.
  *
  * A persistent rail on desktop and a scrolling tab strip on mobile, rather than
- * a hamburger: with four destinations, a menu that hides them costs a tap and
- * buys nothing.
+ * a hamburger: with a handful of destinations, a menu that hides them costs a
+ * tap and buys nothing.
  */
 
 const sections = [
   { segment: "", label: "Overview", icon: LayoutDashboard },
   { segment: "events", label: "Events", icon: CalendarDays },
   { segment: "admins", label: "Administrators", icon: Users },
+  // Last on purpose: it is a record of what already happened, so it is where
+  // you go after noticing something, not where you start.
+  { segment: "activity", label: "Activity", icon: History },
 ] as const;
 
 export default function ManageSidebar({ clubId }: { clubId: string }) {

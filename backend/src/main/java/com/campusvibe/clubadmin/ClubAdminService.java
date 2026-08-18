@@ -50,6 +50,7 @@ public class ClubAdminService {
     private final ClubRepository clubRepository;
     private final UserRepository userRepository;
     private final ClubOwnershipService ownershipService;
+    private final ClubAuditService auditService;
     private final MailSender mailSender;
     private final AppMailProperties mailProperties;
 
@@ -57,12 +58,14 @@ public class ClubAdminService {
                             ClubRepository clubRepository,
                             UserRepository userRepository,
                             ClubOwnershipService ownershipService,
+                            ClubAuditService auditService,
                             MailSender mailSender,
                             AppMailProperties mailProperties) {
         this.assignmentRepository = assignmentRepository;
         this.clubRepository = clubRepository;
         this.userRepository = userRepository;
         this.ownershipService = ownershipService;
+        this.auditService = auditService;
         this.mailSender = mailSender;
         this.mailProperties = mailProperties;
     }
@@ -205,6 +208,11 @@ public class ClubAdminService {
 
         ClubAdminAssignment saved = saveGuardingIndexes(invitation);
 
+        auditService.recordAssignment(club, invitedBy, ClubAuditAction.CLUB_ADMIN_INVITED, saved,
+                ClubAuditService.metadata(
+                        "invitedEmail", email,
+                        "targetName", existing.map(User::getName).orElse(null)));
+
         sendInvitationEmail(club, email, invitedBy, existing.isPresent());
         notifyClubInbox(club,
                 "%s was invited to administer %s".formatted(email, club.getName()),
@@ -274,6 +282,14 @@ public class ClubAdminService {
             ownershipService.cancelTransfersTo(clubId, assignment.getUser().getId());
         }
 
+        auditService.recordAssignment(club, actor, ClubAuditAction.CLUB_ADMIN_REMOVED, assignment,
+                ClubAuditService.metadata(
+                        "targetName", assignment.getUser() == null ? null : assignment.getUser().getName(),
+                        "targetEmail", address,
+                        // Distinguishes 'removed an administrator' from
+                        // 'cancelled an invitation nobody had accepted'.
+                        "wasInvitation", String.valueOf(wasInvitation)));
+
         if (wasInvitation) {
             notifyClubInbox(club,
                     "An invitation to administer %s was cancelled".formatted(club.getName()),
@@ -334,6 +350,9 @@ public class ClubAdminService {
         saveGuardingIndexes(invitation,
                 "You already administer %s.".formatted(club.getName()));
 
+        auditService.recordAssignment(club, user, ClubAuditAction.CLUB_ADMIN_ADDED, invitation,
+                ClubAuditService.metadata("targetEmail", user.getEmail()));
+
         notifyClubInbox(club,
                 "%s is now an administrator of %s".formatted(user.getName(), club.getName()),
                 """
@@ -359,6 +378,9 @@ public class ClubAdminService {
 
         invitation.revoke(user.getId());
         assignmentRepository.save(invitation);
+
+        auditService.recordAssignment(club, user, ClubAuditAction.CLUB_ADMIN_DECLINED, invitation,
+                ClubAuditService.metadata("targetEmail", user.getEmail()));
 
         notifyClubInbox(club,
                 "An invitation to administer %s was declined".formatted(club.getName()),
