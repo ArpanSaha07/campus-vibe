@@ -72,7 +72,10 @@ public class SecurityFilterChainConfig {
                                 // business and nobody else's.
                                 "/api/v1/clubs/*/ownership-transfer",
                                 // The club's own history of who did what.
-                                "/api/v1/clubs/*/audit-logs").authenticated()
+                                "/api/v1/clubs/*/audit-logs",
+                                // Carries officialEmail, which must never
+                                // reach a public club page.
+                                "/api/v1/clubs/*/managed").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
                                 "/actuator/**",

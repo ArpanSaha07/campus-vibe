@@ -169,7 +169,12 @@ export interface ManagedClub {
   clubName: string;
   logo: string | null;
   followers: number;
-  role: ClubRole;
+  /**
+   * Null when the caller is a platform admin with no assignment in this club —
+   * they may manage it without holding a role in it. Never null in the
+   * managed-clubs list, which is built from assignments.
+   */
+  role: ClubRole | null;
   /** Null until a platform admin sets one — club admins cannot change it. */
   officialEmail: string | null;
   officialEmailVerified: boolean;

@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import { Info, Trash2, UserPlus } from "lucide-react";
 import { useAuth } from "@/app/lib/auth-context";
-import { useManagedClubs } from "@/app/lib/managed-clubs-context";
+import { useManageClub } from "@/app/lib/manage-club-context";
 import {
   getPendingOwnershipTransfer,
   inviteClubAdmin,
@@ -37,8 +37,12 @@ export default function ClubAdminsPage({
 }) {
   const { clubId } = use(params);
   const { user } = useAuth();
-  const { isOwnerOf } = useManagedClubs();
-  const viewerIsOwner = isOwnerOf(clubId);
+  const { role, viaPlatformAdmin } = useManageClub();
+  // A platform admin gets the owner's controls, because the server gives them
+  // the owner's powers: isClubOwner is true for ROLE_ADMIN. Showing them a
+  // read-only screen would hide actions they can actually perform, which is the
+  // same mistake in the opposite direction.
+  const viewerIsOwner = role === "CLUB_OWNER" || viaPlatformAdmin;
 
   const [admins, setAdmins] = useState<ClubAdmin[] | null>(null);
   const [transfer, setTransfer] = useState<OwnershipTransfer | null>(null);
@@ -118,12 +122,13 @@ export default function ClubAdminsPage({
         <div className="text-sm text-ink-600">
           {viewerIsOwner ? (
             <>
-              <p className="font-semibold text-ink-900">About your team</p>
+              <p className="font-semibold text-ink-900">
+                {viaPlatformAdmin ? "You're here as platform staff" : "About your team"}
+              </p>
               <p className="mt-1">
-                Admins can manage this club&apos;s page and its events. Only you can
-                invite and remove them, or hand the club over. Your own row
-                can&apos;t be removed — the club is never left without an owner, so
-                leaving means handing it to someone else first.
+                {viaPlatformAdmin
+                  ? "You can manage this club's team because you're a CampusVibe admin, not because you're on it. Everything you do here is recorded in the club's activity log under your name."
+                  : "Admins can manage this club's page and its events. Only you can invite and remove them, or hand the club over. Your own row can't be removed — the club is never left without an owner, so leaving means handing it to someone else first."}
               </p>
             </>
           ) : (

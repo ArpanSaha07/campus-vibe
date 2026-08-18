@@ -17,6 +17,12 @@ public record ManagedClubDTO(
         String clubName,
         String logo,
         Integer followers,
+        /**
+         * The caller's role in this club, or null when they are a platform
+         * ADMIN with no assignment here — they may manage the club without
+         * holding a role in it. Always present in the managed-clubs list,
+         * which only contains clubs the caller actually has an assignment in.
+         */
         ClubRole role,
         /** Null until a platform admin sets one. Administrator workflows fall
          *  back to invitee acceptance alone while it is absent. */

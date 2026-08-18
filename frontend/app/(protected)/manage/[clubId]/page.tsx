@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useManagedClubs } from "@/app/lib/managed-clubs-context";
+import { useManageClub } from "@/app/lib/manage-club-context";
 import { listClubAdmins } from "@/app/lib/club-admin-requests";
 import { listEventsByClub } from "@/app/lib/event";
 import type { EventInstance } from "@/app/types";
@@ -25,8 +25,9 @@ export default function ClubOverviewPage({
   params: Promise<{ clubId: string }>;
 }) {
   const { clubId } = use(params);
-  const { clubs } = useManagedClubs();
-  const club = clubs.find((candidate) => candidate.clubId === clubId);
+  // From the layout, which already resolved it — including for a platform admin
+  // who holds no assignment here and so appears in no managed-clubs list.
+  const { club } = useManageClub();
 
   const [events, setEvents] = useState<EventInstance[] | null>(null);
   const [adminCount, setAdminCount] = useState<number | null>(null);
@@ -67,7 +68,7 @@ export default function ClubOverviewPage({
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           <StatTile
             label="Followers"
-            value={club ? club.followers : "—"}
+            value={club.followers}
             hint="Students following this club"
           />
           <StatTile

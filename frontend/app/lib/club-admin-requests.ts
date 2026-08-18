@@ -50,6 +50,24 @@ export async function getManagedClubs(): Promise<ManagedClub[]> {
 }
 
 /**
+ * One club, as somebody managing it sees it.
+ *
+ * The single-club twin of `getManagedClubs()`, and the only way a platform
+ * admin can load a dashboard: that list is built from assignments and they have
+ * none, so they appear in nobody's list. `role` comes back null for exactly
+ * that caller.
+ *
+ * 403 for anyone who may not manage the club, which is what the dashboard guard
+ * reads to decide whether to render at all.
+ */
+export async function getManagedClub(clubId: string): Promise<ManagedClub> {
+  return apiFetch<ManagedClub>(
+    `/api/v1/clubs/${encodeURIComponent(clubId)}/managed`,
+    { auth: true },
+  );
+}
+
+/**
  * A club's management team. Readable by anyone on it, and by platform admins;
  * 403 for everyone else.
  */

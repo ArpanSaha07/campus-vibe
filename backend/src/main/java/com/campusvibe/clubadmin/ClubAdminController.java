@@ -52,6 +52,23 @@ public class ClubAdminController {
      * <p>{@code #clubId} is checked against the caller's assignments rather than
      * trusted: sending someone else's club id proves nothing (§25).
      */
+    /**
+     * One club as its managers see it — the same shape as a row of
+     * {@code /users/me/managed-clubs}, for the club named in the path.
+     *
+     * <p>Exists because that list is built from assignments, and a platform
+     * ADMIN has none: they may manage every club and appear in no list, so a
+     * dashboard that loaded its club from the list alone could never open for
+     * them. {@code role} is null in exactly that case.
+     */
+    @GetMapping("/api/v1/clubs/{clubId}/managed")
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #clubId)")
+    public ManagedClubDTO managedClub(@PathVariable String clubId,
+                                      Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return clubAdminService.managedClub(clubId, user.getId());
+    }
+
     @GetMapping("/api/v1/clubs/{clubId}/admins")
     @PreAuthorize("@clubPermissionService.canManageClub(authentication, #clubId)")
     public List<ClubAdminDTO> listAdmins(@PathVariable String clubId) {

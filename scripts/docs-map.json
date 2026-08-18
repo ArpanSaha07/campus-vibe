@@ -66,7 +66,7 @@
     },
 
     "user-roles.md": {
-      "covers": "RBAC: the three roles, JWT claims, endpoint authorisation",
+      "covers": "RBAC: two platform roles, two club roles, JWT claims, endpoint authorisation",
       "paths": [
         "backend/src/main/java/com/campusvibe/security/",
         "backend/src/main/java/com/campusvibe/clubadmin/",

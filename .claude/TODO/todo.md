@@ -88,14 +88,6 @@ log. The rest, in the spec's order:
   entity types already exist; what is needed is call sites in `ClubService` and
   `EventService`. Pairs with `EventService.update` (BUG-006), which has to touch
   those paths regardless.
-- [ ] **P2** **A platform admin cannot open a club dashboard.** `ClubPermissionService`
-  answers yes for `ROLE_ADMIN` on every club-scoped endpoint, but the frontend
-  guard in `manage/[clubId]/layout.tsx` checks the caller's *assignments*, which a
-  platform admin has none of. So the API works and the UI says "You don't manage
-  this club". Pre-existing and harmless until 2026-08-18, when the bootstrap
-  runner made a platform admin exist for the first time. Settle it with §15
-  recovery, which is the workflow that actually needs an admin inside a club they
-  do not belong to.
 - [ ] **P3** *(items 11–13)* **Notification separation.** Club-operational mail
   to the official club email, personal mail to the user, optional personal
   copies for admins, and the §17 security notices that cannot be opted out of.
@@ -221,7 +213,8 @@ findings.**
 - [ ] **P3** **Reconsider a client query library (TanStack Query or similar) after the cookie migration.** **Decided 2026-08-15: not now**, reasoning in [`api-and-caching.md`](../docs/architecture/api-and-caching.md). Not for clubs/events/search — those are Server Components on Next's data cache already, so a query library there would move rendering off the server to get a cache that exists. The real case is the client surface: `followed-clubs-context.tsx` hand-rolls ~200 lines of `useQuery` + optimistic `useMutation`, four client pages repeat `useState`/`useEffect`/error-flag, and a **second** bespoke provider is queued below for saved events. Deferred because the `localStorage` JWT is *why* those pages are client-rendered at all — fix [BUG-003](../bugs/bugs.md#bug-003) first and several become Server Components, changing what is left to serve. **Trigger:** the cookie migration landing, or a third hand-rolled client cache being about to be written.
 - [ ] **P2** **Call `revalidateTag` from the write paths.** The tags already exist, so this is small. Today, creating an event does not evict the events list — it stays stale for up to five minutes. Trigger: the first real club admin, or the first complaint that a new event does not appear.
 - [ ] **P3** **Add a row for [`ai-planner.md`](../docs/architecture/ai-planner.md) to the docs index.** The file exists but is absent from `docs/README.md`, so nothing points at it. Left undescribed rather than guessed at from the filename.
-- [ ] **P1** **Re-verify [`user-roles.md`](../docs/architecture/user-roles.md) against the code** and split it into a spec and an as-built description. Highest priority of the two remaining backfills because four source files cite it as the authority for RBAC, so a drifted claim there propagates. Owner: `backend`, reviewed by `security`.
+- [x] **P1** ~~Re-verify [`user-roles.md`](../docs/architecture/user-roles.md) against the code and split it into a spec and an as-built description~~ — **done 2026-08-18.** Rewritten from the code to the [`implementation-docs`](../skills/implementation-docs/SKILL.md) standard: two platform roles in the JWT, two club roles in `club_admin_assignments`, why they are stored and checked differently, and the platform-admin bypass. The split happened by *dropping* the spec half rather than moving it — roughly half the old file was a product specification for unbuilt dashboards, which `club_admin_governance.md` and this queue already cover better. `docs-map.json` said it covered *three roles*; corrected. Still open below: `security` has not reviewed it.
+- [ ] **P2** **Have `security` review [`user-roles.md`](../docs/architecture/user-roles.md).** Rewritten from the code on 2026-08-18 by the agent that also wrote most of the authorisation it describes, which is the same conflict flagged for `authentication.md` below. The claims most worth an independent read: that platform roles are safe to keep in the JWT while club roles are not, and that the four `authenticated()` matchers above the `permitAll` block cover every club sub-path that must not be public.
 - [ ] **P2** **Have `security` review [`authentication.md`](../docs/architecture/authentication.md).** It was rewritten from the code on 2026-08-15 and carries 14 known gaps including four security findings, but the agent that wrote it also wrote the code it describes. A finding list that has not been read by anyone else is a first draft.
 - [ ] **P2** **Rewrite [`authentication.md`](../docs/architecture/authentication.md)** to the [`implementation-docs`](../skills/implementation-docs/SKILL.md) standard. It currently describes endpoints as *Required* rather than existing, so it reads as a plan. Blocked in part on [BUG-003](../bugs/bugs.md#bug-003) — the JWT transport decision should be an ADR first, then the doc describes what shipped.
 - [ ] **P2** **Rewrite [`search.md`](../docs/architecture/search.md)** against `com.campusvibe.search`. Keep the existing design note as the rejected-alternatives record. Best done *after* [BUG-001](../bugs/bugs.md#bug-001) is fixed, so the doc describes working behaviour rather than a bug.
@@ -255,6 +248,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-18 | Platform admins can manage every club: dashboards load from `GET /clubs/{id}/managed`, and a Manage pill on the club card links straight in |
 | 2026-08-18 | Club governance items 9–10: append-only `club_audit_logs` (V17, enforced by trigger) and the Activity tab in the manage sidebar — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-18 | `dev` profile (`application-dev.yml`, `SPRING_PROFILES_ACTIVE` in compose) and the admin bootstrap runner — the system can finally have a platform admin, which unblocks `/search/reindex` and the Admin Dashboard track |
 | 2026-08-18 | Club governance item 8: ownership transfer — `club_ownership_transfers` (V16), the outgoing owner chooses whether they stay, one transaction demotes and promotes — [`club-administration.md`](../docs/architecture/club-administration.md) |

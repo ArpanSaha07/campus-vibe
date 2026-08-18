@@ -83,6 +83,39 @@ public class ClubAdminService {
     }
 
     /**
+     * One club, as seen by somebody managing it.
+     *
+     * <p>The single-club twin of {@link #listManagedClubs}, and it exists for
+     * the case that list cannot express: a platform {@code ADMIN} may manage
+     * every club but holds an assignment in none, so they appear in nobody's
+     * managed-clubs list and would otherwise have no way to load a dashboard.
+     *
+     * <p>{@code role} comes back null for exactly that caller. Null rather than
+     * a synthetic {@code PLATFORM_ADMIN} value in {@link ClubRole}, because
+     * their authority is not a club role — it is a property of their account
+     * that happens to outrank one, and putting it in the same enum would let
+     * every {@code role == CLUB_OWNER} check in the codebase quietly disagree
+     * about whether it counts.
+     *
+     * <p>Authorisation is the controller's {@code canManageClub}, which is true
+     * for an active owner, an active admin, or a platform admin — so reaching
+     * this method at all is the proof, and no check is repeated here.
+     */
+    @Transactional(readOnly = true)
+    public ManagedClubDTO managedClub(String clubId, Long userId) {
+        Club club = clubRepository.findById(clubId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Club [%s] not found".formatted(clubId)));
+
+        ClubRole role = assignmentRepository
+                .findByClubIdAndUserIdAndStatus(clubId, userId, AssignmentStatus.ACTIVE)
+                .map(ClubAdminAssignment::getRole)
+                .orElse(null);
+
+        return toManagedClubDto(club, role);
+    }
+
+    /**
      * The club's management team, owner first and then admins by join date.
      *
      * <p>The owner-first sort happens here rather than in the query because

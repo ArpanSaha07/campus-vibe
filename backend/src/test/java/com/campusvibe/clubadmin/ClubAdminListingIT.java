@@ -108,6 +108,68 @@ class ClubAdminListingIT extends AbstractIntegrationTest {
     }
 
     /** One user, several clubs — the case the old one-club model could not express. */
+    // --- one club, as its managers see it -----------------------------------
+
+    @Test
+    void managedClubReturnsTheCallersRole() throws Exception {
+        Club club = createClub("robotics", "Robotics");
+        User owner = createUser("Sarah", "sarah@campus.com", "password123", RoleName.ROLE_USER);
+        makeClubOwner(club, owner);
+
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clubId", is("robotics")))
+                .andExpect(jsonPath("$.role", is("CLUB_OWNER")));
+    }
+
+    /**
+     * The case the managed-clubs *list* cannot express, and the reason this
+     * endpoint exists: a platform admin may manage every club and holds an
+     * assignment in none, so they appear in nobody's list. Before this, the
+     * dashboard refused to open for the one account that can administer
+     * anything, while the same club's endpoints answered them normally.
+     */
+    @Test
+    void aPlatformAdminMayLoadAnyClubWithANullRole() throws Exception {
+        Club club = createClub("robotics", "Robotics");
+        User owner = createUser("Sarah", "sarah@campus.com", "password123", RoleName.ROLE_USER);
+        User platformAdmin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+        makeClubOwner(club, owner);
+
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(platformAdmin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clubName", is("Robotics")))
+                // Null, not a synthetic club role: their authority is a property
+                // of the account, not a relationship with this club.
+                .andExpect(jsonPath("$.role").doesNotExist());
+
+        // And they still hold no assignment, so their own list stays empty.
+        mockMvc.perform(get("/api/v1/users/me/managed-clubs")
+                        .header("Authorization", bearer(platformAdmin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void managedClubIsRefusedToAnOutsider() throws Exception {
+        Club club = createClub("robotics", "Robotics");
+        User owner = createUser("Sarah", "sarah@campus.com", "password123", RoleName.ROLE_USER);
+        User outsider = createUser("Nobody", "nobody@campus.com", "password123", RoleName.ROLE_USER);
+        makeClubOwner(club, owner);
+
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(outsider)))
+                .andExpect(status().isForbidden());
+
+        // Not public either, despite sitting under the otherwise-public
+        // /api/v1/clubs/** — it carries officialEmail.
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed"))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void managedClubsListsEveryClubWithTheRoleHeldInEach() throws Exception {
         Club owned = createClub("owned-club", "Owned Club");

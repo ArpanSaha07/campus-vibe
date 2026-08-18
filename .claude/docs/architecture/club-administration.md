@@ -219,10 +219,11 @@ view of an invitation, and the owner's request to create one. The request record
 carries *only* an address: with no `role` field there is no payload that could
 ask for `CLUB_OWNER`.
 
-**`ClubAdminController.java`** — seven endpoints across three roots, which is
-why there is no class-level `@RequestMapping`. Under `/clubs/{clubId}/admins`:
-`GET` the team (`canManageClub`), `POST .../invitations` and
-`DELETE .../{assignmentId}` (both `isClubOwner`). Under `/users/me`:
+**`ClubAdminController.java`** — nine endpoints across three roots, which is
+why there is no class-level `@RequestMapping`. Under `/clubs/{clubId}`:
+`GET /managed` (the club as its managers see it), `GET /admins` (the team) and
+`GET /audit-logs`, all `canManageClub`; `POST /admins/invitations` and
+`DELETE /admins/{assignmentId}`, both `isClubOwner`. Under `/users/me`:
 `managed-clubs`, `club-invitations`, and accept/decline on a single invitation —
 none of which take a user id from the URL, so one user cannot enumerate or
 answer another's.
@@ -279,6 +280,19 @@ the same list rather than a section of its own: the owner's question is "who is
 on my team", and someone invited last Tuesday who has not answered belongs in
 that answer.
 
+**`app/lib/manage-club-context.tsx`** — the club the current `/manage/[clubId]`
+screen is about, resolved once by the layout and read by the pages inside it.
+Replaces each page doing its own `clubs.find(...)`, which only ever worked for
+someone holding an assignment.
+
+**`app/components/club/ManageClubPill.tsx`** — a Manage shortcut revealed on
+hover of a club card, for platform admins and for anyone who manages that club.
+A client component nested inside the server-rendered card, so four grids do not
+move to the client to decide one pill. Renders nothing for everyone else — not a
+disabled state, which on a public listing would advertise that a dashboard
+exists. `focus-visible:opacity-100` as well as `group-hover`, or it would be
+unreachable by keyboard.
+
 **`.../activity/page.tsx`** — the club's history, newest first, with Load more.
 `describe()` turns an entry into a sentence in the browser, so the wording lives
 beside the rest of the copy and an entry written a year ago is described in
@@ -318,6 +332,8 @@ hidden from them.
 | Invitations are PENDING rows in `club_admin_assignments`, not a second table | An invitation and an assignment differ by one field; acceptance is a status change rather than a copy between tables that could half-fail | The separate `club_admin_invitations` table §23.4 offers | Two tables to keep in step, and a window where a row exists in both or neither |
 | An invitation may name an address with no account | The incoming treasurer is frequently not on CampusVibe in August; a user picker can only offer accounts that already exist | Existing accounts only | The owner is told to go and chase a signup before they can do the thing they came to do |
 | Claiming an invitation requires a confirmed address | Sign-up does not require confirming one, so the address on an account proves nothing by itself | Matching the account's email string alone | Registering someone's address first is enough to steal their invitation |
+| The dashboard asks `GET /clubs/{id}/managed` instead of searching the managed-clubs list | The list is built from assignments; a platform admin manages every club and holds none, so the search missed for the only account that can administer anything | Returning every club from `/users/me/managed-clubs` for an admin | The eagerly-loaded provider carries the whole platform on every page, and 'clubs you manage' stops distinguishing clubs you run from clubs you may touch |
+| `ManagedClubDTO.role` is nullable rather than gaining a `PLATFORM_ADMIN` value | A platform admin's authority is a property of their account, not a relationship with the club | Adding `PLATFORM_ADMIN` to `ClubRole` | Every `role == CLUB_OWNER` check in the codebase quietly disagrees about whether it counts |
 | The audit log is append-only by database trigger | §22 requires that a club admin cannot delete the entry recording what they did | Repository discipline — expose no delete | The guarantee lives in code review, and the person likeliest to add a delete is the one the rule constrains |
 | `club_audit_logs` has no foreign keys | A key makes the history only as durable as what it describes, and a club being deleted is when its history matters most | `club_id REFERENCES clubs ON DELETE CASCADE` | Deleting a club destroys the record of how it was run |
 | Actor and target names are snapshotted, not joined | The line must still read after the account is renamed or deleted, and should say what it said that day | Joining `users` at read time | A rename silently rewrites history; a deleted account blanks it |
@@ -430,15 +446,11 @@ list must not make the app believe the user manages nothing.
   reason invitations skip §6's: there is no address to confirm against. What
   remains is owner authorisation plus incoming acceptance, which is two of the
   three factors §8 asks for. The third arrives with item 6.
-- **A platform admin cannot open any club's dashboard**, though the backend lets
-  them call every endpoint on it. `ClubPermissionService` answers yes for
-  `ROLE_ADMIN`, but the frontend guard in `manage/[clubId]/layout.tsx` checks
-  the caller's *assignments*, and a platform admin has none — so `/manage/x`
-  shows "You don't manage this club" while `curl` against the same club
-  succeeds. Pre-existing, and invisible until 2026-08-18 when the bootstrap
-  runner made a platform admin exist for the first time. It blocks nothing today
-  and is the natural thing to settle alongside §15 recovery, which is the
-  workflow that actually needs an admin inside a club they do not belong to.
+- ~~A platform admin cannot open any club's dashboard.~~ **Fixed 2026-08-18**,
+  later the same day. The guard asked the wrong question — "is this club on your
+  list" rather than "may you manage it" — and the list is built from
+  assignments, which a platform admin has none of. It now loads the club from
+  `GET /clubs/{id}/managed`, which answers the second question.
 - **The audit log records administration and ownership only.** Club-page edits
   and event changes are not logged, so a club whose team has been stable has an
   empty Activity tab — §21's own example shows both, and they arrive with
@@ -515,6 +527,14 @@ list must not make the app believe the user manages nothing.
   [`club_admin_governance.md`](club_admin_governance.md): the assignment table,
   the two club roles, the one-owner invariant, the authorisation rewrite, and
   the read-only `/manage/[clubId]` dashboard. Implementing agent.
+- 2026-08-18 — Platform admins can manage every club, which §12 always implied
+  and nothing implemented. The dashboard now loads its club from
+  `GET /clubs/{id}/managed` rather than searching the assignment-built
+  managed-clubs list, `ManagedClubDTO.role` is nullable for a caller whose
+  authority is not a club role, and a Manage pill on the club card takes them
+  straight there. The badge says `Platform admin` in berry, because a screen
+  claiming they are the owner would be a lie the rest of it then acts on.
+  Implementing agent.
 - 2026-08-18 — MVP items 9 and 10: the club activity log. `club_audit_logs`
   (V17) is append-only by database trigger, has no foreign keys so it outlives
   what it describes, and snapshots the actor's name so a rename cannot rewrite
