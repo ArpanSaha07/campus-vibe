@@ -65,7 +65,12 @@ public class SecurityFilterChainConfig {
                         // refuse an anonymous caller, but as 403-from-SpEL
                         // rather than 401, and one edit to the SpEL away from
                         // leaking every administrator's name and email.
-                        .requestMatchers(HttpMethod.GET, "/api/v1/clubs/*/admins").authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/clubs/*/admins",
+                                // Same reasoning: it names the sitting owner and
+                                // their chosen successor, which is the club's
+                                // business and nobody else's.
+                                "/api/v1/clubs/*/ownership-transfer").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
                                 "/actuator/**",

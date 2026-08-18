@@ -13,8 +13,14 @@ import { useAuth } from "@/app/lib/auth-context";
 import {
   getManagedClubs,
   listMyClubInvitations,
+  listMyOwnershipTransfers,
 } from "@/app/lib/club-admin-requests";
-import type { ClubInvitation, ClubRole, ManagedClub } from "@/app/types";
+import type {
+  ClubInvitation,
+  ClubRole,
+  ManagedClub,
+  OwnershipTransfer,
+} from "@/app/types";
 
 // Which clubs the signed-in user may manage, held once for the whole app.
 //
@@ -42,6 +48,17 @@ interface ManagedClubsContextType {
    * email link aside, and an email is easy to lose.
    */
   invitations: ClubInvitation[];
+  /**
+   * Clubs being handed to this user, waiting on them to accept or decline.
+   *
+   * Separate from invitations because they are a different offer — an
+   * invitation asks you to help run a club, this asks you to become
+   * responsible for it — but they surface in the same two places, so they load
+   * together.
+   */
+  ownershipTransfers: OwnershipTransfer[];
+  /** Everything waiting on an answer, for the navbar badge. */
+  pendingAnswers: number;
   /** True when the club request failed, as opposed to the user managing nothing. */
   failed: boolean;
   /** The same distinction for invitations, which fail independently. */
@@ -59,6 +76,7 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [clubs, setClubs] = useState<ManagedClub[]>([]);
   const [invitations, setInvitations] = useState<ClubInvitation[]>([]);
+  const [ownershipTransfers, setOwnershipTransfers] = useState<OwnershipTransfer[]>([]);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [invitationsFailed, setInvitationsFailed] = useState(false);
@@ -75,6 +93,7 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
       // Signed out is a known answer, not a pending one.
       setClubs([]);
       setInvitations([]);
+      setOwnershipTransfers([]);
       setFailed(false);
       setInvitationsFailed(false);
       setReady(true);
@@ -86,8 +105,12 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
     // allSettled, not all: an unreadable invitation list must not make the app
     // believe the user manages nothing, which is what a rejected Promise.all
     // would do. The two answers are independent and are treated that way.
-    Promise.allSettled([getManagedClubs(), listMyClubInvitations()])
-      .then(([managed, waiting]) => {
+    Promise.allSettled([
+      getManagedClubs(),
+      listMyClubInvitations(),
+      listMyOwnershipTransfers(),
+    ])
+      .then(([managed, waiting, handovers]) => {
         if (cancelled) return;
         // Fail closed on the clubs: an unreadable list hides management UI
         // rather than showing links that would 403 on click. `failed` lets a
@@ -95,7 +118,10 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
         setClubs(managed.status === "fulfilled" ? managed.value : []);
         setFailed(managed.status !== "fulfilled");
         setInvitations(waiting.status === "fulfilled" ? waiting.value : []);
-        setInvitationsFailed(waiting.status !== "fulfilled");
+        setOwnershipTransfers(handovers.status === "fulfilled" ? handovers.value : []);
+        // One flag for both offers: they load together and the screen that
+        // reports the failure shows them in one list.
+        setInvitationsFailed(waiting.status !== "fulfilled" || handovers.status !== "fulfilled");
       })
       .finally(() => {
         if (!cancelled) setReady(true);
@@ -122,8 +148,20 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, clubs, invitations, failed, invitationsFailed, roleIn, isOwnerOf, refresh }),
-    [ready, clubs, invitations, failed, invitationsFailed, roleIn, isOwnerOf, refresh],
+    () => ({
+      ready,
+      clubs,
+      invitations,
+      ownershipTransfers,
+      pendingAnswers: invitations.length + ownershipTransfers.length,
+      failed,
+      invitationsFailed,
+      roleIn,
+      isOwnerOf,
+      refresh,
+    }),
+    [ready, clubs, invitations, ownershipTransfers, failed, invitationsFailed,
+     roleIn, isOwnerOf, refresh],
   );
 
   return (

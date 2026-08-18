@@ -24,11 +24,11 @@ import Button from "@/app/components/ui/Button";
  * email.
  */
 export default function ManageIndexPage() {
-  const { ready, failed, clubs, invitations } = useManagedClubs();
+  const { ready, failed, clubs, invitations, pendingAnswers } = useManagedClubs();
   const router = useRouter();
 
   const onlyClub =
-    ready && !failed && clubs.length === 1 && invitations.length === 0
+    ready && !failed && clubs.length === 1 && pendingAnswers === 0
       ? clubs[0]
       : null;
 
@@ -46,7 +46,7 @@ export default function ManageIndexPage() {
     );
   }
 
-  const waiting = invitations.length;
+  const waiting = pendingAnswers;
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8 fade-up">
@@ -69,13 +69,13 @@ export default function ManageIndexPage() {
           <span className="min-w-0">
             <span className="block font-semibold text-ink-900">
               {waiting === 1
-                ? "You have an invitation waiting"
-                : `You have ${waiting} invitations waiting`}
+                ? "You have something waiting"
+                : `You have ${waiting} things waiting`}
             </span>
             <span className="block text-sm text-ink-600">
-              {waiting === 1
+              {waiting === 1 && invitations.length === 1
                 ? `${invitations[0].clubName} asked you to help run the club.`
-                : "Clubs have asked you to help run them."}{" "}
+                : "An invitation or a club being handed to you."}{" "}
               Review and answer →
             </span>
           </span>

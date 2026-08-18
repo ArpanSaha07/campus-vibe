@@ -10,6 +10,7 @@ import type {
   ClubAdminRequest,
   ClubInvitation,
   ManagedClub,
+  OwnershipTransfer,
   User,
 } from "@/app/types";
 
@@ -134,6 +135,20 @@ const clubInvitationFields: Record<keyof ClubInvitation, true> = {
   invitedAt: true,
 };
 
+const ownershipTransferFields: Record<keyof OwnershipTransfer, true> = {
+  transferId: true,
+  clubId: true,
+  clubName: true,
+  clubLogo: true,
+  fromUserId: true,
+  fromUserName: true,
+  toUserId: true,
+  toUserName: true,
+  outgoingBecomes: true,
+  status: true,
+  createdAt: true,
+};
+
 const managedClubFields: Record<keyof ManagedClub, true> = {
   clubId: true,
   clubName: true,
@@ -154,6 +169,7 @@ const MIRRORS: Record<string, Record<string, true>> = {
   ClubAdminRequestDTO: clubAdminRequestFields,
   ClubAdminDTO: clubAdminFields,
   ClubInvitationDTO: clubInvitationFields,
+  OwnershipTransferDTO: ownershipTransferFields,
   ManagedClubDTO: managedClubFields,
 };
 

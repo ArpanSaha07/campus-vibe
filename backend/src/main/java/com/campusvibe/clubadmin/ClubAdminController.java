@@ -3,6 +3,7 @@ package com.campusvibe.clubadmin;
 import com.campusvibe.user.User;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -30,9 +31,12 @@ import java.util.List;
 public class ClubAdminController {
 
     private final ClubAdminService clubAdminService;
+    private final ClubOwnershipService ownershipService;
 
-    public ClubAdminController(ClubAdminService clubAdminService) {
+    public ClubAdminController(ClubAdminService clubAdminService,
+                               ClubOwnershipService ownershipService) {
         this.clubAdminService = clubAdminService;
+        this.ownershipService = ownershipService;
     }
 
     // --- the club's team ----------------------------------------------------
@@ -88,6 +92,50 @@ public class ClubAdminController {
         clubAdminService.revoke(clubId, assignmentId, actor);
     }
 
+    // --- handing the club on --------------------------------------------------
+
+    /**
+     * The club's handover in flight, or 204 if there is none.
+     *
+     * <p>Readable by the whole management team, not just the owner: an admin
+     * being offered the club needs to see it, and one who is not needs to know
+     * the club is changing hands rather than discovering it afterwards.
+     */
+    @GetMapping("/api/v1/clubs/{clubId}/ownership-transfer")
+    @PreAuthorize("@clubPermissionService.canManageClub(authentication, #clubId)")
+    public ResponseEntity<OwnershipTransferDTO> pendingTransfer(@PathVariable String clubId) {
+        return ownershipService.pendingFor(clubId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /**
+     * Offers the club to one of its admins. Nothing moves until they accept.
+     *
+     * <p>No transfer id in the path on any of these three: a club has at most
+     * one handover in flight, held by {@code one_pending_transfer_per_club}, so
+     * the club identifies it. An id here would be a second way to name the same
+     * row and a second thing to check.
+     */
+    @PostMapping("/api/v1/clubs/{clubId}/ownership-transfer")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("@clubPermissionService.isClubOwner(authentication, #clubId)")
+    public OwnershipTransferDTO offerOwnership(@PathVariable String clubId,
+                                               @Valid @RequestBody OwnershipTransferRequest request,
+                                               Authentication authentication) {
+        User actor = (User) authentication.getPrincipal();
+        return ownershipService.offer(clubId, request.toUserId(), request.outgoingBecomes(), actor);
+    }
+
+    @DeleteMapping("/api/v1/clubs/{clubId}/ownership-transfer")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@clubPermissionService.isClubOwner(authentication, #clubId)")
+    public void cancelOwnershipTransfer(@PathVariable String clubId,
+                                        Authentication authentication) {
+        User actor = (User) authentication.getPrincipal();
+        ownershipService.cancel(clubId, actor);
+    }
+
     // --- the caller's own memberships and invitations ------------------------
 
     /**
@@ -136,5 +184,34 @@ public class ClubAdminController {
                                   Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         clubAdminService.declineInvitation(invitationId, user);
+    }
+
+    /** Handovers waiting on the signed-in user to answer. */
+    @GetMapping("/api/v1/users/me/ownership-transfers")
+    public List<OwnershipTransferDTO> myOwnershipTransfers(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return ownershipService.awaiting(user.getId());
+    }
+
+    /**
+     * Accepts a club. The only call in the application that moves authority
+     * between two people, and the only one whose service method is a single
+     * transaction by necessity rather than by habit.
+     *
+     * @return the club as it now appears on the caller's dashboard, owner role
+     */
+    @PostMapping("/api/v1/users/me/ownership-transfers/{transferId}/accept")
+    public ManagedClubDTO acceptOwnership(@PathVariable Long transferId,
+                                          Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        return ownershipService.accept(transferId, user);
+    }
+
+    @PostMapping("/api/v1/users/me/ownership-transfers/{transferId}/decline")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void declineOwnership(@PathVariable Long transferId,
+                                 Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        ownershipService.decline(transferId, user);
     }
 }

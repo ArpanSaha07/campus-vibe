@@ -5,6 +5,7 @@ import com.campusvibe.club.ClubRepository;
 import com.campusvibe.clubadmin.ClubAdminAssignment;
 import com.campusvibe.clubadmin.ClubAdminAssignmentRepository;
 import com.campusvibe.clubadmin.ClubAdminRequestRepository;
+import com.campusvibe.clubadmin.ClubOwnershipTransferRepository;
 import com.campusvibe.clubadmin.ClubRole;
 import com.campusvibe.event.EventRepository;
 import com.campusvibe.jwt.JWTUtil;
@@ -54,11 +55,16 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected EventRepository eventRepository;
     @Autowired protected ClubAdminRequestRepository clubAdminRequestRepository;
     @Autowired protected ClubAdminAssignmentRepository clubAdminAssignmentRepository;
+    @Autowired protected ClubOwnershipTransferRepository clubOwnershipTransferRepository;
     @Autowired protected PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void resetDatabaseAndSeedRoles() {
-        // Assignments hold FKs to both clubs and users, so they go first.
+        // Transfers and assignments hold FKs to both clubs and users, so they
+        // go first. Transfers before assignments only for readability -- they
+        // reference no assignment -- but keeping the order 'most dependent
+        // first' means a new table can be added at the top without thought.
+        clubOwnershipTransferRepository.deleteAll();
         clubAdminAssignmentRepository.deleteAll();
         clubAdminRequestRepository.deleteAll();
         eventRepository.deleteAll();

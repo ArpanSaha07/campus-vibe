@@ -5,16 +5,18 @@ import { Info, Trash2, UserPlus } from "lucide-react";
 import { useAuth } from "@/app/lib/auth-context";
 import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import {
+  getPendingOwnershipTransfer,
   inviteClubAdmin,
   listClubAdmins,
   removeClubAdmin,
 } from "@/app/lib/club-admin-requests";
 import { parseApiError } from "@/app/lib/auth-errors";
-import type { ClubAdmin } from "@/app/types";
+import type { ClubAdmin, OwnershipTransfer } from "@/app/types";
 import ClubRoleBadge from "@/app/components/manage/ClubRoleBadge";
 import SectionHeading from "@/app/components/ui/SectionHeading";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
+import TransferOwnershipPanel from "@/app/components/manage/TransferOwnershipPanel";
 
 /**
  * The club's management team, and — for the owner — the controls that change it.
@@ -39,14 +41,24 @@ export default function ClubAdminsPage({
   const viewerIsOwner = isOwnerOf(clubId);
 
   const [admins, setAdmins] = useState<ClubAdmin[] | null>(null);
+  const [transfer, setTransfer] = useState<OwnershipTransfer | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setAdmins(await listClubAdmins(clubId));
+      // Together, because removing an admin can cancel a pending handover and
+      // accepting one rewrites the team: showing either from a stale read makes
+      // the screen contradict itself.
+      const [team, pending] = await Promise.all([
+        listClubAdmins(clubId),
+        getPendingOwnershipTransfer(clubId),
+      ]);
+      setAdmins(team);
+      setTransfer(pending);
       setFailed(false);
     } catch {
       setAdmins([]);
+      setTransfer(null);
       setFailed(true);
     }
   }, [clubId]);
@@ -92,6 +104,15 @@ export default function ClubAdminsPage({
         </ul>
       )}
 
+      {viewerIsOwner && admins !== null && !failed && (
+        <TransferOwnershipPanel
+          clubId={clubId}
+          admins={admins}
+          pending={transfer}
+          onChanged={load}
+        />
+      )}
+
       <div className="mt-8 flex gap-3 rounded-2xl border border-mist-200 bg-mist-100 p-5">
         <Info className="mt-0.5 h-5 w-5 shrink-0 text-lavender-600" aria-hidden="true" />
         <div className="text-sm text-ink-600">
@@ -100,9 +121,9 @@ export default function ClubAdminsPage({
               <p className="font-semibold text-ink-900">About your team</p>
               <p className="mt-1">
                 Admins can manage this club&apos;s page and its events. Only you can
-                invite and remove them. Handing over ownership is coming next — until
-                then, your own row can&apos;t be removed, so the club is never left
-                without an owner.
+                invite and remove them, or hand the club over. Your own row
+                can&apos;t be removed — the club is never left without an owner, so
+                leaving means handing it to someone else first.
               </p>
             </>
           ) : (

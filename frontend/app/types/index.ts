@@ -209,6 +209,33 @@ export interface ClubInvitation {
   invitedAt: string;
 }
 
+/** What becomes of the outgoing owner. Mirrors ClubOwnershipTransfer.OutgoingOwner. */
+export type OutgoingOwner = "CLUB_ADMIN" | "REVOKED";
+
+/** Mirrors com.campusvibe.clubadmin.TransferStatus. Only PENDING is live. */
+export type TransferStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED";
+
+/**
+ * A club changing hands. Mirrors OwnershipTransferDTO.
+ *
+ * One shape for both sides: the outgoing owner watching their offer, and the
+ * admin deciding whether to take the club. Neither learns anything from it the
+ * other could not already see.
+ */
+export interface OwnershipTransfer {
+  transferId: number;
+  clubId: string;
+  clubName: string;
+  clubLogo: string | null;
+  fromUserId: number;
+  fromUserName: string;
+  toUserId: number;
+  toUserName: string;
+  outgoingBecomes: OutgoingOwner;
+  status: TransferStatus;
+  createdAt: string;
+}
+
 export interface ClubAdminRequest {
   id: number;
   userId: number;

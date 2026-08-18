@@ -58,10 +58,10 @@ Spec: [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md
 (15 MVP items) · As-built:
 [`club-administration.md`](../docs/architecture/club-administration.md)
 
-**Items 1–4 shipped 2026-08-17**, **items 5 and 7 shipped 2026-08-18** —
+**Items 1–4 shipped 2026-08-17**, **items 5, 7 and 8 shipped 2026-08-18** —
 assignment table, the two club roles, the one-owner invariant, administrator
-listing, the `/manage/[clubId]` dashboard, and invite/accept/decline/remove. The
-rest, in the spec's order:
+listing, the `/manage/[clubId]` dashboard, invite/accept/decline/remove, and
+ownership transfer. The rest, in the spec's order:
 
 - [ ] **P1** *(item 6)* **Platform-admin UI for `official_email`.** The column
   landed in V13 and **nothing can write it**, so every club has `NULL`. Two
@@ -76,11 +76,10 @@ rest, in the spec's order:
   `one_live_invite_per_club_email` slot, so an owner who mistypes an address has
   to cancel before re-inviting. Wants a TTL and a sweep; natural to pair with
   the audit log, which is where the sweep should be recorded.
-- [ ] **P2** *(item 8)* **Ownership transfer.** Owner authorises → official club
-  email confirms → incoming owner accepts → one transaction demotes and
-  promotes. The partial unique index means a half-finished transfer fails loudly
-  rather than leaving a club with zero or two owners. Also implement §36:
-  an owner may not remove themselves, only transfer.
+- [ ] **P2** *(item 8, follow-up)* **Expire stale handovers**, alongside the
+  invitation expiry below. An offer nobody answers sits PENDING forever and
+  holds the club's one transfer slot; the owner can withdraw it, but nothing
+  does so on its own.
 - [ ] **P2** *(items 9–10)* **Audit log + Activity tab.** `club_audit_logs`,
   written through one central `ClubAuditService` rather than scattered inserts,
   immutable from the dashboard (a `BEFORE UPDATE OR DELETE` trigger makes that a
@@ -247,6 +246,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-18 | Club governance item 8: ownership transfer — `club_ownership_transfers` (V16), the outgoing owner chooses whether they stay, one transaction demotes and promotes — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-18 | Club governance items 5 and 7: invite an admin by address (V15 — nullable `user_id`, `invited_email`), accept/decline at `/invitations`, remove and cancel from the Administrators tab — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-17 | Flyway migration lint moved out of `_database.yml` into `scripts/lint-migrations.mjs`, wired into `verify.mjs` so `pre-push` catches it; CI now calls the same script |
 | 2026-08-17 | Club governance items 1–4: `club_admin_assignments` (V12–V14), `CLUB_OWNER`/`CLUB_ADMIN`, `ROLE_CLUB_ADMIN` deleted, per-request authorisation, read-only `/manage/[clubId]` dashboard — [`club-administration.md`](../docs/architecture/club-administration.md) |

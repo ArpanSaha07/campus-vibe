@@ -49,17 +49,20 @@ public class ClubAdminService {
     private final ClubAdminAssignmentRepository assignmentRepository;
     private final ClubRepository clubRepository;
     private final UserRepository userRepository;
+    private final ClubOwnershipService ownershipService;
     private final MailSender mailSender;
     private final AppMailProperties mailProperties;
 
     public ClubAdminService(ClubAdminAssignmentRepository assignmentRepository,
                             ClubRepository clubRepository,
                             UserRepository userRepository,
+                            ClubOwnershipService ownershipService,
                             MailSender mailSender,
                             AppMailProperties mailProperties) {
         this.assignmentRepository = assignmentRepository;
         this.clubRepository = clubRepository;
         this.userRepository = userRepository;
+        this.ownershipService = ownershipService;
         this.mailSender = mailSender;
         this.mailProperties = mailProperties;
     }
@@ -263,6 +266,13 @@ public class ClubAdminService {
 
         assignment.revoke(actor.getId());
         assignmentRepository.save(assignment);
+
+        // A handover offered to somebody who is no longer on the team can
+        // never complete, and while it sits PENDING it holds the club's one
+        // transfer slot against a handover that could.
+        if (assignment.getUser() != null) {
+            ownershipService.cancelTransfersTo(clubId, assignment.getUser().getId());
+        }
 
         if (wasInvitation) {
             notifyClubInbox(club,

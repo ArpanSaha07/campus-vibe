@@ -7,10 +7,12 @@ import { useAuth } from "@/app/lib/auth-context";
 import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import {
   acceptClubInvitation,
+  acceptOwnership,
   declineClubInvitation,
+  declineOwnership,
 } from "@/app/lib/club-admin-requests";
 import { parseApiError } from "@/app/lib/auth-errors";
-import type { ClubInvitation } from "@/app/types";
+import type { ClubInvitation, OwnershipTransfer } from "@/app/types";
 import ClubLogo from "@/app/components/club/ClubLogo";
 import ClubRoleBadge from "@/app/components/manage/ClubRoleBadge";
 import EmptyState from "@/app/components/ui/EmptyState";
@@ -34,7 +36,9 @@ import Button from "@/app/components/ui/Button";
  */
 export default function ClubInvitationsPage() {
   const { user } = useAuth();
-  const { ready, invitations, invitationsFailed } = useManagedClubs();
+  const { ready, invitations, ownershipTransfers, invitationsFailed } =
+    useManagedClubs();
+  const nothingWaiting = invitations.length === 0 && ownershipTransfers.length === 0;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8 fade-up">
@@ -43,8 +47,9 @@ export default function ClubInvitationsPage() {
         Invitations for you
       </h1>
       <p className="mt-2 text-ink-600">
-        Clubs that have asked you to help run them. Accepting adds the club to your
-        dashboard; it changes nothing about your own account.
+        Clubs that have asked you to help run them, or to take them on entirely.
+        Accepting adds the club to your dashboard; it changes nothing about your
+        own account.
       </p>
 
       {/* The one thing that stops an invitation being answerable, surfaced
@@ -72,17 +77,22 @@ export default function ClubInvitationsPage() {
           />
         )}
 
-        {ready && !invitationsFailed && invitations.length === 0 && (
+        {ready && !invitationsFailed && nothingWaiting && (
           <EmptyState
             icon={<MailOpen className="h-7 w-7" aria-hidden="true" />}
-            title="No invitations waiting"
-            body="When a club owner invites you to help run their club, it will show up here."
+            title="Nothing waiting"
+            body="When a club owner invites you to help run their club, or offers to hand you one, it will show up here."
             action={<Button href="/clubs">Browse clubs</Button>}
           />
         )}
 
-        {ready && !invitationsFailed && invitations.length > 0 && (
+        {ready && !invitationsFailed && !nothingWaiting && (
           <ul className="space-y-4">
+            {/* Handovers first: being offered a club is the bigger decision,
+                and burying it under three admin invitations would be wrong. */}
+            {ownershipTransfers.map((transfer) => (
+              <OwnershipCard key={transfer.transferId} transfer={transfer} />
+            ))}
             {invitations.map((invitation) => (
               <InvitationCard key={invitation.invitationId} invitation={invitation} />
             ))}
@@ -154,6 +164,86 @@ function InvitationCard({ invitation }: { invitation: ClubInvitation }) {
           </Button>
         </div>
       </div>
+
+      {error && <p className="mt-4 text-sm text-berry-600">{error}</p>}
+    </li>
+  );
+}
+
+/**
+ * Being handed a whole club.
+ *
+ * Visibly heavier than an invitation card, because it is a heavier decision:
+ * accepting makes you the person responsible for the club, its events and its
+ * team, and the previous owner cannot take it back unilaterally. The card says
+ * what changes for the outgoing owner too, since that is a fact about the club
+ * the incoming owner should not discover afterwards.
+ */
+function OwnershipCard({ transfer }: { transfer: OwnershipTransfer }) {
+  const router = useRouter();
+  const { refresh } = useManagedClubs();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function accept() {
+    setBusy(true);
+    setError(null);
+    try {
+      const club = await acceptOwnership(transfer.transferId);
+      refresh();
+      router.push(`/manage/${club.clubId}`);
+    } catch (err) {
+      setError(parseApiError(err, "We couldn't accept that club. Try again."));
+      setBusy(false);
+    }
+  }
+
+  async function decline() {
+    setBusy(true);
+    setError(null);
+    try {
+      await declineOwnership(transfer.transferId);
+      refresh();
+    } catch (err) {
+      setError(parseApiError(err, "We couldn't decline that. Try again."));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="rounded-2xl border border-lavender-600/40 bg-lavender-50 p-6">
+      <span className="ticket-label text-lavender-600">Ownership offer</span>
+
+      <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <ClubLogo name={transfer.clubName} logo={transfer.clubLogo} size="md" />
+          <div className="min-w-0">
+            <p className="truncate font-display text-lg font-bold text-ink-900">
+              {transfer.clubName}
+            </p>
+            <p className="mt-0.5 text-sm text-ink-600">
+              {transfer.fromUserName} wants to make you the owner of this club.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 gap-3">
+          <Button onClick={accept} disabled={busy}>
+            Accept the club
+          </Button>
+          <Button variant="secondary" onClick={decline} disabled={busy}>
+            Decline
+          </Button>
+        </div>
+      </div>
+
+      <p className="mt-4 border-t border-lavender-600/20 pt-4 text-sm text-ink-600">
+        As owner you manage the club page and its events, and you are the only
+        person who can invite admins, remove them, and hand the club on.{" "}
+        {transfer.outgoingBecomes === "CLUB_ADMIN"
+          ? `${transfer.fromUserName} will stay on as a club admin.`
+          : `${transfer.fromUserName} will leave the club when you accept.`}
+      </p>
 
       {error && <p className="mt-4 text-sm text-berry-600">{error}</p>}
     </li>

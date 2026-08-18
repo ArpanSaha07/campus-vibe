@@ -55,6 +55,12 @@
     "invitedAt"
   ],
 
+  "OwnershipTransferDTO": [
+    "transferId", "clubId", "clubName", "clubLogo", "fromUserId",
+    "fromUserName", "toUserId", "toUserName", "outgoingBecomes", "status",
+    "createdAt"
+  ],
+
   "ManagedClubDTO": [
     "clubId", "clubName", "logo", "followers", "role", "officialEmail",
     "officialEmailVerified"

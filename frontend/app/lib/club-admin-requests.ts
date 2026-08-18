@@ -4,6 +4,8 @@ import type {
   ClubAdminRequest,
   ClubInvitation,
   ManagedClub,
+  OutgoingOwner,
+  OwnershipTransfer,
 } from "@/app/types";
 
 export async function requestClubAdminAccess(clubId: string, message: string): Promise<ClubAdminRequest> {
@@ -107,6 +109,77 @@ export async function acceptClubInvitation(invitationId: number): Promise<Manage
 export async function declineClubInvitation(invitationId: number): Promise<void> {
   await apiFetch<void>(
     `/api/v1/users/me/club-invitations/${invitationId}/decline`,
+    { method: "POST", auth: true },
+  );
+}
+
+// --- handing the club on ----------------------------------------------------
+
+/**
+ * The club's handover in flight, or null when there is none.
+ *
+ * The backend answers 204 rather than an empty object for the common case, so
+ * apiFetch gets no body to parse; that is normalised to null here rather than
+ * at three call sites.
+ */
+export async function getPendingOwnershipTransfer(
+  clubId: string,
+): Promise<OwnershipTransfer | null> {
+  const transfer = await apiFetch<OwnershipTransfer | null>(
+    `/api/v1/clubs/${encodeURIComponent(clubId)}/ownership-transfer`,
+    { auth: true },
+  );
+  return transfer ?? null;
+}
+
+/**
+ * Offers the club to one of its admins. Owner-only, and nothing moves until
+ * they accept.
+ *
+ * `toUserId` rather than an address: ownership can only pass to an active admin
+ * of this club, so the successor is picked from a list rather than typed.
+ */
+export async function offerOwnership(
+  clubId: string,
+  toUserId: number,
+  outgoingBecomes: OutgoingOwner,
+): Promise<OwnershipTransfer> {
+  return apiFetch<OwnershipTransfer>(
+    `/api/v1/clubs/${encodeURIComponent(clubId)}/ownership-transfer`,
+    {
+      method: "POST",
+      body: JSON.stringify({ toUserId, outgoingBecomes }),
+      auth: true,
+    },
+  );
+}
+
+/** The outgoing owner withdrawing, before the successor answers. */
+export async function cancelOwnershipTransfer(clubId: string): Promise<void> {
+  await apiFetch<void>(
+    `/api/v1/clubs/${encodeURIComponent(clubId)}/ownership-transfer`,
+    { method: "DELETE", auth: true },
+  );
+}
+
+/** Handovers waiting on the signed-in user to answer. */
+export async function listMyOwnershipTransfers(): Promise<OwnershipTransfer[]> {
+  return apiFetch<OwnershipTransfer[]>(`/api/v1/users/me/ownership-transfers`, {
+    auth: true,
+  });
+}
+
+/** Accepts a club. Returns it as it now appears on the dashboard, owner role. */
+export async function acceptOwnership(transferId: number): Promise<ManagedClub> {
+  return apiFetch<ManagedClub>(
+    `/api/v1/users/me/ownership-transfers/${transferId}/accept`,
+    { method: "POST", auth: true },
+  );
+}
+
+export async function declineOwnership(transferId: number): Promise<void> {
+  await apiFetch<void>(
+    `/api/v1/users/me/ownership-transfers/${transferId}/decline`,
     { method: "POST", auth: true },
   );
 }

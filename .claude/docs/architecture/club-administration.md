@@ -1,17 +1,18 @@
 # Club Administration & Authorisation (CampusVibe)
 
-**Date:** 2026-08-17, extended 2026-08-18 · **Branch:** `feature/user-roles` ·
+**Date:** 2026-08-17, extended 2026-08-18 (twice) · **Branch:** `feature/user-roles` ·
 **Authors:** implementing agent (backend, frontend, tests)
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** 36b6104 — invitations and removal are committed.
+**Code as of:** 36b6104, plus the uncommitted working tree adding ownership
+transfer.
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
 *design*, written before the code and covering fifteen MVP items. **This file
-describes what actually shipped, which is items 1–5 and 7 of that list.** Where
-the two disagree, this one describes reality.
+describes what actually shipped, which is items 1–5, 7 and 8 of that list.**
+Where the two disagree, this one describes reality.
 
 ---
 
@@ -29,8 +30,11 @@ now build their own team from it: invite an administrator by email address —
 whether or not that address has a CampusVibe account yet — and remove one, or
 cancel an invitation, from the same list. The invitee accepts by signing in and
 clicking Accept at `/invitations`; there is no token in the link, because the
-session proves more than a forwarded secret would. Transferring ownership and
-the activity log are still not built.
+session proves more than a forwarded secret would. An owner can also hand the
+club on: they offer it to one of their admins, choose whether they stay or
+leave, and the successor accepts on that same screen — at which point one
+transaction demotes one and promotes the other, so the club is never left with
+nobody or two people in charge. The activity log is still not built.
 
 ---
 
@@ -48,6 +52,13 @@ the activity log are still not built.
   club. It is held by a partial unique index *and* by a service-layer check.
   Both are tested; do not remove either. The service check gives a message a
   user can act on, the index survives a race between two approvals.
+- **The ordering inside `ClubOwnershipService.accept` is deliberate.** The old
+  owner is demoted *and flushed* before the new one is promoted, because
+  `one_active_owner_per_club` is a partial unique index and PostgreSQL checks
+  those per statement — a partial index cannot be DEFERRABLE, so there is no
+  moment when two rows may both be owners. Measured: removing the flushes still
+  passes today, because Hibernate happens to emit the updates in the order they
+  were dirtied. That is not a guarantee. Do not "simplify" them away.
 - **The security boundary of the invitation flow is one `if`.**
   `ClubAdminService.claimableBy` refuses to let an account with an unconfirmed
   address answer an invitation. Sign-up does not require confirming an address
@@ -124,6 +135,15 @@ club predates the column.
 `user_roles` and then `roles`. V7 inserts that row and cannot be edited, so on a
 fresh database it is created there and removed here.
 
+**`V16__create_club_ownership_transfers.sql`** — a handover waiting on the
+successor. Could not be a PENDING `CLUB_OWNER` row in
+`club_admin_assignments`, because the successor is already an ACTIVE
+`CLUB_ADMIN` there and `one_live_assignment_per_club_user` forbids a second
+live row for the same person in the same club. Carries `outgoing_becomes`,
+which no assignment row has anywhere to put, and two CHECKs — a transfer has
+two distinct parties, and `resolved_at` is set exactly when the status is not
+PENDING.
+
 **`V15__invite_club_admins_by_email.sql`** — drops `NOT NULL` from `user_id`,
 adds `invited_email`, and adds two CHECK constraints plus a partial unique index
 on `(club_id, lower(invited_email))`. The nullability is what lets an invitation
@@ -156,6 +176,17 @@ invitation lifecycle: `invite`, `listInvitations`, `acceptInvitation`,
 stated exception — `claimableBy`, which decides whether an invitation belongs to
 the caller, because no `@PreAuthorize` expression can answer that without the
 row in hand.
+
+**`ClubOwnershipService.java`** — `offer`, `cancel`, `cancelTransfersTo`,
+`accept`, `decline`. Its own service, per §34, because it is the only thing in
+the application that moves authority between two people; everything in it
+exists to make that one act atomic.
+
+**`ClubOwnershipTransfer.java`**, **`TransferStatus.java`**,
+**`OwnershipTransferDTO.java`**, **`OwnershipTransferRequest.java`** — the
+entity with its `OutgoingOwner` nested enum, the four outcomes, and the two
+wire shapes. The request takes a user id rather than an address, because
+ownership can only pass to an existing admin.
 
 **`ClubInvitationDTO.java`**, **`ClubAdminInviteRequest.java`** — the invitee's
 view of an invitation, and the owner's request to create one. The request record
@@ -254,6 +285,9 @@ hidden from them.
 | Invitations are PENDING rows in `club_admin_assignments`, not a second table | An invitation and an assignment differ by one field; acceptance is a status change rather than a copy between tables that could half-fail | The separate `club_admin_invitations` table §23.4 offers | Two tables to keep in step, and a window where a row exists in both or neither |
 | An invitation may name an address with no account | The incoming treasurer is frequently not on CampusVibe in August; a user picker can only offer accounts that already exist | Existing accounts only | The owner is told to go and chase a signup before they can do the thing they came to do |
 | Claiming an invitation requires a confirmed address | Sign-up does not require confirming one, so the address on an account proves nothing by itself | Matching the account's email string alone | Registering someone's address first is enough to steal their invitation |
+| A pending transfer is its own table, not a PENDING CLUB_OWNER row | The successor already holds a live assignment row, which `one_live_assignment_per_club_user` makes unique per (club, user) | Relaxing that index to include `role` | "One live relationship per person per club" stops holding, and the invitation logic that leans on it gets subtler |
+| Ownership passes only to an existing active admin | The successor has already accepted an invitation, so they proved their address and agreed to be involved | Offering to any address, like invitations | "Should this person help run the club" and "should they own it" collapse into one click |
+| The outgoing owner picks whether they stay | §8 asks for it, and the graduating case and the continuing-exec case are genuinely different | Always demote to CLUB_ADMIN | Someone handing over because they are leaving stays listed on a club they left |
 | Acceptance is an authenticated POST, with no token in the link | The session proves identity; a mailed token proves only that its holder read the message | A `CLUB_ADMIN_INVITATION` purpose on `AuthTokenService` | A forwardable, inbox-resident credential, plus `issue()` deleting one club's invitation when a second club sends one |
 
 ### Task-specific
@@ -310,6 +344,25 @@ statuses in §6.1 have no DECLINED, and adding one would mean a new CHECK
 constraint for a distinction the `revoked_by_user_id` column already draws: the
 invitee's own id there means declined, the owner's means cancelled.
 
+**Everything is re-read when a transfer is accepted, not trusted from when it
+was offered.** An offer can sit for days. The successor may have been removed
+from the club since, and the sitting owner may no longer be the person who made
+the offer. A transfer that promoted someone no longer on the team, or demoted
+someone who is no longer the owner, would be worse than one that refuses — so
+`accept` re-reads both assignment rows and refuses with a sentence if either has
+moved.
+
+**Removing an admin cancels a handover offered to them.** Otherwise the row sits
+PENDING for a person who cannot accept it, holding the club's single transfer
+slot against one that could complete. `ClubAdminService.revoke` calls
+`ClubOwnershipService.cancelTransfersTo` for that reason.
+
+**No transfer id in the club-scoped paths.** `POST`, `GET` and `DELETE` on
+`/clubs/{clubId}/ownership-transfer` all address the club's one pending
+handover, which `one_pending_transfer_per_club` guarantees is at most one. An id
+in the path would be a second way to name the same row and a second thing to
+check against the club.
+
 **Invitations live on `ManagedClubsProvider` rather than fetching per page.**
 The navbar needs the count on every page anyway, and accepting changes both the
 invitation list and the club list, so one `refresh()` covers both. The two
@@ -320,6 +373,10 @@ list must not make the app believe the user manages nothing.
 
 ## Known deviations, gaps and blockers
 
+- **A transfer never expires.** An offer nobody answers stays PENDING forever and
+  holds the club's one transfer slot, though the owner can withdraw it at any
+  time. Same shape as the invitation-expiry gap, and worth fixing in the same
+  change.
 - ~~The database half of the single-owner invariant is untested.~~ **Closed
   2026-08-17**, later the same day: every `*IT` now runs on real PostgreSQL +
   pgvector through `PostgresTestContainer`, with Flyway enabled and
@@ -328,10 +385,19 @@ list must not make the app believe the user manages nothing.
   `databaseAllowsANewOwnerOnceTheOldRowIsRevoked` and
   `databaseRefusesTwoLiveAssignmentsForOneUser`. Running the ITs now needs a
   working Docker daemon; the `*Test` unit suites still do not.
-- ~~**MVP items 5–15 are not built.**~~ **Items 5 and 7 landed 2026-08-18** —
-  invitation by address, acceptance, decline, removal and cancellation. Still
-  unbuilt: **items 8–15** — ownership transfer, audit log, notification
-  separation, annual review, platform-admin recovery.
+- ~~**MVP items 5–15 are not built.**~~ **Items 5, 7 and 8 landed 2026-08-18** —
+  invitation by address, acceptance, decline, removal, cancellation, and
+  ownership transfer. Still unbuilt: **items 9–15** — audit log, Activity tab,
+  notification separation, annual review, platform-admin recovery.
+- **Ownership transfer skips §8's official-email confirmation,** for the same
+  reason invitations skip §6's: there is no address to confirm against. What
+  remains is owner authorisation plus incoming acceptance, which is two of the
+  three factors §8 asks for. The third arrives with item 6.
+- **There is still no way out of an ownerless club.** Transfer needs a sitting
+  owner to start it, so a club whose owner's account is deleted, or which never
+  had one, cannot acquire one except through the club-admin-request queue — and
+  that path refuses a club that already has an owner. §15 recovery, which is the
+  real answer, needs a platform admin to exist.
 - **Item 6, official-email verification, is deliberately skipped rather than
   done.** §6 puts a verification to the club's official address in the middle of
   the invitation flow. Every club's `official_email` is NULL and nothing can set
@@ -399,6 +465,15 @@ list must not make the app believe the user manages nothing.
   [`club_admin_governance.md`](club_admin_governance.md): the assignment table,
   the two club roles, the one-owner invariant, the authorisation rewrite, and
   the read-only `/manage/[clubId]` dashboard. Implementing agent.
+- 2026-08-18 — MVP item 8: ownership transfer. `club_ownership_transfers` (V16)
+  holds a handover while it waits, because the successor already has a live
+  assignment row and the index forbids a second. The outgoing owner chooses
+  whether they stay on as an admin or leave, and `accept` applies both halves in
+  one transaction, demoting before promoting because
+  `one_active_owner_per_club` is checked per statement. 23 tests in
+  `ClubOwnershipTransferIT`; verified live including that a token issued before
+  the transfer gains and loses the right powers immediately after it.
+  Implementing agent.
 - 2026-08-18 — MVP items 5 and 7: invite an administrator by address, accept,
   decline, remove, cancel. V15 makes `user_id` nullable and adds
   `invited_email`, so an invitation can name someone who has not signed up yet.
