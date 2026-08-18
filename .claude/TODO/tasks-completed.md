@@ -58,6 +58,20 @@ links resolve unchanged — this file sits in the same directory.
 
   23 tests in `ClubOwnershipTransferIT` (suite 153 → 176, still the one pre-existing `SearchIT` failure). Verified live in both dispositions: stay-as-admin and leave-entirely, each ending with exactly one active owner and with pre-existing bearer tokens gaining and losing the right powers immediately.
 
+### Database Lifecycle & Seeding
+
+- [x] **P1** *(Step 1)* **Create the `dev` profile** — **done 2026-08-18.** It gated everything profile-scoped: a `@Profile("dev")` bean written before an active dev profile exists compiles, deploys and silently never runs, with no error to notice. `application-dev.yml` is deliberately almost empty, because `application.yml` already defaults to the development shape (`show-sql`, `include-message: always`, mocked S3) and it is `application-prod.yml` that overrides those back — so the file's real job is to *exist*. It carries `logging.level.com.campusvibe: DEBUG` and a comment explaining what belongs there later. `docker-compose.yml` sets `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}`, defaulting to dev rather than none for exactly the silent-no-op reason above. Confirmed the banner logs `The following 1 profile is active: "dev"`, and that the suites are unaffected — `@ActiveProfiles` *replaces* the active set rather than adding to it, so `test` and `it` never see `dev`.
+
+- [x] **P1** *(Step 2)* **Admin bootstrap runner** — **done 2026-08-18.** There was no platform admin in the system at all, so every `hasRole('ADMIN')` path was unreachable by everybody: creating clubs, `POST /search/reindex`, and — since 2026-08-17 — approving the club-admin requests that install a club's first owner. There is deliberately no bootstrap *endpoint*, because an unauthenticated way to mint an administrator is the thing that must not exist; the door is an environment variable instead.
+
+  `bootstrap/BootstrapProperties.java` + `bootstrap/AdminBootstrapRunner.java`, an `ApplicationRunner` rather than `@PostConstruct` — the latter can fire before Flyway finishes, and this touches `users` and `roles`, which on a cold start is a race with the migration that creates them.
+
+  **Not gated on a profile,** only on `campusvibe.bootstrap.admin.enabled` (default false). The first administrator has to come from somewhere in production too, and that is the environment where reaching for `psql` is least appropriate. Both modes from the skill are implemented: promote an existing account (the primary path, and the only one that works for a Google account, which has no password), or create-then-grant when the address has never signed up and a password is supplied. A missing account with no password logs a warning and returns rather than throwing — a misconfigured convenience must not take a working application down — and never creates a password-less row, which could not sign in but which a later password-reset request could claim.
+
+  **Grants only, never revokes.** Stripping `ROLE_ADMIN` from accounts the variable no longer names would make one edited environment variable enough to lock every administrator out of production on the next deploy.
+
+  11 tests in `AdminBootstrapRunnerIT` (suite 176 → 187, still the one pre-existing `SearchIT` failure). The runner is driven directly rather than through a context restart, so a single test can execute it twice and assert the second pass changed nothing — the property that actually matters, and one a restart-per-case setup cannot express. Verified live end to end: `ROLE_ADMIN` granted to the real account on first boot, `already holds ROLE_ADMIN, nothing to do` on the second, and exactly one row in `user_roles` after both.
+
 ### Backend / Features
 
 - [x] **P2** Bookmark events + RSVPs (entity, migration, endpoints). `user_saved_events` was already in V4 but unmapped; `V9__create_event_rsvps.sql` adds `user_event_rsvps`. Both are mapped as lazy `@ElementCollection` id sets on `User`, served by `MyEventService` / `MyEventController` under `/api/v1/users/me/*`. Saved and going are deliberately independent relations, not one status column. Covered by `MyEventsIT`.

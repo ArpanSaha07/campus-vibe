@@ -1,0 +1,35 @@
+# The `dev` profile — local development.
+#
+# DELIBERATELY ALMOST EMPTY, and that is the point rather than an oversight.
+# application.yml already defaults to the development shape: `show-sql: true`,
+# `include-message: always`, `AWS_S3_MOCK=true`, mail unset so messages are
+# logged rather than sent. It is application-prod.yml that overrides those back
+# to something safe. So there is very little for this file to say.
+#
+# WHAT IT BUYS is an *active* profile for `@Profile("dev")` beans to attach to.
+# Without one, a dev-only seeder compiles, deploys, and silently never runs —
+# no error, no log line, nothing to notice. That failure mode is why this file
+# had to exist before the seeder rather than alongside it.
+#
+# ACTIVATED BY docker/docker-compose.yml, which sets
+# `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}` on the backend
+# service. Confirm it took with the startup banner:
+#
+#     The following 1 profile is active: "dev"
+#
+# NOT ACTIVE UNDER TEST. The `*Test` and `*IT` suites use `@ActiveProfiles`
+# ({"test"} and {"test","it"} respectively), and Spring replaces the active set
+# rather than adding to it — so nothing here, and nothing gated on `dev`, ever
+# runs during a test. That separation is deliberate: a seeder that ran under
+# test would put rows in front of assertions that count them.
+#
+# WHAT BELONGS HERE LATER: anything you want locally and never in production.
+# The dev seeder's own switches, relaxed timeouts, a fake provider. Anything
+# that must hold in *every* environment belongs in application.yml instead —
+# a value set only here is a value production does not have.
+
+logging:
+  level:
+    # The application's own logs at DEBUG. Framework logging is untouched, so
+    # this stays readable; Hibernate and Spring at DEBUG would bury it.
+    com.campusvibe: DEBUG

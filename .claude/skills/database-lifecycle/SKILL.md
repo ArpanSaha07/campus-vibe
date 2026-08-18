@@ -32,11 +32,15 @@ not silently rewrite them.
 |---|---|
 | `V6__insert_mock_clubs.sql` seeds 8 clubs + images through Flyway | Applied (rank 6). Violates the mock-data rule. Retire by superseding, never by deleting the file. |
 | `V7__multi_role_rbac.sql` creates tables AND inserts the 3 role rows | Applied. Mixes schema with reference data. Leave as-is; keep them separate going forward. |
-| No `dev` profile or `application-dev.yml` exists | Must be created before any `@Profile("dev")` seeder will run. `docker-compose.yml` sets no `SPRING_PROFILES_ACTIVE`. |
+| ~~No `dev` profile or `application-dev.yml` exists~~ | **Fixed 2026-08-18.** `application-dev.yml` exists and `docker-compose.yml` sets `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}`, so `@Profile("dev")` beans now run locally. |
+| No dev seeder exists yet | PLAN.md Step 3. The profile it needs is now in place. |
 
-Because there is no `dev` profile yet, a seeder annotated `@Profile("dev")`
-would compile, deploy, and never execute — with no error. Create the profile and
-activate it in `docker/docker-compose.yml` first. See PLAN.md Step 1.
+The `dev` profile is live, so a seeder annotated `@Profile("dev")` will actually
+execute locally — which was not true before 2026-08-18, when such a bean would
+have compiled, deployed and silently never run. Confirm with the startup banner:
+`The following 1 profile is active: "dev"`. Note that `@ActiveProfiles` in the
+test suites *replaces* the active set rather than adding to it, so nothing gated
+on `dev` ever runs under `test` or `it`.
 
 ---
 
@@ -176,6 +180,10 @@ not hypothetical: every club seeded by `V6__insert_mock_clubs.sql` has
 
 The initial admin account is not a Flyway migration. Use an `ApplicationRunner`
 — never `@PostConstruct`, which can race Flyway on a cold start.
+
+**Built 2026-08-18** as `bootstrap/AdminBootstrapRunner.java` +
+`bootstrap/BootstrapProperties.java`, covered by `AdminBootstrapRunnerIT`. The
+rules below describe what it does; read them before changing it.
 
 Configuration comes from environment variables:
 

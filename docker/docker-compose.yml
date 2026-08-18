@@ -51,6 +51,15 @@ services:
       dockerfile: backend/Dockerfile
     container_name: campusvibe-backend
     environment:
+      # Local development runs the `dev` profile. Overridable, but the default
+      # is dev rather than none because a @Profile("dev") bean with no active
+      # dev profile does not fail -- it compiles, deploys and silently never
+      # runs, which is a much worse way to find out.
+      #
+      # The `test` and `it` profiles are set by @ActiveProfiles in the suites
+      # and replace this rather than adding to it, so tests never see dev.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-campusvibe}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-arpan}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in docker/.env}
@@ -78,6 +87,12 @@ services:
       MAIL_FROM: ${MAIL_FROM:-no-reply@campusvibe.local}
       # Links point at the frontend, so this is a browser-reachable address.
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+
+      # The first platform administrator. Off unless you ask for it; see
+      # .env.example. Grants only, never revokes.
+      APP_BOOTSTRAP_ADMIN_ENABLED: ${APP_BOOTSTRAP_ADMIN_ENABLED:-false}
+      APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-}
+      APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
 
       AUTH_REQUIRE_VERIFIED_EMAIL: ${AUTH_REQUIRE_VERIFIED_EMAIL:-false}
       AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}
