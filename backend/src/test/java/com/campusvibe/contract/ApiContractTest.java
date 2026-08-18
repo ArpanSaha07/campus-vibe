@@ -3,6 +3,7 @@ package com.campusvibe.contract;
 import com.campusvibe.auth.AuthenticationResponse;
 import com.campusvibe.club.ClubDTO;
 import com.campusvibe.clubadmin.ClubAdminDTO;
+import com.campusvibe.clubadmin.ClubInvitationDTO;
 import com.campusvibe.clubadmin.ClubAdminRequestDTO;
 import com.campusvibe.clubadmin.ManagedClubDTO;
 import com.campusvibe.event.EventDTO;
@@ -62,6 +63,7 @@ class ApiContractTest {
         CONTRACTED.put("AuthenticationResponse", AuthenticationResponse.class);
         CONTRACTED.put("ClubAdminRequestDTO", ClubAdminRequestDTO.class);
         CONTRACTED.put("ClubAdminDTO", ClubAdminDTO.class);
+        CONTRACTED.put("ClubInvitationDTO", ClubInvitationDTO.class);
         CONTRACTED.put("ManagedClubDTO", ManagedClubDTO.class);
     }
 

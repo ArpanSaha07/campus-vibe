@@ -10,8 +10,11 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/app/lib/auth-context";
-import { getManagedClubs } from "@/app/lib/club-admin-requests";
-import type { ClubRole, ManagedClub } from "@/app/types";
+import {
+  getManagedClubs,
+  listMyClubInvitations,
+} from "@/app/lib/club-admin-requests";
+import type { ClubInvitation, ClubRole, ManagedClub } from "@/app/types";
 
 // Which clubs the signed-in user may manage, held once for the whole app.
 //
@@ -31,12 +34,22 @@ interface ManagedClubsContextType {
   /** False until the list has loaded. Guard on this before rendering "you manage nothing". */
   ready: boolean;
   clubs: ManagedClub[];
-  /** True when the request failed, as opposed to the user managing nothing. */
+  /**
+   * Invitations waiting on this user, across every club.
+   *
+   * Loaded here rather than only on /invitations because the navbar is the
+   * only way someone who manages nothing yet would ever find that page — the
+   * email link aside, and an email is easy to lose.
+   */
+  invitations: ClubInvitation[];
+  /** True when the club request failed, as opposed to the user managing nothing. */
   failed: boolean;
+  /** The same distinction for invitations, which fail independently. */
+  invitationsFailed: boolean;
   /** The user's role in one club, or null if they do not manage it. */
   roleIn: (clubId: string) => ClubRole | null;
   isOwnerOf: (clubId: string) => boolean;
-  /** Re-fetches — call after anything that changes the caller's own assignments. */
+  /** Re-fetches both — call after anything that changes the caller's own assignments. */
   refresh: () => void;
 }
 
@@ -45,8 +58,10 @@ const ManagedClubsContext = createContext<ManagedClubsContextType | undefined>(u
 export function ManagedClubsProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [clubs, setClubs] = useState<ManagedClub[]>([]);
+  const [invitations, setInvitations] = useState<ClubInvitation[]>([]);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [invitationsFailed, setInvitationsFailed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
 
   const refresh = useCallback(() => setReloadTick((n) => n + 1), []);
@@ -59,26 +74,28 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated) {
       // Signed out is a known answer, not a pending one.
       setClubs([]);
+      setInvitations([]);
       setFailed(false);
+      setInvitationsFailed(false);
       setReady(true);
       return;
     }
 
     let cancelled = false;
     setReady(false);
-    getManagedClubs()
-      .then((results) => {
+    // allSettled, not all: an unreadable invitation list must not make the app
+    // believe the user manages nothing, which is what a rejected Promise.all
+    // would do. The two answers are independent and are treated that way.
+    Promise.allSettled([getManagedClubs(), listMyClubInvitations()])
+      .then(([managed, waiting]) => {
         if (cancelled) return;
-        setClubs(results);
-        setFailed(false);
-      })
-      .catch(() => {
-        // Fail closed: an unreadable list hides management UI rather than
-        // showing links that would 403 on click. `failed` lets a dashboard
-        // distinguish this from genuinely managing nothing.
-        if (cancelled) return;
-        setClubs([]);
-        setFailed(true);
+        // Fail closed on the clubs: an unreadable list hides management UI
+        // rather than showing links that would 403 on click. `failed` lets a
+        // dashboard distinguish this from genuinely managing nothing.
+        setClubs(managed.status === "fulfilled" ? managed.value : []);
+        setFailed(managed.status !== "fulfilled");
+        setInvitations(waiting.status === "fulfilled" ? waiting.value : []);
+        setInvitationsFailed(waiting.status !== "fulfilled");
       })
       .finally(() => {
         if (!cancelled) setReady(true);
@@ -105,8 +122,8 @@ export function ManagedClubsProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, clubs, failed, roleIn, isOwnerOf, refresh }),
-    [ready, clubs, failed, roleIn, isOwnerOf, refresh],
+    () => ({ ready, clubs, invitations, failed, invitationsFailed, roleIn, isOwnerOf, refresh }),
+    [ready, clubs, invitations, failed, invitationsFailed, roleIn, isOwnerOf, refresh],
   );
 
   return (

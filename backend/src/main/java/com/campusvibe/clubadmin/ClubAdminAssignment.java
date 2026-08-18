@@ -41,9 +41,34 @@ public class ClubAdminAssignment {
     @JoinColumn(name = "club_id", nullable = false)
     private Club club;
 
+    /**
+     * The account this assignment belongs to.
+     *
+     * <p>Null on a PENDING invitation sent to an address with no CampusVibe
+     * account yet — see {@link #invitedEmail}. It is filled in at the moment
+     * the invitation is claimed, and a database CHECK
+     * ({@code club_admin_assignment_active_has_user}) refuses any ACTIVE row
+     * without it, so authority is never held by a mailbox.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
+
+    /**
+     * The address the invitation was sent to, kept even after {@link #user} is
+     * resolved.
+     *
+     * <p>Two reasons it is not dropped on acceptance: it says which address the
+     * owner actually typed, which is the only way to explain a mis-sent
+     * invitation later; and it is the key
+     * {@code one_live_invite_per_club_email} enforces, so clearing it would
+     * open a second invitation to the same person.
+     *
+     * <p>Null on rows that were never invitations — the V12 backfill and
+     * {@code assignFirstOwner}.
+     */
+    @Column(name = "invited_email")
+    private String invitedEmail;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -84,6 +109,19 @@ public class ClubAdminAssignment {
     public void activate() {
         this.status = AssignmentStatus.ACTIVE;
         this.activatedAt = Instant.now();
+    }
+
+    /**
+     * Claims a pending invitation for the account that accepted it.
+     *
+     * <p>Setting the user and activating are one act, never two: an ACTIVE row
+     * with no user violates a database CHECK, so anything that could leave them
+     * out of step would fail at the constraint rather than in a message anyone
+     * can act on.
+     */
+    public void claimBy(User claimant) {
+        this.user = claimant;
+        activate();
     }
 
     /**

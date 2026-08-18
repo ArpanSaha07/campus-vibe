@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Mail } from "lucide-react";
 import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import ClubLogo from "@/app/components/club/ClubLogo";
 import ClubRoleBadge from "@/app/components/manage/ClubRoleBadge";
@@ -16,12 +17,20 @@ import Button from "@/app/components/ui/Button";
  * and help with the film society — so there has to be a choice somewhere. When
  * there is only one it goes straight through rather than showing a page with a
  * single card on it.
+ *
+ * That shortcut waits on the invitation list as well as the club list. Someone
+ * who manages one club and has an invitation waiting would otherwise be thrown
+ * past the only screen that mentions it, with no way back except the original
+ * email.
  */
 export default function ManageIndexPage() {
-  const { ready, failed, clubs } = useManagedClubs();
+  const { ready, failed, clubs, invitations } = useManagedClubs();
   const router = useRouter();
 
-  const onlyClub = ready && !failed && clubs.length === 1 ? clubs[0] : null;
+  const onlyClub =
+    ready && !failed && clubs.length === 1 && invitations.length === 0
+      ? clubs[0]
+      : null;
 
   useEffect(() => {
     // replace, not push: this page is a junction, and Back should return to
@@ -37,6 +46,8 @@ export default function ManageIndexPage() {
     );
   }
 
+  const waiting = invitations.length;
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 lg:px-8 fade-up">
       <p className="ticket-label text-lavender-600">Club dashboard</p>
@@ -46,6 +57,30 @@ export default function ManageIndexPage() {
       <p className="mt-2 max-w-xl text-ink-600">
         Pick a club to manage its page, its events and its team.
       </p>
+
+      {waiting > 0 && (
+        <Link
+          href="/invitations"
+          className="mt-6 flex items-center gap-4 rounded-2xl border border-lavender-600/30 bg-lavender-50 p-5 lift"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lavender-100 text-lavender-600">
+            <Mail className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-semibold text-ink-900">
+              {waiting === 1
+                ? "You have an invitation waiting"
+                : `You have ${waiting} invitations waiting`}
+            </span>
+            <span className="block text-sm text-ink-600">
+              {waiting === 1
+                ? `${invitations[0].clubName} asked you to help run the club.`
+                : "Clubs have asked you to help run them."}{" "}
+              Review and answer →
+            </span>
+          </span>
+        </Link>
+      )}
 
       <div className="mt-8">
         {failed ? (

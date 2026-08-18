@@ -178,13 +178,35 @@ export interface ManagedClub {
 /** One member of a club's management team. Mirrors ClubAdminDTO. */
 export interface ClubAdmin {
   assignmentId: number;
-  userId: number;
-  userName: string;
-  userEmail: string;
+  /** Null while an invitation is outstanding to an address with no account. */
+  userId: number | null;
+  /** Null in the same case. Render `invitedEmail` instead. */
+  userName: string | null;
+  userEmail: string | null;
+  /** The address the owner invited. Null on rows that were never an invitation. */
+  invitedEmail: string | null;
   role: ClubRole;
   status: AssignmentStatus;
   createdAt: string;
   activatedAt: string | null;
+}
+
+/**
+ * An invitation as the person invited sees it. Mirrors ClubInvitationDTO.
+ *
+ * Not `ClubAdmin` turned around: this is what someone outside the club is shown
+ * before they accept, so it carries the club's identity and none of the other
+ * administrators' details.
+ */
+export interface ClubInvitation {
+  invitationId: number;
+  clubId: string;
+  clubName: string;
+  clubLogo: string | null;
+  role: ClubRole;
+  /** Null if the inviting account has since been deleted. */
+  invitedByName: string | null;
+  invitedAt: string;
 }
 
 export interface ClubAdminRequest {

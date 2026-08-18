@@ -283,8 +283,8 @@ class ClubAdminListingIT extends AbstractIntegrationTest {
                 "select version from flyway_schema_history where success order by installed_rank",
                 String.class);
 
-        assertTrue(applied.containsAll(List.of("12", "13", "14")),
-                "expected V12-V14 to be applied, got " + applied);
+        assertTrue(applied.containsAll(List.of("12", "13", "14", "15")),
+                "expected V12-V15 to be applied, got " + applied);
     }
 
     /** The pgvector extension V8 needs. Absent on H2, so this never held before. */

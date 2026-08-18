@@ -12,9 +12,21 @@ import java.time.Instant;
  */
 public record ClubAdminDTO(
         Long assignmentId,
+        /** Null while an invitation is outstanding to an address with no account. */
         Long userId,
+        /** Null in the same case — there is no name to show until someone claims it. */
         String userName,
         String userEmail,
+        /**
+         * The address the owner invited, present on every invitation and null on
+         * rows that were never one (the V12 backfill, and the first owner
+         * installed by approving a club-admin request).
+         *
+         * <p>The Administrators list renders this when {@code userName} is
+         * absent, which is what lets a pending invitation to a stranger appear
+         * as a row the owner can see and cancel.
+         */
+        String invitedEmail,
         ClubRole role,
         AssignmentStatus status,
         Instant createdAt,

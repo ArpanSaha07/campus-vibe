@@ -58,23 +58,24 @@ Spec: [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md
 (15 MVP items) · As-built:
 [`club-administration.md`](../docs/architecture/club-administration.md)
 
-**Items 1–4 shipped 2026-08-17** — assignment table, the two club roles, the
-one-owner invariant, administrator listing and the `/manage/[clubId]` dashboard.
-The rest, in the spec's order:
+**Items 1–4 shipped 2026-08-17**, **items 5 and 7 shipped 2026-08-18** —
+assignment table, the two club roles, the one-owner invariant, administrator
+listing, the `/manage/[clubId]` dashboard, and invite/accept/decline/remove. The
+rest, in the spec's order:
 
-- [ ] **P1** *(items 5–7)* **Invite and remove club admins.** The owner-facing
-  half of the Administrators tab, which today lists people and offers no
-  actions. Invite by email address (works whether or not they have an account
-  yet — the acceptance link routes through sign-up when they do not). Extend
-  `AuthTokenService` with club-scoped purposes rather than writing new token
-  handling: it already does CSPRNG, hash-at-rest, single-use and expiry, and
-  those are exactly §27's requirements. Removal marks the row `REVOKED`, never
-  deletes it. **Owner-only** — gate on `@clubPermissionService.isClubOwner`,
-  which exists and is tested but has no caller yet.
 - [ ] **P1** *(item 6)* **Platform-admin UI for `official_email`.** The column
-  landed in V13 and **nothing can write it**, so every club has `NULL` and the
-  official-email verification the invite flow is supposed to use has nothing to
-  verify against. Small, and it unblocks the security half of items 5 and 8.
+  landed in V13 and **nothing can write it**, so every club has `NULL`. Two
+  things are already written and waiting on it: the §17 security notices in
+  `ClubAdminService.notifyClubInbox` fire only when a club has an address, and
+  the official-email verification step §6 puts in the middle of the invite flow
+  was skipped for the same reason. Small, and it unblocks the security half of
+  items 5 and 8.
+- [ ] **P2** *(item 5, follow-up)* **Expire stale invitations.** `EXPIRED` is in
+  `AssignmentStatus` and nothing sets it. A PENDING row grants nothing, so this
+  is tidiness rather than exposure — but it holds the
+  `one_live_invite_per_club_email` slot, so an owner who mistypes an address has
+  to cancel before re-inviting. Wants a TTL and a sweep; natural to pair with
+  the audit log, which is where the sweep should be recorded.
 - [ ] **P2** *(item 8)* **Ownership transfer.** Owner authorises → official club
   email confirms → incoming owner accepts → one transaction demotes and
   promotes. The partial unique index means a half-finished transfer fails loudly
@@ -246,6 +247,7 @@ The last ten, one line each. Full write-ups, and everything older, in
 
 | Date | What landed |
 |---|---|
+| 2026-08-18 | Club governance items 5 and 7: invite an admin by address (V15 — nullable `user_id`, `invited_email`), accept/decline at `/invitations`, remove and cancel from the Administrators tab — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-17 | Flyway migration lint moved out of `_database.yml` into `scripts/lint-migrations.mjs`, wired into `verify.mjs` so `pre-push` catches it; CI now calls the same script |
 | 2026-08-17 | Club governance items 1–4: `club_admin_assignments` (V12–V14), `CLUB_OWNER`/`CLUB_ADMIN`, `ROLE_CLUB_ADMIN` deleted, per-request authorisation, read-only `/manage/[clubId]` dashboard — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-16 | CI runs once per PR instead of 2–3× per commit; tiering removed with the `push` trigger; every action pinned to a SHA, gitleaks and trivy to versions |

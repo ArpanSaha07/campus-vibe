@@ -42,7 +42,18 @@
       ]
     },
 
-    "authentication.md": {
+    "club-administration.md": {
+   "covers": "Club-scoped authority, the assignment table, invitations, and the /manage dashboard",
+   "paths": [
+    "backend/src/main/java/com/campusvibe/clubadmin/",
+    "backend/src/main/java/com/campusvibe/security/ClubPermissionService.java",
+    "frontend/app/lib/managed-clubs-context.tsx",
+    "frontend/app/(protected)/manage/",
+    "frontend/app/(protected)/invitations/",
+    "frontend/app/components/manage/"
+   ]
+  },
+  "authentication.md": {
       "covers": "Email + code login, Google OAuth, token handling",
       "paths": [
         "backend/src/main/java/com/campusvibe/auth/",

@@ -1,18 +1,18 @@
 # Club Administration & Authorisation (CampusVibe)
 
-**Date:** 2026-08-17 · **Branch:** `feature/user-profile` ·
+**Date:** 2026-08-17, extended 2026-08-18 · **Branch:** `feature/user-roles` ·
 **Authors:** implementing agent (backend, frontend, tests)
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** dcbe55d (plus the uncommitted working tree this document
-describes; the change is not yet committed).
+**Code as of:** 23a7d1d (plus the uncommitted working tree adding invitations
+and removal; that half is not yet committed).
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
 *design*, written before the code and covering fifteen MVP items. **This file
-describes what actually shipped, which is items 1–4 of that list.** Where the two
-disagree, this one describes reality.
+describes what actually shipped, which is items 1–5 and 7 of that list.** Where
+the two disagree, this one describes reality.
 
 ---
 
@@ -24,12 +24,14 @@ recorded on the club row, and that person carried a permanent `ROLE_CLUB_ADMIN`
 badge on their account. Now a club can have one owner and any number of admins,
 one person can help run several clubs, and the badge is gone entirely — the
 permission is looked up per request, so removing someone takes effect on their
-very next click instead of whenever their login expires. What is built so far is
-the *reading* half: the new data model, the authorisation rewrite, and a
-club-management dashboard at `/manage/[clubId]` showing the club's numbers, its
-events and its team. Inviting admins, removing them, transferring ownership and
-the activity log are not built yet — the Administrators screen lists people but
-has no buttons.
+very next click instead of whenever their login expires. On top of that data
+model sits a club-management dashboard at `/manage/[clubId]`, and an owner can
+now build their own team from it: invite an administrator by email address —
+whether or not that address has a CampusVibe account yet — and remove one, or
+cancel an invitation, from the same list. The invitee accepts by signing in and
+clicking Accept at `/invitations`; there is no token in the link, because the
+session proves more than a forwarded secret would. Transferring ownership and
+the activity log are still not built.
 
 ---
 
@@ -47,6 +49,13 @@ has no buttons.
   club. It is held by a partial unique index *and* by a service-layer check.
   Both are tested; do not remove either. The service check gives a message a
   user can act on, the index survives a race between two approvals.
+- **The security boundary of the invitation flow is one `if`.**
+  `ClubAdminService.claimableBy` refuses to let an account with an unconfirmed
+  address answer an invitation. Sign-up does not require confirming an address
+  (`campusvibe.auth.require-verified-email` is off by default), so without that
+  line, registering the invitee's address first is enough to steal their
+  invitation. Covered by
+  `anUnconfirmedAccountCannotClaimAnInvitationToItsAddress`.
 - **Integration tests need Docker.** `*IT` runs on real PostgreSQL + pgvector
   (`PostgresTestContainer`) with `ddl-auto: validate`, so an entity that drifts
   from a migration fails a test instead of a container boot. `*Test` unit suites
@@ -85,9 +94,11 @@ deliberate trade of a database round trip for correctness, and it is the reason
 
 **Owner and admin differ only in who they can change.** Both manage the club
 page and its events. Only the owner touches people: inviting admins, removing
-them, handing over ownership. Neither can change the club's official email —
-that is a platform-admin act, so the club's recovery channel cannot be captured
-by whoever currently controls the club.
+them, handing over ownership. That split is what keeps a single compromised
+club-admin account from becoming two — an admin can edit an event, but cannot
+bring in an accomplice. Neither can change the club's official email — that is a
+platform-admin act, so the club's recovery channel cannot be captured by whoever
+currently controls the club.
 
 Clubs launch with nobody in charge. The first owner arrives through the existing
 club-admin-request queue: a student asks, a platform admin approves, and the
@@ -114,6 +125,13 @@ club predates the column.
 `user_roles` and then `roles`. V7 inserts that row and cannot be edited, so on a
 fresh database it is created there and removed here.
 
+**`V15__invite_club_admins_by_email.sql`** — drops `NOT NULL` from `user_id`,
+adds `invited_email`, and adds two CHECK constraints plus a partial unique index
+on `(club_id, lower(invited_email))`. The nullability is what lets an invitation
+name someone who has not signed up yet; the constraints are what stop that from
+weakening anything — a row must name somebody, and an `ACTIVE` row must name an
+*account*, never just a mailbox.
+
 ### Backend — `com.campusvibe.clubadmin`
 
 **`ClubRole.java`** — `CLUB_OWNER` / `CLUB_ADMIN`. Enum order is load-bearing:
@@ -132,14 +150,26 @@ fresh database it is created there and removed here.
 index and loads no entity. The two list queries carry `@EntityGraph` to avoid
 N+1s.
 
-**`ClubAdminService.java`** — `listManagedClubs`, `listAdmins`, and
-`assignFirstOwner`, which refuses a club that already has an owner. Performs no
-authorisation of its own; callers arrive pre-cleared by `@PreAuthorize`.
+**`ClubAdminService.java`** — `listManagedClubs`, `listAdmins`,
+`assignFirstOwner` (which refuses a club that already has an owner), and the
+invitation lifecycle: `invite`, `listInvitations`, `acceptInvitation`,
+`declineInvitation`, `revoke`. Performs no authorisation of its own with one
+stated exception — `claimableBy`, which decides whether an invitation belongs to
+the caller, because no `@PreAuthorize` expression can answer that without the
+row in hand.
 
-**`ClubAdminController.java`** — `GET /api/v1/clubs/{clubId}/admins` and
-`GET /api/v1/users/me/managed-clubs`. No class-level `@RequestMapping` because
-the two paths sit under different roots on purpose: the second never takes a
-user id from the URL.
+**`ClubInvitationDTO.java`**, **`ClubAdminInviteRequest.java`** — the invitee's
+view of an invitation, and the owner's request to create one. The request record
+carries *only* an address: with no `role` field there is no payload that could
+ask for `CLUB_OWNER`.
+
+**`ClubAdminController.java`** — seven endpoints across three roots, which is
+why there is no class-level `@RequestMapping`. Under `/clubs/{clubId}/admins`:
+`GET` the team (`canManageClub`), `POST .../invitations` and
+`DELETE .../{assignmentId}` (both `isClubOwner`). Under `/users/me`:
+`managed-clubs`, `club-invitations`, and accept/decline on a single invitation —
+none of which take a user id from the URL, so one user cannot enumerate or
+answer another's.
 
 **`ClubAdminDTO.java`**, **`ManagedClubDTO.java`** — both added to
 `contracts/api-dto-fields.json`. `ManagedClubDTO` is separate from `ClubDTO`
@@ -187,8 +217,15 @@ next four events, and the official-email panel.
 **`.../events/page.tsx`** — upcoming/past tabs. Date-based, because `events` has
 no status column.
 
-**`.../admins/page.tsx`** — the team list, read-only, with a role-aware note
-explaining who can change it.
+**`.../admins/page.tsx`** — the team list, plus the owner's invite form and a
+remove control on every row but the owner's. A pending invitation is a row in
+the same list rather than a section of its own: the owner's question is "who is
+on my team", and someone invited last Tuesday who has not answered belongs in
+that answer.
+
+**`app/(protected)/invitations/page.tsx`** — where the invitation email lands.
+Outside `/manage` deliberately: the person opening the link may manage nothing
+at all, and `/manage` is not in their navbar.
 
 **`app/components/manage/ManageSidebar.tsx`**, **`ClubRoleBadge.tsx`** — the
 rail and the owner/admin chip.
@@ -197,7 +234,10 @@ rail and the owner/admin chip.
 
 **`app/components/Navbar.tsx`**, **`app/lib/user.tsx`**,
 **`app/types/index.ts`** — `isClubAdmin` deleted, `Role.CLUB_ADMIN` deleted, nav
-gating moved onto the managed-clubs list.
+gating moved onto the managed-clubs list. The navbar also grew a counted
+`Invitations` link, shown only while there is something to answer; someone
+invited before they managed anything has no other route in, since `/manage` is
+hidden from them.
 
 ---
 
@@ -212,6 +252,10 @@ gating moved onto the managed-clubs list.
 | Per-request database lookup | Same as above | Trusting token claims and accepting staleness | Revocation stops being immediate |
 | Platform `ADMIN` bypasses club scope | Someone must be able to fix an abandoned club | Making platform admins hold assignments too | No recovery path when a club has no owner |
 | `official_email` is admin-only, enforced by omission from `ClubUpdateRequest` | The recovery channel must not be capturable by whoever controls the club | A runtime role check inside the update path | One forgotten check exposes it; with no field, there is no path to forget |
+| Invitations are PENDING rows in `club_admin_assignments`, not a second table | An invitation and an assignment differ by one field; acceptance is a status change rather than a copy between tables that could half-fail | The separate `club_admin_invitations` table §23.4 offers | Two tables to keep in step, and a window where a row exists in both or neither |
+| An invitation may name an address with no account | The incoming treasurer is frequently not on CampusVibe in August; a user picker can only offer accounts that already exist | Existing accounts only | The owner is told to go and chase a signup before they can do the thing they came to do |
+| Claiming an invitation requires a confirmed address | Sign-up does not require confirming one, so the address on an account proves nothing by itself | Matching the account's email string alone | Registering someone's address first is enough to steal their invitation |
+| Acceptance is an authenticated POST, with no token in the link | The session proves identity; a mailed token proves only that its holder read the message | A `CLUB_ADMIN_INVITATION` purpose on `AuthTokenService` | A forwardable, inbox-resident credential, plus `issue()` deleting one club's invitation when a second club sends one |
 
 ### Task-specific
 
@@ -244,6 +288,35 @@ and hard to undo.
 club and a forbidden one.** Telling an outsider that a club exists but is closed
 to them is more than they need.
 
+**Removal and cancelling an invitation are one endpoint.** They are the same act
+on the same row — the status it was in decides only which email goes out. Two
+endpoints would mean two authorisation checks and two chances to get one wrong.
+
+**Addressed by assignment id, not user id.** §33 sketches
+`DELETE /clubs/{clubId}/admins/{userId}`. An invitation to an address with no
+account has no user id and still has to be cancellable, so the assignment id —
+the only identifier every row on the list actually has — is what the endpoint
+takes. The club in the path is checked against the row rather than trusted: the
+`@PreAuthorize` cleared the caller for *that* club, so without the check an
+owner of one club could revoke in another by sending its assignment id.
+
+**Owner rows are refused to everybody, platform admins included.** An owner
+removing themselves leaves nobody who can invite anyone (§36); an owner removed
+by someone else is an ownership change in disguise. Both belong in transfer,
+which ends one role and starts the other in a single transaction. The platform
+admin's escape hatch is §15's recovery workflow, which is not built.
+
+**A declined invitation is REVOKED by the invitee, not deleted.** The four
+statuses in §6.1 have no DECLINED, and adding one would mean a new CHECK
+constraint for a distinction the `revoked_by_user_id` column already draws: the
+invitee's own id there means declined, the owner's means cancelled.
+
+**Invitations live on `ManagedClubsProvider` rather than fetching per page.**
+The navbar needs the count on every page anyway, and accepting changes both the
+invitation list and the club list, so one `refresh()` covers both. The two
+requests run through `Promise.allSettled`, not `all` — an unreadable invitation
+list must not make the app believe the user manages nothing.
+
 ---
 
 ## Known deviations, gaps and blockers
@@ -256,13 +329,33 @@ to them is more than they need.
   `databaseAllowsANewOwnerOnceTheOldRowIsRevoked` and
   `databaseRefusesTwoLiveAssignmentsForOneUser`. Running the ITs now needs a
   working Docker daemon; the `*Test` unit suites still do not.
-- **MVP items 5–15 are not built.** No invitations, no removal, no ownership
-  transfer, no audit log, no notifications, no annual review, no recovery. The
-  Administrators screen is a list with no actions.
+- ~~**MVP items 5–15 are not built.**~~ **Items 5 and 7 landed 2026-08-18** —
+  invitation by address, acceptance, decline, removal and cancellation. Still
+  unbuilt: **items 8–15** — ownership transfer, audit log, notification
+  separation, annual review, platform-admin recovery.
+- **Item 6, official-email verification, is deliberately skipped rather than
+  done.** §6 puts a verification to the club's official address in the middle of
+  the invitation flow. Every club's `official_email` is NULL and nothing can set
+  one, so that step would verify against nothing. The flow is therefore
+  invitee-acceptance-only, and the §17 security notices are written and wired
+  but no-op until a club has an address. When the platform-admin screen lands,
+  the notices start working with no further change; the verification step is the
+  part that has to be added.
+- **Invitations never expire.** `EXPIRED` exists in `AssignmentStatus` and
+  nothing sets it. A PENDING row grants nothing, so a stale invitation is
+  clutter rather than exposure — but it does hold the
+  `one_live_invite_per_club_email` slot, so an owner who mistypes an address must
+  cancel before re-inviting. A TTL and a sweep belong with the audit log.
+- **Mail failures are invisible to the caller by design.** `MailSender`
+  implementations must not throw, so an invitation returns 201 whether or not the
+  message went out. Verified live on 2026-08-18: this machine's SMTP credentials
+  fail authentication, the invite still succeeded, and the failure was logged by
+  `SmtpMailSender`. That is the intended contract — but it means "the invitation
+  was sent" in the UI means "the row exists", and a club whose invitee never
+  received anything has no signal. Worth a delivery status once notifications
+  exist.
 - **No platform-admin UI for `official_email`.** The column exists and nothing
-  can write it. Every club has `NULL` today, so the official-email verification
-  in §6 has nothing to verify against — which is why invitations were scoped to
-  invitee-acceptance-only.
+  can write it.
 - **`events` has no lifecycle status,** so the Events tab splits by date.
   Queued as P1 in `todo.md`; the trap recorded there is that every public read
   path must filter on status or drafts leak.
@@ -289,9 +382,12 @@ to them is more than they need.
    `docker compose build backend` after any `mvn package`.
 2. **Admin bootstrap runner** (P1, unblocked, already queued) — until it exists
    the first-owner path cannot be exercised through the product at all.
-3. **Invitations + removal** (next slice) — needs `AuthTokenService` extended
-   with club-scoped purposes; that service already has the right token
-   discipline (CSPRNG, hash-at-rest, single use, expiry).
+3. ~~**Invitations + removal**~~ — **done 2026-08-18**, and *without* extending
+   `AuthTokenService`, which is what this entry originally proposed. Requiring
+   the invitee to sign in and POST turned out to be both simpler and stronger
+   than mailing a token: nothing forwardable, nothing sitting in an inbox, and no
+   need for a context column on `auth_tokens` to stop two clubs' invitations to
+   one person from deleting each other.
 4. **Audit log** (blocked on nothing, but worth doing with removal and transfer,
    since those are the actions most worth recording).
 5. **Fold `revokedByUserId` into the audit log** once it exists — the field
@@ -304,6 +400,14 @@ to them is more than they need.
   [`club_admin_governance.md`](club_admin_governance.md): the assignment table,
   the two club roles, the one-owner invariant, the authorisation rewrite, and
   the read-only `/manage/[clubId]` dashboard. Implementing agent.
+- 2026-08-18 — MVP items 5 and 7: invite an administrator by address, accept,
+  decline, remove, cancel. V15 makes `user_id` nullable and adds
+  `invited_email`, so an invitation can name someone who has not signed up yet.
+  Acceptance is an authenticated POST rather than a mailed token, and requires a
+  confirmed address — the rule that stops an invitation being stolen by
+  registering its address first. 26 tests in `ClubAdminInvitationIT`; the whole
+  flow re-checked against the running stack, including that a token issued
+  before removal stops working immediately after it. Implementing agent.
 - 2026-08-17 — integration tests moved onto real PostgreSQL + pgvector
   (`PostgresTestContainer`, `application-it.yml`), with `ddl-auto: validate`.
   Closes the untested-invariant gap this document reported the same day, and

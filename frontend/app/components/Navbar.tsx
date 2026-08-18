@@ -19,8 +19,12 @@ export default function Navbar() {
   // Asked of the server rather than read off the user's roles. Managing a club
   // is a relationship with that club, and it can be revoked while the user's
   // token still says otherwise — so the nav follows the assignment list.
-  const { clubs: managedClubs } = useManagedClubs();
+  const { clubs: managedClubs, invitations } = useManagedClubs();
   const managesAClub = managedClubs.length > 0;
+  // Shown only while there is something to answer. Someone invited before they
+  // managed anything has no other route in: /manage is hidden from them, so
+  // without this their only way back is the original email.
+  const invitationCount = invitations.length;
 
   const linkClasses =
     "px-3 py-2 rounded-full text-ink-900 hover:bg-lavender-50 hover:text-lavender-800 transition-colors";
@@ -68,6 +72,14 @@ export default function Navbar() {
                 {managesAClub && (
                   <Link href="/manage" className={linkClasses}>
                     {managedClubs.length > 1 ? "My clubs' dashboards" : "Manage club"}
+                  </Link>
+                )}
+                {invitationCount > 0 && (
+                  <Link href="/invitations" className={linkClasses}>
+                    Invitations
+                    <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-berry-600 px-1.5 text-xs font-bold text-white">
+                      {invitationCount}
+                    </span>
                   </Link>
                 )}
                 {user && isAdmin(user) && (
@@ -135,6 +147,11 @@ export default function Navbar() {
                       Manage club
                     </Link>
                   </>
+                )}
+                {invitationCount > 0 && (
+                  <Link href="/invitations" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                    Invitations ({invitationCount})
+                  </Link>
                 )}
                 {user && isAdmin(user) && (
                   <Link href="/dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">

@@ -8,6 +8,7 @@ import type {
   AuthResponse,
   ClubAdmin,
   ClubAdminRequest,
+  ClubInvitation,
   ManagedClub,
   User,
 } from "@/app/types";
@@ -116,10 +117,21 @@ const clubAdminFields: Record<keyof ClubAdmin, true> = {
   userId: true,
   userName: true,
   userEmail: true,
+  invitedEmail: true,
   role: true,
   status: true,
   createdAt: true,
   activatedAt: true,
+};
+
+const clubInvitationFields: Record<keyof ClubInvitation, true> = {
+  invitationId: true,
+  clubId: true,
+  clubName: true,
+  clubLogo: true,
+  role: true,
+  invitedByName: true,
+  invitedAt: true,
 };
 
 const managedClubFields: Record<keyof ManagedClub, true> = {
@@ -141,6 +153,7 @@ const MIRRORS: Record<string, Record<string, true>> = {
   AuthenticationResponse: authResponseFields,
   ClubAdminRequestDTO: clubAdminRequestFields,
   ClubAdminDTO: clubAdminFields,
+  ClubInvitationDTO: clubInvitationFields,
   ManagedClubDTO: managedClubFields,
 };
 

@@ -46,8 +46,13 @@
   ],
 
   "ClubAdminDTO": [
-    "assignmentId", "userId", "userName", "userEmail", "role", "status",
-    "createdAt", "activatedAt"
+    "assignmentId", "userId", "userName", "userEmail", "invitedEmail", "role",
+    "status", "createdAt", "activatedAt"
+  ],
+
+  "ClubInvitationDTO": [
+    "invitationId", "clubId", "clubName", "clubLogo", "role", "invitedByName",
+    "invitedAt"
   ],
 
   "ManagedClubDTO": [
