@@ -5,8 +5,7 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** 23a7d1d (plus the uncommitted working tree adding invitations
-and removal; that half is not yet committed).
+**Code as of:** 36b6104 — invitations and removal are committed.
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
