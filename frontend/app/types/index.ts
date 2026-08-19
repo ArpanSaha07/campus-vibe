@@ -120,6 +120,31 @@ export interface User {
   authProvider: "LOCAL" | "GOOGLE";
 }
 
+/**
+ * The part of a profile the user writes about themselves, as opposed to the
+ * account facts in `User`.
+ *
+ * Deliberately NOT fields on `User`. That interface is pinned to the backend's
+ * UserDTO by contracts/api-dto-fields.json, and the contract test keys on
+ * `Record<keyof User, true>` — so adding `bio` there fails type-check until the
+ * backend serialises it too, which is exactly the guard working as intended.
+ *
+ * Nothing returns this yet. The shape is settled first so the profile page and
+ * the edit form that follows it agree on one vocabulary, the same way PlanSlot
+ * was settled before the RAG endpoint existed. Every field is nullable because
+ * every one of them is optional to the user.
+ */
+export interface UserProfile {
+  /** Free text, the user's own words. Newlines are preserved when shown. */
+  bio: string | null;
+  /** e.g. "Faculty of Engineering". */
+  faculty: string | null;
+  /** e.g. "BSc Computer Science". */
+  degree: string | null;
+  /** Subjects being studied. Empty rather than null when none are chosen. */
+  subjects: string[];
+}
+
 export interface AuthResponse {
   token: string;
   user: User;

@@ -4,12 +4,6 @@ import type { MyEvent, MyEventStatus, MyEventsTab } from "@/app/types";
 // month grid for the date filter. Kept out of the components so the date maths
 // stays testable.
 
-export const MY_EVENTS_TABS: { id: MyEventsTab; label: string }[] = [
-  { id: "going", label: "Going" },
-  { id: "saved", label: "Saved" },
-  { id: "past", label: "Past" },
-];
-
 export const WEEKDAY_INITIALS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 const MS_PER_DAY = 86_400_000;

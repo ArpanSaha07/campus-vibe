@@ -67,13 +67,16 @@ export default function Navbar() {
 
             {isAuthenticated ? (
               <>
-                {managesAClub && (
-                  <Link href="/create-event" className={linkClasses}>Create event</Link>
+                {user && isAdmin(user) && (
+                  <Link href="/admin" className={linkClasses}>Admin</Link>
                 )}
+                <Link href="/my-events" className={linkClasses}>My events</Link>
+                <Link href="/my-clubs" className={linkClasses}>My clubs</Link>
                 {managesAClub && (
-                  <Link href="/manage" className={linkClasses}>
-                    {managedClubs.length > 1 ? "My clubs' dashboards" : "Manage club"}
-                  </Link>
+                  <>
+                    <Link href="/create-event" className={linkClasses}>Create event</Link>
+                    <Link href="/manage" className={linkClasses}>Manage club</Link>
+                  </>
                 )}
                 {invitationCount > 0 && (
                   <Link href="/invitations" className={linkClasses}>
@@ -83,12 +86,7 @@ export default function Navbar() {
                     </span>
                   </Link>
                 )}
-                {user && isAdmin(user) && (
-                  <Link href="/admin" className={linkClasses}>Admin</Link>
-                )}
-                <Link href="/my-events" className={linkClasses}>My events</Link>
-                <Link href="/my-clubs" className={linkClasses}>My clubs</Link>
-                <Link href="/profile" className={linkClasses}>Profile</Link>
+                <Link href="/profile" className={linkClasses}>My profile</Link>
                 <button onClick={logout} className={linkClasses}>
                   Sign out
                 </button>
@@ -139,6 +137,17 @@ export default function Navbar() {
             </Link>
             {isAuthenticated ? (
               <>
+                {user && isAdmin(user) && (
+                  <Link href="/admin" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                    Admin
+                  </Link>
+                )}
+                <Link href="/my-events" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                  My events
+                </Link>
+                <Link href="/my-clubs" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                  My clubs
+                </Link>
                 {managesAClub && (
                   <>
                     <Link href="/create-event" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
@@ -152,11 +161,6 @@ export default function Navbar() {
                 {invitationCount > 0 && (
                   <Link href="/invitations" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
                     Invitations ({invitationCount})
-                  </Link>
-                )}
-                {user && isAdmin(user) && (
-                  <Link href="/dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                    Dashboard
                   </Link>
                 )}
                 <Link href="/profile" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
