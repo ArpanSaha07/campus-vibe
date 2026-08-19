@@ -7,6 +7,7 @@ import SectionHeading from "@/app/components/ui/SectionHeading";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
 import EventCard from "@/app/components/event/EventCard";
+import ClubEventTabButton, { type EventTab } from "@/app/components/club/ClubEventTabButtons";
 
 /**
  * The club's events, split into upcoming and past.
@@ -16,9 +17,6 @@ import EventCard from "@/app/components/event/EventCard";
  * Adding real statuses is queued as its own task in todo.md — it needs every
  * public read path to filter on status, or drafts leak onto the homepage.
  */
-
-type Tab = "upcoming" | "past";
-
 export default function ClubEventsPage({
   params,
 }: {
@@ -27,7 +25,8 @@ export default function ClubEventsPage({
   const { clubId } = use(params);
   const [events, setEvents] = useState<EventInstance[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [tab, setTab] = useState<Tab>("upcoming");
+  // Lives here, not in ClubEventTabButton: the cards below are drawn from it.
+  const [tab, setTab] = useState<EventTab>("upcoming");
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +59,7 @@ export default function ClubEventsPage({
     };
   }, [events]);
 
-  const shown = tab === "upcoming" ? upcoming : past;
+  const shown = tab === "past" ? past : upcoming;
 
   return (
     <div>
@@ -70,31 +69,14 @@ export default function ClubEventsPage({
       />
 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div role="tablist" aria-label="Event timeframe" className="flex gap-2">
-          {(
-            [
-              ["upcoming", "Upcoming", upcoming.length],
-              ["past", "Past", past.length],
-            ] as const
-          ).map(([value, label, count]) => (
-            <button
-              key={value}
-              role="tab"
-              aria-selected={tab === value}
-              onClick={() => setTab(value)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-150 ${
-                tab === value
-                  ? "bg-lavender-600 text-white"
-                  : "border border-mist-200 text-ink-900 hover:bg-lavender-50"
-              }`}
-            >
-              {label}
-              <span className="ml-2 font-mono text-xs opacity-70">
-                {events === null ? "…" : count}
-              </span>
-            </button>
-          ))}
-        </div>
+        <ClubEventTabButton
+          value={tab}
+          onChange={setTab}
+          // null rather than 0 while the fetch is in flight, so the pill
+          // reads as pending instead of claiming this club has none.
+          upcomingCount={events === null ? null : upcoming.length}
+          pastCount={events === null ? null : past.length}
+        />
 
         <Button href="/create-event">Create event</Button>
       </div>
