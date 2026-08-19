@@ -143,6 +143,43 @@ export interface UserProfile {
   degree: string | null;
   /** Subjects being studied. Empty rather than null when none are chosen. */
   subjects: string[];
+  /**
+   * Where else to find this person. Each is null until they add it, so the
+   * object itself is always present — a caller reading one link never has to
+   * check two levels.
+   *
+   * Stored as whatever the user typed. Nothing here is a trustworthy URL:
+   * normalise every one through `normaliseProfileLink` before it reaches an
+   * href.
+   */
+  socialLinks: {
+    instagram: string | null;
+    facebook: string | null;
+    linkedin: string | null;
+  };
+  /** Chosen from the catalogue in lib/profile-options. Empty, never null. */
+  interests: string[];
+  /**
+   * Whether each optional block appears on the profile as other people see it.
+   *
+   * Separate from the values themselves, so turning a block off hides it
+   * without destroying what is behind it — someone who hides their interests
+   * for a term and turns them back on has not had to pick them again.
+   *
+   * These govern the public view, which does not exist yet: /profile shows you
+   * your own page, and you always see all of your own.
+   */
+  showInterests: boolean;
+  showSocialLinks: boolean;
+}
+
+/** What email CampusVibe may send. Mirrors nothing yet — see UserProfile. */
+export interface NotificationPreferences {
+  eventReminders: boolean;
+  clubAnnouncements: boolean;
+  weeklyDigest: boolean;
+  newFollowerEvents: boolean;
+  productNews: boolean;
 }
 
 export interface AuthResponse {
