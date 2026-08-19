@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
  * a white fill with a lavender-300 ring.
  */
 export const inputClasses =
-  "w-full rounded-xl border border-transparent bg-mist-100 px-4 py-2.5 text-ink-900 placeholder-ink-600/60 transition-colors focus:border-lavender-300 focus:bg-white focus:outline-none";
+  "w-full rounded-full border border-transparent bg-mist-100 px-4 py-2.5 text-ink-900 placeholder-ink-600/60 transition-colors focus:bg-white focus:outline-none";
 
 /** The same, plus room for the chevron a native select draws on the right. */
 export const selectClasses = `${inputClasses} appearance-none bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10`;

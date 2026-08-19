@@ -4,7 +4,7 @@ Finished work, moved out of [`todo.md`](todo.md) so the queue stays readable.
 Nothing here needs doing. It is kept because *what was already tried, and why it
 was done that way* is the expensive thing to rediscover.
 
-Last updated: **2026-08-14**
+Last updated: **2026-08-19**
 
 **Two halves, and they answer different questions:**
 
@@ -93,6 +93,32 @@ links resolve unchanged — this file sits in the same directory.
 - [x] **P2** Google Calendar export for an event — **needs no backend**. Done client-side in `frontend/app/lib/google-calendar.ts`: a Google Calendar template link carries the whole event in its query string, so there is no API key, OAuth or endpoint to build. Reusable via `<AddToCalendarLink event={…} />`.
 
 ### Frontend / Features
+
+- [x] **P1** **The profile settings screens (`/profile/edit`)** — **done 2026-08-19.** `/profile` shipped the day before with nothing that could fill it in: the Edit profile link and the About card's prompt both pointed here and 404'd, so every field on `UserProfile` was unreachable. Modelled on Meetup's `/account/`, read tab by tab in a browser first — Edit Profile, Personal Info, Account Management, Email Updates, Social Media and Interests — which is where the Save-disabled-until-dirty behaviour, the toggle-row shape and the interests layout come from.
+
+  **Five sections behind a rail, each saving on its own.** One Save at the foot of everything would mean different things depending on how far down you had scrolled. `useEditableForm` holds a baseline and a draft and keeps Save disabled until they differ; **it compares string arrays as sets**, because removing an interest and adding it back puts it at the end of the array and a deep compare would offer to save a difference nobody can see.
+
+  **Interests come from a fixed catalogue, subjects are free text**, and the asymmetry is the point: two people who both like board games have to be matchable, while no list of courses would ever be complete enough to be worth the frustration. A chosen interest *leaves* the grid rather than greying out in it, so the lower half is always things you can still add and one pill never means add here and remove there depending on its colour.
+
+  **`normaliseProfileLink` (`lib/profile.ts`) rejects any scheme that is not http or https BEFORE assuming https for a bare `instagram.com/name`.** That order is load-bearing: reverse it and `javascript:alert(1)` becomes an https URL that passes the check and reaches an href. It normalises on read, not only on write, because a row written before the edit form existed would still render. 11 tests, most of them refusals.
+
+  **Close account is deliberately disabled with a note rather than wired.** The nearest available action is sign-out, which would leave someone believing their data was gone while every row of it is still there. **Only one control here reaches the server** — Email me a reset link calls the existing `requestPasswordReset` and really sends mail; every other Save resolves through the `saveProfile` seam and commits locally. Nothing persists across a reload; that is tracked as its own P1 below.
+
+- [x] **P1** **The profile page (`/profile`)** — **done 2026-08-19.** The navbar had linked every signed-in session here and the route was a dead end: `app/profile/page.tsx` sat *outside* the `(protected)` group, so it drew a placeholder navbar of its own and then redirected every visitor away from a hardcoded empty user. Nobody had ever seen it. Moving it into the group was not optional either way — two files resolving to `/profile` is a build error.
+
+  **Bio, faculty, degree and subjects could not be fields on `User`.** That interface is pinned to the backend by `contracts/api-dto-fields.json`, and `api-contract.test.ts` keys on `Record<keyof User, true>` — so adding `bio` there fails type-check until the backend serialises it too. The guard working as designed is what forced `UserProfile` into its own interface, settled before any endpoint returns one, the way `PlanSlot` was settled before the RAG endpoint existed.
+
+  **A trap worth knowing:** `const profile: UserProfile | null = null` narrows to the type `null`, and then to `never` inside `profile?.socialLinks` — a hard compile error rather than the `undefined` you would expect. The placeholder sits behind a `loadProfile()` function instead, which is also the seam the fetch drops into. It compiled before only because the page never touched the value, it just handed it to a component.
+
+  Two wide blocks lead to My clubs and My events, and carry **no counts**: a count needs a fetch this page otherwise never makes, and could disagree with the page it points at. Degree, faculty and subjects render as one row of berry-outlined pills with no fill and no hover — they state something, they do nothing. `app/components/user-profile-page-components/` was orphaned by the move and deleted.
+
+- [x] **P2** **One component for the Upcoming / Past pills** — **done 2026-08-19.** Three screens had each grown their own version of the same row and they had drifted — the manage dashboard used a bordered resting state, the club page and My events used the documented `lavender-100` chip. The manage screen's markup was lifted to `components/club/ClubEventTabButtons.tsx` and adopted by `ClubEventTabs` (club page) and `/my-events`.
+
+  **Counts arrive as `number | null | undefined`, not the event arrays.** The component never renders an event, and — the reason that actually decided it — an array cannot say *still loading*: `[]` and a fetch in flight look identical, while the pill has to show `…` for one and `0` for the other. `undefined` means the page has no such tab, which is also how each page picks which pills appear. Controlled rather than holding its own state, because every call site draws the cards underneath and has to know which tab is open.
+
+  On `/my-events` this needed `selectTab` widened to the component's union and narrowed back with the existing `isMyEventsTab` guard rather than a cast, and it gave those tabs counts they never had — computed at the current anchor even for tabs that anchor is out of range for, which is safe rather than lucky: an out-of-range anchor is always looser than the tab's own bound, and `isPastEvent` enforces that bound anyway. `MyEventsTabs.tsx` and `MY_EVENTS_TABS` were deleted with it.
+
+- [x] **P2** **Navbar link list by role** — **done 2026-08-19.** Reordered to `Admin` → `My events` → `My clubs` → `Create event` + `Manage club` → `My profile` → `Sign out`, identically on desktop and mobile. Two inconsistencies fell out of writing the lists down: **mobile's admin link pointed at `/dashboard`** and read *Dashboard* while desktop pointed at `/admin`; and **`Manage club` used to relabel itself** *My clubs' dashboards* when you ran more than one, which now sits beside a real `My clubs` link going somewhere else. Mobile gained `My events` and `My clubs`, which it never had. `Invitations` was kept though it is in none of the role lists — it renders only while `pendingAnswers > 0`, and it is the only route in for someone invited before they manage anything, since `/manage` is hidden from them.
 
 - [x] **P1** Wire the My events page to the backend. `getMyEvents()` now calls `GET /api/v1/users/me/events` and maps through `toMyEvent`; the mock `app/data/my-events.ts` is deleted. Verified end-to-end against Postgres.
 - [x] **P1** My clubs page (`/my-clubs`) — the route the navbar already linked to. `app/(protected)/my-clubs/page.tsx` plus `MyClubsGrid` / `MyClubCard`: circular logo and name only, both centered, the whole card one link to the club page, drifting to the top-right on hover (`.lift-tr` in `globals.css`). One column on phones, two at `sm`, three at `lg`. **Frontend only** — see the next item.
