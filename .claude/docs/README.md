@@ -61,8 +61,15 @@ be a guess. Someone who knows it should add its line.
 
 ## Decisions — ADRs
 
-None yet. The first will be written when a `/kickoff` reaches a decision, or when
-one of the open questions below is settled.
+| Document | Decides | Status |
+|---|---|---|
+| [`interests_and_categories.md`](decisions/interests_and_categories.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
+
+**That file holds seven decisions rather than one**, against `adr.md`'s
+one-per-file rule, and says in its own header why: they are a single
+interlocking choice about one taxonomy, and the argument for each is the
+argument for the others. A reversal of any one of them gets its own numbered
+ADR.
 
 Open questions that will become ADRs when decided: JWT transport
 ([BUG-003](../bugs/bugs.md#bug-003)) · whether to adopt shadcn/ui alongside the

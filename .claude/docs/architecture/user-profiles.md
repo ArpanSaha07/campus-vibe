@@ -75,8 +75,8 @@ the schema instead of in a comment plus a unique index.
 Not at sign-up. Every account that exists today predates the table, so a
 create-on-registration hook would still have to cope with profiles that are
 absent — and then a profile would have two ways to come into being instead of
-one. Creating it on first write means there is exactly one path, and the "no row
-yet" case is exercised constantly rather than only by old accounts.
+one. Creating it on first write means there is exactly one path, and the *no row
+yet* case is exercised constantly rather than only by old accounts.
 
 ---
 
@@ -118,7 +118,7 @@ changed.
 ## The interest catalogue
 
 Interests are a closed vocabulary; subjects, sitting next to them in the same
-form, are free text. The asymmetry is deliberate and worth not "fixing".
+form, are free text. The asymmetry is deliberate and worth not *fixing*.
 
 An interest exists so that two people who both picked it are discoverable as the
 same thing. `Board games`, `board games` and `Boardgames` are three groups of
@@ -340,13 +340,19 @@ through `DefaultExceptionHandler`, not something specific to these routes.
 6. **The catalogue and the faculty list have had no product review.** 76
    interests invented for a campus audience, and 12 faculties transcribed by hand
    — and faculties do get renamed.
-7. **Event categories and user interests are still two vocabularies.** The
-   intended design is one shared list across both. Today `event_categories`
-   (V3) is free text — the mock data uses `Dating`, `Research`, `Food` — the
-   homepage tiles are a third hardcoded list of eight in
-   `CategoriesSectionMainPage.tsx` that link to a *search query* rather than a
-   filter, and `interest_catalogue` is the only one of the three with a key and
-   a foreign key behind it. Unifying them means pointing `event_categories` at
-   the catalogue, migrating the values that exist, and rewiring the homepage
-   tiles and the events filter. `user_preferred_categories`, which would have
-   been a fourth, was dropped in V22.
+7. **The catalogue serves only profiles so far — clubs are meant to share it.**
+   [`interests_and_categories.md`](../decisions/interests_and_categories.md)
+   decides that clubs carry tags drawn from this same `interest_catalogue`,
+   which is what will make *clubs you might like* a direct join on shared slugs
+   rather than a mapping. Events get their **own** vocabulary, because they also
+   need format words such as *Workshop* and must exclude interest words such as
+   *Make friends*. Until that work lands, clubs have no classification at all
+   and `event_categories` (V3) is still free text with no key.
+   `user_preferred_categories` was dropped in V22.
+
+   Two things there touch this table directly. The catalogue will need entries
+   it currently lacks once clubs use it — there is no `engineering`, for one.
+   And `interest_catalogue.category`, the twelve picker groups, becomes the last
+   overloaded use of the word *category* once `club_categories` exists; renaming
+   it `group_label` is free while V19 and V20 are uncommitted and costs a
+   migration afterwards.
