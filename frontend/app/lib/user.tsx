@@ -33,6 +33,25 @@ export async function me(): Promise<User> {
 }
 
 /**
+ * Renames the signed-in account.
+ *
+ * Separate from saveProfile because the name lives on `users`, not on the
+ * profile -- it is already part of `User`, which the API contract pins. The
+ * edit-profile screen writes both, which is why it makes two calls.
+ *
+ * PATCH, not PUT: this changes one named field and leaves the rest of the
+ * account alone, where the profile write replaces the whole thing. Returns the
+ * updated account so the caller can put it straight back into the auth context.
+ */
+export async function updateMyName(name: string): Promise<User> {
+	return apiFetch<User>(`/api/v1/users/me`, {
+		method: "PATCH",
+		body: JSON.stringify({ name }),
+		auth: true,
+	});
+}
+
+/**
  * Asks for a password-reset link.
  *
  * Resolves the same way whether or not the address has an account — the backend

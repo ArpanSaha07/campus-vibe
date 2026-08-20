@@ -3,24 +3,24 @@
 import Link from "next/link";
 import { CalendarDays, Ticket, Users } from "lucide-react";
 import { useAuth } from "@/app/lib/auth-context";
+import { useProfile } from "@/app/lib/profile-context";
 import ProfileAvatar from "@/app/components/profile/ProfileAvatar";
 import ProfileAboutCard from "@/app/components/profile/ProfileAboutCard";
 import ProfileLinkBlock from "@/app/components/profile/ProfileLinkBlock";
 import ProfileSocialLinks from "@/app/components/profile/ProfileSocialLinks";
-import type { UserProfile } from "@/app/types";
 
 // Sign-in is already enforced by (protected)/layout.tsx, which also supplies
 // the navbar and footer — this page renders the panel only. It moved here from
 // app/profile/page.tsx, which sat outside the group and so drew a second,
 // placeholder navbar of its own and redirected every visitor away.
 
-/** Placeholder for the profile read. See the call site. */
-function loadProfile(): UserProfile | null {
-  return null;
-}
-
 export default function ProfilePage() {
   const { user } = useAuth();
+  // Loaded by (protected)/profile/layout.tsx, so this page and the settings
+  // sections behind it share one read. Null while that is in flight, which is
+  // also what an account with nothing filled in renders as -- both show the
+  // same empty states, so there is no flash of a wrong answer.
+  const { profile } = useProfile();
 
   // Unreachable in practice — ProtectedRoute renders nothing until it has a
   // user. It is here because the context type still admits null, and a guard
@@ -34,17 +34,6 @@ export default function ProfilePage() {
     month: "short",
     year: "numeric",
   });
-
-  // Nothing returns a UserProfile yet — no column, no endpoint, and the edit
-  // form that writes it is the next piece of work. Null is honest rather than
-  // a stub: it is the same value a new account will send, and it renders the
-  // same empty states.
-  //
-  // Behind a function rather than written inline as `const profile = null`,
-  // which TypeScript narrows to the type `null` — and then to `never` inside
-  // `profile?.socialLinks`, which is an error rather than the undefined you
-  // would expect. This is also the seam the fetch drops into.
-  const profile = loadProfile();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8 fade-up">

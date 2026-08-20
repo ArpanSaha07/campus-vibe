@@ -5,7 +5,7 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-08-14**
+Last updated: **2026-08-20**
 
 ```
 .claude/docs/
@@ -39,6 +39,7 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`club_admin_governance.md`](architecture/club_admin_governance.md) | The governance **specification** — administrator lifecycle, official-email trust anchor, invitations, ownership transfer and recovery, audit logs, notifications. Written before the code; items 6 and 11–15 are still unbuilt | 📐 Spec, partially implemented |
 | [`user-roles.md`](architecture/user-roles.md) | The role model: two platform roles (`ROLE_USER`, `ROLE_ADMIN`) in the JWT, two club roles in `club_admin_assignments`, why they are stored and checked differently, and the platform-admin bypass | ✅ Live · rewritten from the code 2026-08-18 |
 | [`authentication.md`](architecture/authentication.md) | The two sign-in methods (Google ID token, email + password), JWT issuing and per-request verification, bcrypt, the auth modal · measured endpoint behaviour · **14 known gaps incl. 4 security findings** | ✅ Live · rewritten from the code 2026-08-15 · **not security-reviewed** |
+| [`user-profiles.md`](architecture/user-profiles.md) | Profile content and email preferences: why the profile is its own table rather than columns on `users`, why the write is a full-replace PUT and what that demands of the frontend, the slug-keyed interest catalogue and its foreign key, and the two places a social link is checked · **7 known gaps, incl. two visibility switches that currently control nothing** | ✅ Live · written with the code 2026-08-20 |
 | [`search.md`](architecture/search.md) | Why hybrid semantic search (embeddings in pgvector + keyword rank) rather than the alternatives | ⚠ Pre-implementation design note |
 
 **On the ⚠ marks.** These predate the documentation standard and were moved into

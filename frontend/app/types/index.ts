@@ -129,10 +129,9 @@ export interface User {
  * `Record<keyof User, true>` — so adding `bio` there fails type-check until the
  * backend serialises it too, which is exactly the guard working as intended.
  *
- * Nothing returns this yet. The shape is settled first so the profile page and
- * the edit form that follows it agree on one vocabulary, the same way PlanSlot
- * was settled before the RAG endpoint existed. Every field is nullable because
- * every one of them is optional to the user.
+ * Mirrors the backend's UserProfileDTO and is pinned by
+ * contracts/api-dto-fields.json. Every field is nullable or empty because every
+ * one of them is optional to the user.
  */
 export interface UserProfile {
   /** Free text, the user's own words. Newlines are preserved when shown. */
@@ -143,21 +142,13 @@ export interface UserProfile {
   degree: string | null;
   /** Subjects being studied. Empty rather than null when none are chosen. */
   subjects: string[];
+  /** See `ProfileSocialLinks`. Always present; each link null until added. */
+  socialLinks: ProfileSocialLinks;
   /**
-   * Where else to find this person. Each is null until they add it, so the
-   * object itself is always present — a caller reading one link never has to
-   * check two levels.
-   *
-   * Stored as whatever the user typed. Nothing here is a trustworthy URL:
-   * normalise every one through `normaliseProfileLink` before it reaches an
-   * href.
+   * Catalogue **slugs**, not labels — the labels come from `GET
+   * /api/v1/interests` so that renaming one does not move anyone's choices.
+   * Empty, never null.
    */
-  socialLinks: {
-    instagram: string | null;
-    facebook: string | null;
-    linkedin: string | null;
-  };
-  /** Chosen from the catalogue in lib/profile-options. Empty, never null. */
   interests: string[];
   /**
    * Whether each optional block appears on the profile as other people see it.
@@ -173,13 +164,48 @@ export interface UserProfile {
   showSocialLinks: boolean;
 }
 
-/** What email CampusVibe may send. Mirrors nothing yet — see UserProfile. */
+/**
+ * Where else to find this person.
+ *
+ * A named interface rather than an inline object type on `UserProfile`, because
+ * the API contract records a nested object as a single field name — so these
+ * three are pinned only by having a `ProfileSocialLinksDTO` entry of their own,
+ * and `Record<keyof T, true>` in the contract test needs a name to key on.
+ *
+ * Each is null until the user adds it, so the object itself is always present:
+ * a caller reading one link never has to check two levels.
+ *
+ * The backend stores only http(s) URLs and refuses anything else on write. Run
+ * every one through `normaliseProfileLink` anyway before it reaches an href —
+ * a row written before that rule existed would still render.
+ */
+export interface ProfileSocialLinks {
+  instagram: string | null;
+  facebook: string | null;
+  linkedin: string | null;
+}
+
+/** What email CampusVibe may send. Mirrors the backend's NotificationPreferencesDTO. */
 export interface NotificationPreferences {
   eventReminders: boolean;
   clubAnnouncements: boolean;
   weeklyDigest: boolean;
   newFollowerEvents: boolean;
   productNews: boolean;
+}
+
+/**
+ * One entry of the interest vocabulary, from `GET /api/v1/interests`.
+ *
+ * The catalogue lives in the database (V20) rather than in the frontend, so
+ * that the slugs a profile stores and the labels a picker shows cannot drift
+ * apart. `sortOrder` is deliberately not on the wire — the endpoint returns the
+ * list already in order.
+ */
+export interface Interest {
+  slug: string;
+  label: string;
+  category: string;
 }
 
 export interface AuthResponse {

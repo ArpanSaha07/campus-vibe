@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
-import { INTEREST_CATEGORIES } from "@/app/lib/profile-options";
+import { useInterestCatalogue } from "@/app/hooks/useInterestCatalogue";
 import { inputClasses, selectClasses } from "@/app/components/ui/FormField";
 
 /**
@@ -18,6 +18,11 @@ import { inputClasses, selectClasses } from "@/app/components/ui/FormField";
  * The two filters compose rather than override: choose a category and then type
  * to search within it. Search matches anywhere in the name, not just the start,
  * because someone after `board games` should find it by typing `games`.
+ *
+ * <strong>`selected` holds catalogue slugs, not labels.</strong> The label is
+ * what gets revised — the list has had no product review — and keying on it
+ * would move everybody's choices every time a word changed. Everything visible
+ * here is looked up from the fetched catalogue.
  */
 export default function InterestPicker({
   selected,
@@ -26,17 +31,30 @@ export default function InterestPicker({
   selected: string[];
   onChange: (interests: string[]) => void;
 }) {
+  const { interests, failed } = useInterestCatalogue();
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
+
+  const bySlug = useMemo(
+    () => new Map((interests ?? []).map((interest) => [interest.slug, interest])),
+    [interests],
+  );
+
+  // In catalogue order, deduplicated. Derived rather than a second endpoint:
+  // a category is only ever "the set of interests carrying this label".
+  const categories = useMemo(
+    () => [...new Set((interests ?? []).map((interest) => interest.category))],
+    [interests],
+  );
 
   const available = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const chosen = new Set(selected);
-    return INTEREST_CATEGORIES.filter((group) => !category || group.category === category)
-      .flatMap((group) => group.interests)
-      .filter((interest) => !chosen.has(interest))
-      .filter((interest) => !needle || interest.toLowerCase().includes(needle));
-  }, [category, query, selected]);
+    return (interests ?? [])
+      .filter((interest) => !chosen.has(interest.slug))
+      .filter((interest) => !category || interest.category === category)
+      .filter((interest) => !needle || interest.label.toLowerCase().includes(needle));
+  }, [interests, category, query, selected]);
 
   return (
     <div>
@@ -47,15 +65,19 @@ export default function InterestPicker({
 
       {selected.length > 0 ? (
         <ul className="mt-4 flex flex-wrap gap-2">
-          {selected.map((interest) => (
-            <li key={interest}>
+          {selected.map((slug) => (
+            <li key={slug}>
               <button
                 type="button"
-                onClick={() => onChange(selected.filter((value) => value !== interest))}
-                aria-label={`Remove ${interest}`}
+                onClick={() => onChange(selected.filter((value) => value !== slug))}
+                aria-label={`Remove ${bySlug.get(slug)?.label ?? slug}`}
                 className="inline-flex items-center gap-1.5 rounded-full bg-lavender-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-lavender-800"
               >
-                {interest}
+                {/* Falls back to the slug for an interest that has been retired
+                    from the catalogue since it was picked. Showing it is what
+                    lets someone take it off; hiding it would leave a choice
+                    they can neither see nor remove. */}
+                {bySlug.get(slug)?.label ?? slug}
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </li>
@@ -76,9 +98,9 @@ export default function InterestPicker({
           className={`${selectClasses} sm:w-64`}
         >
           <option value="">Browse by category</option>
-          {INTEREST_CATEGORIES.map((group) => (
-            <option key={group.category} value={group.category}>
-              {group.category}
+          {categories.map((name) => (
+            <option key={name} value={name}>
+              {name}
             </option>
           ))}
         </select>
@@ -105,26 +127,35 @@ export default function InterestPicker({
       {available.length > 0 ? (
         <ul className="mt-4 flex flex-wrap gap-2">
           {available.map((interest) => (
-            <li key={interest}>
+            <li key={interest.slug}>
               <button
                 type="button"
-                onClick={() => onChange([...selected, interest])}
-                aria-label={`Add ${interest}`}
+                onClick={() => onChange([...selected, interest.slug])}
+                aria-label={`Add ${interest.label}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-mist-200 px-4 py-2 text-xs font-semibold text-ink-900 transition-colors hover:border-lavender-300 hover:bg-lavender-50"
               >
-                {interest}
+                {interest.label}
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </li>
           ))}
         </ul>
       ) : (
-        /* Two ways to reach an empty grid, and they need different answers:
-           nothing matched what you typed, or you have already added the lot. */
+        /* Four ways to reach an empty grid, and they need different answers:
+           the catalogue is still loading, it failed to load, nothing matched
+           what you typed, or you have already added the lot. */
         <p className="mt-4 text-sm text-ink-600">
-          {query.trim() || category
-            ? "Nothing matches that. Try another word or category."
-            : "You have added every interest we have. Impressive."}
+          {failed ? (
+            <span className="font-semibold text-alert-600">
+              The interest list didn&apos;t load. Refresh to try again.
+            </span>
+          ) : interests === null ? (
+            <span className="font-mono">Loading interests…</span>
+          ) : query.trim() || category ? (
+            "Nothing matches that. Try another word or category."
+          ) : (
+            "You have added every interest we have. Impressive."
+          )}
         </p>
       )}
     </div>

@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
 import { useEditableForm } from "@/app/hooks/useEditableForm";
-import { emptyProfile, saveProfile } from "@/app/lib/profile";
+import { useProfile } from "@/app/lib/profile-context";
+import { emptyProfile } from "@/app/lib/profile";
 import { DEGREES, MCGILL_FACULTIES } from "@/app/lib/profile-options";
 import SubjectPicker from "@/app/components/profile/edit/SubjectPicker";
 import SaveChangesBar from "@/app/components/profile/edit/SaveChangesBar";
+import ProfileSectionState from "@/app/components/profile/edit/ProfileSectionState";
 import FormField, { selectClasses } from "@/app/components/ui/FormField";
 
 /**
@@ -19,9 +22,18 @@ import FormField, { selectClasses } from "@/app/components/ui/FormField";
  * real value. Without it the form would claim on load that everyone is a
  * Bachelor's student in Agricultural and Environmental Sciences, and the only
  * way to say otherwise would be to notice and correct it.
+ *
+ * The draft is the *whole* profile even though this screen shows three fields
+ * of it, because the save replaces everything. `useProfile` is what makes the
+ * other fields real values rather than the nulls of an empty profile.
  */
 export default function ProgramInfoPage() {
-  const { draft, setField, dirty, commit } = useEditableForm(emptyProfile());
+  const { profile, failed, save } = useProfile();
+  const { draft, setField, dirty, commit, reinitialise } = useEditableForm(emptyProfile());
+
+  useEffect(() => {
+    if (profile) reinitialise(profile);
+  }, [profile, reinitialise]);
 
   return (
     <div>
@@ -30,56 +42,62 @@ export default function ProgramInfoPage() {
         What you study, so clubs in your field are easier to find.
       </p>
 
-      <div className="mt-8 space-y-6">
-        <FormField label="Degree" htmlFor="degree">
-          <select
-            id="degree"
-            value={draft.degree ?? ""}
-            onChange={(event) => setField("degree", event.target.value || null)}
-            className={selectClasses}
-          >
-            <option value="">Select a degree</option>
-            {DEGREES.map((degree) => (
-              <option key={degree} value={degree}>
-                {degree}
-              </option>
-            ))}
-          </select>
-        </FormField>
+      <ProfileSectionState profile={profile} failed={failed} />
 
-        <FormField
-          label="Faculty"
-          htmlFor="faculty"
-          hint="Every McGill faculty and school."
-        >
-          <select
-            id="faculty"
-            value={draft.faculty ?? ""}
-            onChange={(event) => setField("faculty", event.target.value || null)}
-            className={selectClasses}
-          >
-            <option value="">Select a faculty</option>
-            {MCGILL_FACULTIES.map((faculty) => (
-              <option key={faculty} value={faculty}>
-                {faculty}
-              </option>
-            ))}
-          </select>
-        </FormField>
+      {profile && (
+        <>
+          <div className="mt-8 space-y-6">
+            <FormField label="Degree" htmlFor="degree">
+              <select
+                id="degree"
+                value={draft.degree ?? ""}
+                onChange={(event) => setField("degree", event.target.value || null)}
+                className={selectClasses}
+              >
+                <option value="">Select a degree</option>
+                {DEGREES.map((degree) => (
+                  <option key={degree} value={degree}>
+                    {degree}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-        <SubjectPicker
-          subjects={draft.subjects}
-          onChange={(subjects) => setField("subjects", subjects)}
-        />
-      </div>
+            <FormField
+              label="Faculty"
+              htmlFor="faculty"
+              hint="Every McGill faculty and school."
+            >
+              <select
+                id="faculty"
+                value={draft.faculty ?? ""}
+                onChange={(event) => setField("faculty", event.target.value || null)}
+                className={selectClasses}
+              >
+                <option value="">Select a faculty</option>
+                {MCGILL_FACULTIES.map((faculty) => (
+                  <option key={faculty} value={faculty}>
+                    {faculty}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-      <SaveChangesBar
-        dirty={dirty}
-        onSave={async () => {
-          await saveProfile(draft);
-          commit();
-        }}
-      />
+            <SubjectPicker
+              subjects={draft.subjects}
+              onChange={(subjects) => setField("subjects", subjects)}
+            />
+          </div>
+
+          <SaveChangesBar
+            dirty={dirty}
+            onSave={async () => {
+              await save(draft);
+              commit();
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

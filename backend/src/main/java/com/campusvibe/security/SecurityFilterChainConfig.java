@@ -81,6 +81,15 @@ public class SecurityFilterChainConfig {
                                 "/actuator/**",
                                 // Asked by the signup form before anyone is signed in.
                                 "/api/v1/auth/email-status",
+                                // The interest vocabulary. A shared list that
+                                // names nobody and is identical for every
+                                // caller -- and a public profile has to render
+                                // the labels behind someone's interests with
+                                // no token to do it with. Needs saying here
+                                // because it sits under neither /clubs nor
+                                // /events and would otherwise fall through to
+                                // anyRequest().authenticated().
+                                "/api/v1/interests",
                                 "/api/v1/clubs/**",
                                 "/api/v1/events/**"
                         ).permitAll()

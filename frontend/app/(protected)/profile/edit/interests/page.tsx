@@ -1,20 +1,28 @@
 "use client";
 
+import { useEffect } from "react";
 import { useEditableForm } from "@/app/hooks/useEditableForm";
-import { emptyProfile, saveProfile } from "@/app/lib/profile";
+import { useProfile } from "@/app/lib/profile-context";
+import { emptyProfile } from "@/app/lib/profile";
 import InterestPicker from "@/app/components/profile/edit/InterestPicker";
 import SaveChangesBar from "@/app/components/profile/edit/SaveChangesBar";
+import ProfileSectionState from "@/app/components/profile/edit/ProfileSectionState";
 
 /**
  * Its own section, not a field on Edit profile.
  *
- * The picker is a full screen of controls — two filters and a grid of eighty
+ * The picker is a full screen of controls — two filters and a grid of seventy-six
  * pills — and folding it into the profile form would bury the name and bio
  * under it. It is also the one part of a profile people come back to change on
  * its own, which is why the Show interests toggle links straight here.
  */
 export default function InterestsPage() {
-  const { draft, setField, dirty, commit } = useEditableForm(emptyProfile());
+  const { profile, failed, save } = useProfile();
+  const { draft, setField, dirty, commit, reinitialise } = useEditableForm(emptyProfile());
+
+  useEffect(() => {
+    if (profile) reinitialise(profile);
+  }, [profile, reinitialise]);
 
   return (
     <div>
@@ -23,20 +31,26 @@ export default function InterestsPage() {
         Pick what you are into and share it on your profile.
       </p>
 
-      <div className="mt-8">
-        <InterestPicker
-          selected={draft.interests}
-          onChange={(interests) => setField("interests", interests)}
-        />
-      </div>
+      <ProfileSectionState profile={profile} failed={failed} />
 
-      <SaveChangesBar
-        dirty={dirty}
-        onSave={async () => {
-          await saveProfile(draft);
-          commit();
-        }}
-      />
+      {profile && (
+        <>
+          <div className="mt-8">
+            <InterestPicker
+              selected={draft.interests}
+              onChange={(interests) => setField("interests", interests)}
+            />
+          </div>
+
+          <SaveChangesBar
+            dirty={dirty}
+            onSave={async () => {
+              await save(draft);
+              commit();
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

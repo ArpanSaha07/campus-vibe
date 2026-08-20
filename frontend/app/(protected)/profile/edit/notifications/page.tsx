@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useEditableForm } from "@/app/hooks/useEditableForm";
-import { saveNotificationPreferences } from "@/app/lib/profile";
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+} from "@/app/lib/profile";
 import ToggleRow from "@/app/components/profile/edit/ToggleRow";
 import SaveChangesBar from "@/app/components/profile/edit/SaveChangesBar";
 import type { NotificationPreferences } from "@/app/types";
@@ -44,14 +48,45 @@ const ROWS: { key: keyof NotificationPreferences; title: string; description: st
   },
 ];
 
+/**
+ * These defaults are only ever shown for the instant before the real ones
+ * arrive, and they mirror the backend's -- V21's column defaults and the
+ * entity's field initialisers. Kept in step so the form does not visibly flip a
+ * switch on load.
+ */
+const FALLBACK: NotificationPreferences = {
+  eventReminders: true,
+  clubAnnouncements: true,
+  weeklyDigest: true,
+  newFollowerEvents: true,
+  productNews: false,
+};
+
 export default function NotificationsPage() {
-  const { draft, setField, dirty, commit } = useEditableForm<NotificationPreferences>({
-    eventReminders: true,
-    clubAnnouncements: true,
-    weeklyDigest: true,
-    newFollowerEvents: true,
-    productNews: false,
-  });
+  const { draft, setField, dirty, reinitialise } =
+    useEditableForm<NotificationPreferences>(FALLBACK);
+
+  // Loaded here rather than through ProfileProvider: preferences are not
+  // profile content, and unlike the profile they are edited by exactly one
+  // screen, which owns all five switches. There is no slice to clobber.
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getNotificationPreferences()
+      .then((preferences) => {
+        if (cancelled) return;
+        reinitialise(preferences);
+        setLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reinitialise]);
 
   return (
     <div>
@@ -61,25 +96,42 @@ export default function NotificationsPage() {
         listed here — those only ever arrive because you asked for them.
       </p>
 
-      <div className="mt-6 divide-y divide-mist-200">
-        {ROWS.map(({ key, title, description }) => (
-          <ToggleRow
-            key={key}
-            title={title}
-            description={description}
-            checked={draft[key]}
-            onChange={(value) => setField(key, value)}
-          />
-        ))}
-      </div>
+      {failed && (
+        <p className="mt-6 font-semibold text-alert-600">
+          Your preferences didn&apos;t load, so there is nothing safe to change here.
+          Refresh to try again.
+        </p>
+      )}
 
-      <SaveChangesBar
-        dirty={dirty}
-        onSave={async () => {
-          await saveNotificationPreferences(draft);
-          commit();
-        }}
-      />
+      {!failed && !loaded && (
+        <p className="mt-6 font-mono text-sm text-ink-600">Loading your preferences…</p>
+      )}
+
+      {loaded && (
+        <>
+          <div className="mt-6 divide-y divide-mist-200">
+            {ROWS.map(({ key, title, description }) => (
+              <ToggleRow
+                key={key}
+                title={title}
+                description={description}
+                checked={draft[key]}
+                onChange={(value) => setField(key, value)}
+              />
+            ))}
+          </div>
+
+          <SaveChangesBar
+            dirty={dirty}
+            // reinitialise rather than commit: it adopts the server's answer
+            // as the new baseline in one step, so there is no moment where the
+            // form is clean but showing something the database disagrees with.
+            onSave={async () => {
+              reinitialise(await saveNotificationPreferences(draft));
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

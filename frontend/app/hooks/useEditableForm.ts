@@ -65,5 +65,23 @@ export function useEditableForm<T extends object>(initial: T) {
   /** Throw the draft away and go back to the last saved state. */
   const reset = useCallback(() => setDraft(baseline), [baseline]);
 
-  return { draft, setDraft, setField, dirty, commit, reset };
+  /**
+   * Adopt a freshly loaded value as both the baseline and the draft.
+   *
+   * `initial` is only read on the first render -- `useState` ignores it
+   * afterwards -- so a form that mounts before its data arrives has no way to
+   * pick that data up. Every profile section is in exactly that position: the
+   * screen renders, the fetch lands a moment later.
+   *
+   * Distinct from `commit`, which promotes what the user typed. This discards
+   * the draft, so call it only for a value from the server. Remounting the form
+   * under a new `key` would also work and would throw away anything half-typed
+   * on every refresh.
+   */
+  const reinitialise = useCallback((next: T) => {
+    setBaseline(next);
+    setDraft(next);
+  }, []);
+
+  return { draft, setDraft, setField, dirty, commit, reset, reinitialise };
 }

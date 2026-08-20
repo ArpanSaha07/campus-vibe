@@ -74,6 +74,17 @@
       ]
     },
 
+    "user-profiles.md": {
+      "covers": "Profile content and email preferences: the user_profiles / user_interests / user_notification_preferences tables, the full-replace PUT, the slug-keyed interest catalogue, and the shared profile load the editor depends on",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/user/profile/",
+        "frontend/app/(protected)/profile/",
+        "frontend/app/components/profile/",
+        "frontend/app/lib/profile.ts",
+        "frontend/app/lib/profile-context.tsx",
+        "frontend/app/lib/profile-options.ts"
+      ]
+    },
     "search.md": {
       "covers": "Hybrid semantic + keyword search",
       "paths": [

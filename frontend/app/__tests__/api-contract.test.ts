@@ -10,9 +10,13 @@ import type {
   ClubAdminRequest,
   ClubAuditLog,
   ClubInvitation,
+  Interest,
   ManagedClub,
+  NotificationPreferences,
   OwnershipTransfer,
+  ProfileSocialLinks,
   User,
+  UserProfile,
 } from "@/app/types";
 
 /**
@@ -171,6 +175,41 @@ const managedClubFields: Record<keyof ManagedClub, true> = {
   officialEmailVerified: true,
 };
 
+const userProfileFields: Record<keyof UserProfile, true> = {
+  bio: true,
+  faculty: true,
+  degree: true,
+  subjects: true,
+  socialLinks: true,
+  interests: true,
+  showInterests: true,
+  showSocialLinks: true,
+};
+
+// Pinned separately because the contract records a nested object as one field
+// name: `userProfileFields` above contributes `socialLinks` and says nothing
+// about what is inside it. Without an entry of its own, renaming `instagram` on
+// either side would break the app with both suites still green.
+const profileSocialLinksFields: Record<keyof ProfileSocialLinks, true> = {
+  instagram: true,
+  facebook: true,
+  linkedin: true,
+};
+
+const notificationPreferencesFields: Record<keyof NotificationPreferences, true> = {
+  eventReminders: true,
+  clubAnnouncements: true,
+  weeklyDigest: true,
+  newFollowerEvents: true,
+  productNews: true,
+};
+
+const interestFields: Record<keyof Interest, true> = {
+  slug: true,
+  label: true,
+  category: true,
+};
+
 /** Backend DTO name → the TypeScript interface mirroring it. */
 const MIRRORS: Record<string, Record<string, true>> = {
   EventDTO: eventFields,
@@ -184,6 +223,10 @@ const MIRRORS: Record<string, Record<string, true>> = {
   OwnershipTransferDTO: ownershipTransferFields,
   ClubAuditLogDTO: clubAuditLogFields,
   ManagedClubDTO: managedClubFields,
+  UserProfileDTO: userProfileFields,
+  ProfileSocialLinksDTO: profileSocialLinksFields,
+  NotificationPreferencesDTO: notificationPreferencesFields,
+  InterestDTO: interestFields,
 };
 
 describe("API contract", () => {

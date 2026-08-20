@@ -66,6 +66,20 @@
     "metadata", "createdAt"
   ],
 
+  "UserProfileDTO": [
+    "bio", "faculty", "degree", "subjects", "socialLinks", "interests",
+    "showInterests", "showSocialLinks"
+  ],
+
+  "ProfileSocialLinksDTO": ["instagram", "facebook", "linkedin"],
+
+  "NotificationPreferencesDTO": [
+    "eventReminders", "clubAnnouncements", "weeklyDigest", "newFollowerEvents",
+    "productNews"
+  ],
+
+  "InterestDTO": ["slug", "label", "category"],
+
   "ManagedClubDTO": [
     "clubId", "clubName", "logo", "followers", "role", "officialEmail",
     "officialEmailVerified"
