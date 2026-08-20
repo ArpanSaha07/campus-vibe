@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getInterests } from "@/app/lib/profile";
+import { getInterests } from "@/app/lib/taxonomy";
 import type { Interest } from "@/app/types";
 
 /**

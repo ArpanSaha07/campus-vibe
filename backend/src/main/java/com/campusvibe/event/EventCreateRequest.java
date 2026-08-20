@@ -11,5 +11,6 @@ public record EventCreateRequest(
         String price,
         String organizerId,
         Integer capacity,
-        List<String> categories
+        List<String> topics,
+        List<String> formats
 ) {}

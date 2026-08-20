@@ -1,4 +1,4 @@
-package com.campusvibe.user.profile;
+package com.campusvibe.taxonomy;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -32,8 +32,19 @@ public class InterestCatalogueEntry {
 	@Column(name = "label", nullable = false)
 	private String label;
 
-	@Column(name = "category", nullable = false)
-	private String category;
+	/**
+	 * The group this sits under, or null when this row <em>is</em> a group.
+	 *
+	 * <p>V26 replaced the free-text {@code category} column with this
+	 * self-reference, because an event can be tagged with a group and
+	 * nothing can foreign-key to a string. Exactly two levels are intended
+	 * -- a group has no parent, an interest has one -- which Postgres
+	 * cannot express as a CHECK without a subquery, so nothing but
+	 * convention enforces it. A third level would break the parent rollup
+	 * that recommendation scoring depends on.
+	 */
+	@Column(name = "parent_slug")
+	private String parentSlug;
 
 	@Column(name = "sort_order", nullable = false)
 	private int sortOrder;

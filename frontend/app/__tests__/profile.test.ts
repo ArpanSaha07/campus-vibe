@@ -1,6 +1,5 @@
 import {
   emptyProfile,
-  getInterests,
   getNotificationPreferences,
   getProfile,
   normaliseProfileLink,
@@ -113,14 +112,6 @@ describe("profile API calls", () => {
       body: JSON.stringify(preferences),
       auth: true,
     });
-  });
-
-  // The one call here that is deliberately anonymous: the catalogue is a shared
-  // vocabulary, not anybody's data, and a public profile has to render it with
-  // no token to do it with.
-  it("reads the interest catalogue without a token", async () => {
-    await getInterests();
-    expect(mockedApiFetch).toHaveBeenCalledWith("/api/v1/interests");
   });
 
   it("never asks for an authenticated response to be cached", async () => {

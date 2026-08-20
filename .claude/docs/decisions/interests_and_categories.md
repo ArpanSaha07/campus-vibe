@@ -565,38 +565,56 @@ referenceable group layer either way.
 
 ## Implementation checklist
 
-Nothing below is built. In dependency order:
+**Built 2026-08-20 — migrations V23 to V30, backend, contract and the frontend
+data layer.** What remains is the two authoring forms, and why is below.
 
-Content and schema are now settled. In dependency order:
+- [x] **`club_categories`** (V23 schema, V24 seed) plus `clubs.category_slug`,
+      nullable because every club predates the column.
+- [x] **`club_interests`** (V25), foreign-keyed to `interest_catalogue`.
+- [x] **Interest groups promoted to rows** (V26): a self-referencing
+      `parent_slug`, the twelve groups inserted, the 76 leaves back-filled, and
+      the free-text `category` column dropped. The migration fails loudly if any
+      leaf ends up without a group rather than shipping a silent thirteenth one.
+- [x] **Sixteen new interests** (V27) — not 22: *Technology* was folded into the
+      `tech` group, which was relabelled from *Tech*; *Sports* and *Fitness* into
+      `sports-fitness`; and *Black community*, *French* and *English* already
+      existed under other names. The catalogue is now 104 rows.
+- [x] **`event_formats`** (V28 schema, V29 seed of 22) plus
+      `event_format_assignments` and `event_topic_assignments`; `event_categories`
+      dropped by V30, superseding V3 rather than editing it.
+- [x] **A `taxonomy` package**, holding all three vocabularies. The interest
+      catalogue moved there from `user.profile`, which stopped being true the
+      moment clubs and events shared it. `TaxonomyService` is the single place
+      that decides whether a slug is real; `UserProfileService` delegates to it
+      rather than keeping its own copy of that logic.
+- [x] **Three public endpoints** — `/api/v1/interests`, `/club-categories`,
+      `/event-formats` — and their `permitAll` entries.
+- [x] **Caps enforced server-side**: 8 club tags, 8 per event axis.
+- [x] **Tag labels in the embedded text** for both clubs and events, which is
+      what lets a search for *tech* reach a departmental society whose
+      description never uses the word. Labels, not slugs —
+      `ai-machine-learning` embeds badly. The keyword leg reads them too:
+      `SearchRepository` now joins the tag tables where it used to join
+      `event_categories`.
+- [x] **Contract**: `EventDTO.categories` became `topics` and `formats`;
+      `ClubDTO` gained `category` and `interests`; `InterestDTO.category` became
+      `parentSlug`; `ClubCategoryDTO` and `EventFormatDTO` added. Both sides.
+- [x] **Frontend data layer**: `lib/taxonomy.ts` (cached an hour, never
+      authenticated), `InterestPicker` regrouped on `parentSlug` and offering
+      leaves only, the event page rendering labels under a *Tags* heading.
+- [x] **`CategoriesSectionMainPage.tsx` deleted** — dead code, imported nowhere.
 
-1. Migration: `club_categories` reference table, then its seed of thirteen
-   labels **in a separate file** per `database-lifecycle` — reference-data
-   inserts do not share a migration with the `CREATE TABLE`. Then
-   `clubs.category_slug` foreign-keyed to it.
-2. Migration: `club_interests` (D7), foreign-keyed to `interest_catalogue`.
-3. Make the interest groups referenceable — the self-referencing `parent_slug`
-   of D3 is the recommendation, and it is cheap only while V19 and V20 are
-   uncommitted.
-4. Extend the interest catalogue with the 22 new topics from D3, settling
-   *Technology*, *Sports* and *Fitness* against the group layer first. This is
-   reference data, so it is its own migration.
-5. Migration: `event_formats` reference table plus its seed of 22, then
-   `event_format_assignments` and `event_topic_assignments`, then drop
-   `event_categories`. Foreign keys use `ON DELETE RESTRICT` on the vocabulary
-   side and `CASCADE` on the owner side, matching `user_interests` — retiring a
-   vocabulary entry must fail loudly rather than silently deleting it from
-   everything that used it.
-4. Backend: club category, club tags and event tags — read and write. All
-   validate slugs against their vocabulary and answer 400 for an unknown one,
-   the way `UserProfileService` does, rather than letting the foreign key
-   surface as a 500. Cap club tags at 8 server-side. Two new public endpoints
-   for the two new lists, alongside `GET /api/v1/interests`.
-5. Add club tags to `SearchableText.forClub`, which currently embeds only name
-   and description (D7).
-6. Contract: rename `EventDTO.categories` to `tags` across all six touch points
-   in one commit; add the club category and club tags fields.
-7. Frontend: a category select and a tag picker on the club form, a tag picker
-   on the event form. `InterestPicker` is reused as-is for club tags and
-   generalised for event tags — it already fetches a vocabulary, filters by
-   group and stores slugs, so lift it rather than writing a third picker.
-8. Delete or deliberately keep `CategoriesSectionMainPage.tsx` (D6).
+### What is left, and what blocks it
+
+- [ ] **A category select and a tag picker on the club form.** The form writes
+      through `lib/services/clubService.ts`, which uses raw relative `fetch`
+      rather than `apiFetch` and sits outside the main idiom. Wiring taxonomy
+      into it means moving it onto `apiFetch` first, or the new fields inherit
+      that oddity.
+- [ ] **A tag picker on the event form.** `CreateEventForm.tsx` has **no state
+      and no submit handler at all** — it is markup. There is nothing to add a
+      picker to yet, and adding one would produce a control that cannot save.
+      The endpoint accepts `topics` and `formats` today, so the form is the only
+      missing piece.
+- [ ] **Nothing has been rendered in a browser.** Same gap as the profile work.
+

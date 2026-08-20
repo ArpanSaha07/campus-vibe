@@ -7,7 +7,9 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "clubs")
@@ -54,6 +56,23 @@ public class Club {
     @CollectionTable(name = "club_images", joinColumns = @JoinColumn(name = "club_id"))
     @Column(name = "url")
     private List<String> images = new ArrayList<>();
+
+    // What kind of organisation this is -- one of the thirteen in
+    // club_categories (V23). Nullable because every club predates the column
+    // and there is no value that would be true for them; uncategorised means
+    // nobody has said yet.
+    @Column(name = "category_slug")
+    private String categorySlug;
+
+    // What this club is *about*, which is the axis that actually finds it.
+    // Thirteen category labels cannot answer `show me AI clubs`; these can,
+    // because they are interest_catalogue slugs -- the same vocabulary students
+    // pick their own interests from, which makes matching a direct join.
+    // See V25 and decision D7.
+    @ElementCollection
+    @CollectionTable(name = "club_interests", joinColumns = @JoinColumn(name = "club_id"))
+    @Column(name = "interest_slug")
+    private Set<String> interestSlugs = new HashSet<>();
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();

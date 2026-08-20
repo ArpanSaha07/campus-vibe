@@ -24,12 +24,12 @@
   "EventDTO": [
     "id", "title", "description", "dateTime", "createdAt", "location", "price",
     "organizerId", "organizerName", "followers", "images", "promoted",
-    "capacity", "registered", "categories"
+    "capacity", "registered", "topics", "formats"
   ],
 
   "ClubDTO": [
     "id", "name", "description", "followers", "logo", "socialLinks",
-    "featured", "images", "createdAt"
+    "featured", "images", "createdAt", "category", "interests"
   ],
 
   "UserDTO": [
@@ -78,7 +78,11 @@
     "productNews"
   ],
 
-  "InterestDTO": ["slug", "label", "category"],
+  "InterestDTO": ["slug", "label", "parentSlug"],
+
+  "ClubCategoryDTO": ["slug", "label"],
+
+  "EventFormatDTO": ["slug", "label", "groupLabel"],
 
   "ManagedClubDTO": [
     "clubId", "clubName", "logo", "followers", "role", "officialEmail",

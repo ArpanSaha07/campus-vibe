@@ -1,5 +1,5 @@
 import { apiFetch } from "@/app/lib/api";
-import type { Interest, NotificationPreferences, UserProfile } from "@/app/types";
+import type { NotificationPreferences, UserProfile } from "@/app/types";
 
 /**
  * Turns something a user typed into an href, or into null.
@@ -107,17 +107,4 @@ export async function saveNotificationPreferences(
     body: JSON.stringify(preferences),
     auth: true,
   });
-}
-
-/**
- * The interest vocabulary, already in the order the picker should show it.
- *
- * Public and identical for everyone, so unlike everything else here it takes no
- * token. It is fetched rather than hardcoded because the profile stores slugs
- * and the database owns the slug-to-label mapping; a second copy in the
- * frontend would be two lists that must agree with nothing checking that they
- * do.
- */
-export async function getInterests(): Promise<Interest[]> {
-  return apiFetch<Interest[]>("/api/v1/interests");
 }

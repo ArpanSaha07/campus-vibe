@@ -2,6 +2,7 @@ package com.campusvibe.user.profile;
 
 import com.campusvibe.exception.RequestValidationException;
 import com.campusvibe.exception.ResourceNotFoundException;
+import com.campusvibe.taxonomy.TaxonomyService;
 import com.campusvibe.user.User;
 import com.campusvibe.user.UserRepository;
 import org.springframework.stereotype.Service;
@@ -31,18 +32,27 @@ public class UserProfileService {
 	/** Matches MAX_SUBJECTS in app/components/profile/edit/SubjectPicker.tsx. */
 	private static final int MAX_SUBJECTS = 12;
 
+	/**
+	 * No cap on a person's own interests, unlike a club's eight.
+	 *
+	 * <p>A club tagged with everything matches every student and degrades
+	 * recommendations for all of them. A student interested in everything only
+	 * gets a busier feed, which is their business.
+	 */
+	private static final int MAX_INTERESTS = 76;
+
 	private final UserProfileRepository profileRepository;
 	private final UserRepository userRepository;
-	private final InterestCatalogueRepository interestRepository;
+	private final TaxonomyService taxonomyService;
 	private final UserProfileMapper mapper;
 
 	public UserProfileService(UserProfileRepository profileRepository,
 	                          UserRepository userRepository,
-	                          InterestCatalogueRepository interestRepository,
+	                          TaxonomyService taxonomyService,
 	                          UserProfileMapper mapper) {
 		this.profileRepository = profileRepository;
 		this.userRepository = userRepository;
-		this.interestRepository = interestRepository;
+		this.taxonomyService = taxonomyService;
 		this.mapper = mapper;
 	}
 
@@ -79,7 +89,9 @@ public class UserProfileService {
 		profile.setShowSocialLinks(request.showSocialLinks());
 
 		profile.replaceSubjects(cleanSubjects(request.subjects()));
-		profile.replaceInterestSlugs(checkedInterests(request.interests()));
+		profile.replaceInterestSlugs(
+				taxonomyService.requireKnownInterests(
+						request.interests(), MAX_INTERESTS, "interest"));
 
 		// Explicit save because the profile may be new; for an existing one this
 		// is the same dirty-checked flush it would have got anyway.
@@ -115,34 +127,6 @@ public class UserProfileService {
 					"A profile can list at most %d subjects".formatted(MAX_SUBJECTS));
 		}
 		return seen;
-	}
-
-	/**
-	 * Interests must name catalogue entries.
-	 *
-	 * <p>Checked here rather than left to the foreign key so that a bad slug is
-	 * a 400 naming the slug, not a constraint violation surfacing as a 500. The
-	 * key is still there and still the thing that makes this guarantee true —
-	 * this only decides what the caller is told.
-	 */
-	private Set<String> checkedInterests(List<String> submitted) {
-		if (submitted == null || submitted.isEmpty()) {
-			return Set.of();
-		}
-		Set<String> slugs = new LinkedHashSet<>(submitted);
-		slugs.remove(null);
-
-		Set<String> known = Set.copyOf(
-				interestRepository.findAllById(slugs).stream()
-						.map(InterestCatalogueEntry::getSlug)
-						.toList());
-
-		List<String> unknown = slugs.stream().filter(slug -> !known.contains(slug)).sorted().toList();
-		if (!unknown.isEmpty()) {
-			throw new RequestValidationException(
-					"Unknown interest: %s".formatted(String.join(", ", unknown)));
-		}
-		return slugs;
 	}
 
 	private static String blankToNull(String value) {

@@ -1,4 +1,4 @@
-package com.campusvibe.user.profile;
+package com.campusvibe.taxonomy;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

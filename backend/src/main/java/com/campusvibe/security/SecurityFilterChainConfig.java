@@ -90,6 +90,8 @@ public class SecurityFilterChainConfig {
                                 // /events and would otherwise fall through to
                                 // anyRequest().authenticated().
                                 "/api/v1/interests",
+                                "/api/v1/club-categories",
+                                "/api/v1/event-formats",
                                 "/api/v1/clubs/**",
                                 "/api/v1/events/**"
                         ).permitAll()

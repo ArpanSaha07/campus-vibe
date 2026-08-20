@@ -21,5 +21,11 @@ public record EventDTO(
         Boolean promoted,
         Integer capacity,
         Integer registered,
-        List<String> categories
+        // Two fields, not one merged array. A single list would put `workshop`
+        // beside `robotics` with nothing saying which is which, and every
+        // consumer would have to look each value up to find out. Both carry
+        // slugs; labels come from GET /api/v1/event-formats and
+        // GET /api/v1/interests.
+        List<String> topics,
+        List<String> formats
 ) {}

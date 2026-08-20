@@ -11,7 +11,9 @@ import com.campusvibe.clubadmin.ManagedClubDTO;
 import com.campusvibe.event.EventDTO;
 import com.campusvibe.user.MyEventDTO;
 import com.campusvibe.user.UserDTO;
-import com.campusvibe.user.profile.InterestDTO;
+import com.campusvibe.taxonomy.ClubCategoryDTO;
+import com.campusvibe.taxonomy.EventFormatDTO;
+import com.campusvibe.taxonomy.InterestDTO;
 import com.campusvibe.user.profile.NotificationPreferencesDTO;
 import com.campusvibe.user.profile.ProfileSocialLinksDTO;
 import com.campusvibe.user.profile.UserProfileDTO;
@@ -82,6 +84,8 @@ class ApiContractTest {
         CONTRACTED.put("ProfileSocialLinksDTO", ProfileSocialLinksDTO.class);
         CONTRACTED.put("NotificationPreferencesDTO", NotificationPreferencesDTO.class);
         CONTRACTED.put("InterestDTO", InterestDTO.class);
+        CONTRACTED.put("ClubCategoryDTO", ClubCategoryDTO.class);
+        CONTRACTED.put("EventFormatDTO", EventFormatDTO.class);
     }
 
     private final ObjectMapper mapper = new ObjectMapper();

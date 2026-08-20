@@ -40,10 +40,11 @@ export default function InterestPicker({
     [interests],
   );
 
-  // In catalogue order, deduplicated. Derived rather than a second endpoint:
-  // a category is only ever "the set of interests carrying this label".
-  const categories = useMemo(
-    () => [...new Set((interests ?? []).map((interest) => interest.category))],
+  // The groups are the rows with no parent -- V26 promoted them from a text
+  // column so that an event can be tagged with one. Here they are only ever
+  // headings and filter options.
+  const groups = useMemo(
+    () => (interests ?? []).filter((interest) => interest.parentSlug === null),
     [interests],
   );
 
@@ -51,8 +52,12 @@ export default function InterestPicker({
     const needle = query.trim().toLowerCase();
     const chosen = new Set(selected);
     return (interests ?? [])
+      // A profile states specific interests, so only leaves are offered here.
+      // An event picker would drop this line: tagging a jam night `music` is
+      // exactly right, where claiming `music` as your whole personality is not.
+      .filter((interest) => interest.parentSlug !== null)
       .filter((interest) => !chosen.has(interest.slug))
-      .filter((interest) => !category || interest.category === category)
+      .filter((interest) => !category || interest.parentSlug === category)
       .filter((interest) => !needle || interest.label.toLowerCase().includes(needle));
   }, [interests, category, query, selected]);
 
@@ -98,9 +103,9 @@ export default function InterestPicker({
           className={`${selectClasses} sm:w-64`}
         >
           <option value="">Browse by category</option>
-          {categories.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {groups.map((group) => (
+            <option key={group.slug} value={group.slug}>
+              {group.label}
             </option>
           ))}
         </select>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { EventPageProps } from "@/app/types";
 import { getEvent } from "@/app/lib/event";
 import { getClubById } from "@/app/lib/club";
+import { getEventFormats, getInterests, labelFor } from "@/app/lib/taxonomy";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import EventShareButton from "@/app/components/event/EventShareButton";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
@@ -66,6 +67,23 @@ export default async function EventPage({ params }: EventPageProps) {
   // follower count, which are club-shaped data no event DTO should carry — so a
   // miss or a failure costs those two details and nothing else.
   const organizer = await getClubById(event.organizer).catch(() => null);
+
+  // An event stores slugs, and `ai-machine-learning` is not something to show a
+  // human. Both vocabularies are public and cached for an hour, so this costs
+  // nothing per request; a failure costs the tag labels and nothing else, which
+  // is why it is caught rather than allowed to take the page down.
+  const [interests, formats] = await Promise.all([
+    getInterests().catch(() => []),
+    getEventFormats().catch(() => []),
+  ]);
+
+  // Format first, then topic: `Workshop` tells you what you would be walking
+  // into, and `Robotics` tells you what it is about. The first is the more
+  // useful of the two at a glance.
+  const tags = [
+    ...event.formats.map((slug) => labelFor(formats, slug)),
+    ...event.topics.map((slug) => labelFor(interests, slug)),
+  ];
 
   const banner = event.images[0] ?? FALLBACK_EVENT_IMAGE;
 
@@ -148,13 +166,14 @@ export default async function EventPage({ params }: EventPageProps) {
           {/* Ticket — shown here on small screens, in the side column on lg+ */}
           <div className="lg:hidden">{ticket}</div>
 
-          {/* Categories */}
-          {event.categories.length > 0 && (
+          {/* Tags -- what kind of thing this is, and what it is about. There
+              is deliberately no event category; see decision D2. */}
+          {tags.length > 0 && (
             <section>
-              <h2 className="font-display text-xl font-bold text-ink-900 mb-3">Categories</h2>
+              <h2 className="font-display text-xl font-bold text-ink-900 mb-3">Tags</h2>
               <div className="flex flex-wrap gap-2">
-                {event.categories.map((category) => (
-                  <Chip key={category}>{category}</Chip>
+                {tags.map((tag) => (
+                  <Chip key={tag}>{tag}</Chip>
                 ))}
               </div>
             </section>

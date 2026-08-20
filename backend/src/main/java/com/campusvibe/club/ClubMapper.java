@@ -19,7 +19,11 @@ public class ClubMapper implements Function<Club, ClubDTO> {
                 club.getFeatured(),
                 // copy so the lazy collection is initialized while the session is open
                 List.copyOf(club.getImages()),
-                club.getCreatedAt()
+                club.getCreatedAt(),
+                club.getCategorySlug(),
+                // Sorted, so two reads of one row cannot disagree about the
+                // order -- Hibernate hands this back as a HashSet.
+                club.getInterestSlugs().stream().sorted().toList()
         );
     }
 }

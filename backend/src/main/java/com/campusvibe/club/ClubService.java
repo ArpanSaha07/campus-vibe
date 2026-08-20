@@ -3,22 +3,38 @@ package com.campusvibe.club;
 import com.campusvibe.exception.DuplicateResourceException;
 import com.campusvibe.exception.ResourceNotFoundException;
 import com.campusvibe.search.SearchIndexService;
+import com.campusvibe.taxonomy.TaxonomyService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ClubService {
+
+    /**
+     * Eight, and the cap is load-bearing.
+     *
+     * <p>A club that tags itself with thirty interests matches every student,
+     * which helps that club not at all and quietly degrades recommendations for
+     * everybody else. This is the tag-spam failure that ruins the pattern
+     * wherever it is left uncapped.
+     */
+    private static final int MAX_CLUB_INTERESTS = 8;
+
     private final ClubRepository clubRepository;
     private final ClubMapper clubMapper;
     private final SearchIndexService searchIndexService;
+    private final TaxonomyService taxonomyService;
 
     public ClubService(ClubRepository clubRepository, ClubMapper clubMapper,
-                       SearchIndexService searchIndexService) {
+                       SearchIndexService searchIndexService,
+                       TaxonomyService taxonomyService) {
         this.clubRepository = clubRepository;
         this.clubMapper = clubMapper;
         this.searchIndexService = searchIndexService;
+        this.taxonomyService = taxonomyService;
     }
 
     @Transactional(readOnly = true)
@@ -53,6 +69,21 @@ public class ClubService {
         if (request.socialLinks() != null) {
             club.setSocialLinks(request.socialLinks());
         }
+        if (request.category() != null) {
+            club.setCategorySlug(taxonomyService.requireKnownClubCategory(request.category()));
+        }
+        if (request.interests() != null) {
+            // Replace rather than merge: the form sends the whole set, so an
+            // absent slug means removed. Cleared and refilled rather than
+            // reassigned -- swapping the PersistentSet out makes Hibernate
+            // delete and reinsert every row.
+            Set<String> next = taxonomyService.requireKnownInterests(
+                    request.interests(), MAX_CLUB_INTERESTS, "interest");
+            club.getInterestSlugs().clear();
+            club.getInterestSlugs().addAll(next);
+        }
+        // Re-indexed after the tags change, not before: the embedded text
+        // includes them, so indexing first would describe the club as it was.
         searchIndexService.indexClub(club);
         return clubMapper.apply(club);
     }

@@ -37,7 +37,11 @@ function rotate<T>(items: T[], offset: number, count: number): T[] {
 /** Grounded in the event's own fields — a real endpoint would explain the match. */
 function rationale(event: EventInstance): string {
   const cost = event.price === "Free" ? "free to attend" : "ticketed";
-  const tags = event.categories.slice(0, 2).join(" and ");
+  // Slugs rather than labels, which reads acceptably for `hackathon` and
+  // poorly for `ai-machine-learning`. The planner is mock data behind a
+  // placeholder rationale; when the real endpoint lands it should resolve
+  // labels through lib/taxonomy rather than print raw slugs.
+  const tags = [...event.formats, ...event.topics].slice(0, 2).join(" and ");
   return tags
     ? `Picked for its ${tags} tags — ${cost}.`
     : `Picked because it is ${cost} and fits the time slot.`;

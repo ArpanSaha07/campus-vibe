@@ -27,7 +27,10 @@ export type EventInstance = {
   promoted: boolean;
   capacity: number;
   registered: number;
-  categories: string[];
+  /** interest_catalogue slugs. Labels come from `GET /api/v1/interests`. */
+  topics: string[];
+  /** event_formats slugs. Labels come from `GET /api/v1/event-formats`. */
+  formats: string[];
   // recurrence?
 };
 
@@ -62,7 +65,16 @@ export type Club = {
     featured: boolean;
     images: string[];
     createdAt: Date;
-    // clubcategories: string[];
+    /** club_categories slug, or null while nobody has classified this club. */
+    category: string | null;
+    /**
+     * interest_catalogue slugs — the same vocabulary students pick their own
+     * interests from, which is what makes `clubs matching your interests` a
+     * direct join rather than a mapping. This is the axis that finds a
+     * departmental society for somebody searching for tech; the thirteen
+     * categories above are far too coarse to.
+     */
+    interests: string[];
 };
 
 // AI planner (see .claude/docs/architecture/ai-planner.md).
@@ -205,7 +217,34 @@ export interface NotificationPreferences {
 export interface Interest {
   slug: string;
   label: string;
-  category: string;
+  /**
+   * The group this hangs under, or **null when this row is itself a group**.
+   *
+   * The endpoint returns both levels in one list: twelve groups with a null
+   * parent, and the interests beneath them. A picker renders headings from the
+   * former and pills from the latter, and an event may be tagged with either —
+   * which is why the groups are rows rather than a string column.
+   */
+  parentSlug: string | null;
+}
+
+/** One of the thirteen kinds of organisation, from `GET /api/v1/club-categories`. */
+export interface ClubCategory {
+  slug: string;
+  label: string;
+}
+
+/**
+ * One of the twenty-two event shapes, from `GET /api/v1/event-formats`.
+ *
+ * `groupLabel` is plain text where `Interest` carries a `parentSlug`, and the
+ * asymmetry is deliberate: an interest group is a row something can be tagged
+ * with, while a format group is only ever a heading.
+ */
+export interface EventFormat {
+  slug: string;
+  label: string;
+  groupLabel: string;
 }
 
 export interface AuthResponse {
@@ -230,7 +269,8 @@ export interface ApiEvent {
   promoted: boolean;
   capacity: number | null;
   registered: number;
-  categories: string[];
+  topics: string[];
+  formats: string[];
 }
 
 export interface ApiMyEvent {
@@ -249,6 +289,8 @@ export interface ApiClub {
   featured: boolean;
   images: string[];
   createdAt: string;
+  category: string | null;
+  interests: string[];
 }
 
 /** A club the signed-in user may manage. Mirrors ManagedClubDTO. */

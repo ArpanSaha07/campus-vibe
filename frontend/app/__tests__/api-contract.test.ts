@@ -9,7 +9,9 @@ import type {
   ClubAdmin,
   ClubAdminRequest,
   ClubAuditLog,
+  ClubCategory,
   ClubInvitation,
+  EventFormat,
   Interest,
   ManagedClub,
   NotificationPreferences,
@@ -69,7 +71,8 @@ const eventFields: Record<keyof ApiEvent, true> = {
   promoted: true,
   capacity: true,
   registered: true,
-  categories: true,
+  topics: true,
+  formats: true,
 };
 
 const clubFields: Record<keyof ApiClub, true> = {
@@ -82,6 +85,8 @@ const clubFields: Record<keyof ApiClub, true> = {
   featured: true,
   images: true,
   createdAt: true,
+  category: true,
+  interests: true,
 };
 
 const userFields: Record<keyof User, true> = {
@@ -207,7 +212,18 @@ const notificationPreferencesFields: Record<keyof NotificationPreferences, true>
 const interestFields: Record<keyof Interest, true> = {
   slug: true,
   label: true,
-  category: true,
+  parentSlug: true,
+};
+
+const clubCategoryFields: Record<keyof ClubCategory, true> = {
+  slug: true,
+  label: true,
+};
+
+const eventFormatFields: Record<keyof EventFormat, true> = {
+  slug: true,
+  label: true,
+  groupLabel: true,
 };
 
 /** Backend DTO name → the TypeScript interface mirroring it. */
@@ -227,6 +243,8 @@ const MIRRORS: Record<string, Record<string, true>> = {
   ProfileSocialLinksDTO: profileSocialLinksFields,
   NotificationPreferencesDTO: notificationPreferencesFields,
   InterestDTO: interestFields,
+  ClubCategoryDTO: clubCategoryFields,
+  EventFormatDTO: eventFormatFields,
 };
 
 describe("API contract", () => {
