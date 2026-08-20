@@ -9,7 +9,6 @@ import {
 import {
   checkClubNameExists,
   createClub,
-  prepareClubFormData,
 } from '@/app/lib/services/clubService';
 
 export interface UseCreateClubFormReturn {
@@ -29,6 +28,8 @@ export interface UseCreateClubFormReturn {
   removeImage: (index: number) => void;
   removeLogo: () => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  setCategory: (slug: string | null) => void;
+  setInterests: (slugs: string[]) => void;
 }
 
 export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormReturn {
@@ -37,6 +38,8 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
     description: '',
     logo: null,
     images: [],
+    category: null,
+    interests: [],
     socialLinks: {
       email: '',
       website: '',
@@ -169,6 +172,14 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
     }
   }, []);
 
+  const setCategory = useCallback((slug: string | null) => {
+    setFormData((prev) => ({ ...prev, category: slug }));
+  }, []);
+
+  const setInterests = useCallback((slugs: string[]) => {
+    setFormData((prev) => ({ ...prev, interests: slugs }));
+  }, []);
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -184,16 +195,12 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
           return;
         }
 
-        // Prepare and submit form data
-        const uploadFormData = prepareClubFormData(
-          formData.name,
-          formData.description,
-          formData.logo,
-          formData.images,
-          formData.socialLinks
-        );
-
-        await createClub(uploadFormData);
+        await createClub({
+          name: formData.name,
+          description: formData.description,
+          category: formData.category,
+          interests: formData.interests,
+        });
 
         // Reset form on success
         setFormData({
@@ -201,6 +208,8 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
           description: '',
           logo: null,
           images: [],
+          category: null,
+          interests: [],
           socialLinks: {
             email: '',
             website: '',
@@ -243,5 +252,7 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
     removeImage,
     removeLogo,
     handleSubmit,
+    setCategory,
+    setInterests,
   };
 }

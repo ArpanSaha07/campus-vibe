@@ -67,7 +67,7 @@ public class ClubController {
         club.setId(request.id());
         club.setName(request.name());
         club.setDescription(request.description());
-        return clubService.create(club);
+        return clubService.create(club, request.category(), request.interests());
     }
 
     @PutMapping("/{id}")

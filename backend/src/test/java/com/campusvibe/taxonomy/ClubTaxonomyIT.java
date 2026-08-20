@@ -19,6 +19,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -133,6 +134,53 @@ class ClubTaxonomyIT extends AbstractIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/clubs/robotics"))
 				.andExpect(jsonPath("$.interests", contains("robotics", "tech")));
+	}
+
+	@Test
+	void aClubCanBeClassifiedAtCreation() throws Exception {
+		// Creation is the only moment a creator can set these: PUT demands
+		// canManageClub, and creating a club does not make you its owner. So
+		// the create request carries them, or a new club could never say what
+		// it is until somebody else granted ownership.
+		User anyone = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+
+		Map<String, Object> create = new HashMap<>();
+		create.put("id", "quantum-society");
+		create.put("name", "Quantum Society");
+		create.put("description", "Quantum computing, badly explained.");
+		create.put("category", "departmental");
+		create.put("interests", List.of("tech", "research"));
+
+		mockMvc.perform(post("/api/v1/clubs")
+						.header("Authorization", bearer(anyone))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(create)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.category", is("departmental")))
+				.andExpect(jsonPath("$.interests", contains("research", "tech")));
+	}
+
+	@Test
+	void abadSlugRefusesTheWholeCreation() throws Exception {
+		// Validated before the insert, so a misclassified club never exists at
+		// all rather than existing and being wrong.
+		User anyone = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+
+		Map<String, Object> create = new HashMap<>();
+		create.put("id", "quantum-society");
+		create.put("name", "Quantum Society");
+		create.put("description", null);
+		create.put("category", "secret-society");
+		create.put("interests", List.of());
+
+		mockMvc.perform(post("/api/v1/clubs")
+						.header("Authorization", bearer(anyone))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(create)))
+				.andExpect(status().isBadRequest());
+
+		mockMvc.perform(get("/api/v1/clubs/quantum-society"))
+				.andExpect(status().isNotFound());
 	}
 
 	// ------------------------------------------------------------ refusals

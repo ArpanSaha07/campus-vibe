@@ -48,10 +48,15 @@ public class ClubService {
     }
 
     @Transactional
-    public ClubDTO create(Club club) {
+    public ClubDTO create(Club club, String category, List<String> interests) {
         if (clubRepository.existsById(club.getId())) {
             throw new DuplicateResourceException("Club with id [%s] already exists".formatted(club.getId()));
         }
+        // Validated before the insert, so a bad slug refuses the whole creation
+        // rather than leaving a club that exists but is misclassified.
+        club.setCategorySlug(taxonomyService.requireKnownClubCategory(category));
+        club.getInterestSlugs().addAll(
+                taxonomyService.requireKnownInterests(interests, MAX_CLUB_INTERESTS, "interest"));
         Club saved = clubRepository.save(club);
         searchIndexService.indexClub(saved);
         return clubMapper.apply(saved);

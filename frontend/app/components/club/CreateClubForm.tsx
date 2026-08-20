@@ -1,6 +1,8 @@
 'use client';
 
 import { AlertCircle } from 'lucide-react';
+import InterestPicker from "@/app/components/profile/edit/InterestPicker";
+import { useClubCategories } from "@/app/hooks/useClubCategories";
 import { useCreateClubForm } from '@/app/hooks/useCreateClubForm';
 import { LogoPreview, ImageGallery } from '../PhotoFileUploadPreview';
 import { ClubFormErrorBoundary } from './ClubFormErrorBoundary';
@@ -20,7 +22,11 @@ export default function CreateClubForm() {
     removeImage,
     removeLogo,
     handleSubmit,
+    setCategory,
+    setInterests,
   } = useCreateClubForm();
+
+  const { categories, failed: categoriesFailed } = useClubCategories();
 
   return (
     <ClubFormErrorBoundary>
@@ -83,6 +89,67 @@ export default function CreateClubForm() {
               {errors.description && (
                 <p className="text-red-400 text-sm mt-1">{errors.description}</p>
               )}
+            </div>
+
+            {/* What kind of organisation this is. One value, from a fixed list
+                of thirteen -- see decision D1. Categories load from the server
+                rather than being hardcoded here, so the list cannot drift from
+                the one the foreign key checks against. */}
+            <div>
+              <label htmlFor="category" className="block text-sm font-semibold mb-2">
+                Category
+              </label>
+              <select
+                id="category"
+                value={formData.category ?? ""}
+                onChange={(event) => setCategory(event.target.value || null)}
+                disabled={isSubmitting || categories === null}
+                className="w-full px-4 py-2 bg-gray-100 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              >
+                <option value="">
+                  {categoriesFailed
+                    ? "Categories didn't load"
+                    : categories === null
+                      ? "Loading categories…"
+                      : "Select a category"}
+                </option>
+                {(categories ?? []).map((category) => (
+                  <option key={category.slug} value={category.slug}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-slate-400 text-sm mt-1">
+                What the club <em>is</em>. What it is <em>about</em> goes below.
+              </p>
+            </div>
+
+            {/* What the club is about -- the axis that actually finds it. A
+                category alone cannot answer `show me AI clubs`; these can,
+                because they are the same slugs students pick as their own
+                interests. See decision D7. */}
+            <div>
+              <InterestPicker
+                selected={formData.interests}
+                onChange={setInterests}
+                title="What is this club about?"
+                description="Pick up to eight. Students who share these interests will find you."
+                max={8}
+              />
+            </div>
+
+            {/* Said plainly rather than letting three fields quietly go
+                nowhere. Creating a club grants the creator no authority over
+                it, and all three of these are written by endpoints guarded by
+                canManageClub -- so sending them would 403. See the P0 at the
+                top of todo.md. */}
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+              <p className="text-sm">
+                <strong>The logo, images and links below aren&apos;t saved yet.</strong> A
+                new club has no owner until an administrator approves your request to run
+                it, and only its owner can upload to it. Everything above is saved now;
+                come back for the rest once you have been approved.
+              </p>
             </div>
 
             {/* Club Logo */}

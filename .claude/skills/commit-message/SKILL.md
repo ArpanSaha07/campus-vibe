@@ -21,8 +21,7 @@ git diff --staged           # the changes being described
 git log --format='%s' -15   # recent subject style
 ```
 
-- **Anything staged** → describe **only** the staged changes. Unstaged work is
-  not in this commit and must not appear in the message.
+- **Anything staged** → describe both staged and unstaged changes.
 - **Nothing staged** → fall back to `git diff` and say so when presenting, since
   the user still has to stage.
 - **Untracked files** (`??`) never appear in a diff. Check `git status` and

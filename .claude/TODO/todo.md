@@ -19,13 +19,15 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 ## Next up (in order)
 
-1. **Commit the secrets-management work** — Steps 1-5 are complete and verified. See [Recently completed](tasks-completed.md#completed-work-log).
-2. **P0** — Fix backend CI: JDK 17 → 25, and stop skipping tests ([BUG-002](../bugs/bugs.md#bug-002)).
-3. **P0** — Fix semantic search returning 0 results ([BUG-001](../bugs/bugs.md#bug-001)).
-4. **P1** — Step 6 of the LLM key work: query-embedding cache + rate limiting ([BUG-005](../bugs/bugs.md#bug-005)).
-5. **P1** — Decide JWT transport (localStorage vs httpOnly cookie) and fix route protection ([BUG-003](../bugs/bugs.md#bug-003)).
-6. **P1** — Backfill club embeddings with `POST /api/v1/search/reindex`, now that an admin account exists. All 8 clubs have `embedding IS NULL`, so the semantic half of club search matches nothing.
-7. **P0** — Two auth findings from the 2026-08-15 review, both small: fail closed on a blank `GOOGLE_CLIENT_ID` ([BUG-030](../bugs/bugs.md#bug-030)) and check `email_verified` ([BUG-031](../bugs/bugs.md#bug-031)). See [Security](#security).
+1. **P0** — **Creating a club leaves you unable to manage it.** `POST /api/v1/clubs` needs only `ROLE_USER` and grants the creator nothing; ownership arrives only when a platform admin approves a club-admin request. So the logo, the banner images and the social links the create form collects **cannot be sent** — all three go through endpoints guarded by `canManageClub`, and the creator gets a 403 on their own club. The form now says so rather than dropping them silently. Fix is a decision, not code: either the creator becomes `CLUB_OWNER` on create (touches the one-owner invariant in `club_admin_governance.md`), or club creation moves behind admin approval entirely.
+2. **P2** — **An event cannot be given a banner image from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)).
+3. **Commit the secrets-management work** — Steps 1-5 are complete and verified. See [Recently completed](tasks-completed.md#completed-work-log).
+4. **P0** — Fix backend CI: JDK 17 → 25, and stop skipping tests ([BUG-002](../bugs/bugs.md#bug-002)).
+5. **P0** — Fix semantic search returning 0 results ([BUG-001](../bugs/bugs.md#bug-001)).
+6. **P1** — Step 6 of the LLM key work: query-embedding cache + rate limiting ([BUG-005](../bugs/bugs.md#bug-005)).
+7. **P1** — Decide JWT transport (localStorage vs httpOnly cookie) and fix route protection ([BUG-003](../bugs/bugs.md#bug-003)).
+8. **P1** — Backfill club embeddings with `POST /api/v1/search/reindex`, now that an admin account exists. All 8 clubs have `embedding IS NULL`, so the semantic half of club search matches nothing.
+9. **P0** — Two auth findings from the 2026-08-15 review, both small: fail closed on a blank `GOOGLE_CLIENT_ID` ([BUG-030](../bugs/bugs.md#bug-030)) and check `email_verified` ([BUG-031](../bugs/bugs.md#bug-031)). See [Security](#security).
 
 ---
 

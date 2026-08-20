@@ -454,8 +454,19 @@ export type PillProps = {
 export interface ClubFormData {
   name: string;
   description: string;
+  /**
+   * Collected, previewed, and **not sent yet**. Both uploads go through
+   * endpoints guarded by `canManageClub`, and creating a club does not make you
+   * its owner — see the note on `createClub` and the club-creation items in
+   * `todo.md`.
+   */
   logo: File | null;
   images: File[];
+  /** A `club_categories` slug. */
+  category: string | null;
+  /** `interest_catalogue` slugs — what the club is about, capped at eight. */
+  interests: string[];
+  /** Also collected and not sent yet, for the same reason as the uploads. */
   socialLinks: {
     email: string;
     website: string;

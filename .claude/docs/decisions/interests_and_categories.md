@@ -604,17 +604,45 @@ data layer.** What remains is the two authoring forms, and why is below.
       leaves only, the event page rendering labels under a *Tags* heading.
 - [x] **`CategoriesSectionMainPage.tsx` deleted** — dead code, imported nowhere.
 
-### What is left, and what blocks it
+- [x] **A category select and a tag picker on the club form**, and the club
+      service moved onto `apiFetch` to make that possible. It had been calling
+      `/api/clubs/check-name` and `/api/clubs/create` — relative paths with no
+      version prefix, and there are no Next route handlers in this app, so
+      **club creation had never worked from the UI at all**. It now posts to
+      `POST /api/v1/clubs`, which gained `category` and `interests` on its
+      request: creation is the only moment a creator can set them, because
+      `PUT /clubs/{id}` demands `canManageClub` and creating a club grants
+      nothing. `InterestPicker` was generalised with a title, a description and
+      an optional cap rather than copied.
 
-- [ ] **A category select and a tag picker on the club form.** The form writes
-      through `lib/services/clubService.ts`, which uses raw relative `fetch`
-      rather than `apiFetch` and sits outside the main idiom. Wiring taxonomy
-      into it means moving it onto `apiFetch` first, or the new fields inherit
-      that oddity.
-- [ ] **A tag picker on the event form.** `CreateEventForm.tsx` has **no state
-      and no submit handler at all** — it is markup. There is nothing to add a
-      picker to yet, and adding one would produce a control that cannot save.
-      The endpoint accepts `topics` and `formats` today, so the form is the only
-      missing piece.
-- [ ] **Nothing has been rendered in a browser.** Same gap as the profile work.
+- [x] **A working create-event form, with both pickers.** The old one was 237
+      lines of uncontrolled inputs with no state and no submit handler — a form
+      in appearance only, beside a Maps embed carrying a literal
+      `YOUR_API_KEY` — so there was nothing to hang a picker on. Replaced
+      rather than extended. The club select offers only clubs the user manages,
+      because authorisation here is club-scoped and anything else would just
+      produce 403s. `EventFormatPicker` is its own component rather than a
+      third reuse of `InterestPicker`: a format's group is a plain label
+      nothing is tagged with, so there is no hierarchy to flatten, and
+      twenty-two entries in five groups need no search box.
+
+### What is left
+
+- [ ] **Nothing has been rendered in a browser.** Same gap as the profile work,
+      and now the larger of the two: three pickers, two selects and a
+      datetime-local input have been type-checked and integration-tested but
+      never looked at.
+
+### A blocker this work uncovered
+
+**Creating a club leaves the creator unable to manage it**, which is why the
+club form can save a name, description, category and tags but not a logo, banner
+images or social links — those three go through `canManageClub` endpoints, and
+`POST /api/v1/clubs` needs only `ROLE_USER` and grants nothing. The form now
+says so on screen rather than dropping three fields silently.
+
+This is not a taxonomy problem and is deliberately not fixed here: making the
+creator `CLUB_OWNER` touches the one-owner invariant in
+`club_admin_governance.md`, and is a governance decision rather than a side
+effect of wiring a picker. Queued as item 1 in *Next up*.
 

@@ -27,9 +27,22 @@ import { inputClasses, selectClasses } from "@/app/components/ui/FormField";
 export default function InterestPicker({
   selected,
   onChange,
+  title = "Your interests",
+  description = "We'll use these to suggest clubs and events worth your time.",
+  max,
 }: {
   selected: string[];
   onChange: (interests: string[]) => void;
+  /** Overridden where this is not a profile — a club picks topics, not hobbies. */
+  title?: string;
+  description?: string;
+  /**
+   * Optional ceiling. A profile has none: somebody interested in everything
+   * only gets a busier feed, which is their business. A club has one, because a
+   * club tagged with everything matches every student and quietly degrades
+   * recommendations for all of them.
+   */
+  max?: number;
 }) {
   const { interests, failed } = useInterestCatalogue();
   const [category, setCategory] = useState("");
@@ -48,6 +61,8 @@ export default function InterestPicker({
     [interests],
   );
 
+  const atLimit = max !== undefined && selected.length >= max;
+
   const available = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const chosen = new Set(selected);
@@ -63,10 +78,14 @@ export default function InterestPicker({
 
   return (
     <div>
-      <h2 className="font-display text-xl font-bold text-ink-900">Your interests</h2>
-      <p className="mt-1 text-sm text-ink-600">
-        We&apos;ll use these to suggest clubs and events worth your time.
-      </p>
+      <h2 className="font-display text-xl font-bold text-ink-900">{title}</h2>
+      <p className="mt-1 text-sm text-ink-600">{description}</p>
+
+      {atLimit && (
+        <p className="mt-3 text-sm font-semibold text-ink-600">
+          That&apos;s {max} — the most you can pick. Remove one to swap it out.
+        </p>
+      )}
 
       {selected.length > 0 ? (
         <ul className="mt-4 flex flex-wrap gap-2">
@@ -135,9 +154,10 @@ export default function InterestPicker({
             <li key={interest.slug}>
               <button
                 type="button"
+                disabled={atLimit}
                 onClick={() => onChange([...selected, interest.slug])}
                 aria-label={`Add ${interest.label}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-mist-200 px-4 py-2 text-xs font-semibold text-ink-900 transition-colors hover:border-lavender-300 hover:bg-lavender-50"
+                className="inline-flex items-center gap-1.5 rounded-full border border-mist-200 px-4 py-2 text-xs font-semibold text-ink-900 transition-colors hover:border-lavender-300 hover:bg-lavender-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-mist-200 disabled:hover:bg-transparent"
               >
                 {interest.label}
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
