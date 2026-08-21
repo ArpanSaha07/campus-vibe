@@ -118,8 +118,6 @@ export default async function EventPage({ params }: EventPageProps) {
         )}
       </div>
 
-      <div className="ticket-divider" aria-hidden="true" />
-
       <div className="px-5 py-4">
         <Button size="lg" className="w-full">
           Save your spot

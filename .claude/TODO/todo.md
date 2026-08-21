@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-08-20** · Branch: `feature/user-profile`
+Last updated: **2026-08-21** · Branch: `feature/user-profile`
 
 Project knowledge — what the code does and why — lives in
 [`.claude/docs/`](../docs/README.md). Read that index before changing a
@@ -102,6 +102,49 @@ log. The rest, in the spec's order:
   `official_email` to be real first, and needs an admin account to exist.
 
 ## Frontend / Features
+
+### Taxonomy — built, and almost entirely unread
+
+Audited 2026-08-21. The three vocabularies are seeded, foreign-keyed, served and
+writable, and both authoring forms set them. **Almost nothing reads them back.**
+Today the only consumer of a club's category or tags is the text handed to the
+embedder, and BUG-001 means the semantic leg does not work — so in practice the
+taxonomy is currently write-only. Ordered by how visible the gap is.
+
+- [ ] **P1** **A club page shows neither its category nor its tags.** `ClubDTO`
+      carries both, `toClub` maps them onto `Club`, `types/index.ts` documents
+      them — and `(main)/clubs/[clubId]/page.tsx` renders neither. The data
+      travels the whole way and stops one line short of the screen. A club admin
+      picks a category and up to eight tags at creation and no visitor can ever
+      see them.
+- [ ] **P1** **Nothing browses by category or by tag.** `GET /api/v1/clubs` takes
+      no category parameter, `(main)/clubs/page.tsx` is a flat grid with no
+      filter, and `/events` filters only on free-text `?q=`. D6 deleted the
+      homepage tiles on the explicit promise that *browsing by club category or
+      by event tag is a real filter against a real foreign key, and it belongs on
+      `/events` and `/clubs`* — the replacement was never built, so the delete
+      removed a bad filter and left none.
+- [ ] **P1** **A club's category and tags cannot be changed after creation.**
+      `PUT /api/v1/clubs/{id}` accepts `category` and `interests`, and there is
+      no `updateClub` anywhere in the frontend — `/manage/[clubId]` has no
+      club-details editor at all. Creation is the only moment, permanently.
+      Compounded by the P0 above it: the creator cannot manage the club anyway,
+      so the only route to a fix is an endpoint no screen reaches.
+- [ ] **P2** **A profile never shows its own interests.** `/profile/edit/interests`
+      writes them; `ProfileAboutCard` renders degree, faculty and subjects and
+      stops. So `showInterests` — the toggle at `profile/edit/page.tsx:164` — is
+      a boolean with **no reader on either side of the wire**, as is
+      `showSocialLinks`. Both were built for a public profile view that does not
+      exist yet, which is a defensible reason to have written them and not a
+      reason to leave them unread without a note.
+- [ ] **P2** **Every seeded club is unclassified and every seeded event
+      untagged.** V6 inserts sixteen mock clubs, all with `category_slug` null
+      and zero `club_interests` rows, and no migration seeds a topic or format
+      assignment. Whatever gets built above will render empty against dev data,
+      and so will any eyeball check of it. Classifying the sixteen is one seed
+      migration and is the cheapest of these by a distance — do it first, or the
+      others cannot be looked at.
+
 
 - [ ] **P1** Fix route protection — `proxy.tsx` is never executed by Next.js (wrong filename *and* wrong export name), and it reads a cookie while the JWT lives in localStorage. Decide the token transport first; a half-wired guard is worse than none. ([BUG-003](../bugs/bugs.md#bug-003))
 - [ ] **P2** Fix `NEXT_PUBLIC_*` in the **production** Docker build — values are inlined at build time, so the deployed frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. No longer affects local dev, which now builds the `dev` stage and reads them at runtime. ([BUG-004](../bugs/bugs.md#bug-004))

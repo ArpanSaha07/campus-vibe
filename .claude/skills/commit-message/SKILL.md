@@ -173,3 +173,27 @@ inspected, inspect it or leave it out and name what was skipped.
 **Report accurately.** A known-failing test, a skipped step, or a part left out
 on purpose belongs in the body. A message that overstates what landed is worse
 than none.
+
+**No opinions, and never address the user.** The message goes into the log as
+the user's own words, read by people who were never in this conversation. A
+sentence such as `It is not mine and not part of this audit; split it out if you
+would rather` fails twice over: there is no *me* in a commit, and by the time
+anyone reads it the suggestion is moot — the commit already happened.
+
+Keep all of this out of the message:
+
+| Out | Because |
+|---|---|
+| First person meaning Claude — `I found`, `not mine`, `my audit` | The commit's author is the user. Claude is not a party to it. |
+| Second person — `split it out if you would rather`, `you may want to` | Addresses someone who is not reading. The user reads chat; `git log` readers are strangers. |
+| Hedging — `hopefully this works`, `I think this is right` | A commit records what was done, not how confident anyone felt. |
+| Praise or apology — `a clean solution`, `sorry about the churn` | Neither is a fact about the change. |
+
+**The dividing line is fact versus advice.** `Also carries an unrelated two-line
+change removing the ticket-divider on the event page` is a fact about what is in
+this commit and belongs. `Split it out if you would rather` is advice, and does
+not.
+
+Recommendations, doubts and split suggestions belong in the **chat response**,
+where the user can still act on them. This is what the `Types` section means by
+raising an unrelated half *when presenting* — in chat, not in the file.

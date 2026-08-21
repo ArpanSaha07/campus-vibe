@@ -628,10 +628,47 @@ data layer.** What remains is the two authoring forms, and why is below.
 
 ### What is left
 
+Audited 2026-08-21 against the code, not against this checklist. Everything the
+checklist claimed is genuinely there — and the audit found that the checklist was
+asking the wrong question. It tracked *can a club or an event be classified*,
+which is done. It never asked *does classifying one change anything a person
+sees*, and the answer to that is almost entirely no.
+
+**The write path is complete and the read path barely exists.** Both authoring
+forms set every vocabulary, the caps hold, the foreign keys hold, and the only
+thing consuming a club's category or tags afterwards is the string handed to the
+embedder — which BUG-001 stops from working. So today the taxonomy is, in
+practice, write-only. That is not a flaw in any decision above; D1 through D7 are
+unaffected. It is the half of the work that follows them.
+
+Filed in full under *Taxonomy — built, and almost entirely unread* in
+[`todo.md`](../../TODO/todo.md), and in short:
+
+- [ ] **A club page renders neither its category nor its tags** — the data
+      reaches `Club` on the client and is never drawn.
+- [ ] **Nothing browses by category or tag.** D6 deleted the homepage tiles on
+      the promise of a real filter on `/clubs` and `/events`; that filter does
+      not exist, so the delete removed a bad answer and left none. This is the
+      one item that is a debt against a decision in this document rather than
+      merely unbuilt work.
+- [ ] **Neither can be changed after creation** — `PUT /clubs/{id}` accepts both
+      and no frontend code calls it; an event has no update endpoint at all.
+- [ ] **A profile never shows its interests**, which leaves `showInterests` a
+      stored boolean with no reader anywhere.
+- [ ] **No seeded club is classified and no seeded event tagged** — sixteen mock
+      clubs, `category_slug` null on every one. Cheapest item here and a
+      prerequisite for looking at any of the others.
 - [ ] **Nothing has been rendered in a browser.** Same gap as the profile work,
       and now the larger of the two: three pickers, two selects and a
       datetime-local input have been type-checked and integration-tested but
-      never looked at.
+      never looked at. Worth doing *after* the seed, since against today's data
+      every picker saves into a void nothing displays.
+
+**Test state at the audit**, both suites run in full: frontend `npm run verify`
+green on all four checks; backend 248 tests with one failure, the pre-existing
+BUG-001, and the 57 unit tests clean. Migration lint green across 30. The four
+taxonomy suites — `ClubTaxonomyIT`, `EventTaxonomyIT`, `InterestCatalogueIT` and
+the contract pair — all pass.
 
 ### A blocker this work uncovered
 
