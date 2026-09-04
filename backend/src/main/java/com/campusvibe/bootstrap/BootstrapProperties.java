@@ -27,7 +27,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record BootstrapProperties(
         boolean enabled,
         String email,
-        String password
+        String password,
         String name
 ) {
     public BootstrapProperties {
