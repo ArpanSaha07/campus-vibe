@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-08-16**
+Last updated: **2026-09-03**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-035](#bug-035) | High | 2026-09-03 | Backend jar shipped Tomcat 10.1.55 with three CRITICAL CVEs, and the parent-version lever that fixed this last time was exhausted |
 | [BUG-034](#bug-034) | High | 2026-08-16 | Every club ever created had `embedding` NULL — the index UPDATE ran before Hibernate had inserted the row |
 | [BUG-033](#bug-033) | Medium | 2026-08-16 | Three log statements interpolated caller-supplied text, so a newline could forge log entries |
 | [BUG-032](#bug-032) | Medium | 2026-08-16 | The rate-limit 429 built its JSON by string interpolation, escaping nothing and omitting a field every other error carries |
@@ -28,6 +29,120 @@ Last updated: **2026-08-16**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-035
+**Backend jar shipped Tomcat 10.1.55 with three CRITICAL CVEs** · High · FIXED 2026-09-03
+
+**Found:** 2026-09-03, Docker workflow → *Scan images for known vulnerabilities*,
+[run 33825682549](https://github.com/ArpanSaha07/campus-vibe/actions/runs/33825682549/job/100877748407)
+on [PR #39](https://github.com/ArpanSaha07/campus-vibe/pull/39).
+
+**Symptom:** three fixable CRITICALs, all `lang-pkgs`, all one library, all inside
+`app/app.jar`. The `alpine 3.24.1` layer reported **0**, and the production
+frontend image reported **0 fixable HIGH and 0 CRITICAL** — it still holds the
+[BUG-016](#bug-016) result. Same shape as [BUG-019](#bug-019), one bump later.
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `tomcat-embed-core` | CVE-2026-65182 — bypass of the longest-prefix security constraint | 10.1.55 | 10.1.58 |
+| `tomcat-embed-core` | CVE-2026-65905 — limited replay attack against DIGEST authentication | 10.1.55 | 10.1.58 |
+| `tomcat-embed-core` | CVE-2026-68525 — redirect after FORM auth bypasses method-specific constraints | 10.1.55 | 10.1.58 |
+
+Checked against the GitHub Advisory Database rather than read off the scanner:
+Trivy renders one merged *Fixed Version* cell across all three rows, which looks
+like an assumption until you confirm each advisory separately gives
+`org.apache.tomcat.embed:tomcat-embed-core` the range `>= 10.1.0-M1, < 10.1.58`.
+
+**Cause.** Identical to BUG-019, and worth repeating because it is the recurring
+shape: `tomcat-embed-core` appears nowhere in `pom.xml`. It arrives transitively
+through `spring-boot-starter-web`, and its version is dictated by
+`spring-boot-starter-parent` 3.5.16, whose BOM sets
+`<tomcat.version>10.1.55</tomcat.version>`.
+
+Nothing in this repository changed between the green run and the red one. These
+are newly published advisories, not newly reached code — the second time that
+has happened here, which makes it a property of pinning a framework rather than
+an incident.
+
+**Two things made this one different from BUG-019.**
+
+**1. The parent-version lever is exhausted.** BUG-019 fixed the same failure by
+moving the parent 3.5.5 → 3.5.16 and recorded that *"the parent version is the
+only lever — overriding `<tomcat.version>` by hand would leave the rest of the
+tree on 3.5.5's matrix."* That reasoning held while the 3.5 line still had room
+above the pin. It does not hold now: **3.5.16 is the newest 3.5.x published**.
+The next parent is 4.0.0 — a major, which `todo.md` records as failing both CI
+tiers (Dependabot `#17`), and taking a framework migration as a CVE remedy is
+exactly what BUG-019 refused to do. So the override BUG-019 dismissed is what is
+left, and it is in any case Spring Boot's own documented mechanism: the BOM
+declares all four `tomcat-embed-*` artifacts at `${tomcat.version}`, so a child
+property moves them together rather than desynchronising them.
+
+**2. The version the advisories name does not exist.** Every advisory says the
+fix is **10.1.58**. Maven Central has no such artifact — the published 10.1.5x
+line runs 55, 56, 57, **59**; the `10.1.58/` directory returns 404. Copying the
+number out of the scanner report gives a build that cannot resolve, with an error
+that says nothing about why. **10.1.59** is the first release that both exists
+and satisfies the range.
+
+**Fix.** `<tomcat.version>10.1.59</tomcat.version>` in `backend/pom.xml`
+`<properties>`, with the parent left at 3.5.16. The comment on the property
+records the 10.1.58 trap and the condition for removing the override (a parent
+that manages 10.1.58 or newer), so a later tidy-up does not quietly reintroduce
+three CRITICALs. The stale comment on the parent `<version>` — which claimed
+3.5.16 was the floor for the Trivy gate — was corrected at the same time, since
+left alone it points the next reader at the wrong lever.
+
+**Verified locally, 2026-09-03**, with Docker Desktop running. Version identity
+is strong evidence for these three findings and silent about any fourth, so the
+gate itself was replayed rather than inferred, with Trivy **0.74.0** — the same
+version `_docker.yml` installs — run from the `aquasec/trivy` image against the
+daemon:
+
+| Check | Result |
+|---|---|
+| `./mvnw -B verify -DskipITs` | BUILD SUCCESS, **39/39** unit tests |
+| `./mvnw -B verify` (full) | BUILD SUCCESS, **149/149** — 39 unit + 110 integration, `SearchIT` included |
+| `dependency:list` | `tomcat-embed-core`/`-el`/`-websocket` all **10.1.59**; `spring-security-*` unchanged at **6.5.11** |
+| Fat jar contents | `BOOT-INF/lib/tomcat-embed-core-10.1.59.jar` |
+| **Gate — fixable CRITICAL** | **exit 0** · alpine **0** · `app/app.jar` **0** |
+| Container boots | Tomcat starts, `/actuator/health` `{"status":"UP"}` |
+| CI smoke replay | `/ping` `Pong: 2` · `/api/v1/clubs` **8** · `clubs/search?q=coding` **1** hit · `/my-club` **403** |
+
+The boot check is not ceremony. Spring Boot reaches into Tomcat internals through
+`TomcatServletWebServerFactory`, so a Tomcat bump under a fixed Boot version is
+not structurally free the way a leaf-library bump is; a resolved version proves
+the jar changed, not that the server still starts.
+
+**New fixable-HIGH baseline for the backend image**, measured in the same run —
+**12 findings, 0 CRITICAL**, none of which the gate can see. Tomcat is now absent
+from HIGH as well as CRITICAL:
+
+| Class | Library | CVE | Installed | Fixed in | Whose to fix |
+|---|---|---|---|---|---|
+| `os-pkgs` | `libcrypto3`, `libssl3`, `openssl` | CVE-2026-14456 | 3.5.7-r0 | 3.5.8-r0 | `eclipse-temurin:25-jdk-alpine` |
+| `os-pkgs` | `libexpat` | CVE-2026-66046, -76641 | 2.8.3-r0 | 2.8.4-r0 | same base image |
+| `lang-pkgs` | `commons-io` | CVE-2024-47554 | 2.11.0 | 2.14.0 | **ours** — hard-pinned in `pom.xml` |
+| `lang-pkgs` | `netty-codec` | CVE-2026-59901 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http` | CVE-2026-55831, -55833, -56745 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http2` | CVE-2026-56819 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `org.postgresql:postgresql` | CVE-2026-54291 | 42.7.11 | 42.7.12 | BOM |
+
+The `p11-kit` pair from the BUG-019 table is gone; `libcrypto3`/`libssl3`/
+`openssl` are new. The `lang-pkgs` half is unchanged from BUG-019, including the
+open question it left: all five netty artifacts still enter through
+`software.amazon.awssdk:s3` → `netty-nio-client`, the SDK's *async* transport, so
+if the S3 client in use is synchronous an `<exclusion>` deletes five of the twelve
+outright. Still worth establishing before bumping anything.
+
+**Deliberately left alone:** everything in the HIGH table. The gate is
+CRITICAL-only, none of these blocks CI, and `commons-io` in particular is part of
+the hard-pinned, BOM-free block that Dependabot's maven entry exists to service.
+Tightening the gate to HIGH remains blocked for the same reason as before.
+
+**Affected files:** `backend/pom.xml`
 
 ---
 

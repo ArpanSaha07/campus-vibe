@@ -90,6 +90,7 @@ jobs:
           ANALYSED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           ANALYSED_BRANCH: ${{ github.event.inputs.branch || github.event.workflow_run.head_branch || github.ref_name }}
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
             --allowedTools "Bash(gh api:*),Bash(gh pr:*),Bash(echo:*),Read,Grep,Glob"
