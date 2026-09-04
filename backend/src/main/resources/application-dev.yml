@@ -1,0 +1,18 @@
+# Local development overrides. NON-SECRET VALUES ONLY.
+#
+# Activated by SPRING_PROFILES_ACTIVE=dev, which docker/docker-compose.yml now
+# sets by default.
+#
+# Creating this profile is what makes @Profile("dev") work at all. Until it
+# existed no profile was ever active locally, so a bean annotated @Profile("dev")
+# would compile, deploy and silently never run — with no error to notice.
+#
+# Production sets SPRING_PROFILES_ACTIVE=prod, so nothing here can reach it and
+# DevDataSeeder cannot execute there.
+
+campusvibe:
+  seed:
+    # Recreates the demo clubs that V6__insert_mock_clubs.sql used to insert
+    # through Flyway — but through ClubService, so `embedding` is written on the
+    # way in. Idempotent: skipped entirely when any club already exists.
+    enabled: ${DEV_SEED_ENABLED:true}

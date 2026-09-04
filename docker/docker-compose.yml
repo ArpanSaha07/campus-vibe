@@ -51,6 +51,11 @@ services:
       dockerfile: backend/Dockerfile
     container_name: campusvibe-backend
     environment:
+      # Activates application-dev.yml, which is what makes @Profile("dev") beans
+      # run at all — DevDataSeeder above all. Production sets this to `prod`,
+      # where the seeder is not registered and cannot execute.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-campusvibe}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-arpan}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in docker/.env}
@@ -78,6 +83,18 @@ services:
       MAIL_FROM: ${MAIL_FROM:-no-reply@campusvibe.local}
       # Links point at the frontend, so this is a browser-reachable address.
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+
+      # Grants ROLE_ADMIN to one existing account at startup. Off by default:
+      # with it enabled and an email set, sign up through the app first, then
+      # restart to be promoted. Never revokes — see AdminBootstrapRunner.
+      APP_BOOTSTRAP_ADMIN_ENABLED: ${APP_BOOTSTRAP_ADMIN_ENABLED:-false}
+      APP_BOOTSTRAP_ADMIN_EMAIL: ${APP_BOOTSTRAP_ADMIN_EMAIL:-}
+      APP_BOOTSTRAP_ADMIN_PASSWORD: ${APP_BOOTSTRAP_ADMIN_PASSWORD:-}
+      APP_BOOTSTRAP_ADMIN_NAME: ${APP_BOOTSTRAP_ADMIN_NAME:-Administrator}
+
+      # Loads the demo clubs when the clubs table is empty. Set false for a
+      # deliberately empty local database.
+      DEV_SEED_ENABLED: ${DEV_SEED_ENABLED:-true}
 
       AUTH_REQUIRE_VERIFIED_EMAIL: ${AUTH_REQUIRE_VERIFIED_EMAIL:-false}
       AUTH_RATE_LIMIT_ENABLED: ${AUTH_RATE_LIMIT_ENABLED:-true}

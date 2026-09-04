@@ -5,7 +5,7 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-08-14**
+Last updated: **2026-08-18**
 
 ```
 .claude/docs/
@@ -38,6 +38,7 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`user-roles.md`](architecture/user-roles.md) | RBAC: the three roles, multi-role support, JWT claims, endpoint authorisation. **Cited as authority by four source files** | ⚠ Part spec, part as-built |
 | [`authentication.md`](architecture/authentication.md) | The two sign-in methods (Google ID token, email + password), JWT issuing and per-request verification, bcrypt, the auth modal · measured endpoint behaviour · **14 known gaps incl. 4 security findings** | ✅ Live · rewritten from the code 2026-08-15 · **not security-reviewed** |
 | [`search.md`](architecture/search.md) | Why hybrid semantic search (embeddings in pgvector + keyword rank) rather than the alternatives | ⚠ Pre-implementation design note |
+| [`aws-deployment.md`](architecture/aws-deployment.md) | Production packaging for Elastic Beanstalk: the second Dockerfile and why it exists, `scripts/package-eb.mjs`, the JVM sizing for a 1 GiB instance, the PostgreSQL 15 pin, and the HTTPS-without-an-ALB resolution | ⚠ **Phase 1 only** · packaging verified locally; nothing runs on AWS yet |
 
 **On the ⚠ marks.** These predate the documentation standard and were moved into
 this folder on 2026-08-06 without being re-verified against the code. Each

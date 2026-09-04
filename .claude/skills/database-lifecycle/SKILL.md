@@ -30,13 +30,23 @@ not silently rewrite them.
 
 | Deviation | Status |
 |---|---|
-| `V6__insert_mock_clubs.sql` seeds 8 clubs + images through Flyway | Applied (rank 6). Violates the mock-data rule. Retire by superseding, never by deleting the file. |
+| `V6__insert_mock_clubs.sql` seeds 8 clubs + images through Flyway | **Retired 2026-08-16** by `V12__remove_mock_club_seed_data.sql`. Both files stay: deleting V6 breaks Flyway validation. The clubs now come from `seed/DevDataSeeder` under the `dev` profile. |
 | `V7__multi_role_rbac.sql` creates tables AND inserts the 3 role rows | Applied. Mixes schema with reference data. Leave as-is; keep them separate going forward. |
-| No `dev` profile or `application-dev.yml` exists | Must be created before any `@Profile("dev")` seeder will run. `docker-compose.yml` sets no `SPRING_PROFILES_ACTIVE`. |
+| No `dev` profile or `application-dev.yml` exists | **Resolved 2026-08-16.** `application-dev.yml` exists and `docker-compose.yml` sets `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}`. |
 
-Because there is no `dev` profile yet, a seeder annotated `@Profile("dev")`
-would compile, deploy, and never execute — with no error. Create the profile and
-activate it in `docker/docker-compose.yml` first. See PLAN.md Step 1.
+Steps 1–4 of PLAN.md's Implementation Sequence are therefore done; Step 5
+(production posture in Elastic Beanstalk) is not, and automated tests for the
+bootstrap and seeder are still open in `todo.md` — their verification so far was
+manual.
+
+**The lesson worth carrying forward** is the one that step turned up. Seeding
+through the service layer is mandated here so that derived columns get written,
+but doing it exposed that `ClubService.create` was not writing them either
+([BUG-034](../../bugs/fixed_bugs.md#bug-034)): `Club.id` is assigned rather than
+generated, so Hibernate had not issued the INSERT when the raw-JDBC embedding
+UPDATE ran, and it silently matched zero rows. Any code that mixes a JPA write
+with a `JdbcTemplate` write in one transaction needs a flush between them —
+`JdbcTemplate` is not a JPA query and will not trigger one.
 
 ---
 

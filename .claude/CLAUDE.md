@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-CampusVibe is a university event management platform inspired by Eventbrite. The goal is to provide a single place where students can discover events happening on or around campus while giving university clubs a dashboard to manage their events and club pages.
+CampusVibe is a university event management platform. The goal is to provide a single place where students can discover events happening on or around campus while giving university clubs a dashboard to manage their events and club pages.
 
 Target audience: **University students and student clubs**
 
@@ -58,13 +58,24 @@ not been reconciled with the code, so read it with the same suspicion.
 - PostgreSQL
 
 ## Infrastructure
-- Docker
-- AWS S3 (event banners, club logos)
 - GitHub Actions (CI/CD)
 
 ## Testing
 - Frontend: React Testing Library + Jest
 - Backend: JUnit + Integration Tests
+- Frontend + Backend DTO contract Tests
+
+## Deployment
+- Frontend on Vercel
+- AWS Elastic Beanstalk (Spring Boot Docker container)
+- AWS S3 (event banners, club logos, images)
+- AWS RDS PostgreSQL (private database)
+
+## Local development
+- Three docker containers (frontend, backend, database)
+- Fake S3 for testing (future)
+
+
 
 ---
 
@@ -73,10 +84,22 @@ not been reconciled with the code, so read it with the same suspicion.
 ```
 campusvibe/
 ├── frontend/      # Next.js application
-├── backend/       # Spring Boot API
-├── db/            # PostgreSQL configuration
-├── docker/        # Docker & Compose
-└── .github/       # CI/CD workflows
+├── backend/       # Spring Boot API. Flyway migrations live in
+│                  #   src/main/resources/db/migrations
+├── contracts/     # The frontend/backend API contract — one list of JSON field
+│                  #   names per DTO. A test on EACH side asserts against it,
+│                  #   which is the only thing catching a rename that would
+│                  #   otherwise break the browser with both suites green.
+├── docker/        # Docker & Compose. Also where PostgreSQL is configured —
+│                  #   the pgvector image, volumes and env wiring.
+├── scripts/       # verify.mjs (runs what CI runs, locally) · check-docs.mjs +
+│                  #   docs-map.json (which doc covers the code you touched)
+├── .githooks/     # pre-push, running verify.mjs before code leaves the machine.
+│                  #   Enable per clone: git config core.hooksPath .githooks
+├── .github/       # CI/CD workflows. ci.yml gates merges; branch-checks.yml is
+│                  #   the fast push loop; _*.yml are reusable, never triggered.
+└── .claude/       # This file, plus the knowledge base it maps to:
+                   #   docs/ · TODO/ · bugs/ · skills/ · design-guidelines.md
 ```
 
 ---
@@ -112,12 +135,12 @@ campusvibe/
 - Event pages
 - Club pages
 - Event categories
-- Category filtering
+- AI planner card
 - Responsive design
 
 ## Authentication
 - Email + password login
-- Passwordless email code login
+- Google sign-in
 - Persistent login using secure cookies
 
 ## User Features
@@ -126,6 +149,8 @@ campusvibe/
 - Personalized profile
 - Notifications (future)
 - Google Calendar export
+- AI planner
+
 
 ## Club Dashboard
 - Create/edit/delete events
@@ -142,6 +167,9 @@ campusvibe/
 - Hybrid semantic search for:
   - Events
   - Clubs
+
+# AI Planner
+- Create personalised plans and recommendations based on available clubs and events.
 
 ---
 
@@ -199,6 +227,3 @@ campusvibe/
 - Write clean, modular, production-quality code.
 - Suggest improvements that follow modern Next.js and Spring Boot best practices.
 - If you attempt a solution or test **three times without making progress, stop and inform me instead of continuing to iterate.**
-
-## Informational websites:
-- NextJS folder structure guidelines: https://medium.com/@kaveeshbc/building-production-grade-next-js-part-1-architecture-structure-c3b0e448d8f0
