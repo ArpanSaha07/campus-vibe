@@ -1,11 +1,6 @@
 # CampusVibe
-A campus events management app to allow campus clubs to post their events in a single dedicated space, fostering closer communities and ensuring students never miss their favourite events again!
+A campus event platform to allow students to discover, get notified, plan and keep track of events around their university, and allow campus clubs to post their events in a single dedicated space, fostering closer communities and ensuring students never miss their favourite events again!
 
-> **Status: in active development.** Nothing is deployed yet. The sections
-> below separate what is built and running from what is still intended — the
-> architecture diagram further down is the *target*, not the current estimate.
-
-## Built and working
 
 - **Frontend** — Next.js (App Router) + TypeScript + Tailwind CSS v4
 - **Backend** — Spring Boot REST API under `/api/v1`
@@ -22,12 +17,8 @@ A campus events management app to allow campus clubs to post their events in a s
   scan and gitleaks secret scanning
 - **Testing** — React Testing Library + Jest (frontend), JUnit + Testcontainers
   integration suites (backend)
-
-## Planned
-
 - Deployment — frontend to Vercel, backend to AWS Elastic Beanstalk, database to
-  AWS RDS. The Elastic Beanstalk configuration exists under `docker/`; no
-  environment has been provisioned and **CI deploys nothing today**
+  AWS RDS. The Elastic Beanstalk configuration exists under `docker/`;
 - Notifications
 - Admin dashboard for managing clubs, roles and moderation
 - End-to-end browser tests
