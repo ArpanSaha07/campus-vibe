@@ -24,12 +24,12 @@
   "EventDTO": [
     "id", "title", "description", "dateTime", "createdAt", "location", "price",
     "organizerId", "organizerName", "followers", "images", "promoted",
-    "capacity", "registered", "categories"
+    "capacity", "registered", "topics", "formats"
   ],
 
   "ClubDTO": [
     "id", "name", "description", "followers", "logo", "socialLinks",
-    "featured", "images", "createdAt"
+    "featured", "images", "createdAt", "category", "interests"
   ],
 
   "UserDTO": [
@@ -43,5 +43,49 @@
   "ClubAdminRequestDTO": [
     "id", "userId", "userName", "userEmail", "clubId", "clubName", "message",
     "status", "requestedAt", "reviewedAt"
+  ],
+
+  "ClubAdminDTO": [
+    "assignmentId", "userId", "userName", "userEmail", "invitedEmail", "role",
+    "status", "createdAt", "activatedAt"
+  ],
+
+  "ClubInvitationDTO": [
+    "invitationId", "clubId", "clubName", "clubLogo", "role", "invitedByName",
+    "invitedAt"
+  ],
+
+  "OwnershipTransferDTO": [
+    "transferId", "clubId", "clubName", "clubLogo", "fromUserId",
+    "fromUserName", "toUserId", "toUserName", "outgoingBecomes", "status",
+    "createdAt"
+  ],
+
+  "ClubAuditLogDTO": [
+    "id", "action", "entityType", "entityId", "actorUserId", "actorName",
+    "metadata", "createdAt"
+  ],
+
+  "UserProfileDTO": [
+    "bio", "faculty", "degree", "subjects", "socialLinks", "interests",
+    "showInterests", "showSocialLinks"
+  ],
+
+  "ProfileSocialLinksDTO": ["instagram", "facebook", "linkedin"],
+
+  "NotificationPreferencesDTO": [
+    "eventReminders", "clubAnnouncements", "weeklyDigest", "newFollowerEvents",
+    "productNews"
+  ],
+
+  "InterestDTO": ["slug", "label", "parentSlug"],
+
+  "ClubCategoryDTO": ["slug", "label"],
+
+  "EventFormatDTO": ["slug", "label", "groupLabel"],
+
+  "ManagedClubDTO": [
+    "clubId", "clubName", "logo", "followers", "role", "officialEmail",
+    "officialEmailVerified"
   ]
 }

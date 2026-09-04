@@ -5,7 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/app/lib/auth-context";
 import { useAuthModal } from "@/app/lib/auth-modal-context";
-import { isAdmin, isClubAdmin } from "@/app/lib/user";
+import { isAdmin } from "@/app/lib/user";
+import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import SearchBar from "@/app/components/SearchBar";
 import Button from "@/app/components/ui/Button";
 import { Sparkles } from "lucide-react";
@@ -14,6 +15,17 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { openAuth } = useAuthModal();
+
+  // Asked of the server rather than read off the user's roles. Managing a club
+  // is a relationship with that club, and it can be revoked while the user's
+  // token still says otherwise — so the nav follows the assignment list.
+  const { clubs: managedClubs, pendingAnswers } = useManagedClubs();
+  const managesAClub = managedClubs.length > 0;
+  // Shown only while there is something to answer -- an admin invitation or a
+  // club being handed over. Someone invited before they managed anything has no
+  // other route in: /manage is hidden from them, so without this their only way
+  // back is the original email.
+  const invitationCount = pendingAnswers;
 
   const linkClasses =
     "px-3 py-2 rounded-full text-ink-900 hover:bg-lavender-50 hover:text-lavender-800 transition-colors";
@@ -55,18 +67,26 @@ export default function Navbar() {
 
             {isAuthenticated ? (
               <>
-                {user && isClubAdmin(user) && (
-                  <Link href="/create-event" className={linkClasses}>Create event</Link>
-                )}
-                {user && isClubAdmin(user) && (
-                  <Link href="/club-dashboard" className={linkClasses}>My club</Link>
-                )}
                 {user && isAdmin(user) && (
                   <Link href="/admin" className={linkClasses}>Admin</Link>
                 )}
                 <Link href="/my-events" className={linkClasses}>My events</Link>
                 <Link href="/my-clubs" className={linkClasses}>My clubs</Link>
-                <Link href="/profile" className={linkClasses}>Profile</Link>
+                {managesAClub && (
+                  <>
+                    <Link href="/create-event" className={linkClasses}>Create event</Link>
+                    <Link href="/manage" className={linkClasses}>Manage club</Link>
+                  </>
+                )}
+                {invitationCount > 0 && (
+                  <Link href="/invitations" className={linkClasses}>
+                    Invitations
+                    <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-berry-600 px-1.5 text-xs font-bold text-white">
+                      {invitationCount}
+                    </span>
+                  </Link>
+                )}
+                <Link href="/profile" className={linkClasses}>My profile</Link>
                 <button onClick={logout} className={linkClasses}>
                   Sign out
                 </button>
@@ -117,19 +137,30 @@ export default function Navbar() {
             </Link>
             {isAuthenticated ? (
               <>
-                {user && isClubAdmin(user) && (
+                {user && isAdmin(user) && (
+                  <Link href="/admin" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                    Admin
+                  </Link>
+                )}
+                <Link href="/my-events" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                  My events
+                </Link>
+                <Link href="/my-clubs" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                  My clubs
+                </Link>
+                {managesAClub && (
                   <>
                     <Link href="/create-event" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
                       Create event
                     </Link>
-                    <Link href="/club-dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                      My club
+                    <Link href="/manage" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                      Manage club
                     </Link>
                   </>
                 )}
-                {user && isAdmin(user) && (
-                  <Link href="/dashboard" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
-                    Dashboard
+                {invitationCount > 0 && (
+                  <Link href="/invitations" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">
+                    Invitations ({invitationCount})
                   </Link>
                 )}
                 <Link href="/profile" className="block px-3 py-2 rounded-xl hover:bg-lavender-50">

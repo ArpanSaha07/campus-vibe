@@ -1,0 +1,21 @@
+-- Retire event_categories, created by V3.
+--
+-- Free text with no key and no constraint -- the last unconstrained vocabulary
+-- in the schema, and the reason `Dating`, `Research` and `Food` sat under a
+-- heading reading *Categories* on the event page. It is replaced by two things
+-- that a foreign key can check: event_format_assignments for what kind of
+-- thing an event is, and event_topic_assignments for what it is about (V28).
+--
+-- Superseded rather than deleted from V3. Removing the statement from an
+-- applied migration does not undo it: the flyway_schema_history row stays and
+-- startup fails validation with `Detected applied migration not resolved
+-- locally: 3`, which means the application does not boot. Forward-only is the
+-- only direction available. Same route V22 took for user_preferred_categories.
+--
+-- The three values in the table are seeded mock data from V6-era fixtures, not
+-- anything a user created, and none of them is a catalogue slug -- `Research`
+-- has an exact twin, but `Dating` and `Food` do not, and inventing a mapping
+-- for them would be a guess written into the schema. They go with the table.
+-- Losing three mock values is not a cost; silently guessing would be.
+
+DROP TABLE IF EXISTS event_categories;

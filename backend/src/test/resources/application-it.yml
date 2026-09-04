@@ -1,0 +1,29 @@
+# Integration-test overrides, layered on top of application-test.yml.
+#
+# Activated by AbstractIntegrationTest via @ActiveProfiles({"test", "it"}) —
+# later profiles win, so everything here overrides the H2 settings that the
+# `test` profile sets for the fast unit-test loop.
+#
+# This file lives in src/test/resources, not src/main/resources, so it never
+# ships inside the jar. (application-test.yml is still in the wrong place; that
+# is BUG-007 and a separate change.)
+#
+# The datasource itself is NOT configured here — the URL and port come from the
+# Testcontainers instance at runtime, through PostgresTestContainer.registerTo
+# and @DynamicPropertySource, which outrank any property file.
+
+spring:
+  # The point of the exercise: run the real migrations, in order, against the
+  # real database engine, on every integration-test run.
+  flyway:
+    enabled: true
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      # validate, not create-drop. Flyway owns the schema now, and this turns
+      # every entity/migration disagreement into a failed test rather than a
+      # container that will not boot. It is exactly the check that caught
+      # `missing column [club_admin_id] in table [clubs]` in Docker, moved to
+      # where it fails cheaply.
+      ddl-auto: validate

@@ -58,11 +58,40 @@ public class SecurityFilterChainConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/auth/verify-email"
                         ).permitAll()
+                        // MUST precede the permitAll block below — matchers are
+                        // evaluated in order and the first match wins, so
+                        // "/api/v1/clubs/**" would otherwise make a club's
+                        // management team public. @PreAuthorize would still
+                        // refuse an anonymous caller, but as 403-from-SpEL
+                        // rather than 401, and one edit to the SpEL away from
+                        // leaking every administrator's name and email.
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/clubs/*/admins",
+                                // Same reasoning: it names the sitting owner and
+                                // their chosen successor, which is the club's
+                                // business and nobody else's.
+                                "/api/v1/clubs/*/ownership-transfer",
+                                // The club's own history of who did what.
+                                "/api/v1/clubs/*/audit-logs",
+                                // Carries officialEmail, which must never
+                                // reach a public club page.
+                                "/api/v1/clubs/*/managed").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
                                 "/actuator/**",
                                 // Asked by the signup form before anyone is signed in.
                                 "/api/v1/auth/email-status",
+                                // The interest vocabulary. A shared list that
+                                // names nobody and is identical for every
+                                // caller -- and a public profile has to render
+                                // the labels behind someone's interests with
+                                // no token to do it with. Needs saying here
+                                // because it sits under neither /clubs nor
+                                // /events and would otherwise fall through to
+                                // anyRequest().authenticated().
+                                "/api/v1/interests",
+                                "/api/v1/club-categories",
+                                "/api/v1/event-formats",
                                 "/api/v1/clubs/**",
                                 "/api/v1/events/**"
                         ).permitAll()

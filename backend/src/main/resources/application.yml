@@ -88,6 +88,21 @@ campusvibe.auth:
   # A product decision, so it is a switch rather than a default.
   require-verified-email: ${AUTH_REQUIRE_VERIFIED_EMAIL:false}
 
+# The first platform administrator. Every admin path is behind hasRole('ADMIN'),
+# including approving the club-admin requests that give a club its first owner,
+# so a system with no admin cannot acquire one through the product at all.
+#
+# OFF by default. Turning it on grants ROLE_ADMIN to the named account at
+# startup, creating the account first only if it does not exist and a password
+# is supplied. It never revokes: see AdminBootstrapRunner.
+campusvibe.bootstrap.admin:
+  enabled: ${APP_BOOTSTRAP_ADMIN_ENABLED:false}
+  email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
+  # Only used when the address has no account yet. Leave blank to promote an
+  # existing account, which is the normal case and the only one that works for
+  # a Google account -- it has no password to set.
+  password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
+
 campusvibe.auth.rate-limit:
   # Bounds online password guessing, signup spam and enumeration through
   # /email-status. In-memory and per instance — see AuthRateLimiter for what

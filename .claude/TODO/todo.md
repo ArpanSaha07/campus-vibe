@@ -19,13 +19,15 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 
 ## Next up (in order)
 
-1. **Commit the secrets-management work** — Steps 1-5 are complete and verified. See [Recently completed](tasks-completed.md#completed-work-log).
-2. **P0** — Fix backend CI: JDK 17 → 25, and stop skipping tests ([BUG-002](../bugs/bugs.md#bug-002)).
-3. **P0** — Fix semantic search returning 0 results ([BUG-001](../bugs/bugs.md#bug-001)).
-4. **P1** — Step 6 of the LLM key work: query-embedding cache + rate limiting ([BUG-005](../bugs/bugs.md#bug-005)).
-5. **P1** — Decide JWT transport (localStorage vs httpOnly cookie) and fix route protection ([BUG-003](../bugs/bugs.md#bug-003)).
-6. **P1** — [`dev` profile → admin bootstrap](#database-lifecycle--seeding), in that order. Small, and together they unblock `/search/reindex` and the whole Admin Dashboard track.
-7. **P0** — Two auth findings from the 2026-08-15 review, both small: fail closed on a blank `GOOGLE_CLIENT_ID` ([BUG-030](../bugs/bugs.md#bug-030)) and check `email_verified` ([BUG-031](../bugs/bugs.md#bug-031)). See [Security](#security).
+1. **P0** — **Creating a club leaves you unable to manage it.** `POST /api/v1/clubs` needs only `ROLE_USER` and grants the creator nothing; ownership arrives only when a platform admin approves a club-admin request. So the logo, the banner images and the social links the create form collects **cannot be sent** — all three go through endpoints guarded by `canManageClub`, and the creator gets a 403 on their own club. The form now says so rather than dropping them silently. Fix is a decision, not code: either the creator becomes `CLUB_OWNER` on create (touches the one-owner invariant in `club_admin_governance.md`), or club creation moves behind admin approval entirely.
+2. **P2** — **An event cannot be given a banner image from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)).
+3. **Commit the secrets-management work** — Steps 1-5 are complete and verified. See [Recently completed](tasks-completed.md#completed-work-log).
+4. **P0** — Fix backend CI: JDK 17 → 25, and stop skipping tests ([BUG-002](../bugs/bugs.md#bug-002)).
+5. **P0** — Fix semantic search returning 0 results ([BUG-001](../bugs/bugs.md#bug-001)).
+6. **P1** — Step 6 of the LLM key work: query-embedding cache + rate limiting ([BUG-005](../bugs/bugs.md#bug-005)).
+7. **P1** — Decide JWT transport (localStorage vs httpOnly cookie) and fix route protection ([BUG-003](../bugs/bugs.md#bug-003)).
+8. **P1** — Backfill club embeddings with `POST /api/v1/search/reindex`, now that an admin account exists. All 8 clubs have `embedding IS NULL`, so the semantic half of club search matches nothing.
+9. **P0** — Two auth findings from the 2026-08-15 review, both small: fail closed on a blank `GOOGLE_CLIENT_ID` ([BUG-030](../bugs/bugs.md#bug-030)) and check `email_verified` ([BUG-031](../bugs/bugs.md#bug-031)). See [Security](#security).
 
 ---
 
@@ -41,13 +43,108 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P1** Add `EventService.update(...)` — there is currently no update path at all, so events can never be edited, and their embeddings go stale. Mirror `ClubService.update`, which correctly re-indexes. ([BUG-006](../bugs/bugs.md#bug-006))
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
 - [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-023](../bugs/bugs.md#bug-023))
-- [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload.
-- [ ] **P2** Admin Dashboard API: create clubs, assign Club Admins, manage users, moderate events.
+- [ ] **P1** **Event lifecycle status — `DRAFT` / `PUBLISHED` / `ARCHIVED`.** `events` has no status column today (`Event.java`), so the club dashboard can only split by `date_time` into upcoming and past, and there is no way to draft an event before announcing it or to retire one without deleting it. Deliberately kept out of the club-governance work on 2026-08-17 so that feature stayed scoped; it is the next thing the club dashboard's Events tab needs.
+
+  **The work:** migration adding `events.status TEXT NOT NULL DEFAULT 'PUBLISHED' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED'))` (default `PUBLISHED` so every existing row stays visible), an `EventStatus` enum on `Event`, a publish/unpublish/archive action on `EventService`, and status tabs on `/manage/[clubId]/events`.
+
+  **The trap that makes this P1 rather than P2:** *every* public read path must filter to `PUBLISHED`, or drafts leak onto the homepage, the club page, and search. That means `EventRepository` list queries, `SearchRepository.hybridSearchEventIds`, and `SearchIndexService` (a draft should not be indexed at all, and archiving should evict it). Getting the column in without covering all four is worse than not having it. Pair it with `EventService.update` (BUG-006), which is a prerequisite anyway — there is no update path to set the status through.
+- [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload. *(Authorisation for these landed 2026-08-17 — `@clubPermissionService.canManageClub` now covers every club admin, not just one per club. What is still missing is `EventService.update` above, delete, and the upload endpoints being reachable from `/manage/[clubId]`.)*
+- [ ] **P2** Admin Dashboard API: create clubs, manage users, moderate events. *(Assigning the first club owner is done — approving a club-admin request writes the `CLUB_OWNER` assignment. Setting `official_email` is listed under Club governance.)*
+- [ ] **P2** **Nothing can change an account's email address.** `/profile/edit/account` renders the field and its Save commits locally. Needs a confirm-the-new-address round trip, not a straight update — `auth_tokens` (V11) already carries the machinery and would gain an `EMAIL_CHANGE` purpose, and the address is the login identifier, so an unverified change locks the account out. *(The other half of that screen now works: `PATCH /api/v1/users/me` renames an account, 2026-08-20. Only the email is still local.)*
+- [ ] **P2** **Account closure has no endpoint.** The confirmation panel on `/profile/edit/account` is built and its destructive button is deliberately `disabled` with a note, because the nearest wired action is sign-out and that would tell someone their data was gone while every row of it remained. Overlaps the GDPR item under Security. An owner cannot leave a club without handing it on, so closure has to refuse or force a transfer first.
 - [ ] **P3** Notifications.
 - [ ] **P3** Ticket purchasing flow.
 - [ ] **P3** Move `application-test.yml` from `src/main/resources` to `src/test/resources` so test config stops shipping in the production jar. ([BUG-007](../bugs/bugs.md#bug-007))
 
+## Club governance
+
+Spec: [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md)
+(15 MVP items) · As-built:
+[`club-administration.md`](../docs/architecture/club-administration.md)
+
+**Items 1–4 shipped 2026-08-17**, **items 5, 7, 8, 9 and 10 shipped
+2026-08-18** — assignment table, the two club roles, the one-owner invariant,
+administrator listing, the `/manage/[clubId]` dashboard,
+invite/accept/decline/remove, ownership transfer, and the append-only activity
+log. The rest, in the spec's order:
+
+- [ ] **P1** *(item 6)* **Platform-admin UI for `official_email`.** The column
+  landed in V13 and **nothing can write it**, so every club has `NULL`. Two
+  things are already written and waiting on it: the §17 security notices in
+  `ClubAdminService.notifyClubInbox` fire only when a club has an address, and
+  the official-email verification step §6 puts in the middle of the invite flow
+  was skipped for the same reason. Small, and it unblocks the security half of
+  items 5 and 8.
+- [ ] **P2** *(item 5, follow-up)* **Expire stale invitations.** `EXPIRED` is in
+  `AssignmentStatus` and nothing sets it. A PENDING row grants nothing, so this
+  is tidiness rather than exposure — but it holds the
+  `one_live_invite_per_club_email` slot, so an owner who mistypes an address has
+  to cancel before re-inviting. Wants a TTL and a sweep; natural to pair with
+  the audit log, which is where the sweep should be recorded.
+- [ ] **P2** *(item 8, follow-up)* **Expire stale handovers**, alongside the
+  invitation expiry below. An offer nobody answers sits PENDING forever and
+  holds the club's one transfer slot; the owner can withdraw it, but nothing
+  does so on its own.
+- [ ] **P2** *(items 9–10, follow-up)* **Log club-page edits and event changes.**
+  The audit log covers administration and ownership only, so a club with a stable
+  team has an empty Activity tab — and §21's own UI example shows exactly the
+  entries that are missing. `ClubAuditService.record` and the `CLUB` / `EVENT`
+  entity types already exist; what is needed is call sites in `ClubService` and
+  `EventService`. Pairs with `EventService.update` (BUG-006), which has to touch
+  those paths regardless.
+- [ ] **P3** *(items 11–13)* **Notification separation.** Club-operational mail
+  to the official club email, personal mail to the user, optional personal
+  copies for admins, and the §17 security notices that cannot be opted out of.
+  Blocked on the notification system generally, which does not exist.
+- [ ] **P3** *(item 14)* **Annual administrator review.** Prompt only — never
+  auto-remove anyone on a date (§43).
+- [ ] **P3** *(item 15)* **Platform-admin ownership recovery.** Needs
+  `official_email` to be real first, and needs an admin account to exist.
+
 ## Frontend / Features
+
+### Taxonomy — built, and almost entirely unread
+
+Audited 2026-08-21. The three vocabularies are seeded, foreign-keyed, served and
+writable, and both authoring forms set them. **Almost nothing reads them back.**
+Today the only consumer of a club's category or tags is the text handed to the
+embedder, and BUG-001 means the semantic leg does not work — so in practice the
+taxonomy is currently write-only. Ordered by how visible the gap is.
+
+- [ ] **P1** **A club page shows neither its category nor its tags.** `ClubDTO`
+      carries both, `toClub` maps them onto `Club`, `types/index.ts` documents
+      them — and `(main)/clubs/[clubId]/page.tsx` renders neither. The data
+      travels the whole way and stops one line short of the screen. A club admin
+      picks a category and up to eight tags at creation and no visitor can ever
+      see them.
+- [ ] **P1** **Nothing browses by category or by tag.** `GET /api/v1/clubs` takes
+      no category parameter, `(main)/clubs/page.tsx` is a flat grid with no
+      filter, and `/events` filters only on free-text `?q=`. D6 deleted the
+      homepage tiles on the explicit promise that *browsing by club category or
+      by event tag is a real filter against a real foreign key, and it belongs on
+      `/events` and `/clubs`* — the replacement was never built, so the delete
+      removed a bad filter and left none.
+- [ ] **P1** **A club's category and tags cannot be changed after creation.**
+      `PUT /api/v1/clubs/{id}` accepts `category` and `interests`, and there is
+      no `updateClub` anywhere in the frontend — `/manage/[clubId]` has no
+      club-details editor at all. Creation is the only moment, permanently.
+      Compounded by the P0 above it: the creator cannot manage the club anyway,
+      so the only route to a fix is an endpoint no screen reaches.
+- [ ] **P2** **A profile never shows its own interests.** `/profile/edit/interests`
+      writes them; `ProfileAboutCard` renders degree, faculty and subjects and
+      stops. So `showInterests` — the toggle at `profile/edit/page.tsx:164` — is
+      a boolean with **no reader on either side of the wire**, as is
+      `showSocialLinks`. Both were built for a public profile view that does not
+      exist yet, which is a defensible reason to have written them and not a
+      reason to leave them unread without a note.
+- [ ] **P2** **Every seeded club is unclassified and every seeded event
+      untagged.** V6 inserts sixteen mock clubs, all with `category_slug` null
+      and zero `club_interests` rows, and no migration seeds a topic or format
+      assignment. Whatever gets built above will render empty against dev data,
+      and so will any eyeball check of it. Classifying the sixteen is one seed
+      migration and is the cheapest of these by a distance — do it first, or the
+      others cannot be looked at.
+
 
 - [ ] **P1** Fix route protection — `proxy.tsx` is never executed by Next.js (wrong filename *and* wrong export name), and it reads a cookie while the JWT lives in localStorage. Decide the token transport first; a half-wired guard is worse than none. ([BUG-003](../bugs/bugs.md#bug-003))
 - [ ] **P2** Fix `NEXT_PUBLIC_*` in the **production** Docker build — values are inlined at build time, so the deployed frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. No longer affects local dev, which now builds the `dev` stage and reads them at runtime. ([BUG-004](../bugs/bugs.md#bug-004))
@@ -63,6 +160,20 @@ Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
 - [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.
 - [ ] **P2** Bookmark UI. `EventLikeButton` posts to `/saved-events` but starts from `initiallySaved={false}` unless the caller knows better, so a saved event still shows an empty heart on the events listing. Same fix as the follow button: a provider holding the saved ids, filled from `GET /api/v1/users/me/events`.
 - [ ] **P3** Show the live follower count on club cards and the club page. `Club.followers` is accurate now that follows move it, but `ClubCard` has its count commented out and the club page's number never refreshes after a follow — the provider only tracks ids.
+- [ ] **P2** **The club page's event tabs still render mock data.** `ClubEventTabs` is wired to the shared pill component but `app/(main)/clubs/[clubId]/page.tsx` passes `popularEvents` for *both* upcoming and past, so the two tabs show the same eight fixtures and the counts are the same number twice. `listEventsByClub(clubId)` already exists and is what `/manage/[clubId]/events` uses — this is a call site, not a feature. Also un-comment the `followers · events` line the page currently has commented out.
+- [ ] **P2** **Profile photo upload.** `ProfileAvatar` draws the first initial and `/profile/edit` says in words that uploads are not available, rather than showing a disabled button. There is no avatar column on `users` or on `user_profiles` to fall back from. S3 is already wired for club logos and event banners, so this is the same path with a different owner.
+- [ ] **P2** **The public profile view does not exist.** `showInterests` and `showSocialLinks` persist as of 2026-08-20 and govern how a profile looks *to other people* — but `/profile` only ever shows you your own, where you always see everything. **Both switches therefore still control nothing.** Decide the route (`/users/[id]`?), what a visitor may see, and add the public read endpoint. Note that its `permitAll` matcher has to sit *above* the broad public-GET block in `SecurityFilterChainConfig`, the way `/api/v1/interests` does — first match wins.
+- [ ] **P2** **Build the club and event taxonomies.** Fully specified as of 2026-08-20 in [`interests_and_categories.md`](../docs/decisions/interests_and_categories.md) — seven decisions, **no open questions**, content settled down to the word lists. **Read it before starting**; the summary below is not enough to build from.
+
+  **Three vocabularies, and only three.** `interest_catalogue` plus its groups is the shared topic vocabulary — students pick interests from it, clubs are tagged from it, and events are tagged from it. `club_categories` is 13 organisation types, one per club. `event_formats` is 22 words (*Workshop*, *Panel*, *Screening*) that are genuinely events-only. **There is no event category and no separate event-topic list.**
+
+  **The rule that keeps it honest:** every event topic is an interest or an interest group, so an event needing a topic the catalogue lacks *adds it as an interest*. That is why there is no mapping between what a student likes and what an event is about — it is the same row. The draft needs **22 new interests** adding (Careers, Business, Finance, Dance, Politics, Travel…), three of which are really group work rather than new leaves.
+
+  **Do the group layer first.** Tagging an event *Music* means pointing at a group, and `interest_catalogue.category` is a text column nothing can foreign-key to. The self-referencing `parent_slug` the doc recommends is cheap **only while V19 and V20 are uncommitted**.
+
+  **Two traps.** `EventDTO.categories` is replaced by **two** fields, `topics` and `formats` — six coordinated contract edits each, since one merged array would put `workshop` beside `robotics` with nothing saying which is which. And `event_categories` (V3) is applied, so it is dropped by a new migration and never by editing V3 — the same supersede route V22 took.
+
+- [ ] **P3** **Interests are stored and never read.** They persist against a real catalogue as of 2026-08-20 (`interest_catalogue`, V20) with a foreign key behind them — but nothing reads the chosen values: no filtering, no ranking, no suggestion. The copy on that screen promises we will use them to suggest clubs and events, which is still untrue. Natural pair with the search work, since `search` already has the embedding machinery.
 - [ ] **P3** Custom header style in `layout.tsx`. *(from `frontend/README.md`)*
 - [ ] **P3** Apply `EventCard`'s stretched-link pattern to `MyEventCard`. Only its stub content links to the event, so the image and padding are still dead. Same fix: `relative` root, `after:absolute after:inset-0` on the title `<Link>`, and the heart/calendar controls lifted above it — they cannot be nested inside the `<a>`.
 - [ ] **P3** Stop event cards overlapping in the event section. *(from `frontend/README.md`)*
@@ -79,6 +190,13 @@ Architecture reference: [`.claude/docs/architecture/llm-api-key-management.md`](
 - [ ] **P1** *(Step 6)* Cap query length before embedding.
 - [ ] **P1** *(Step 6)* Set a hard monthly budget cap on the OpenAI project — the only control that bounds the loss from a leaked key. Use **separate OpenAI projects per environment**.
 - [ ] **P2** *(Step 6)* Add a `gitleaks` pre-commit hook and enable GitHub secret-scanning push protection.
+- [ ] **P2** **Index a club's interest tags into its embedding.** `SearchableText.forClub` builds the text that gets embedded from **name and description only** — while `forEvent` beside it already folds in the event's categories. So once clubs carry interest tags ([`interests_and_categories.md`](../docs/decisions/interests_and_categories.md) D7), a search for *tech* will still miss a departmental society whose description never happens to use the word, even though it is tagged `web-development` and `ai-machine-learning`.
+
+  **The change is one line** — join the tag *labels*, not the slugs, since `ai-machine-learning` embeds badly and *AI & machine learning* embeds well. Do the same for event tags when they land.
+
+  **Two things that make it more than one line.** Tag labels have to be loaded inside the indexing transaction, and `SearchIndexService.indexClub` is called on the write path, so tagging a club has to re-index it — otherwise the embedding describes the club as it was before anyone tagged it. And every already-indexed club needs a backfill, which is what `POST /api/v1/search/reindex` exists for.
+
+  Blocked on D7 being built. Treat the tag join as the load-bearing path and the embedding as the bonus, given [BUG-001](../bugs/bugs.md#bug-001).
 - [ ] **P3** Introduce `LlmClient` / `PromptTemplateService` / `AIController` — **only when the first generative feature lands**. Embeddings are not generative; SKILL.md says not to scaffold speculatively. The `com.campusvibe.ai` package and `OpenAiProperties` are the foundation these plug into.
 - [ ] **P3** Candidate generative features once the layer exists: event summarisation, event description generation, recommendations, moderation assistance.
 - [ ] **P3** Multi-provider support (`AnthropicLlmClient`, etc.) — do not add before a feature requires it.
@@ -92,6 +210,15 @@ Implementation Sequence.
 
 - [ ] **P2** **Tests for the bootstrap and the seeder.** Steps 1–4 shipped 2026-08-16 but their verification was manual (a throwaway account promoted, restarted, and deleted). Automate: migrations apply from an empty schema; bootstrap is idempotent across two runs, promotes an existing non-admin, refuses to create a password-less account, and never revokes; the seeder creates no duplicates and does not run under `test` or `prod`.
 - [ ] **P2** **Warn when an index write matches no row.** `SearchIndexService.indexClub/indexEvent` discard the count `JdbcTemplate.update` returns, which is exactly how [BUG-034](../bugs/fixed_bugs.md#bug-034) stayed invisible — the embedding UPDATE hit zero rows and reported nothing. Logging a warning on `0` turns the whole class of "indexed something that wasn't there yet" into a visible event. Deliberately not bundled into the BUG-034 fix: it changes shared indexing behaviour and deserves its own commit.
+- [x] **P1** ~~Integration tests ran on H2, so entity/migration drift was never caught~~ — **done 2026-08-17.** Every `*IT` now runs against real PostgreSQL + pgvector via `PostgresTestContainer`, with Flyway on and `ddl-auto: validate`. Plain `*Test` unit suites stay on H2 and need no Docker.
+- [ ] **P2** **`docker compose up` can silently run a stale backend jar.** `backend/Dockerfile` does `COPY backend/target/campusvibe-0.0.1-SNAPSHOT.jar`, and the `develop.watch` rule syncs that jar in — but **only while `docker compose watch` is actually running**. Recreate the container any other way and it falls back to whatever jar was baked into the image, with no warning. On 2026-08-17 that produced `Schema-validation: missing column [club_admin_id] in table [clubs]`: an image jar from three days earlier meeting a database the newer jar had already migrated. Nothing about the error names the real cause.
+
+  **Options:** build the jar inside the Dockerfile (multi-stage, slower but self-consistent); or stamp the jar's build time into `/actuator/info` and have the healthcheck or a compose profile compare it; or, cheapest, document `docker compose build backend` as a required step after any `mvn package` and say so in the README. The failure is confusing enough — and now reachable on every migration — to be worth more than a docs line.
+
+- [ ] **P1** **Backfill club embeddings.** All 8 clubs have `embedding IS NULL`, so the semantic half of club search cannot match anything — only the keyword path works today. A single `POST /api/v1/search/reindex` once an admin exists. Distinct from [BUG-001](../bugs/bugs.md#bug-001) (events, repository-level) but the symptoms look identical, so confirm embeddings are non-null *before* debugging ranking.
+- [ ] **P2** *(Step 3)* **Dev seeder** (`seed/DevDataSeeder.java`). `@Profile("dev")`, idempotent — skip when clubs already exist. Port the 8 clubs out of V6 and create them **through the service layer** so `SearchIndexService` populates `clubs.embedding` on write; that is precisely why a programmatic seeder is mandated over seed SQL. Verify with `docker compose down -v && docker compose up -d`, then `count(embedding) = count(*)` on `clubs`.
+- [ ] **P2** *(Step 4)* **Retire `V6__insert_mock_clubs.sql`.** Only after the seeder reproduces the same data. Do **not** delete the file — Flyway aborts with `Detected applied migration not resolved locally: 6` and the app will not boot. Supersede it with `V9__remove_mock_club_seed_data.sql`. Locally `docker compose down -v` is cleaner; ship V9 only if V6 ever reached another environment.
+- [ ] **P2** **Tests** — migrations apply from an empty schema; the seeder creates no duplicates and does not run under `test` or `prod`. *(The bootstrap half is done: `AdminBootstrapRunnerIT` covers idempotency across two runs, promoting an existing non-admin, refusing to create a password-less account, and never revoking.)*
 - [ ] **P2** *(Step 5)* **Production posture** — before the first EB deploy: `SPRING_PROFILES_ACTIVE=prod` so `DevDataSeeder` cannot run, and `APP_BOOTSTRAP_ADMIN_ENABLED=false` once the admin exists.
 - [ ] **P3** **Keep reference data out of schema migrations.** `V7__multi_role_rbac.sql` creates the RBAC tables *and* inserts the three role rows. It is applied, so leave it alone — but split the two concerns in every migration from here on.
 
@@ -159,8 +286,12 @@ findings.**
 - [ ] **P3** **Five links point at `.claude/team/`, which does not exist.** `CHARTER.md`, `ROSTER.md`, `ROUTINES.md`, `WORKING-AGREEMENT.md` and `../commands/ask.md` are referenced from the *Agentic team* entries. Pre-existing — they were already broken in the committed file, not introduced by the todo/completed split. Either the folder was never committed or it was removed; decide which, then restore it or drop the references.
 - [ ] **P3** **Reconsider a client query library (TanStack Query or similar) after the cookie migration.** **Decided 2026-08-15: not now**, reasoning in [`api-and-caching.md`](../docs/architecture/api-and-caching.md). Not for clubs/events/search — those are Server Components on Next's data cache already, so a query library there would move rendering off the server to get a cache that exists. The real case is the client surface: `followed-clubs-context.tsx` hand-rolls ~200 lines of `useQuery` + optimistic `useMutation`, four client pages repeat `useState`/`useEffect`/error-flag, and a **second** bespoke provider is queued below for saved events. Deferred because the `localStorage` JWT is *why* those pages are client-rendered at all — fix [BUG-003](../bugs/bugs.md#bug-003) first and several become Server Components, changing what is left to serve. **Trigger:** the cookie migration landing, or a third hand-rolled client cache being about to be written.
 - [ ] **P2** **Call `revalidateTag` from the write paths.** The tags already exist, so this is small. Today, creating an event does not evict the events list — it stays stale for up to five minutes. Trigger: the first real club admin, or the first complaint that a new event does not appear.
+- [x] **P2** ~~Write the user-profile implementation doc~~ — **done 2026-08-20.** [`user-profiles.md`](../docs/architecture/user-profiles.md), with its row in `docs/README.md` and an entry in `scripts/docs-map.json`, which previously mapped `com/campusvibe/user/` to no doc at all. Written alongside the backend rather than after it, so what it keeps is the reasoning that shaped the code: why the profile is its own table, why the write is a full-replace PUT and what that demands of the frontend, why interests get a foreign key and subjects do not, and why a social link is checked in two places. Carries seven known gaps.
+- [ ] **P3** **Check the McGill faculty list and the interest catalogue.** Twelve faculties and schools remain in `frontend/app/lib/profile-options.ts`, transcribed from the university's own listing rather than fetched — and faculties do get renamed, Dentistry having become *Dental Medicine and Oral Health Sciences* recently. The interest catalogue **moved to the database on 2026-08-20** (76 entries, 12 categories, `V20__insert_interest_catalogue.sql`) and still has had no product review at all. Revising it is now a migration rather than an edit to a constant — cheap, because `user_interests` keys on the slug and not the label, so renaming what people read moves nobody's choices.
+- [ ] **P2** **Look at `/profile` and `/profile/edit` in a browser, at both breakpoints.** Still never rendered, now across three commits, every one shipped on a green `verify` — which proves they compile, not that they work. Raised from P3 because these screens now write to a database. The checks that matter most: that editing the bio in one section and the degree in another loses neither (the whole reason `ProfileProvider` exists), that the picker populates from `GET /api/v1/interests`, and that a refused save shows the server's own sentence. Then the layout — the two-column split at `lg`, the sticky identity card, the mobile rail that scrolls sideways, and the interests grid at 76 pills.
 - [ ] **P3** **Add a row for [`ai-planner.md`](../docs/architecture/ai-planner.md) to the docs index.** The file exists but is absent from `docs/README.md`, so nothing points at it. Left undescribed rather than guessed at from the filename.
-- [ ] **P1** **Re-verify [`user-roles.md`](../docs/architecture/user-roles.md) against the code** and split it into a spec and an as-built description. Highest priority of the two remaining backfills because four source files cite it as the authority for RBAC, so a drifted claim there propagates. Owner: `backend`, reviewed by `security`.
+- [x] **P1** ~~Re-verify [`user-roles.md`](../docs/architecture/user-roles.md) against the code and split it into a spec and an as-built description~~ — **done 2026-08-18.** Rewritten from the code to the [`implementation-docs`](../skills/implementation-docs/SKILL.md) standard: two platform roles in the JWT, two club roles in `club_admin_assignments`, why they are stored and checked differently, and the platform-admin bypass. The split happened by *dropping* the spec half rather than moving it — roughly half the old file was a product specification for unbuilt dashboards, which `club_admin_governance.md` and this queue already cover better. `docs-map.json` said it covered *three roles*; corrected. Still open below: `security` has not reviewed it.
+- [ ] **P2** **Have `security` review [`user-roles.md`](../docs/architecture/user-roles.md).** Rewritten from the code on 2026-08-18 by the agent that also wrote most of the authorisation it describes, which is the same conflict flagged for `authentication.md` below. The claims most worth an independent read: that platform roles are safe to keep in the JWT while club roles are not, and that the four `authenticated()` matchers above the `permitAll` block cover every club sub-path that must not be public.
 - [ ] **P2** **Have `security` review [`authentication.md`](../docs/architecture/authentication.md).** It was rewritten from the code on 2026-08-15 and carries 14 known gaps including four security findings, but the agent that wrote it also wrote the code it describes. A finding list that has not been read by anyone else is a first draft.
 - [ ] **P2** **Rewrite [`authentication.md`](../docs/architecture/authentication.md)** to the [`implementation-docs`](../skills/implementation-docs/SKILL.md) standard. It currently describes endpoints as *Required* rather than existing, so it reads as a plan. Blocked in part on [BUG-003](../bugs/bugs.md#bug-003) — the JWT transport decision should be an ADR first, then the doc describes what shipped.
 - [ ] **P2** **Rewrite [`search.md`](../docs/architecture/search.md)** against `com.campusvibe.search`. Keep the existing design note as the rejected-alternatives record. Best done *after* [BUG-001](../bugs/bugs.md#bug-001) is fixed, so the doc describes working behaviour rather than a bug.
@@ -195,6 +326,16 @@ The last ten, one line each. Full write-ups, and everything older, in
 | Date | What landed |
 |---|---|
 | 2026-09-03 | Tomcat pinned to 10.1.59 past the BOM, clearing three CRITICALs that had blocked the Trivy gate ([BUG-035](../bugs/fixed_bugs.md#bug-035)) |
+| 2026-08-20 | User profiles persist: V18-V21, `user_profiles` / `user_interests` / `user_notification_preferences` plus a slug-keyed interest catalogue, a full-replace `PUT` and one shared profile load so the editor cannot erase itself — [`user-profiles.md`](../docs/architecture/user-profiles.md) |
+| 2026-08-19 | `/profile/edit` — five settings sections behind a rail, Save disabled until something changes, interests picker, McGill program fields; a complete UI over memory, nothing persists yet |
+| 2026-08-19 | `/profile` — identity card, About with berry-outlined program pills, social icons, and two blocks through to My clubs and My events; the old stub outside `(protected)` deleted |
+| 2026-08-19 | One `ClubEventTabButtons` component for the Upcoming/Past pills, adopted by the manage dashboard, the club page and `/my-events`; counts passed as numbers so `null` can mean loading |
+| 2026-08-19 | Navbar links reordered by role, desktop and mobile identical; mobile's admin link no longer points at the wrong route |
+| 2026-08-18 | Platform admins can manage every club: dashboards load from `GET /clubs/{id}/managed`, and a Manage pill on the club card links straight in |
+| 2026-08-18 | Club governance items 9–10: append-only `club_audit_logs` (V17, enforced by trigger) and the Activity tab in the manage sidebar — [`club-administration.md`](../docs/architecture/club-administration.md) |
+| 2026-08-18 | `dev` profile (`application-dev.yml`, `SPRING_PROFILES_ACTIVE` in compose) and the admin bootstrap runner — the system can finally have a platform admin, which unblocks `/search/reindex` and the Admin Dashboard track |
+| 2026-08-18 | Club governance item 8: ownership transfer — `club_ownership_transfers` (V16), the outgoing owner chooses whether they stay, one transaction demotes and promotes — [`club-administration.md`](../docs/architecture/club-administration.md) |
+| 2026-08-18 | Club governance items 5 and 7: invite an admin by address (V15 — nullable `user_id`, `invited_email`), accept/decline at `/invitations`, remove and cancel from the Administrators tab — [`club-administration.md`](../docs/architecture/club-administration.md) |
 | 2026-08-16 | Mock clubs left Flyway for a `dev`-profile seeder (V12 supersedes V6), initial-admin bootstrap added, and club search embeddings fixed ([BUG-034](../bugs/fixed_bugs.md#bug-034)) |
 | 2026-08-16 | CI runs once per PR instead of 2–3× per commit; tiering removed with the `push` trigger; every action pinned to a SHA, gitleaks and trivy to versions |
 | 2026-08-16 | CodeQL findings on PR #31 cleared: 429 refusals go back through `@ControllerAdvice` ([BUG-032](../bugs/fixed_bugs.md#bug-032)), request data scrubbed before logging ([BUG-033](../bugs/fixed_bugs.md#bug-033)) |

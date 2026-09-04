@@ -54,6 +54,13 @@ services:
       # Activates application-dev.yml, which is what makes @Profile("dev") beans
       # run at all — DevDataSeeder above all. Production sets this to `prod`,
       # where the seeder is not registered and cannot execute.
+      # Local development runs the `dev` profile. Overridable, but the default
+      # is dev rather than none because a @Profile("dev") bean with no active
+      # dev profile does not fail -- it compiles, deploys and silently never
+      # runs, which is a much worse way to find out.
+      #
+      # The `test` and `it` profiles are set by @ActiveProfiles in the suites
+      # and replace this rather than adding to it, so tests never see dev.
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
 
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-campusvibe}

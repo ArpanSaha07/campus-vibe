@@ -42,7 +42,18 @@
       ]
     },
 
-    "authentication.md": {
+    "club-administration.md": {
+   "covers": "Club-scoped authority, the assignment table, invitations, and the /manage dashboard",
+   "paths": [
+    "backend/src/main/java/com/campusvibe/clubadmin/",
+    "backend/src/main/java/com/campusvibe/security/ClubPermissionService.java",
+    "frontend/app/lib/managed-clubs-context.tsx",
+    "frontend/app/(protected)/manage/",
+    "frontend/app/(protected)/invitations/",
+    "frontend/app/components/manage/"
+   ]
+  },
+  "authentication.md": {
       "covers": "Email + code login, Google OAuth, token handling",
       "paths": [
         "backend/src/main/java/com/campusvibe/auth/",
@@ -55,7 +66,7 @@
     },
 
     "user-roles.md": {
-      "covers": "RBAC: the three roles, JWT claims, endpoint authorisation",
+      "covers": "RBAC: two platform roles, two club roles, JWT claims, endpoint authorisation",
       "paths": [
         "backend/src/main/java/com/campusvibe/security/",
         "backend/src/main/java/com/campusvibe/clubadmin/",
@@ -63,6 +74,17 @@
       ]
     },
 
+    "user-profiles.md": {
+      "covers": "Profile content and email preferences: the user_profiles / user_interests / user_notification_preferences tables, the full-replace PUT, the slug-keyed interest catalogue, and the shared profile load the editor depends on",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/user/profile/",
+        "frontend/app/(protected)/profile/",
+        "frontend/app/components/profile/",
+        "frontend/app/lib/profile.ts",
+        "frontend/app/lib/profile-context.tsx",
+        "frontend/app/lib/profile-options.ts"
+      ]
+    },
     "search.md": {
       "covers": "Hybrid semantic + keyword search",
       "paths": [

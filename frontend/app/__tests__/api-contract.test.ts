@@ -6,8 +6,19 @@ import type {
   ApiEvent,
   ApiMyEvent,
   AuthResponse,
+  ClubAdmin,
   ClubAdminRequest,
+  ClubAuditLog,
+  ClubCategory,
+  ClubInvitation,
+  EventFormat,
+  Interest,
+  ManagedClub,
+  NotificationPreferences,
+  OwnershipTransfer,
+  ProfileSocialLinks,
   User,
+  UserProfile,
 } from "@/app/types";
 
 /**
@@ -60,7 +71,8 @@ const eventFields: Record<keyof ApiEvent, true> = {
   promoted: true,
   capacity: true,
   registered: true,
-  categories: true,
+  topics: true,
+  formats: true,
 };
 
 const clubFields: Record<keyof ApiClub, true> = {
@@ -73,6 +85,8 @@ const clubFields: Record<keyof ApiClub, true> = {
   featured: true,
   images: true,
   createdAt: true,
+  category: true,
+  interests: true,
 };
 
 const userFields: Record<keyof User, true> = {
@@ -109,6 +123,109 @@ const clubAdminRequestFields: Record<keyof ClubAdminRequest, true> = {
   reviewedAt: true,
 };
 
+const clubAdminFields: Record<keyof ClubAdmin, true> = {
+  assignmentId: true,
+  userId: true,
+  userName: true,
+  userEmail: true,
+  invitedEmail: true,
+  role: true,
+  status: true,
+  createdAt: true,
+  activatedAt: true,
+};
+
+const clubInvitationFields: Record<keyof ClubInvitation, true> = {
+  invitationId: true,
+  clubId: true,
+  clubName: true,
+  clubLogo: true,
+  role: true,
+  invitedByName: true,
+  invitedAt: true,
+};
+
+const ownershipTransferFields: Record<keyof OwnershipTransfer, true> = {
+  transferId: true,
+  clubId: true,
+  clubName: true,
+  clubLogo: true,
+  fromUserId: true,
+  fromUserName: true,
+  toUserId: true,
+  toUserName: true,
+  outgoingBecomes: true,
+  status: true,
+  createdAt: true,
+};
+
+const clubAuditLogFields: Record<keyof ClubAuditLog, true> = {
+  id: true,
+  action: true,
+  entityType: true,
+  entityId: true,
+  actorUserId: true,
+  actorName: true,
+  metadata: true,
+  createdAt: true,
+};
+
+const managedClubFields: Record<keyof ManagedClub, true> = {
+  clubId: true,
+  clubName: true,
+  logo: true,
+  followers: true,
+  role: true,
+  officialEmail: true,
+  officialEmailVerified: true,
+};
+
+const userProfileFields: Record<keyof UserProfile, true> = {
+  bio: true,
+  faculty: true,
+  degree: true,
+  subjects: true,
+  socialLinks: true,
+  interests: true,
+  showInterests: true,
+  showSocialLinks: true,
+};
+
+// Pinned separately because the contract records a nested object as one field
+// name: `userProfileFields` above contributes `socialLinks` and says nothing
+// about what is inside it. Without an entry of its own, renaming `instagram` on
+// either side would break the app with both suites still green.
+const profileSocialLinksFields: Record<keyof ProfileSocialLinks, true> = {
+  instagram: true,
+  facebook: true,
+  linkedin: true,
+};
+
+const notificationPreferencesFields: Record<keyof NotificationPreferences, true> = {
+  eventReminders: true,
+  clubAnnouncements: true,
+  weeklyDigest: true,
+  newFollowerEvents: true,
+  productNews: true,
+};
+
+const interestFields: Record<keyof Interest, true> = {
+  slug: true,
+  label: true,
+  parentSlug: true,
+};
+
+const clubCategoryFields: Record<keyof ClubCategory, true> = {
+  slug: true,
+  label: true,
+};
+
+const eventFormatFields: Record<keyof EventFormat, true> = {
+  slug: true,
+  label: true,
+  groupLabel: true,
+};
+
 /** Backend DTO name → the TypeScript interface mirroring it. */
 const MIRRORS: Record<string, Record<string, true>> = {
   EventDTO: eventFields,
@@ -117,6 +234,17 @@ const MIRRORS: Record<string, Record<string, true>> = {
   MyEventDTO: myEventFields,
   AuthenticationResponse: authResponseFields,
   ClubAdminRequestDTO: clubAdminRequestFields,
+  ClubAdminDTO: clubAdminFields,
+  ClubInvitationDTO: clubInvitationFields,
+  OwnershipTransferDTO: ownershipTransferFields,
+  ClubAuditLogDTO: clubAuditLogFields,
+  ManagedClubDTO: managedClubFields,
+  UserProfileDTO: userProfileFields,
+  ProfileSocialLinksDTO: profileSocialLinksFields,
+  NotificationPreferencesDTO: notificationPreferencesFields,
+  InterestDTO: interestFields,
+  ClubCategoryDTO: clubCategoryFields,
+  EventFormatDTO: eventFormatFields,
 };
 
 describe("API contract", () => {

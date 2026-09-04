@@ -49,9 +49,9 @@ export default async function ClubPage({ params }: ClubPageProps) {
         <ClubLogo name={club.name} logo={club.logo} size="lg" alt={`${club.name} logo`} />
         <div>
           <h1 className="font-display text-3xl font-bold text-ink-900">{club.name}</h1>
-          <p className="font-mono text-xs text-ink-600 mt-1">
+          {/* <p className="font-mono text-xs text-ink-600 mt-1">
             {club.followers} followers · {totalEvents} events
-          </p>
+          </p> */}
           <div className="flex gap-3 mt-2 text-sm">
             {club.socialLinks?.facebook && (
               <a

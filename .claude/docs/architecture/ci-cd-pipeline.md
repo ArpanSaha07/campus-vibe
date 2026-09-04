@@ -4,7 +4,10 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** trigger rework of 2026-08-16
+**Code as of:** trigger rework of 2026-08-16, plus the migration-lint
+extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
+`verify.mjs`) reconciled 2026-08-18. Other sections are unreviewed since
+2026-08-16.
 
 > **Note, 2026-08-16.** The dated banner below is kept as a record of where the
 > pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:
@@ -410,25 +413,51 @@ is on `PATH` on the dev machine) and reads the exit code from the process rather
 than through a pipe — a piped `mvnw` reports the exit status of `tail`, which is
 how a failed build once looked green.
 
+The backend tier starts with **migration lint**, ahead of the JDK check so it
+still runs on a machine with no Java, and a failure there skips the Maven build
+entirely. That gate is deliberate: a failing migration lint is always a hard
+blocker and always a one-line fix, so spending a Maven build to reach the same
+answer buys nothing.
+
 **This does not replace CI.** It runs on one developer's machine, in one
 timezone and locale, with whatever is cached; CI remains the arbiter. It exists
 so the obvious failures are found in the terminal that caused them.
 
 ### `.github/workflows/_database.yml`
 
-Exists separately from the backend job for a specific reason: the backend suite
-runs on in-memory H2 with `ddl-auto: create-drop` and `flyway.enabled: false`, so
-Hibernate builds the schema from the entities and **the migration files are
-never executed**. A migration could be malformed, misnumbered or drifted from the
-entities and the entire backend suite would still pass.
+Exists separately from the backend job, though **the original reason has since
+been half dissolved and this section said otherwise until 2026-08-18.** As
+written, it claimed the backend suite ran entirely on in-memory H2 with
+`flyway.enabled: false`, so the migration files were never executed by any test.
+That is now true only of the fast `*Test` surefire suites. Since 2026-08-17 the
+`*IT` failsafe suites run against a real `pgvector/pgvector:pg15` container with
+Flyway enabled and `ddl-auto: validate` (`application-it.yml`,
+`PostgresTestContainer`), so the migrations *do* run, in order, on every
+integration-test run, and an entity that drifts from a migration fails a test.
+
+What still justifies a separate job is the part the suites cannot do: this one
+boots the **packaged jar** twice, which is the only check that a migration
+applies to an empty schema *and* re-applies cleanly to a populated one. The test
+containers start empty every time and never exercise the second boot, where a
+checksum mismatch or a non-idempotent migration actually shows up.
 
 Two jobs, split so the cheap one fails first:
 
 - **`lint-migrations`** — no database, seconds. Enforces
-  `V<n>__<snake_case>.sql`, rejects duplicate version numbers, greps for
-  real-looking email addresses and for password/secret/api-key/token literals,
+  `V<n>__<snake_case>.sql`, rejects duplicate version numbers and
+  real-looking email addresses, rejects password/secret/api-key/token literals,
   and warns on `INSERT INTO users`. It runs first so a bad filename fails in
   seconds rather than after a Maven build and a Postgres container.
+
+  Since 2026-08-17 the rules live in **`scripts/lint-migrations.mjs`** and the
+  workflow is one line calling it, rather than the inline shell it used to be.
+  That was not tidying: as inline shell the check could only ever fail on
+  GitHub, minutes after a push, against the one artifact that is expensive to
+  amend — a migration is immutable once applied, so a late fix means a new
+  migration rather than an edit. `verify.mjs` now runs the same script, so the
+  local check and CI cannot drift apart. Node rather than shell so it behaves
+  identically on Windows, and it tests per match rather than per line, so a line
+  carrying both an allowed placeholder and a real address still fails.
 - **`migrate`** — boots the packaged jar twice against a
   `pgvector/pgvector:pg15` service container.
 
@@ -1016,6 +1045,15 @@ Ordered by value, each with the reason it has not been done. Tracked in
   outside `ci.yml` and outside `ci-success`, so a green `CI` never implied a
   working deploy. Added as a known gap and as
   [BUG-018](../../bugs/bugs.md#bug-018). *(main session)*
+- **2026-08-18** — Reconciled the two sections the pre-push docs check kept
+  flagging. `_database.yml`'s stated reason for existing was **wrong**: it said
+  no test ever executes a migration, which stopped being true on 2026-08-17 when
+  the `*IT` suites moved to Testcontainers with Flyway on and
+  `ddl-auto: validate`. Replaced with the reason that survives — the double boot
+  of the packaged jar, which the test containers cannot do because they start
+  empty every time. Also recorded that the lint rules moved out of inline shell
+  into `scripts/lint-migrations.mjs`, shared with `verify.mjs` so local and CI
+  cannot diverge, and that it gates the backend build. *(implementing agent)*
 - **2026-08-14** — **Moved the first line of defence off the runner and onto the
   machine that writes the code.** Two consecutive pushes broke the Frontend job:
   [BUG-026](../../bugs/fixed_bugs.md#bug-026), a type error from checks that

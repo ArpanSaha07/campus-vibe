@@ -33,6 +33,13 @@ not silently rewrite them.
 | `V6__insert_mock_clubs.sql` seeds 8 clubs + images through Flyway | **Retired 2026-08-16** by `V12__remove_mock_club_seed_data.sql`. Both files stay: deleting V6 breaks Flyway validation. The clubs now come from `seed/DevDataSeeder` under the `dev` profile. |
 | `V7__multi_role_rbac.sql` creates tables AND inserts the 3 role rows | Applied. Mixes schema with reference data. Leave as-is; keep them separate going forward. |
 | No `dev` profile or `application-dev.yml` exists | **Resolved 2026-08-16.** `application-dev.yml` exists and `docker-compose.yml` sets `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}`. |
+The `dev` profile is live, so a seeder annotated `@Profile("dev")` will actually
+execute locally — which was not true before 2026-08-18, when such a bean would
+have compiled, deployed and silently never run. Confirm with the startup banner:
+`The following 1 profile is active: "dev"`. Note that `@ActiveProfiles` in the
+test suites *replaces* the active set rather than adding to it, so nothing gated
+on `dev` ever runs under `test` or `it`.
+
 
 Steps 1–4 of PLAN.md's Implementation Sequence are therefore done; Step 5
 (production posture in Elastic Beanstalk) is not, and automated tests for the
@@ -47,7 +54,6 @@ generated, so Hibernate had not issued the INSERT when the raw-JDBC embedding
 UPDATE ran, and it silently matched zero rows. Any code that mixes a JPA write
 with a `JdbcTemplate` write in one transaction needs a flush between them —
 `JdbcTemplate` is not a JPA query and will not trigger one.
-
 ---
 
 # Ownership: what writes what
@@ -186,6 +192,10 @@ not hypothetical: every club seeded by `V6__insert_mock_clubs.sql` has
 
 The initial admin account is not a Flyway migration. Use an `ApplicationRunner`
 — never `@PostConstruct`, which can race Flyway on a cold start.
+
+**Built 2026-08-18** as `bootstrap/AdminBootstrapRunner.java` +
+`bootstrap/BootstrapProperties.java`, covered by `AdminBootstrapRunnerIT`. The
+rules below describe what it does; read them before changing it.
 
 Configuration comes from environment variables:
 

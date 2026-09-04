@@ -1,237 +1,236 @@
-export default function CreateEventPage() {
-  return (
-    <div className="min-h-screen bg-[#f6f7fb] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-5xl space-y-6">
-        {/* Event Title */}
-        <section className="rounded-2xl border-2 border-indigo-500 bg-white p-6 shadow-sm transition-all">
-          <div className="flex items-start justify-between gap-4">
-            <div className="w-full">
-              <input
-                type="text"
-                placeholder="Event Title"
-                className="w-full border-none bg-transparent text-3xl font-bold text-slate-900 outline-none placeholder:text-slate-900"
-              />
+"use client";
 
-              <textarea
-                placeholder="A short and sweet sentence about your event."
-                rows={2}
-                className="mt-4 w-full resize-none border-none bg-transparent text-base text-slate-600 outline-none placeholder:text-slate-500"
-              />
-            </div>
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createEvent } from "@/app/lib/event";
+import { parseApiError } from "@/app/lib/auth-errors";
+import { useManagedClubs } from "@/app/lib/managed-clubs-context";
+import InterestPicker from "@/app/components/profile/edit/InterestPicker";
+import EventFormatPicker from "@/app/components/event/EventFormatPicker";
+import FormField, { inputClasses, selectClasses } from "@/app/components/ui/FormField";
+import Button from "@/app/components/ui/Button";
+import EmptyState from "@/app/components/ui/EmptyState";
 
-            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-2xl font-semibold text-indigo-600 transition hover:bg-indigo-100">
-              +
-            </button>
-          </div>
-        </section>
+const MAX_TAGS = 8;
 
-        {/* Date + Location */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="grid w-full grid-cols-1 gap-8 md:grid-cols-2">
-              {/* Date & Time */}
-              <div className="border-b border-slate-200 pb-6 md:border-b-0 md:border-r md:pb-0 md:pr-8">
-                <h2 className="text-3xl font-bold text-slate-900">
-                  Date and time
-                </h2>
+/**
+ * Creating an event.
+ *
+ * <strong>This replaces 237 lines that could not create anything.</strong> The
+ * previous version was uncontrolled inputs with no state and no submit handler
+ * — a form in appearance only — alongside a Google Maps embed carrying a
+ * literal `YOUR_API_KEY`. None of it was reachable by a backend, so none of it
+ * is kept.
+ *
+ * Authorisation here is club-scoped rather than role-based: the backend checks
+ * `canManageClub(organizerId)`, so the club select offers only clubs this user
+ * actually manages. That is also why there is no free-text organiser field —
+ * one would only produce 403s.
+ */
+export default function CreateEventForm() {
+  const router = useRouter();
+  const { clubs, ready } = useManagedClubs();
 
-                <div className="mt-6 space-y-5">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Start Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500"
-                    />
-                  </div>
+  const [organizerId, setOrganizerId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [dateTime, setDateTime] = useState("");
+  const [location, setLocation] = useState("");
+  const [price, setPrice] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
+  const [formats, setFormats] = useState<string[]>([]);
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-slate-700">
-                      End Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-              </div>
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-              {/* Location */}
-              <div>
-                <h2 className="text-3xl font-bold text-slate-900">
-                  Location
-                </h2>
+  // The one club case is the common one, so it is chosen rather than asked.
+  const club = organizerId || (clubs.length === 1 ? clubs[0].clubId : "");
+  const canSubmit = Boolean(club && title.trim() && dateTime) && !submitting;
 
-                <div className="mt-6 space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Enter a location"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500"
-                  />
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canSubmit) return;
 
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    {/* Replace YOUR_API_KEY with your Google Maps Embed API key */}
-                    <iframe
-                      title="Google Maps"
-                      src="https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=Montreal"
-                      width="100%"
-                      height="320"
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="no-referrer-when-downgrade"
-                      className="border-0"
-                    />
-                  </div>
+    setSubmitting(true);
+    setError("");
+    try {
+      const created = await createEvent({
+        organizerId: club,
+        title: title.trim(),
+        description,
+        // `datetime-local` yields `2026-09-01T18:00` with no zone. Interpreted
+        // as local time, which is what somebody typing it into a form means,
+        // and sent as an instant so the backend never has to guess.
+        dateTime: new Date(dateTime).toISOString(),
+        location,
+        price,
+        capacity: capacity.trim() ? Number(capacity) : null,
+        topics,
+        formats,
+      });
+      router.push(`/events/${created.eventId}`);
+    } catch (err) {
+      setError(parseApiError(err, "That didn't save. Try again in a moment."));
+      setSubmitting(false);
+    }
+  }
 
-                  <p className="text-sm text-slate-500">
-                    Search for a venue or paste an address to help attendees
-                    find your event.
-                  </p>
-                </div>
-              </div>
-            </div>
+  if (!ready) {
+    return (
+      <p className="mx-auto max-w-3xl px-4 py-10 font-mono text-sm text-ink-600">
+        Loading your clubs…
+      </p>
+    );
+  }
 
-            <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-2xl font-semibold text-indigo-600 transition hover:bg-indigo-100">
-              +
-            </button>
-          </div>
-        </section>
-
-        {/* Event Photos */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="w-full">
-              <h2 className="text-3xl font-bold text-slate-900">
-                Event Photos
-              </h2>
-
-              <p className="mt-3 text-slate-600">
-                Upload photos or banners to make your event stand out.
-              </p>
-
-              <div className="mt-6 rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center transition hover:border-indigo-400">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="mx-auto block text-sm text-slate-600"
-                />
-
-                <p className="mt-4 text-sm text-slate-500">
-                  PNG, JPG, WEBP up to 10MB
-                </p>
-              </div>
-            </div>
-
-            <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-2xl font-semibold text-indigo-600 transition hover:bg-indigo-100">
-              +
-            </button>
-          </div>
-        </section>
-
-        {/* Overview */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="w-full">
-              <h2 className="text-3xl font-bold text-slate-900">
-                Overview
-              </h2>
-
-              <p className="mt-3 text-slate-600">
-                Provide more details about your event, venue, schedule,
-                accessibility, speakers, or anything attendees should know.
-              </p>
-
-              <textarea
-                rows={8}
-                placeholder="Write your event overview here..."
-                className="mt-6 w-full rounded-2xl border border-slate-300 p-4 outline-none transition focus:border-indigo-500"
-              />
-            </div>
-
-            <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-2xl font-semibold text-indigo-600 transition hover:bg-indigo-100">
-              +
-            </button>
-          </div>
-        </section>
-
-        {/* Good To Know */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div className="w-full">
-              <h2 className="text-3xl font-bold text-slate-900">
-                Good to know
-              </h2>
-
-              {/* Tags */}
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-slate-800">
-                  Highlights
-                </h3>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  {[
-                    'Add Age Info',
-                    'Add Door Time',
-                    'Add Parking Info',
-                    'Add Dress Code',
-                    'Add Accessibility Info',
-                  ].map((item) => (
-                    <button
-                      key={item}
-                      className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-indigo-500 hover:text-indigo-600"
-                    >
-                      + {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* FAQ */}
-              <div className="mt-10">
-                <h3 className="text-lg font-semibold text-slate-800">
-                  Frequently asked questions
-                </h3>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  Add FAQs to help attendees understand your event better.
-                </p>
-
-                <div className="mt-6 space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Question"
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500"
-                  />
-
-                  <textarea
-                    rows={3}
-                    placeholder="Answer"
-                    className="w-full rounded-xl border border-slate-300 p-4 outline-none transition focus:border-indigo-500"
-                  />
-                </div>
-
-                <button className="mt-5 text-sm font-medium text-indigo-600 transition hover:text-indigo-700">
-                  + Add another question
-                </button>
-              </div>
-            </div>
-
-            <button className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-2xl font-semibold text-indigo-600 transition hover:bg-indigo-100">
-              +
-            </button>
-          </div>
-        </section>
-
-        {/* Save Button */}
-        <div className="sticky bottom-0 z-20 flex justify-end bg-gradient-to-t from-[#f6f7fb] via-[#f6f7fb] to-transparent py-4">
-          <button className="w-full rounded-2xl bg-orange-600 px-8 py-4 text-base font-semibold text-white shadow-lg transition hover:bg-orange-700 md:w-auto">
-            Save and continue
-          </button>
-        </div>
+  // Said up front rather than as a refusal after the form is filled in: without
+  // a club to put it on, an event has nowhere to go.
+  if (clubs.length === 0) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <EmptyState
+          title="You don't run a club yet"
+          body="Events belong to a club, so you'll need to be running one before you can put an event on. Ask an administrator to add you to yours."
+        />
       </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8 fade-up">
+      <h1 className="font-display text-4xl font-bold text-ink-900">Create an event</h1>
+      <p className="mt-1 text-ink-600">
+        Everything except the title, the club and the date can be filled in later.
+      </p>
+
+      <form onSubmit={submit} className="mt-8 space-y-6">
+        <FormField label="Club" htmlFor="organizerId" hint="Only clubs you run are listed.">
+          <select
+            id="organizerId"
+            value={club}
+            onChange={(event) => setOrganizerId(event.target.value)}
+            className={selectClasses}
+          >
+            <option value="">Select a club</option>
+            {clubs.map((managed) => (
+              <option key={managed.clubId} value={managed.clubId}>
+                {managed.clubName}
+              </option>
+            ))}
+          </select>
+        </FormField>
+
+        <FormField label="Title" htmlFor="title">
+          <input
+            id="title"
+            type="text"
+            value={title}
+            maxLength={140}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Intro to Robotics Workshop"
+            className={inputClasses}
+          />
+        </FormField>
+
+        <FormField label="Description" htmlFor="description">
+          <textarea
+            id="description"
+            rows={5}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="What happens, who it is for, what to bring."
+            className={`${inputClasses} resize-y rounded-xl`}
+          />
+        </FormField>
+
+        <FormField label="Date and time" htmlFor="dateTime">
+          <input
+            id="dateTime"
+            type="datetime-local"
+            value={dateTime}
+            onChange={(event) => setDateTime(event.target.value)}
+            className={inputClasses}
+          />
+        </FormField>
+
+        <FormField label="Location" htmlFor="location">
+          <input
+            id="location"
+            type="text"
+            value={location}
+            onChange={(event) => setLocation(event.target.value)}
+            placeholder="Trottier 1080"
+            className={inputClasses}
+          />
+        </FormField>
+
+        <div className="grid gap-6 sm:grid-cols-2">
+          <FormField label="Price" htmlFor="price" hint="Leave empty if it is free.">
+            <input
+              id="price"
+              type="text"
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              placeholder="$5"
+              className={inputClasses}
+            />
+          </FormField>
+
+          <FormField label="Capacity" htmlFor="capacity" hint="Leave empty for no limit.">
+            <input
+              id="capacity"
+              type="number"
+              min={1}
+              value={capacity}
+              onChange={(event) => setCapacity(event.target.value)}
+              className={inputClasses}
+            />
+          </FormField>
+        </div>
+
+        {/* Two axes, and no category. Format says what kind of thing this is,
+            topics say what it is about, and the topics are the same vocabulary
+            students pick their interests from -- which is what will let this
+            event reach them without any mapping. See decisions D2 and D3. */}
+        <section className="border-t border-mist-200 pt-6">
+          <h2 className="font-display text-xl font-bold text-ink-900">What kind of event?</h2>
+          <p className="mt-1 text-sm text-ink-600">
+            Pick up to {MAX_TAGS}. This is the shape of it, not the subject.
+          </p>
+          <div className="mt-4">
+            <EventFormatPicker selected={formats} onChange={setFormats} max={MAX_TAGS} />
+          </div>
+        </section>
+
+        <section className="border-t border-mist-200 pt-6">
+          <InterestPicker
+            selected={topics}
+            onChange={setTopics}
+            title="What is it about?"
+            description={`Pick up to ${MAX_TAGS}. Students who share these interests will find it.`}
+            max={MAX_TAGS}
+          />
+        </section>
+
+        <div className="flex flex-wrap items-center gap-4 border-t border-mist-200 pt-6">
+          <Button type="submit" disabled={!canSubmit}>
+            {submitting ? "Creating…" : "Create event"}
+          </Button>
+          {/* One live region, so a failure never sits under a stale success. */}
+          <p aria-live="polite" className="text-sm">
+            {error && <span className="font-semibold text-alert-600">{error}</span>}
+            {!error && !canSubmit && !submitting && (
+              <span className="text-ink-600">A club, a title and a date are needed.</span>
+            )}
+          </p>
+        </div>
+
+        {/* Banner images are deliberately not here. Unlike a club, the creator
+            *can* upload to an event they just made -- canManageEvent resolves
+            through the club they already manage -- so this is a gap worth
+            filling rather than a thing that cannot work. Queued in todo.md. */}
+      </form>
     </div>
-  )
+  );
 }
