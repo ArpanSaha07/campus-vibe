@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Local development overrides. NON-SECRET VALUES ONLY.
 #
 # Activated by SPRING_PROFILES_ACTIVE=dev, which docker/docker-compose.yml now
@@ -17,7 +16,6 @@ campusvibe:
     # through Flyway — but through ClubService, so `embedding` is written on the
     # way in. Idempotent: skipped entirely when any club already exists.
     enabled: ${DEV_SEED_ENABLED:true}
-=======
 # The `dev` profile — local development.
 #
 # DELIBERATELY ALMOST EMPTY, and that is the point rather than an oversight.
@@ -53,4 +51,3 @@ logging:
     # The application's own logs at DEBUG. Framework logging is untouched, so
     # this stays readable; Hibernate and Spring at DEBUG would bury it.
     com.campusvibe: DEBUG
->>>>>>> 7fc77e8b4ea47594d1d054eea7c3b408717fd448

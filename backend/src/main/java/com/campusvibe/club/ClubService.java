@@ -52,7 +52,6 @@ public class ClubService {
         if (clubRepository.existsById(club.getId())) {
             throw new DuplicateResourceException("Club with id [%s] already exists".formatted(club.getId()));
         }
-<<<<<<< HEAD
         // saveAndFlush, not save. Club.id is assigned rather than generated, so
         // Hibernate has no reason to issue the INSERT before the transaction
         // commits. indexClub writes the embedding through a raw JDBC UPDATE,
@@ -61,14 +60,11 @@ public class ClubService {
         // here invisible to semantic search. Events avoid this by accident:
         // their IDENTITY id forces the INSERT immediately.
         Club saved = clubRepository.saveAndFlush(club);
-=======
         // Validated before the insert, so a bad slug refuses the whole creation
         // rather than leaving a club that exists but is misclassified.
         club.setCategorySlug(taxonomyService.requireKnownClubCategory(category));
         club.getInterestSlugs().addAll(
                 taxonomyService.requireKnownInterests(interests, MAX_CLUB_INTERESTS, "interest"));
-        Club saved = clubRepository.save(club);
->>>>>>> 7fc77e8b4ea47594d1d054eea7c3b408717fd448
         searchIndexService.indexClub(saved);
         return clubMapper.apply(saved);
     }
