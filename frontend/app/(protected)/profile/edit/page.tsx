@@ -113,7 +113,7 @@ export default function EditProfilePage() {
                 value={draft.bio ?? ""}
                 onChange={(event) => setField("bio", event.target.value || null)}
                 placeholder="A programmer looking to expand his social circle"
-                className={`${inputClasses} resize-y`}
+                className={`${inputClasses} resize-y rounded-xl`}
               />
             </FormField>
           </div>

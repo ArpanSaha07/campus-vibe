@@ -87,10 +87,10 @@ export default async function EventPage({ params }: EventPageProps) {
 
   const banner = event.images[0] ?? FALLBACK_EVENT_IMAGE;
 
-  // Rendered twice — inline on small screens, in the side column on lg+.
+  // Rendered twice — inline on small screens, in the side column on md+.
   // Extracted so the markup stays identical in both spots.
   const ticket = (
-    <div className="lg:sticky lg:top-6 rounded-2xl border border-mist-200 bg-white overflow-hidden">
+    <div className="md:sticky md:top-6 rounded-2xl border border-mist-200 bg-white overflow-hidden">
       <div className="px-5 pt-5 pb-4 space-y-4">
         <div>
           <p className="ticket-label text-ink-600">Date</p>
@@ -127,9 +127,14 @@ export default async function EventPage({ params }: EventPageProps) {
   );
 
   return (
-    <div className="flex flex-col max-w-6xl mx-auto my-10 px-4 sm:px-6">
+    // w-full is load-bearing: this div is a flex item of the (main) layout's
+    // column, and a flex item with auto cross-axis margins (mx-auto) is not
+    // stretched — it shrink-to-fits its content instead. Without a definite
+    // width the page collapsed to whatever its text needed (~730px) and
+    // max-w-* never came into play at all.
+    <div className="w-full max-w-6xl mx-auto my-10 px-4 sm:px-6">
       {/* Banner */}
-      <div className="w-full h-72 lg:h-96 relative">
+      <div className="w-full h-72 md:h-96 relative">
         <Image
           src={banner}
           alt={event.title}
@@ -139,14 +144,14 @@ export default async function EventPage({ params }: EventPageProps) {
         />
       </div>
 
-      <h1 className="font-display text-3xl lg:text-4xl font-bold text-ink-900 mt-8">
+      <h1 className="font-display text-3xl md:text-4xl font-bold text-ink-900 mt-8">
         {event.title}
       </h1>
 
       {/* Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 py-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 lg:gap-14 py-8">
         {/* Left Column */}
-        <div className="lg:col-span-2 space-y-10">
+        <div className="md:col-span-2 space-y-10">
           {/* Details */}
           <section>
             <div className="flex items-center justify-between gap-4 mb-3">
@@ -161,8 +166,8 @@ export default async function EventPage({ params }: EventPageProps) {
             </p>
           </section>
 
-          {/* Ticket — shown here on small screens, in the side column on lg+ */}
-          <div className="lg:hidden">{ticket}</div>
+          {/* Ticket — shown here on small screens, in the side column on md+ */}
+          <div className="md:hidden">{ticket}</div>
 
           {/* Tags -- what kind of thing this is, and what it is about. There
               is deliberately no event category; see decision D2. */}
@@ -178,7 +183,7 @@ export default async function EventPage({ params }: EventPageProps) {
           )}
 
           {/* Organized By */}
-          <section className="px-5 py-4 bg-mist-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <section className="px-5 py-5 bg-gray-50 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               {/* No logo when the club could not be loaded, which ClubLogo
                   renders as the initial of the name the event already gave us. */}
@@ -197,8 +202,13 @@ export default async function EventPage({ params }: EventPageProps) {
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="secondary">Contact</Button>
+            <div className="flex gap-2 font-semibold">
+              <button
+                type="button"
+                className="cursor-pointer rounded border border-gray-200 px-6 py-2 text-ink-900 transition-colors hover:bg-gray-200"
+              >
+                Contact
+              </button>
               <ClubFollowButton clubId={event.organizer} />
             </div>
           </section>
@@ -208,8 +218,8 @@ export default async function EventPage({ params }: EventPageProps) {
           </a>
         </div>
 
-        {/* Right Column — the ticket (side column on lg+, hidden on small screens) */}
-        <div className="hidden lg:block lg:col-span-1">{ticket}</div>
+        {/* Right Column — the ticket (side column on md+, hidden on small screens) */}
+        <div className="hidden md:block md:col-span-1">{ticket}</div>
       </div>
     </div>
   );

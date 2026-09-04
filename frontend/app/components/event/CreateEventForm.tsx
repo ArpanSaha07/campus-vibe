@@ -140,7 +140,7 @@ export default function CreateEventForm() {
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="What happens, who it is for, what to bring."
-            className={`${inputClasses} resize-y`}
+            className={`${inputClasses} resize-y rounded-xl`}
           />
         </FormField>
 
