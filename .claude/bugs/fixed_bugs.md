@@ -2,10 +2,12 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-03**
+Last updated: **2026-09-05**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-037](#bug-037) | High | 2026-09-05 | A club's category and interests were discarded at creation: `saveAndFlush` returned a different instance from the one being tagged |
+| [BUG-036](#bug-036) | Blocker | 2026-09-05 | Backend CI stopped compiling — the `feature/user-profile` merge changed two signatures and left two call sites behind |
 | [BUG-035](#bug-035) | High | 2026-09-03 | Backend jar shipped Tomcat 10.1.55 with three CRITICAL CVEs, and the parent-version lever that fixed this last time was exhausted |
 | [BUG-034](#bug-034) | High | 2026-08-16 | Every club ever created had `embedding` NULL — the index UPDATE ran before Hibernate had inserted the row |
 | [BUG-033](#bug-033) | Medium | 2026-08-16 | Three log statements interpolated caller-supplied text, so a newline could forge log entries |
@@ -29,6 +31,120 @@ Last updated: **2026-09-03**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-037
+**A club's category and interests were discarded at creation** · High · FIXED 2026-09-05
+
+**Found:** 2026-09-05, running the full `./mvnw verify` after clearing
+[BUG-036](#bug-036). `ClubTaxonomyIT.aClubCanBeClassifiedAtCreation` failed on
+`$.category`: *Expected: is "departmental" but: was null*. Nothing else in the
+248-test suite noticed.
+
+**Symptom:** `POST /api/v1/clubs` accepted a `category` and `interests`, answered
+`200`, and returned a `ClubDTO` with `category: null` and no interests. The row
+was written the same way — the tags were not merely missing from the response,
+they were never persisted. The club was also embedded for semantic search
+*without* its interest labels, so a club created with tags searched as though it
+had none. `PUT` was unaffected: it works on an entity loaded by `findClub`.
+
+**Cause.** The order of the four statements in `ClubService.create`:
+
+```java
+Club saved = clubRepository.saveAndFlush(club);
+club.setCategorySlug(taxonomyService.requireKnownClubCategory(category));
+club.getInterestSlugs().addAll(taxonomyService.requireKnownInterests(...));
+searchIndexService.indexClub(saved);
+return clubMapper.apply(saved);
+```
+
+`saved` and `club` look like the same object. They are not. `Club.id` is an
+**assigned** String slug with no `@GeneratedValue`, and `Club` does not implement
+`Persistable`, so Spring Data's `isNew()` sees a non-null id and decides the
+entity is *not* new — `SimpleJpaRepository.save` therefore calls `em.merge()`
+rather than `persist()`. **`merge()` returns a different, managed copy.** The
+original `club` is left detached. Both setters then wrote to the detached object,
+where nothing tracks them: no dirty check at commit, no INSERT column, and
+`clubMapper.apply(saved)` read the managed copy that was never told.
+
+This is the same assigned-id trap as [BUG-034](#bug-034), one layer up. There it
+decided *when* the INSERT ran; here it decides *which object you are holding*.
+Both are invisible in `EventService`, whose `IDENTITY` id makes `save()` take the
+`persist()` branch and hand the same instance straight back.
+
+**Fix:** move the two taxonomy statements above `saveAndFlush`, so they mutate
+`club` while it is still the object being merged. Three lines reordered, no new
+code. The existing comment already claimed the validation happened *before* the
+insert — the code had drifted from it, and now matches again.
+
+**Why the reorder is the better fix**, rather than retagging `saved`: validating
+first means a bad slug throws before anything is written, so a misclassified club
+never reaches the database even momentarily; and `indexClub(saved)` now sees the
+interest labels it is supposed to embed, which retagging after the save would not
+have fixed.
+
+**Verified:** `./mvnw -B clean verify` — 57 unit + 248 integration tests green,
+including the two taxonomy suites and `abadSlugRefusesTheWholeCreation`, which
+still refuses the whole creation.
+
+**Not chased:** `Club` could implement `Persistable` and answer `isNew()` honestly,
+which would make `save()` take the `persist()` branch and remove this class of
+surprise for every future caller. That changes write behaviour for every club
+path, so it belongs in its own commit — noted in `todo.md`.
+
+---
+
+### BUG-036
+**Backend CI stopped compiling after the `feature/user-profile` merge** · Blocker · FIXED 2026-09-05
+
+**Found:** 2026-09-05, Branch checks → *Backend / Build and test*,
+[run 33916539063](https://github.com/ArpanSaha07/campus-vibe/actions/runs/33916539063/job/101164951602)
+on `develop` at `168bd4a`.
+
+**Symptom:** `mvn verify` failed in `default-compile`, one error, no tests run
+and no test reports uploaded:
+
+```
+DevDataSeeder.java:[65,29] incompatible types: invalid method reference
+  method create in class ClubService cannot be applied to given types
+  required: Club,String,List<String>
+  found:    Club
+```
+
+**Cause.** The taxonomy work widened two signatures and updated the callers it
+could see:
+
+| Changed | New shape | Call site left behind |
+|---|---|---|
+| `ClubService.create` | `(Club, String, List<String>)` | `DevDataSeeder:65` — `clubService::create` |
+| `BootstrapProperties` | gained a fourth component, `name` | `AdminBootstrapRunnerIT:33` |
+
+`ClubController` was updated, `DevDataSeeder` was not — a method *reference*
+rather than a call, so it reads as a name and not as an argument list. The
+`BootstrapProperties` miss is a record whose canonical constructor grew in the
+very last commit on the branch.
+
+**Why CI only reported one of them.** `javac` stops the module at the first
+failing phase: `default-compile` never finished, so `default-testCompile` never
+ran and the second break was invisible in the log. Fixing only what the workflow
+printed would have produced an identical-looking failure on the next push. Both
+were found by running `./mvnw -B verify -DskipITs` locally — the exact command
+`_backend.yml` runs.
+
+**Fix:** two call sites, no signature changes.
+
+- `DevDataSeeder` → `create(club, null, List.of())`. `TaxonomyService` already
+  treats a null category and an empty interest list as legitimately absent
+  (clubs predating V23 have neither), so the demo clubs seed uncategorised,
+  exactly as `V6` inserted them.
+- `AdminBootstrapRunnerIT` → passes `null` for `name`, which the compact
+  constructor defaults to `"Administrator"` — the value an environment that sets
+  no display name gets. No assertion in that suite reads the name.
+
+**Verified:** `./mvnw -B verify -DskipITs` green (57 tests), then a full
+`clean verify` to cover the integration test that had been edited — which is how
+[BUG-037](#bug-037) surfaced.
 
 ---
 

@@ -62,7 +62,10 @@ public class DevDataSeeder implements ApplicationRunner {
             return;
         }
 
-        demoClubs().forEach(clubService::create);
+        // Seeded uncategorised, exactly as V6 inserted them: the taxonomy is
+        // optional on create, and TaxonomyService reads a null category and an
+        // empty interest list as legitimately absent rather than invalid.
+        demoClubs().forEach(club -> clubService.create(club, null, List.of()));
         log.info("Dev seed: created {} demo clubs", demoClubs().size());
     }
 

@@ -6,6 +6,7 @@
 *.pem
 
 .claude/docs/commit-message.md
+.claude/settings.json
 
 # Build output. scripts/package-eb.mjs writes the EB source bundle here.
 dist/

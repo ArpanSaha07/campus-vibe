@@ -30,7 +30,9 @@ class AdminBootstrapRunnerIT extends AbstractIntegrationTest {
 
     private AdminBootstrapRunner runnerFor(boolean enabled, String email, String password) {
         return new AdminBootstrapRunner(
-                new BootstrapProperties(enabled, email, password),
+                // null name: the compact constructor defaults it to "Administrator",
+                // which is what an environment that sets no display name gets.
+                new BootstrapProperties(enabled, email, password, null),
                 userRepository, roleRepository, encoder);
     }
 

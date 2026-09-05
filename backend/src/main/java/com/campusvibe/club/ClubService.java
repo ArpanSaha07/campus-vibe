@@ -59,12 +59,16 @@ public class ClubService {
         // would match zero rows and report nothing, leaving every club created
         // here invisible to semantic search. Events avoid this by accident:
         // their IDENTITY id forces the INSERT immediately.
-        Club saved = clubRepository.saveAndFlush(club);
-        // Validated before the insert, so a bad slug refuses the whole creation
-        // rather than leaving a club that exists but is misclassified.
+        // Validated and applied before the insert, so a bad slug refuses the whole
+        // creation rather than leaving a club that exists but is misclassified.
+        // Before, not after, for a second reason: Club.id is assigned rather than
+        // generated, so Spring Data sees a non-new entity and saveAndFlush goes
+        // through em.merge -- which returns a *different* managed instance. Tagging
+        // `club` afterwards would write to the detached copy and persist nothing.
         club.setCategorySlug(taxonomyService.requireKnownClubCategory(category));
         club.getInterestSlugs().addAll(
                 taxonomyService.requireKnownInterests(interests, MAX_CLUB_INTERESTS, "interest"));
+        Club saved = clubRepository.saveAndFlush(club);
         searchIndexService.indexClub(saved);
         return clubMapper.apply(saved);
     }
