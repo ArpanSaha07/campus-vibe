@@ -1,5 +1,13 @@
 # CampusVibe AWS Deployment Guide
 
+**Code as of:** never — this is the plan of record, not a description of code.
+
+**Relation to the as-built record:** [`aws-deployment.md`](aws-deployment.md)
+describes what was actually built and where it departs from this plan. As of
+that document (2026-08-18, `d4afe79`) Phase 1 — packaging for Elastic
+Beanstalk — is complete and verified locally, and Phases 2–6 have not been
+started. Check there before treating any phase below as done.
+
 ## Purpose
 
 This document is the implementation guide for deploying the CampusVibe production backend and infrastructure to AWS in a secure, cost-conscious manner.

@@ -20,6 +20,16 @@ This plan assumes a stack similar to:
 
 ---
 
+> **Historical.** The audit below describes the database as it was on
+> 2026-07-31, when this plan was written, and it has not been updated since.
+> Steps 1–4 of the Implementation Sequence landed on 2026-08-16 (`d4afe79`)
+> and were reworked on 2026-08-18 (`8ca0eea`): the `dev` profile exists
+> (`application-dev.yml`, `SPRING_PROFILES_ACTIVE` in compose),
+> `bootstrap/AdminBootstrapRunner` and `seed/DevDataSeeder` exist, and V12
+> retired V6's mock clubs. Migrations now run to V30. [`SKILL.md`](SKILL.md)
+> holds the rules as they stand; this file keeps the reasoning and the audit
+> that produced them.
+
 ## Current State (audited)
 
 Facts as measured against the running local database and the repo. The rest of

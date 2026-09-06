@@ -5,7 +5,7 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-08-20**
+Last updated: **2026-09-06**
 
 ```
 .claude/docs/
@@ -36,12 +36,13 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`ci-cd-pipeline.md`](architecture/ci-cd-pipeline.md) | GitHub Actions: the `ci.yml` orchestrator, the four reusable component workflows, tiering, the `ci-success` gate, CodeQL, Dependabot, `.dockerignore` · plus local CI parity (`scripts/verify.mjs`, `.githooks/pre-push`) | ✅ Conforms · **but nothing has run on GitHub yet** |
 | [`llm-api-key-management.md`](architecture/llm-api-key-management.md) | How the OpenAI key flows from `docker/.env` and EB environment properties through `OpenAiProperties` without ever being logged or baked into an image | ⚠ Unverified against the standard |
 | [`club-administration.md`](architecture/club-administration.md) | Club owners and admins: the `club_admin_assignments` model, the one-owner invariant, why `ROLE_CLUB_ADMIN` was deleted, per-request authorisation, and the `/manage/[clubId]` dashboard · the club-scoped workflows `user-roles.md` points at for detail** | ✅ Live · items 1–5 and 7–10 of the governance spec |
-| [`club_admin_governance.md`](architecture/club_admin_governance.md) | The governance **specification** — administrator lifecycle, official-email trust anchor, invitations, ownership transfer and recovery, audit logs, notifications. Written before the code; items 6 and 11–15 are still unbuilt | 📐 Spec, partially implemented |
+| [`club_admin_governance.md`](architecture/club_admin_governance.md) | The governance **specification** — administrator lifecycle, official-email trust anchor, invitations, ownership transfer and recovery, audit logs, notifications. Written before the code; items 6 and 11–15 are still unbuilt | 📐 **Superseded spec** — items 1–5 and 7–10 built; `club-administration.md` describes reality |
 | [`user-roles.md`](architecture/user-roles.md) | The role model: two platform roles (`ROLE_USER`, `ROLE_ADMIN`) in the JWT, two club roles in `club_admin_assignments`, why they are stored and checked differently, and the platform-admin bypass | ✅ Live · rewritten from the code 2026-08-18 |
 | [`authentication.md`](architecture/authentication.md) | The two sign-in methods (Google ID token, email + password), JWT issuing and per-request verification, bcrypt, the auth modal · measured endpoint behaviour · **14 known gaps incl. 4 security findings** | ✅ Live · rewritten from the code 2026-08-15 · **not security-reviewed** |
 | [`user-profiles.md`](architecture/user-profiles.md) | Profile content and email preferences: why the profile is its own table rather than columns on `users`, why the write is a full-replace PUT and what that demands of the frontend, the slug-keyed interest catalogue and its foreign key, and the two places a social link is checked · **7 known gaps, incl. two visibility switches that currently control nothing** | ✅ Live · written with the code 2026-08-20 |
 | [`search.md`](architecture/search.md) | Why hybrid semantic search (embeddings in pgvector + keyword rank) rather than the alternatives | ⚠ Pre-implementation design note |
 | [`aws-deployment.md`](architecture/aws-deployment.md) | Production packaging for Elastic Beanstalk: the second Dockerfile and why it exists, `scripts/package-eb.mjs`, the JVM sizing for a 1 GiB instance, the PostgreSQL 15 pin, and the HTTPS-without-an-ALB resolution | ⚠ **Phase 1 only** · packaging verified locally; nothing runs on AWS yet |
+| [`CampusVibe_AWS_Deployment_Guide.md`](architecture/CampusVibe_AWS_Deployment_Guide.md) | The AWS plan of record: target architecture and the six phases — packaging, RDS, S3, Elastic Beanstalk, the Vercel/Cloudflare front, CI/CD — written to be followed in order | 📐 **Plan, not as-built** · `aws-deployment.md` records what exists |
 
 **On the ⚠ marks.** These predate the documentation standard and were moved into
 this folder on 2026-08-06 without being re-verified against the code. Each
