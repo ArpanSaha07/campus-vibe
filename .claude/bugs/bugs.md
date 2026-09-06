@@ -1,15 +1,15 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-08-15** · Branch: `develop`
+Last updated: **2026-09-06** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
-(BUG-008 … BUG-017, BUG-019 … BUG-022 so far). Bug ids are never reused.
+(BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Fixed 2026-08-15 and moved to [`fixed_bugs.md`](fixed_bugs.md): BUG-005, BUG-028, BUG-029, BUG-030, BUG-031.**
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05).
 
 | ID | Severity | Summary |
 |---|---|---|
-| [BUG-023](#bug-023) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
+| [BUG-038](#bug-038) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **reproducing again as of 2026-08-20** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
@@ -354,8 +354,10 @@ nothing for Vercel — nor the reverse.
 
 ---
 
-### BUG-023
+### BUG-038
 **`Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted** · High · OPEN
+
+*Renumbered from BUG-023 on 2026-09-06. That id was already taken by the event-detail-page bug in [`fixed_bugs.md`](fixed_bugs.md#bug-023), so for three weeks two different bugs shared it, against the never-reuse rule at the top of this file.*
 
 **Found:** 2026-08-13, while fixing [BUG-022](fixed_bugs.md#bug-022) on PR #27. That
 bug is this one, already detonated, on a different entity.

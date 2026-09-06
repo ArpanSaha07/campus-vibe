@@ -198,6 +198,7 @@ campusvibe/
 
 - Complete **one feature at a time**.
 - Once a feature is fully working, stop, so that I can review, commit and push it to Git before starting another.
+- Never assume any decisions about features/code that have already been taken or needs to be taken, ask me questions to clarify.
 - Reuse existing components whenever possible.
 - Prefer strongly typed APIs using shared DTOs/interfaces.
 - Keep Flyway migrations synchronized with backend entities.

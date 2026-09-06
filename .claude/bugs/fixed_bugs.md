@@ -681,7 +681,7 @@ and a working Try again, *not* the not-found card. Follow / unfollow works from
 the club page and writes to `user_followed_clubs`, and a My clubs card now
 clicks through to a rendered club page. 7 new tests in `club.test.ts`.
 
-**Left open as [BUG-023](bugs.md#bug-023):** the event detail page has the same
+**Left open as [BUG-023](#bug-023), fixed the same day:** the event detail page has the same
 root cause — a hardcoded event whose `organizer.name` is a slug no club shares —
 and still needs wiring to `GET /api/v1/events/{id}`.
 
