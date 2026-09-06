@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "node scripts/start-standalone.mjs",
     "lint": "eslint",
-    "type-check": "tsc --noEmit",
+    "type-check": "next typegen && tsc --noEmit",
     "test": "jest",
     "verify": "node ../scripts/verify.mjs --frontend"
   },
