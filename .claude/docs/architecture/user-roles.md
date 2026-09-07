@@ -5,8 +5,8 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** the uncommitted working tree that adds platform-admin access to
-club dashboards. Everything else described here is committed.
+**Code as of:** `77bc7c7` — platform-admin access to club dashboards.
+Everything else described here is committed ahead of it.
 
 > **This file was rewritten on 2026-08-18 and the previous version was wrong.**
 > It described three platform roles, one club admin per club, a

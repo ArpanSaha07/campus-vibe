@@ -1,10 +1,10 @@
 # User profiles
 
-**Code as of:** the profile-backend work of 2026-08-20, uncommitted at the time
-of writing. Re-stamp with the real sha once it lands. Every claim below was read
-from the code, and the endpoint behaviours are covered by `UserProfileIT`,
-`NotificationPreferencesIT`, `InterestCatalogueIT` and `MyAccountIT`, all of
-which run against real PostgreSQL with `ddl-auto: validate`.
+**Code as of:** `b2695c6` — the profile-backend work of 2026-08-20. Every
+claim below was read from the code, and the endpoint behaviours are covered by
+`UserProfileIT`, `NotificationPreferencesIT`, `InterestCatalogueIT` and
+`MyAccountIT`, all of which run against real PostgreSQL with
+`ddl-auto: validate`.
 
 **State:** live. Profile content and email preferences persist end to end.
 **Three things are deliberately still missing** and are written up in
@@ -341,7 +341,7 @@ through `DefaultExceptionHandler`, not something specific to these routes.
    interests invented for a campus audience, and 12 faculties transcribed by hand
    — and faculties do get renamed.
 7. **The catalogue serves only profiles so far — clubs are meant to share it.**
-   [`interests_and_categories.md`](../decisions/interests_and_categories.md)
+   [ADR-001](../decisions/ADR-001-three-taxonomy-vocabularies.md)
    decides that clubs carry tags drawn from this same `interest_catalogue`,
    which is what will make *clubs you might like* a direct join on shared slugs
    rather than a mapping. Events get their **own** vocabulary, because they also

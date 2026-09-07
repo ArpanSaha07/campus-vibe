@@ -12,6 +12,7 @@ Last updated: **2026-09-06**
 ├── README.md          this index
 ├── architecture/      implementation docs — living, describe the code as it is today
 └── decisions/         ADRs — dated, frozen, describe one choice at the moment it was made
+    └── README.md      the ADR index, and the decisions still waiting to be written
 ```
 
 Written and maintained under
@@ -65,7 +66,7 @@ be a guess. Someone who knows it should add its line.
 
 | Document | Decides | Status |
 |---|---|---|
-| [`interests_and_categories.md`](decisions/interests_and_categories.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
+| [`ADR-001`](decisions/ADR-001-three-taxonomy-vocabularies.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
 
 **That file holds seven decisions rather than one**, against `adr.md`'s
 one-per-file rule, and says in its own header why: they are a single
@@ -73,9 +74,10 @@ interlocking choice about one taxonomy, and the argument for each is the
 argument for the others. A reversal of any one of them gets its own numbered
 ADR.
 
-Open questions that will become ADRs when decided: JWT transport
-([BUG-003](../bugs/bugs.md#bug-003)) · whether to adopt shadcn/ui alongside the
-bespoke Tailwind v4 tokens · the deployment target and registry.
+**[`decisions/README.md`](decisions/README.md) indexes that folder** — the
+records above, the six decisions still waiting to be written and what forces
+each, and the ones settled inside a bug write-up rather than an ADR. Read it
+before changing architecture, so a choice already made is not quietly remade.
 
 ---
 

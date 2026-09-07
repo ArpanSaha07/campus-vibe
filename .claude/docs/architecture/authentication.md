@@ -143,7 +143,7 @@ warning, and rejects every token - fail closed. It also catches
 `IllegalArgumentException` alongside the checked exceptions, because Google's
 parser rejects a structurally malformed token *before* verification with an
 unchecked one. Those two behaviours are
-[BUG-030](../../bugs/bugs.md#bug-030) and [BUG-028](../../bugs/bugs.md#bug-028);
+[BUG-030](../../bugs/fixed_bugs.md#bug-030) and [BUG-028](../../bugs/fixed_bugs.md#bug-028);
 both were defects here, so treat this file as the place where getting it wrong
 is expensive.
 
@@ -153,7 +153,7 @@ Request and response records, all validated. `@Email`, `@NotBlank`, and
 is not arbitrary: bcrypt silently truncates input beyond 72 bytes, so the
 ceiling makes the truncation impossible rather than invisible.
 `GoogleSignInRequest.idToken` is `@NotBlank`
-([BUG-029](../../bugs/bugs.md#bug-029)). `EmailStatusResponse` carries
+([BUG-029](../../bugs/fixed_bugs.md#bug-029)). `EmailStatusResponse` carries
 `exists` and `provider`.
 
 #### `security/SecurityFilterChainConfig.java`
@@ -224,7 +224,7 @@ and `ConstraintViolationException` to 400. The catch-all now **logs** the
 exception and returns a fixed string rather than echoing `e.getMessage()`:
 echoing handed internal detail to the caller for anything unmapped, which is how
 a null `idToken` leaked a JVM helpful-NPE naming a private field
-([BUG-029](../../bugs/bugs.md#bug-029)). Anything a client legitimately needs to
+([BUG-029](../../bugs/fixed_bugs.md#bug-029)). Anything a client legitimately needs to
 act on deserves its own handler and its own status.
 
 #### `auth/token/` — `AuthToken` · `AuthTokenPurpose` · `AuthTokenRepository` · `AuthTokenService`
@@ -628,11 +628,11 @@ Ordered by how much they matter. Items 1, 2, 8, 9 and 12 were **fixed on
 
 1. ~~A blank `GOOGLE_CLIENT_ID` accepts a Google ID token issued to any
    application.~~ **Fixed** — `GoogleTokenVerifier` now builds no verifier and
-   rejects every token when unconfigured ([BUG-030](../../bugs/bugs.md#bug-030)).
+   rejects every token when unconfigured ([BUG-030](../../bugs/fixed_bugs.md#bug-030)).
 
 2. ~~`email_verified` is never checked on the Google payload.~~ **Fixed** —
    `googleSignIn` rejects a token whose email is not verified
-   ([BUG-031](../../bugs/bugs.md#bug-031)).
+   ([BUG-031](../../bugs/fixed_bugs.md#bug-031)).
 
 3. ~~No rate limiting or account lockout anywhere.~~ **Built 2026-08-15** —
    see *Rate limiting and lockout* below. Two residual limits, both accepted
@@ -681,11 +681,11 @@ Ordered by how much they matter. Items 1, 2, 8, 9 and 12 were **fixed on
    inlines bootstrap scripts) weakens it further. Only the cookie migration
    fixes it.
 
-8. ~~[BUG-028](../../bugs/bugs.md#bug-028) — malformed Google token → 500.~~
+8. ~~[BUG-028](../../bugs/fixed_bugs.md#bug-028) — malformed Google token → 500.~~
    **Fixed** — `GoogleTokenVerifier.verify` now catches the parser's unchecked
    `IllegalArgumentException` and returns null, so the 401 path runs.
 
-9. ~~[BUG-029](../../bugs/bugs.md#bug-029) — `GoogleSignInRequest` is
+9. ~~[BUG-029](../../bugs/fixed_bugs.md#bug-029) — `GoogleSignInRequest` is
    unvalidated.~~ **Fixed** — `@NotBlank` plus `@Valid`, and the catch-all
    handler no longer echoes `e.getMessage()`: it logs the exception and returns
    a fixed string, so no unmapped exception can disclose internals. A

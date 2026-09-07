@@ -4,10 +4,10 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** trigger rework of 2026-08-16, plus the migration-lint
-extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
-`verify.mjs`) reconciled 2026-08-18. Other sections are unreviewed since
-2026-08-16.
+**Code as of:** `23a7d1d` — the migration-lint extraction of 2026-08-17
+(`scripts/lint-migrations.mjs`, `_database.yml`, `verify.mjs`), reconciled
+2026-08-18, on top of the trigger rework of 2026-08-16. Other sections are
+unreviewed since 2026-08-16.
 
 > **Note, 2026-08-16.** The dated banner below is kept as a record of where the
 > pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:

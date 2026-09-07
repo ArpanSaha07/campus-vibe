@@ -1,4 +1,4 @@
-# Interests, club categories and event tags
+# ADR-001 — Interests, club categories and event tags
 
 **Status:** Proposed — only Arpan moves this to Accepted
 **Date:** 2026-08-20
