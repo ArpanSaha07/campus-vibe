@@ -5,15 +5,21 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-09-06**
+Last updated: **2026-09-07**
 
 ```
 .claude/docs/
 ├── README.md          this index
+├── product.md         what the product is meant to do, area by area — shipped vs planned
 ├── architecture/      implementation docs — living, describe the code as it is today
 └── decisions/         ADRs — dated, frozen, describe one choice at the moment it was made
     └── README.md      the ADR index, and the decisions still waiting to be written
 ```
+
+**[`product.md`](product.md) answers a different question from everything else
+here.** The architecture docs say how a subsystem works and why; `product.md`
+says whether a feature is something we have, something we decided to build, or
+neither — the question that otherwise gets answered by guessing.
 
 **Not everything lives here.** [`.claude/rules/`](../rules/) is the sibling
 folder: six short, path-scoped files that load **automatically when you read a
@@ -97,7 +103,10 @@ place to start.
 
 | Where | What it binds |
 |---|---|
-| [`.claude/CLAUDE.md`](../CLAUDE.md) | Project overview, tech stack, roles, development guidelines. Read first, always. |
+| [`.claude/CLAUDE.md`](../CLAUDE.md) | The overview, the stack choices with consequences, the map and the hard rules. Loaded every session. |
+| [`.claude/STATUS.md`](../STATUS.md) | Where the project is *now* — what is next, the blocking bugs, the traps, the last ten shipped. Printed at session start, refreshed by `/wrap-up`. Orient from this, not from `todo.md`. |
+| [`.claude/rules/`](../rules/) | Six path-scoped files that load with the code they govern. A trap belongs here; a paragraph belongs in a doc. |
+| [`.claude/specs/`](../specs/README.md) | One spec per feature, agreed before the code is written. |
 | [`.claude/design-guidelines.md`](../design-guidelines.md) | The *ticket stock* design direction — colour tokens, typography, the perforation device. Cited from `globals.css` and `EventCard.tsx`; binding on all UI work. |
 | [`.claude/skills/database-lifecycle/`](../skills/database-lifecycle/SKILL.md) | Flyway migrations, seeding, data ownership. Mandatory for any schema change. |
 | [`.claude/skills/llm-integration/`](../skills/llm-integration/SKILL.md) | OpenAI clients, prompts, key handling, rate limiting. |
