@@ -9,13 +9,15 @@ paths:
 **Read [`database-lifecycle/SKILL.md`](../skills/database-lifecycle/SKILL.md)
 before changing anything here.** It is mandatory, not a suggestion.
 
-- **Next number:** `ls | sort -V | tail -1`, plus one. Highest today is `V30`.
-- **A migration that exists on `origin/develop` or `origin/main` is
-  immutable.** It has already run somewhere. Supersede it with a new
-  `V<n+1>__<intent>.sql`; never edit it in place. Two files claiming V12 is what
-  the V6 saga cost, and Flyway refuses to start until one of them goes.
-  `scripts/hooks/guard-migrations.mjs` refuses the edit rather than trusting
-  anyone to remember; one you have written and not yet pushed stays editable.
+- **Next number:** the highest across your tree **and** `origin/develop` and
+  `origin/main`, plus one — `V30` today. A stale branch otherwise hands you a
+  number someone else has claimed, and since the two filenames differ git
+  merges both without a conflict; Flyway then refuses to start.
+- **A migration on `origin/develop` or `origin/main` is immutable.** It has
+  already run somewhere. Supersede it with a new `V<n+1>__<intent>.sql`; never
+  edit it in place — two files claiming V12 is what the V6 saga cost.
+- **`scripts/hooks/guard-migrations.mjs` refuses both**, so neither depends on
+  remembering. One you have written and not yet pushed stays editable.
 - **One responsibility per file.**
 - **No mock data in a migration.** The `dev` seeder owns that
   (`SKILL.md:152-169`) — a migration runs in every environment, including the
