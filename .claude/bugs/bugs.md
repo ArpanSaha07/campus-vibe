@@ -1,6 +1,6 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-06** · Branch: `develop`
+Last updated: **2026-09-07** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
@@ -9,6 +9,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-039](#bug-039) | High | Image uploads let the caller name the S3 object, and validate nothing about it |
 | [BUG-038](#bug-038) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **reproducing again as of 2026-08-20** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
@@ -428,3 +429,68 @@ later `addImages` call, which is what pins it as a view rather than a copy.
 `setCategories(...)` rather than mutating, though it inherits the same trap the
 moment anyone writes `getCategories().add(...)`.
 
+
+---
+
+### BUG-039
+**Image uploads let the caller name the S3 object, and validate nothing about it** · High · OPEN
+
+**Found:** 2026-09-07, while distilling `CampusVibe_S3_Media_Security.md` into
+[`s3-media/SKILL.md`](../skills/s3-media/SKILL.md). The document had been sitting
+inside a vendored `aws-s3` skill folder that nothing pointed at, so its rules had
+never been read against the code they govern.
+
+**Symptom:** none visible. Uploads succeed, keys are stored, nothing errors.
+
+All three upload paths build the S3 object key by concatenating the browser's
+own filename:
+
+```java
+String key = "clubs/" + id + "/logo-" + file.getOriginalFilename();   // ClubController.java:82
+String key = "clubs/" + id + "/images/" + file.getOriginalFilename(); // ClubController.java:91
+String key = "events/" + id + "/images/" + file.getOriginalFilename();// EventController.java:108
+```
+
+`reference.md` §7 says *never let a client provide an arbitrary full S3 object
+key*, and §13 says *do not use user-supplied filenames as the canonical S3 object
+name*. Both are violated at every call site.
+
+**What actually goes wrong, in order of how sure it is:**
+
+1. **Silent overwrite.** `putObject` replaces whatever is at the key. Upload
+   `logo.png` twice and the second silently destroys the first. On
+   `/{id}/images` it is worse: the object is replaced but `addImages` still
+   appends the key, so the list holds two entries pointing at one object.
+2. **No stable key, so the documented model cannot be built on top.** §19 needs
+   a new uuid key per upload to do upload → confirm → update database → delete
+   old. With the filename as the key there is no old and new to order.
+3. **Content type is never checked.** The endpoints declare
+   `consumes = MULTIPART_FORM_DATA_VALUE`, which constrains the request, not the
+   part. Any bytes under any name are stored — §12 asks for
+   `image/jpeg`, `image/png`, `image/webp` only.
+4. **`getOriginalFilename()` is nullable**, giving keys like
+   `clubs/24/logo-null`.
+
+**What is NOT wrong, so nobody re-derives it:** size is bounded —
+`application.yml:30-31` caps multipart at 10MB (the reference asks for 5MB, so
+the cap is loose rather than absent). And a `..` in a filename is not traversal:
+S3 keys are opaque strings, the `clubs/{id}/` prefix is still prepended
+literally, so prefix-scoped IAM and lifecycle rules are not evaded.
+
+**Why it is High when nothing is broken today.** Like
+[BUG-038](#bug-038) this is mostly armed rather than fired, and for the same
+reason it is not a note. Nothing serves this media back yet — `S3Service.getObject`
+(`S3Service.java:30`) has no caller anywhere in the codebase. The two items at the
+top of [`STATUS.md`](../STATUS.md) are both about wiring exactly that read path.
+The moment one lands, every missing control goes live at once, on top of keys
+that are already accumulating in S3 and in the database and would need migrating.
+An unvalidated SVG or HTML byte stream stored today becomes a stored-XSS question
+the day it is served inline.
+
+**The fix is a decision, not a patch.** Generating `{uuid}.webp` keys changes what
+is stored in `clubs.logo_key`, `club_images` and `event_images`, so existing rows
+need a backfill or a compatibility read. Doing it at the same time as the move to
+presigned uploads is one piece of work; doing it separately means touching the
+same three endpoints twice. Write the ADR before either. The narrow version —
+stop the caller naming the object, keep direct byte upload — is a much smaller
+change and would close 1, 2 and 4 on its own.

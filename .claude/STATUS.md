@@ -16,6 +16,7 @@ Where the project actually is. Orient from this, **not from
 
 ## Open bugs that block
 
+- [BUG-039](bugs/bugs.md#bug-039) High — image uploads name the S3 object from the browser's filename and check nothing about it; latent until a read path is wired, which is items 1 and 2 above.
 - [BUG-038](bugs/bugs.md#bug-038) High — `Club.images` / `Event.images` lose every write if the CodeQL autofix is accepted.
 - [BUG-001](bugs/bugs.md#bug-001) High — semantic-only search match returns 0 results; reproducing again as of 2026-08-20.
 - [BUG-002](bugs/bugs.md#bug-002) High — backend CI on JDK 17 with `-DskipTests`; fix written, never executed.

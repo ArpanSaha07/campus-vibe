@@ -145,6 +145,16 @@
         "backend/src/main/java/com/campusvibe/bootstrap/",
         "backend/src/main/resources/application-dev.yml"
       ]
+    },
+
+    "s3-media": {
+      "reason": "Media on S3: the private-bucket presigned model, object keys and credential handling. The skill also records where the shipped code departs from it.",
+      "path": ".claude/skills/s3-media/SKILL.md",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/s3/",
+        "backend/src/main/resources/application.yml",
+        "backend/src/main/resources/application-prod.yml"
+      ]
     }
   },
 

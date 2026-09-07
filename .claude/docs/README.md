@@ -110,6 +110,8 @@ place to start.
 | [`.claude/design-guidelines.md`](../design-guidelines.md) | The *ticket stock* design direction — colour tokens, typography, the perforation device. Cited from `globals.css` and `EventCard.tsx`; binding on all UI work. |
 | [`.claude/skills/database-lifecycle/`](../skills/database-lifecycle/SKILL.md) | Flyway migrations, seeding, data ownership. Mandatory for any schema change. |
 | [`.claude/skills/llm-integration/`](../skills/llm-integration/SKILL.md) | OpenAI clients, prompts, key handling, rate limiting. |
+| [`.claude/skills/s3-media/`](../skills/s3-media/SKILL.md) | Club logos, event banners and profile images on S3: the private-bucket presigned model, object keys, credentials — and where the shipped code still departs from it. `reference.md` beside it is the full 38-section security model. |
+| [`.claude/skills/start/`](../skills/start/SKILL.md) · [`wrap-up/`](../skills/wrap-up/SKILL.md) | The two ends of a unit of work: orient and agree a spec before code, record and verify after. |
 | [`.claude/skills/frontend-design/`](../skills/frontend-design/SKILL.md) | Visual design method for new or reshaped UI. |
 | [`.claude/skills/implementation-docs/`](../skills/implementation-docs/SKILL.md) | This knowledge base's own format. |
 | [`.claude/TODO/todo.md`](../TODO/todo.md) | The backlog, P0–P3. Not knowledge — work. |
