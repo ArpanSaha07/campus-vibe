@@ -99,3 +99,8 @@ if [ -n "$base" ]; then
 else
     node "$repo_root/scripts/check-docs.mjs" --quiet || true
 fi
+
+# Dead links inside .claude/, on the same terms: advisory, and silent unless
+# something is dead. A link that says a thing exists and then hides it is how a
+# fixed bug stayed an open P0 for three weeks.
+node "$repo_root/scripts/check-links.mjs" --quiet || true
