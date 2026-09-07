@@ -28,5 +28,7 @@ paths:
   and put a backend that did not compile onto `develop`; CI found it minutes
   later, and clearing it took three more commits. If a hook is red, stop and
   ask. (BUG-036)
-- **Hooks activate per clone:** `git config core.hooksPath .githooks`. Nothing
-  here protects a colleague who has not run that.
+- **Hooks activate per clone:** `git config core.hooksPath .githooks` turns on
+  all three — `pre-commit` (doc drift, advisory), `commit-msg` (semantic
+  subjects, in pure `sh` so GUI clients honour it) and `pre-push`. Nothing here
+  protects a colleague who has not run it.

@@ -20,6 +20,8 @@
 #
 # The hook is committed rather than living in .git/hooks so it is reviewable
 # and shared; core.hooksPath is what activates it, and stays a local choice.
+# That one setting activates all three hooks in this directory: pre-commit
+# (advisory doc drift), commit-msg (semantic subjects) and this one.
 #
 # BYPASS:  git push --no-verify
 #

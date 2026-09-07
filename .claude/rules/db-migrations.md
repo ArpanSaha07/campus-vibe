@@ -14,6 +14,8 @@ before changing anything here.** It is mandatory, not a suggestion.
   immutable.** It has already run somewhere. Supersede it with a new
   `V<n+1>__<intent>.sql`; never edit it in place. Two files claiming V12 is what
   the V6 saga cost, and Flyway refuses to start until one of them goes.
+  `scripts/hooks/guard-migrations.mjs` refuses the edit rather than trusting
+  anyone to remember; one you have written and not yet pushed stays editable.
 - **One responsibility per file.**
 - **No mock data in a migration.** The `dev` seeder owns that
   (`SKILL.md:152-169`) — a migration runs in every environment, including the
