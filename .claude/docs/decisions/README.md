@@ -19,6 +19,8 @@ reads a folder, they read an index.
 | # | Date | Status | Decides | Implemented in |
 |---|---|---|---|---|
 | [ADR-001](ADR-001-three-taxonomy-vocabularies.md) | 2026-08-20 | 📝 Proposed — awaiting Arpan | Three naming vocabularies and only three: one shared `interest_catalogue` behind student interests, club tags **and** event topics · 13 `club_categories` · 22 events-only `event_formats` · **events get no category taxonomy at all** | [`user-profiles.md`](../architecture/user-profiles.md) — the interests half only; the club and event halves are unbuilt |
+| [ADR-002](ADR-002-club-id-is-an-assigned-slug.md) | 2026-09-07 | 📝 Proposed — awaiting Arpan | `Club` keeps its assigned slug id and implements `Persistable`, so `save()` stops silently merging and handing back a different instance · rejected a surrogate id (nine foreign keys, a route and the DTO contract) and rule-only mitigation | — not yet built |
+| [ADR-003](ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | 2026-09-07 | 📝 Proposed — awaiting Arpan | `<tomcat.version>` is overridden past the Boot BOM until a parent manages 10.1.58 or newer · rejected a Boot 4 migration as a CVE remedy and a Trivy suppression outright | `backend/pom.xml` — shipped 2026-09-03 |
 
 **ADR-001 holds seven decisions rather than one**, against `adr.md`'s
 one-per-file rule, and argues the exception in its own header: they are a single
@@ -37,8 +39,6 @@ or a bug that will be closed and lost.
 |---|---|---|
 | How the JWT reaches the browser — `localStorage` or an httpOnly cookie | [BUG-003](../../bugs/bugs.md#bug-003) — frontend route protection never executes, and two of its three stated causes may be stale after the Next 16 upgrade | `bugs.md`, open |
 | Whether the creator of a club becomes its `CLUB_OWNER` at create, or club creation moves behind admin approval | The open **P0** in [`todo.md`](../../TODO/todo.md): `POST /api/v1/clubs` grants the creator nothing, so they get a 403 on their own logo upload | `todo.md`, stated as *a decision, not code* |
-| Whether `Club.id` stays an assigned slug, gains `Persistable`, or moves to a surrogate generated id | [BUG-034](../../bugs/fixed_bugs.md#bug-034) and [BUG-037](../../bugs/fixed_bugs.md#bug-037) — the same `em.merge` trap fired twice in the same method | Two bug write-ups and a rule; the strategic choice is unmade |
-| When to move to Spring Boot 4, and whether pinning `<tomcat.version>` past the BOM is the standing answer | [BUG-019](../../bugs/fixed_bugs.md#bug-019) and [BUG-035](../../bugs/fixed_bugs.md#bug-035) — CRITICAL Tomcat CVEs twice, the parent-version lever now exhausted | A property override in `backend/pom.xml` with no record of why |
 | Whether to adopt shadcn/ui alongside the bespoke Tailwind v4 tokens | New UI surfaces keep re-deciding it per component | Nowhere |
 | The deployment target and container registry | Elastic Beanstalk config exists under `docker/`; nothing is provisioned | [`CampusVibe_AWS_Deployment_Guide.md`](../architecture/CampusVibe_AWS_Deployment_Guide.md), as a plan rather than a decision |
 
@@ -58,7 +58,7 @@ later session does not read the silence as *nobody decided*.
   returned instance after** — [BUG-037](../../bugs/fixed_bugs.md#bug-037). The
   reordering was chosen over re-tagging because `Club.id` is assigned, so `save`
   goes through `em.merge()` and returns a *different* managed instance; the
-  argument stays detached. The underlying id strategy is the open question above.
+  argument stays detached. The underlying id strategy is [ADR-002](ADR-002-club-id-is-an-assigned-slug.md).
 - **`ROLE_CLUB_ADMIN` deleted outright in `V14`** —
   [`user-roles.md`](../architecture/user-roles.md), which records the rejected
   option and its cost: a role claim in a JWT outlives the access it names, so a

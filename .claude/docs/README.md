@@ -66,6 +66,8 @@ be a guess. Someone who knows it should add its line.
 
 | Document | Decides | Status |
 |---|---|---|
+| [`ADR-002`](decisions/ADR-002-club-id-is-an-assigned-slug.md) | Whether `Club.id` stays an assigned slug and gains `Persistable`, moves to a surrogate generated id, or is left alone with a rule · the `em.merge` trap that has now cost two bugs in one method | 📝 Proposed 2026-09-07 — awaiting Arpan |
+| [`ADR-003`](decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | Pinning `<tomcat.version>` past the Spring Boot BOM rather than migrating to Boot 4 or suppressing the scanner · the condition for removing the override | 📝 Proposed 2026-09-07 — already shipped in `backend/pom.xml` |
 | [`ADR-001`](decisions/ADR-001-three-taxonomy-vocabularies.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
 
 **That file holds seven decisions rather than one**, against `adr.md`'s
@@ -75,7 +77,7 @@ argument for the others. A reversal of any one of them gets its own numbered
 ADR.
 
 **[`decisions/README.md`](decisions/README.md) indexes that folder** — the
-records above, the six decisions still waiting to be written and what forces
+records above, the four decisions still waiting to be written and what forces
 each, and the ones settled inside a bug write-up rather than an ADR. Read it
 before changing architecture, so a choice already made is not quietly remade.
 
