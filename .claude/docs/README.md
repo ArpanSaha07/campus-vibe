@@ -15,6 +15,13 @@ Last updated: **2026-09-06**
     └── README.md      the ADR index, and the decisions still waiting to be written
 ```
 
+**Not everything lives here.** [`.claude/rules/`](../rules/) is the sibling
+folder: six short, path-scoped files that load **automatically when you read a
+matching source file**, so the traps for a subsystem arrive with the code rather
+than waiting to be looked up. A doc explains a subsystem; a rule is the handful
+of lines you must not get wrong while editing it. If you find yourself writing a
+paragraph in a rule, it belongs in a doc instead.
+
 Written and maintained under
 [`implementation-docs`](../skills/implementation-docs/SKILL.md) (docs) and
 [`adr.md`](../skills/implementation-docs/adr.md) (decisions). **Adding a document

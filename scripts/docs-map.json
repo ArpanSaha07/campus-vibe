@@ -14,7 +14,14 @@
     "model — are deliberately absent until someone writes the doc.",
     "",
     "`rules` holds .claude/rules/*.md, the path-scoped files a session loads when",
-    "it reads matching code. Same signal: code changed, rule did not."
+    "it reads matching code. Same signal: code changed, rule did not.",
+    "",
+    "A rule's own `paths:` frontmatter is deliberately broader than its entry",
+    "here. Frontmatter decides when the rule is LOADED — backend-java.md wants to",
+    "load on every backend file. This map decides when you are NAGGED to re-read",
+    "it, so it lists only the paths whose change could make a bullet untrue.",
+    "Mapping the broad set here would fire on every backend commit and train you",
+    "to ignore the notice."
   ],
 
   "docs": {
@@ -141,5 +148,54 @@
     }
   },
 
-  "rules": {}
+"rules": {
+    "backend-clubs.md": {
+      "reason": "The assigned-id merge trap, the taxonomy contract and the seeder that calls create()",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/club/",
+        "backend/src/main/java/com/campusvibe/seed/",
+        "backend/src/main/java/com/campusvibe/taxonomy/"
+      ]
+    },
+    "backend-java.md": {
+      "reason": "Layering, entity-collection exposure, log scrubbing. Mapped to the files its bullets cite, not to every backend file it loads on",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/common/",
+        "backend/src/main/java/com/campusvibe/exception/",
+        "backend/src/main/java/com/campusvibe/user/User.java"
+      ]
+    },
+    "db-migrations.md": {
+      "reason": "Numbering, immutability once pushed, and what may not go in a migration",
+      "paths": [
+        "backend/src/main/resources/db/migrations/"
+      ]
+    },
+    "contracts.md": {
+      "reason": "The one field list both suites assert against, and what a rename has to touch",
+      "paths": [
+        "contracts/",
+        "backend/src/test/java/com/campusvibe/contract/",
+        "frontend/app/types/",
+        "frontend/app/__tests__/api-contract.test.ts"
+      ]
+    },
+    "frontend.md": {
+      "reason": "The apiFetch boundary, the build-time traps and the CSP. Mapped to the files its bullets cite",
+      "paths": [
+        "frontend/app/lib/api.tsx",
+        "frontend/next.config.ts",
+        "frontend/AGENTS.md"
+      ]
+    },
+    "ci-and-build.md": {
+      "reason": "What gates what, the exhausted Tomcat lever, and the local/CI parity script",
+      "paths": [
+        ".github/workflows/",
+        ".githooks/",
+        "scripts/verify.mjs",
+        "backend/pom.xml"
+      ]
+    }
+  }
 }
