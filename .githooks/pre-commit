@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Advisory doc check on what is about to be committed. Never blocks.
+#
+# pre-push already reports code that changed without its doc, but by then the
+# commit is written and the message is spent. Saying it here, while the diff is
+# still in front of you, is the cheap moment — add the doc to the same commit or
+# decide, knowingly, that it does not need one.
+#
+# It runs scripts/check-docs.mjs against the index (--staged) and --quiet, so a
+# commit that touches nothing mapped prints nothing at all. Activated per clone
+# by the same setting as pre-push:
+#
+#   git config core.hooksPath .githooks
+#
+# BYPASS: not needed — this cannot fail a commit.
+
+repo_root=$(git rev-parse --show-toplevel)
+node "$repo_root/scripts/check-docs.mjs" --staged --quiet || true
+exit 0

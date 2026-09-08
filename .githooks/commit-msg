@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# Reject a commit subject that is not semantic.
+#
+# WHY THIS EXISTS
+#
+# The log tells two stories. Everything written with the commit-message skill
+# reads `fix(backend): unblock CI and persist club taxonomy`. Everything written
+# in a hurry, or from a GUI client, reads `Fixed a syntax error: added a comma
+# in the file: backend/src/main/java/...` and `Merging changes from the
+# feature/user-profile into the develop branch` — the second of which,
+# `0357b78`, is also the commit that put a backend that did not compile onto
+# develop by going around the pre-push hook.
+#
+# A convention that only holds when someone remembers it is not a convention.
+#
+# WHY PURE sh, AND NO NODE
+#
+# GitHub Desktop and the VS Code git integration run hooks through a minimal
+# environment; a hook that needs node on PATH silently does not run in exactly
+# the client that produced the messages above. This uses nothing but sh, grep
+# and sed.
+#
+# ENABLE IT (once per clone, same setting as pre-push and pre-commit):
+#
+#   git config core.hooksPath .githooks
+#
+# BYPASS:  git commit --no-verify
+#
+# Argument: the path to the file holding the proposed message.
+
+msg_file="$1"
+[ -f "$msg_file" ] || exit 0
+
+# The subject is the first line that is neither a comment nor blank — git's own
+# editor template puts several of both above it.
+subject=$(grep -v '^#' "$msg_file" | sed '/./,$!d' | head -n 1)
+
+[ -n "$subject" ] || exit 0
+
+# Git writes these itself. Rejecting a merge or a fixup would break `git merge`,
+# `git revert` and `git rebase --autosquash` for no gain.
+case "$subject" in
+    'Merge '*|'Revert '*|'fixup! '*|'squash! '*) exit 0 ;;
+esac
+
+fail() {
+    echo "commit-msg: $1"
+    echo ""
+    echo "  subject: $subject"
+    echo ""
+    echo "Format:  type(scope): summary in the imperative, lowercase, no full stop"
+    echo "         at most 72 characters, 50 or fewer preferred"
+    echo ""
+    echo "Types:   feat fix docs style refactor perf test build ci chore revert"
+    echo "Scopes:  frontend backend db docker ci auth search clubs events deps docs"
+    echo ""
+    echo "Example: fix(search): return results for semantic-only queries"
+    echo ""
+    echo "Run /generate-commit-message, then:"
+    echo "  git commit -F .claude/docs/commit-message.md"
+    echo ""
+    echo "Bypass (it will be in the log forever): git commit --no-verify"
+    exit 1
+}
+
+if [ "${#subject}" -gt 72 ]; then
+    fail "subject is ${#subject} characters; the limit is 72."
+fi
+
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: [a-z0-9`].*[^.]$'
+
+if ! printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+    fail "subject is not a semantic commit subject."
+fi
+
+exit 0

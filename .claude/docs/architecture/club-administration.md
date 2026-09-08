@@ -5,7 +5,7 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** the uncommitted working tree adding the activity log; ownership
+**Code as of:** `14ea46e` — the append-only club activity log. Ownership
 transfer and the admin bootstrap are committed ahead of it.
 
 The spec this implements is

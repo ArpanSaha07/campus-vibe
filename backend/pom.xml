@@ -63,6 +63,10 @@
 		  This moves all four tomcat-embed-* artifacts together — the BOM declares
 		  every one of them at this property. Drop the override once a parent
 		  manages 10.1.58 or newer, not before.
+
+		  The options rejected on the way here — a Boot 4 migration, a scanner
+		  suppression — are recorded in
+		  .claude/docs/decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md
 		-->
 		<tomcat.version>10.1.59</tomcat.version>
 

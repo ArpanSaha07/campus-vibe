@@ -1,5 +1,21 @@
 # CampusVibe Club Administration, Governance, Notifications, and Audit Model
 
+**Code as of:** never — this is a specification, not a description of code.
+
+> **Superseded as a description of the system. For what exists, read
+> [`club-administration.md`](club-administration.md).**
+>
+> This file is the design, written before the code, covering fifteen MVP
+> items. Items 1–5 and 7–10 shipped on 2026-08-17 and 2026-08-18 and are
+> described as built in `club-administration.md`; **where the two disagree,
+> that file describes reality.** Still unbuilt: item 6 (official-email
+> verification and the platform-admin UI for `official_email`) and items
+> 11–15 (notification separation, the annual administrator review,
+> platform-admin ownership recovery), tracked under *Club governance* in
+> [`todo.md`](../../TODO/todo.md#club-governance). Kept because it is the only
+> record of the target model and of the reasoning behind the one-owner
+> invariant; nothing below has been edited to match what shipped.
+
 ## Purpose
 
 This document defines the finalized CampusVibe model for club administration, club ownership, administrator lifecycle management, official club email verification, notifications, audit logs, yearly leadership transitions, and recovery safeguards.

@@ -5,14 +5,28 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-08-20**
+Last updated: **2026-09-07**
 
 ```
 .claude/docs/
 ├── README.md          this index
+├── product.md         what the product is meant to do, area by area — shipped vs planned
 ├── architecture/      implementation docs — living, describe the code as it is today
 └── decisions/         ADRs — dated, frozen, describe one choice at the moment it was made
+    └── README.md      the ADR index, and the decisions still waiting to be written
 ```
+
+**[`product.md`](product.md) answers a different question from everything else
+here.** The architecture docs say how a subsystem works and why; `product.md`
+says whether a feature is something we have, something we decided to build, or
+neither — the question that otherwise gets answered by guessing.
+
+**Not everything lives here.** [`.claude/rules/`](../rules/) is the sibling
+folder: six short, path-scoped files that load **automatically when you read a
+matching source file**, so the traps for a subsystem arrive with the code rather
+than waiting to be looked up. A doc explains a subsystem; a rule is the handful
+of lines you must not get wrong while editing it. If you find yourself writing a
+paragraph in a rule, it belongs in a doc instead.
 
 Written and maintained under
 [`implementation-docs`](../skills/implementation-docs/SKILL.md) (docs) and
@@ -36,12 +50,13 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`ci-cd-pipeline.md`](architecture/ci-cd-pipeline.md) | GitHub Actions: the `ci.yml` orchestrator, the four reusable component workflows, tiering, the `ci-success` gate, CodeQL, Dependabot, `.dockerignore` · plus local CI parity (`scripts/verify.mjs`, `.githooks/pre-push`) | ✅ Conforms · **but nothing has run on GitHub yet** |
 | [`llm-api-key-management.md`](architecture/llm-api-key-management.md) | How the OpenAI key flows from `docker/.env` and EB environment properties through `OpenAiProperties` without ever being logged or baked into an image | ⚠ Unverified against the standard |
 | [`club-administration.md`](architecture/club-administration.md) | Club owners and admins: the `club_admin_assignments` model, the one-owner invariant, why `ROLE_CLUB_ADMIN` was deleted, per-request authorisation, and the `/manage/[clubId]` dashboard · the club-scoped workflows `user-roles.md` points at for detail** | ✅ Live · items 1–5 and 7–10 of the governance spec |
-| [`club_admin_governance.md`](architecture/club_admin_governance.md) | The governance **specification** — administrator lifecycle, official-email trust anchor, invitations, ownership transfer and recovery, audit logs, notifications. Written before the code; items 6 and 11–15 are still unbuilt | 📐 Spec, partially implemented |
+| [`club_admin_governance.md`](architecture/club_admin_governance.md) | The governance **specification** — administrator lifecycle, official-email trust anchor, invitations, ownership transfer and recovery, audit logs, notifications. Written before the code; items 6 and 11–15 are still unbuilt | 📐 **Superseded spec** — items 1–5 and 7–10 built; `club-administration.md` describes reality |
 | [`user-roles.md`](architecture/user-roles.md) | The role model: two platform roles (`ROLE_USER`, `ROLE_ADMIN`) in the JWT, two club roles in `club_admin_assignments`, why they are stored and checked differently, and the platform-admin bypass | ✅ Live · rewritten from the code 2026-08-18 |
 | [`authentication.md`](architecture/authentication.md) | The two sign-in methods (Google ID token, email + password), JWT issuing and per-request verification, bcrypt, the auth modal · measured endpoint behaviour · **14 known gaps incl. 4 security findings** | ✅ Live · rewritten from the code 2026-08-15 · **not security-reviewed** |
 | [`user-profiles.md`](architecture/user-profiles.md) | Profile content and email preferences: why the profile is its own table rather than columns on `users`, why the write is a full-replace PUT and what that demands of the frontend, the slug-keyed interest catalogue and its foreign key, and the two places a social link is checked · **7 known gaps, incl. two visibility switches that currently control nothing** | ✅ Live · written with the code 2026-08-20 |
 | [`search.md`](architecture/search.md) | Why hybrid semantic search (embeddings in pgvector + keyword rank) rather than the alternatives | ⚠ Pre-implementation design note |
 | [`aws-deployment.md`](architecture/aws-deployment.md) | Production packaging for Elastic Beanstalk: the second Dockerfile and why it exists, `scripts/package-eb.mjs`, the JVM sizing for a 1 GiB instance, the PostgreSQL 15 pin, and the HTTPS-without-an-ALB resolution | ⚠ **Phase 1 only** · packaging verified locally; nothing runs on AWS yet |
+| [`CampusVibe_AWS_Deployment_Guide.md`](architecture/CampusVibe_AWS_Deployment_Guide.md) | The AWS plan of record: target architecture and the six phases — packaging, RDS, S3, Elastic Beanstalk, the Vercel/Cloudflare front, CI/CD — written to be followed in order | 📐 **Plan, not as-built** · `aws-deployment.md` records what exists |
 
 **On the ⚠ marks.** These predate the documentation standard and were moved into
 this folder on 2026-08-06 without being re-verified against the code. Each
@@ -64,7 +79,9 @@ be a guess. Someone who knows it should add its line.
 
 | Document | Decides | Status |
 |---|---|---|
-| [`interests_and_categories.md`](decisions/interests_and_categories.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
+| [`ADR-002`](decisions/ADR-002-club-id-is-an-assigned-slug.md) | Whether `Club.id` stays an assigned slug and gains `Persistable`, moves to a surrogate generated id, or is left alone with a rule · the `em.merge` trap that has now cost two bugs in one method | 📝 Proposed 2026-09-07 — awaiting Arpan |
+| [`ADR-003`](decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | Pinning `<tomcat.version>` past the Spring Boot BOM rather than migrating to Boot 4 or suppressing the scanner · the condition for removing the override | 📝 Proposed 2026-09-07 — already shipped in `backend/pom.xml` |
+| [`ADR-001`](decisions/ADR-001-three-taxonomy-vocabularies.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
 
 **That file holds seven decisions rather than one**, against `adr.md`'s
 one-per-file rule, and says in its own header why: they are a single
@@ -72,9 +89,10 @@ interlocking choice about one taxonomy, and the argument for each is the
 argument for the others. A reversal of any one of them gets its own numbered
 ADR.
 
-Open questions that will become ADRs when decided: JWT transport
-([BUG-003](../bugs/bugs.md#bug-003)) · whether to adopt shadcn/ui alongside the
-bespoke Tailwind v4 tokens · the deployment target and registry.
+**[`decisions/README.md`](decisions/README.md) indexes that folder** — the
+records above, the four decisions still waiting to be written and what forces
+each, and the ones settled inside a bug write-up rather than an ADR. Read it
+before changing architecture, so a choice already made is not quietly remade.
 
 ---
 
@@ -85,10 +103,15 @@ place to start.
 
 | Where | What it binds |
 |---|---|
-| [`.claude/CLAUDE.md`](../CLAUDE.md) | Project overview, tech stack, roles, development guidelines. Read first, always. |
+| [`.claude/CLAUDE.md`](../CLAUDE.md) | The overview, the stack choices with consequences, the map and the hard rules. Loaded every session. |
+| [`.claude/STATUS.md`](../STATUS.md) | Where the project is *now* — what is next, the blocking bugs, the traps, the last ten shipped. Printed at session start, refreshed by `/wrap-up`. Orient from this, not from `todo.md`. |
+| [`.claude/rules/`](../rules/) | Six path-scoped files that load with the code they govern. A trap belongs here; a paragraph belongs in a doc. |
+| [`.claude/specs/`](../specs/README.md) | One spec per feature, agreed before the code is written. |
 | [`.claude/design-guidelines.md`](../design-guidelines.md) | The *ticket stock* design direction — colour tokens, typography, the perforation device. Cited from `globals.css` and `EventCard.tsx`; binding on all UI work. |
 | [`.claude/skills/database-lifecycle/`](../skills/database-lifecycle/SKILL.md) | Flyway migrations, seeding, data ownership. Mandatory for any schema change. |
 | [`.claude/skills/llm-integration/`](../skills/llm-integration/SKILL.md) | OpenAI clients, prompts, key handling, rate limiting. |
+| [`.claude/skills/s3-media/`](../skills/s3-media/SKILL.md) | Club logos, event banners and profile images on S3: the private-bucket presigned model, object keys, credentials — and where the shipped code still departs from it. `reference.md` beside it is the full 38-section security model. |
+| [`.claude/skills/start/`](../skills/start/SKILL.md) · [`wrap-up/`](../skills/wrap-up/SKILL.md) | The two ends of a unit of work: orient and agree a spec before code, record and verify after. |
 | [`.claude/skills/frontend-design/`](../skills/frontend-design/SKILL.md) | Visual design method for new or reshaped UI. |
 | [`.claude/skills/implementation-docs/`](../skills/implementation-docs/SKILL.md) | This knowledge base's own format. |
 | [`.claude/TODO/todo.md`](../TODO/todo.md) | The backlog, P0–P3. Not knowledge — work. |

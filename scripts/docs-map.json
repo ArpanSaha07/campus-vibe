@@ -1,19 +1,32 @@
 {
   "$comment": [
-    "Which architecture doc covers which code. Read by scripts/check-docs.mjs,",
-    "which reports when an area changed and its doc did not.",
+    "Which architecture doc, skill or rule covers which code. Read by",
+    "scripts/check-docs.mjs, which reports when an area changed and the file",
+    "describing it did not.",
     "",
     "Prefixes, matched against repo-relative paths from `git diff --name-only`.",
-    "A file may map to more than one doc; every match is reported.",
+    "A file may map to more than one entry; every match is reported.",
     "",
     "Keep this honest rather than complete: a mapping that fires on changes the",
     "doc does not actually describe trains you to ignore the warning, which is",
-    "the only failure mode that matters for an advisory check."
+    "the only failure mode that matters for an advisory check. Areas no doc",
+    "describes — frontend/app/(main)/clubs and events, the club/event domain",
+    "model — are deliberately absent until someone writes the doc.",
+    "",
+    "`rules` holds .claude/rules/*.md, the path-scoped files a session loads when",
+    "it reads matching code. Same signal: code changed, rule did not.",
+    "",
+    "A rule's own `paths:` frontmatter is deliberately broader than its entry",
+    "here. Frontmatter decides when the rule is LOADED — backend-java.md wants to",
+    "load on every backend file. This map decides when you are NAGGED to re-read",
+    "it, so it lists only the paths whose change could make a bullet untrue.",
+    "Mapping the broad set here would fire on every backend commit and train you",
+    "to ignore the notice."
   ],
 
   "docs": {
     "api-and-caching.md": {
-      "covers": "The apiFetch boundary, the caching model, DTO mapping, error-status mapping",
+      "covers": "The apiFetch boundary, the caching model, DTO mapping, error-status mapping, and the DTO contract both sides assert against",
       "paths": [
         "frontend/app/lib/api.tsx",
         "frontend/app/lib/cache.ts",
@@ -21,43 +34,52 @@
         "frontend/app/lib/club.tsx",
         "frontend/app/lib/event.tsx",
         "frontend/app/lib/followed-clubs-context.tsx",
+        "frontend/app/types/",
+        "frontend/app/__tests__/api-contract.test.ts",
         "backend/src/main/java/com/campusvibe/event/",
         "backend/src/main/java/com/campusvibe/club/",
-        "backend/src/main/java/com/campusvibe/exception/"
+        "backend/src/main/java/com/campusvibe/exception/",
+        "backend/src/test/java/com/campusvibe/contract/",
+        "contracts/"
       ]
     },
 
     "ci-cd-pipeline.md": {
-      "covers": "GitHub Actions, tiering, the ci-success gate, and local CI parity",
+      "covers": "GitHub Actions, tiering, the ci-success gate, local CI parity, and the dependency pins the Trivy gate depends on",
       "paths": [
         ".github/workflows/",
         ".githooks/",
         "scripts/verify.mjs",
         "scripts/check-docs.mjs",
+        "scripts/check-links.mjs",
+        "scripts/lint-migrations.mjs",
         "docker/",
         ".dockerignore",
         "frontend/next.config.ts",
         "frontend/Dockerfile",
-        "backend/Dockerfile"
+        "backend/Dockerfile",
+        "backend/pom.xml"
       ]
     },
 
     "club-administration.md": {
-   "covers": "Club-scoped authority, the assignment table, invitations, and the /manage dashboard",
-   "paths": [
-    "backend/src/main/java/com/campusvibe/clubadmin/",
-    "backend/src/main/java/com/campusvibe/security/ClubPermissionService.java",
-    "frontend/app/lib/managed-clubs-context.tsx",
-    "frontend/app/(protected)/manage/",
-    "frontend/app/(protected)/invitations/",
-    "frontend/app/components/manage/"
-   ]
-  },
-  "authentication.md": {
-      "covers": "Email + code login, Google OAuth, token handling",
+      "covers": "Club-scoped authority, the assignment table, invitations, and the /manage dashboard",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/clubadmin/",
+        "backend/src/main/java/com/campusvibe/security/ClubPermissionService.java",
+        "frontend/app/lib/managed-clubs-context.tsx",
+        "frontend/app/(protected)/manage/",
+        "frontend/app/(protected)/invitations/",
+        "frontend/app/components/manage/"
+      ]
+    },
+
+    "authentication.md": {
+      "covers": "Email + password and Google sign-in, token handling, password reset and verification mail",
       "paths": [
         "backend/src/main/java/com/campusvibe/auth/",
         "backend/src/main/java/com/campusvibe/jwt/",
+        "backend/src/main/java/com/campusvibe/mail/",
         "frontend/app/lib/auth-context.tsx",
         "frontend/app/lib/auth-errors.ts",
         "frontend/app/lib/user.tsx",
@@ -75,9 +97,10 @@
     },
 
     "user-profiles.md": {
-      "covers": "Profile content and email preferences: the user_profiles / user_interests / user_notification_preferences tables, the full-replace PUT, the slug-keyed interest catalogue, and the shared profile load the editor depends on",
+      "covers": "Profile content and email preferences: the user_profiles / user_interests / user_notification_preferences tables, the full-replace PUT, the slug-keyed interest catalogue (now the taxonomy package), and the shared profile load the editor depends on",
       "paths": [
         "backend/src/main/java/com/campusvibe/user/profile/",
+        "backend/src/main/java/com/campusvibe/taxonomy/",
         "frontend/app/(protected)/profile/",
         "frontend/app/components/profile/",
         "frontend/app/lib/profile.ts",
@@ -85,6 +108,7 @@
         "frontend/app/lib/profile-options.ts"
       ]
     },
+
     "search.md": {
       "covers": "Hybrid semantic + keyword search",
       "paths": [
@@ -98,7 +122,8 @@
       "covers": "The AI planner feature",
       "paths": [
         "frontend/app/lib/planner.ts",
-        "frontend/app/components/planner/"
+        "frontend/app/components/planner/",
+        "frontend/app/(main)/planner/"
       ]
     },
 
@@ -112,10 +137,74 @@
 
   "skills": {
     "database-lifecycle": {
-      "reason": "Migrations, seeding and role grants are governed by a skill, not a doc. Read it before changing these.",
+      "reason": "Migrations, seeding, the dev profile and the admin bootstrap are governed by a skill, not a doc. Read it before changing these.",
       "path": ".claude/skills/database-lifecycle/SKILL.md",
       "paths": [
+        "backend/src/main/resources/db/migrations/",
+        "backend/src/main/java/com/campusvibe/seed/",
+        "backend/src/main/java/com/campusvibe/bootstrap/",
+        "backend/src/main/resources/application-dev.yml"
+      ]
+    },
+
+    "s3-media": {
+      "reason": "Media on S3: the private-bucket presigned model, object keys and credential handling. The skill also records where the shipped code departs from it.",
+      "path": ".claude/skills/s3-media/SKILL.md",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/s3/",
+        "backend/src/main/resources/application.yml",
+        "backend/src/main/resources/application-prod.yml"
+      ]
+    }
+  },
+
+"rules": {
+    "backend-clubs.md": {
+      "reason": "The assigned-id merge trap, the taxonomy contract and the seeder that calls create()",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/club/",
+        "backend/src/main/java/com/campusvibe/seed/",
+        "backend/src/main/java/com/campusvibe/taxonomy/"
+      ]
+    },
+    "backend-java.md": {
+      "reason": "Layering, entity-collection exposure, log scrubbing. Mapped to the files its bullets cite, not to every backend file it loads on",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/common/",
+        "backend/src/main/java/com/campusvibe/exception/",
+        "backend/src/main/java/com/campusvibe/user/User.java"
+      ]
+    },
+    "db-migrations.md": {
+      "reason": "Numbering, immutability once pushed, and what may not go in a migration",
+      "paths": [
         "backend/src/main/resources/db/migrations/"
+      ]
+    },
+    "contracts.md": {
+      "reason": "The one field list both suites assert against, and what a rename has to touch",
+      "paths": [
+        "contracts/",
+        "backend/src/test/java/com/campusvibe/contract/",
+        "frontend/app/types/",
+        "frontend/app/__tests__/api-contract.test.ts"
+      ]
+    },
+    "frontend.md": {
+      "reason": "The apiFetch boundary, the build-time traps and the CSP. Mapped to the files its bullets cite",
+      "paths": [
+        "frontend/app/lib/api.tsx",
+        "frontend/next.config.ts",
+        "frontend/AGENTS.md"
+      ]
+    },
+    "ci-and-build.md": {
+      "reason": "What gates what, the exhausted Tomcat lever, and the local/CI parity script",
+      "paths": [
+        ".github/workflows/",
+        ".githooks/",
+        "scripts/verify.mjs",
+        "backend/pom.xml"
       ]
     }
   }

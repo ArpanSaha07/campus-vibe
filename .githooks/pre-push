@@ -20,6 +20,8 @@
 #
 # The hook is committed rather than living in .git/hooks so it is reviewable
 # and shared; core.hooksPath is what activates it, and stays a local choice.
+# That one setting activates all three hooks in this directory: pre-commit
+# (advisory doc drift), commit-msg (semantic subjects) and this one.
 #
 # BYPASS:  git push --no-verify
 #
@@ -94,8 +96,23 @@ fi
 # tests above. The check prints what looks out of date and gets out of the way.
 #
 # --quiet so a push with nothing stale adds no output at all.
+#
+# `|| skipped <name>` rather than `|| true`. Both keep the push going — these
+# never block — but `|| true` also swallowed the checker *crashing*, which is
+# indistinguishable from it finding nothing: both print zero lines. No workflow
+# runs these scripts, so that silence was the only signal there was. The stamp
+# parser sat broken for weeks on exactly this shape of quiet.
+skipped() {
+    echo "pre-push: $1 did not run (exit $2) - advisory check skipped, not a failure"
+}
+
 if [ -n "$base" ]; then
-    node "$repo_root/scripts/check-docs.mjs" --base "$base" --quiet || true
+    node "$repo_root/scripts/check-docs.mjs" --base "$base" --quiet || skipped check-docs.mjs $?
 else
-    node "$repo_root/scripts/check-docs.mjs" --quiet || true
+    node "$repo_root/scripts/check-docs.mjs" --quiet || skipped check-docs.mjs $?
 fi
+
+# Dead links inside .claude/, on the same terms: advisory, and silent unless
+# something is dead. A link that says a thing exists and then hides it is how a
+# fixed bug stayed an open P0 for three weeks.
+node "$repo_root/scripts/check-links.mjs" --quiet || skipped check-links.mjs $?
