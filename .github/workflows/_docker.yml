@@ -197,9 +197,24 @@ jobs:
           curl -fsS "http://localhost:8080/api/v1/clubs/search?q=coding" | jq 'length'
 
           # Unauthenticated access to a protected route must be rejected.
-          echo "--- GET /api/v1/clubs/my-club (expect 401/403) ---"
-          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/v1/clubs/my-club)
+          # This is the endpoint that replaced GET /api/v1/clubs/my-club: it
+          # lives under /api/v1/users/me, which matches no permitAll rule and
+          # so falls through to .anyRequest().authenticated().
+          #
+          # 404 is called out separately because that is exactly how this
+          # assertion went stale. It used to name /api/v1/clubs/my-club. When
+          # that mapping was deleted the path did not start 404-ing from
+          # Security -- it fell through to the public /api/v1/clubs/{id}
+          # matcher, was never challenged at all, and answered "no such club".
+          # A route that quietly stops being protected reads identically to one
+          # that was renamed, so say which one this is.
+          echo "--- GET /api/v1/users/me/managed-clubs (expect 401/403) ---"
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/v1/users/me/managed-clubs)
           echo "status: $code"
+          if [ "$code" = "404" ]; then
+            echo "::error::Protected endpoint is missing (404). The route was renamed or removed; update this smoke test to name its replacement."
+            exit 1
+          fi
           if [ "$code" != "401" ] && [ "$code" != "403" ]; then
             echo "::error::Protected endpoint returned $code for an unauthenticated request."
             exit 1

@@ -4,7 +4,7 @@ Finished work, moved out of [`todo.md`](todo.md) so the queue stays readable.
 Nothing here needs doing. It is kept because *what was already tried, and why it
 was done that way* is the expensive thing to rediscover.
 
-Last updated: **2026-09-07**
+Last updated: **2026-09-08**
 
 **Two halves, and they answer different questions:**
 
@@ -186,6 +186,18 @@ clubs into every environment it touched.
 - [x] **P2** *(plan Step 7)* ~~Branch protection on `main`~~ — **enabled 2026-08-07 by Arpan.** Requires a pull request, requires branches up to date, and requires the single check named **`CI`**; the component jobs are correctly *not* required. Two things this settings change implies that no file in the repo records: the required check is matched by **display name**, so renaming the `ci-success` job hangs every PR on *Expected — Waiting for status* and the fix is in GitHub settings rather than a commit; and require-branches-up-to-date means each merge invalidates every other open PR, so the nine Dependabot PRs become nine sequential update-and-rerun cycles. `merge_group` is already wired if that becomes painful.
 - [x] **P2** ~~Add `output: "standalone"` to `frontend/next.config.ts`~~ — **done 2026-08-07**, forced by [BUG-016](../bugs/fixed_bugs.md#bug-016) rather than chosen. The `runner` stage copied the whole `node_modules`, which put `tar` — a build-time dependency of `@tailwindcss/oxide`, marked `dev` in the lockfile — into the shipping image and failed the Trivy CRITICAL gate. Now copies `.next/standalone` + `.next/static` + `public`, runs `node server.js`, and **deletes npm from the stage** (its bundled `tar` was a second CRITICAL that no published Node tag fixes). Bundle is 11 top-level packages; image scans clean of fixable HIGH *and* CRITICAL. Two follow-ons came with it: `npm start` now runs `scripts/start-standalone.mjs`, because `next start` does not work with standalone output and fails by serving unstyled pages rather than erroring; and Jest needed `modulePathIgnorePatterns` for the second `package.json` the standalone build writes.
 
+### Security
+
+- [x] **P3** ~~Clear the four `js/unused-local-variable` alerts (`useCreateClubForm.ts`, `auth-context.tsx`, `GoogleProvider.tsx`, `auth-context.test.tsx`)~~ — **done 2026-09-08**, in the same pass that unblocked [PR #41](https://github.com/ArpanSaha07/campus-vibe/pull/41) ([BUG-038](../bugs/fixed_bugs.md#bug-038)), which is what the queued item asked for: do it while those files are open, not on its own. All four were checked against the code before touching anything, and all four were genuinely dead.
+
+  **Deleted rather than wired up, which was the only real decision here.** Two of the four look like an unfinished feature and invite the opposite fix. `useCreateClubForm.isChecking` was returned to consumers and permanently `false` — `setIsChecking` is never called — so the tempting move is to set it around the `checkClubNameExists` call. `GoogleProvider.loaded` was *set* twice and never *read*, so the tempting move is to gate `{children}` on it. Both would change runtime behaviour to satisfy a dead-code alert: the first adds a spinner nobody asked for, the second stops the whole app rendering until Google's script loads. Neither is a bug today; both would be after the "fix".
+
+  **`GoogleProvider` keeps the preload and loses the flag.** It was never a gate — it renders `{children}` unconditionally and exposes no context, so nothing *could* have read `loaded`. `GoogleAuthButton` owns readiness itself: it re-checks `window.google`, reuses an existing script tag and waits on that tag's `load` event (`GoogleAuthButton.tsx:115-129`). The provider is a head start, not a gate. That is now written in the file, because the flag looked like an intention and the next reader would have re-added it.
+
+  **These never failed CI and never would have.** `eslint-config-next/typescript.js:4` sets `@typescript-eslint/no-unused-vars` to severity **1 (warn)**, and nothing runs `--max-warnings 0`, so `npm run lint` was green with all four present and is green without them. CodeQL's `js/unused-local-variable` was the only signal. Worth knowing before assuming lint covers this class.
+
+  **Not a defect, and deliberately left alone:** the fifth alert in the same query, `Navbar.tsx` "unused imports `Menu`, `X`" (alert 32), is stale. Both are used in the ternary at line 119, and the alert is pinned to an older commit whose content shows the same usage. Re-scan; do not edit to satisfy it.
+
 ### Docs
 
 - [x] **P1** ~~Rebuild `.claude/` so a fresh session gets the load-bearing context automatically~~ — **done 2026-09-07**, in thirteen commits from `8b03670` to this one. The problem in one line: `ClubService.create` re-armed a JPA trap that had been diagnosed five weeks earlier, because the diagnosis existed only in an 85 KB `fixed_bugs.md` that `CLAUDE.md` told sessions to grep — and you cannot grep for a trap you do not know exists. Three mechanisms replaced remembering: knowledge that loads **by path** ([`.claude/rules/`](../rules/), six files, every bullet carrying its bug or ADR id), one stamped 48-line [`STATUS.md`](../STATUS.md) injected at session start by `scripts/hooks/session-context.mjs`, and hooks that enforce what prose could not (`guard-migrations.mjs`, `.githooks/commit-msg`).
@@ -229,6 +241,14 @@ clubs into every environment it touched.
 ---
 
 ## Completed work log
+
+**2026-09-08 — PR #41 was blocked by one failing job, and the failure was a stale test rather than the security regression it announced ([BUG-038](../bugs/fixed_bugs.md#bug-038)).**
+
+- **The gate worked; its message pointed at the wrong culprit.** `Docker / Build images and run the stack` failed on `GET /api/v1/clubs/my-club` returning **404** where the smoke test wanted 401/403 — reading, at a glance, like a protected route that had stopped rejecting anonymous callers. It had: the endpoint was deleted on this branch, and `/api/v1/clubs/my-club` then fell through to `@GetMapping("/{id}")`, which sits under the GET `"/api/v1/clubs/**"` **permitAll** rule. The request was never challenged at all — it looked up a club named "my-club", found none, and answered 404. **A route that quietly stops being protected and a route that was renamed are indistinguishable to an assertion that only checks "not 401/403".** The retargeted step now branches on 404 separately and says which one it is.
+- **It broke on the merge, not on a commit, which is exactly what a merge gate is for.** `_docker.yml` is untouched by this PR and is still correct on `main`, where `@GetMapping("/my-club")` exists. Nothing in the fast push loop could have caught it: `scripts/verify.mjs` covers the frontend and backend tiers and never runs compose. Worth remembering before trusting a green pre-push hook on a workflow change.
+- **Verified by replaying the job locally rather than by pushing and watching.** Full compose stack built and run: `/ping` → `Pong: 1`, `/api/v1/clubs` → **8**, `clubs/search?q=coding` → **1** hit, `/api/v1/users/me/managed-clubs` → **403** with body *"Full authentication is required to access this resource"* — which is the part that matters, because it proves Security rejected the call rather than a controller answering. The old path was re-checked in the same run and still returned 404, so the diagnosis was confirmed rather than assumed.
+- **The four CodeQL unused-variable alerts were cleared in the same pass**, per the queued P3 item — deleted, not wired up. See [Security](#security) above for why the tempting fix was the wrong one in two of the four cases.
+- **Three new CodeQL alerts were triaged and left in the code on purpose.** `Club.getInterestSlugs` (44), `Event.getTopicSlugs` (45) and `Event.getFormatSlugs` (46) were raised as inline review comments on the PR. They are Lombok `@Getter`s on JPA collections that callers mutate deliberately, relying on Hibernate dirty-checking inside the transaction (`ClubService.java:69,98,99`; `EventController.java:90,92`). Accepting the offered defensive-copy autofix would silently stop persisting club interests and event taxonomy — which is [BUG-037](../bugs/fixed_bugs.md#bug-037) again, three weeks after it was fixed. Added as group **(d)** of the standing dismissal sweep in `todo.md`; dismissal is a Security-tab action and Arpan's call.
 
 **2026-08-08 — The Docker job was replayed locally, end to end. The Trivy gate passes; two other things came back different from what is written down.**
 

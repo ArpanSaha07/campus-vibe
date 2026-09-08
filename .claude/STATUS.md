@@ -35,6 +35,8 @@ Where the project actually is. Orient from this, **not from
 
 | Date | What landed |
 |---|---|
+| 2026-09-08 | The Docker smoke test asserted on `GET /clubs/my-club`, deleted on this branch, so it read 404 and blocked every merge; retargeted at `/users/me/managed-clubs` and taught to name a missing route for what it is ([BUG-038](../bugs/fixed_bugs.md#bug-038)) |
+| 2026-09-08 | Four `js/unused-local-variable` CodeQL alerts cleared — the dead `isChecking`, `loaded`, `setToken` and `act` bindings deleted rather than wired up |
 | 2026-09-07 | `.claude/` rebuilt so a fresh session gets the load-bearing context automatically: path-scoped [`rules/`](rules/), this file injected at session start, and hooks enforcing migrations and commit subjects. Orientation for a club feature measured at 20,852 bytes against 109,556 before — [`tasks-completed.md`](TODO/tasks-completed.md) carries the table |
 | 2026-09-05 | `develop` compiles again and a club's category and interests persist at creation ([BUG-036](bugs/fixed_bugs.md#bug-036), [BUG-037](bugs/fixed_bugs.md#bug-037)) |
 | 2026-09-04 | `feature/user-profile` merged into `develop` (`0357b78`) — 19 commits: club governance, profiles, taxonomy, the create forms |
@@ -43,7 +45,5 @@ Where the project actually is. Orient from this, **not from
 | 2026-08-20 | Taxonomy (`d1d915f`): V23–V30, the `taxonomy/` package, `ClubService.create(Club, category, interests)` — [ADR-001](docs/decisions/ADR-001-three-taxonomy-vocabularies.md) |
 | 2026-08-20 | User profiles persist: V18–V21, a full-replace `PUT` and one shared profile load — [`user-profiles.md`](docs/architecture/user-profiles.md) |
 | 2026-08-19 | `/profile` and `/profile/edit` — the profile page and five settings sections behind a rail |
-| 2026-08-18 | Platform admins can manage every club; club governance items 5, 7–10 — [`club-administration.md`](docs/architecture/club-administration.md) |
-| 2026-08-18 | `dev` profile and the admin bootstrap runner — the system can finally have a platform admin |
 
 Older, with full write-ups: [`tasks-completed.md`](TODO/tasks-completed.md).
