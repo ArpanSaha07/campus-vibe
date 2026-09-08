@@ -20,11 +20,11 @@ class JWTUtilTest {
 
     @Test
     void tokenCarriesIdentityAndRolesOnly() {
-        String token = jwtUtil.issueToken(42L, "user@campus.com", List.of("ROLE_USER", "ROLE_CLUB_ADMIN"));
+        String token = jwtUtil.issueToken(42L, "user@campus.com", List.of("ROLE_USER", "ROLE_ADMIN"));
 
         assertEquals("42", jwtUtil.getSubject(token));
         assertEquals("user@campus.com", jwtUtil.getEmail(token));
-        assertEquals(List.of("ROLE_USER", "ROLE_CLUB_ADMIN"), jwtUtil.getRoles(token));
+        assertEquals(List.of("ROLE_USER", "ROLE_ADMIN"), jwtUtil.getRoles(token));
     }
 
     @Test

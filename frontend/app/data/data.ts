@@ -23,7 +23,8 @@ export const popularEvents: EventInstance[] = [
     promoted: true,
     capacity: 200,
     registered: 100,
-    categories: ["Dating", "Research", "Food"]
+    topics: ["research", "food-drink"],
+    formats: ["social", "networking"]
   },
   {
     eventId: "mts-2025",
@@ -44,7 +45,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 500,
     registered: 400,
-    categories: ["Dating", "Research", "Food"]
+    topics: ["research", "food-drink"],
+    formats: ["social", "networking"]
   },
   {
     eventId: "art-expo-montreal",
@@ -65,7 +67,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 300,
     registered: 100,
-    categories: ["Dating", "Research", "Food"]
+    topics: ["research", "food-drink"],
+    formats: ["social", "networking"]
   },
   {
     eventId: "startup-pitch-night",
@@ -86,7 +89,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 150,
     registered: 120,
-    categories: ["Dating", "Research", "Food"]
+    topics: ["research", "food-drink"],
+    formats: ["social", "networking"]
   },
   {
     eventId: "startup-pitch-night-2",
@@ -107,7 +111,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 150,
     registered: 120,
-    categories: ["Dating", "Research", "Food"]
+    topics: ["research", "food-drink"],
+    formats: ["social", "networking"]
   },
   {
     eventId: "annual-ski-trip",
@@ -128,7 +133,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 150,
     registered: 120,
-    categories: ["Nightlife"]
+    topics: ["parties"],
+    formats: ["party"]
   },
   {
     eventId: "startup-pitch-night-4",
@@ -149,7 +155,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 150,
     registered: 120,
-    categories: ["Tech", "Networking"]
+    topics: ["research"],
+    formats: ["social"]
   },
   {
     eventId: "tech-fair-2025",
@@ -170,7 +177,8 @@ export const popularEvents: EventInstance[] = [
     promoted: false,
     capacity: 150,
     registered: 120,
-    categories: ["Tech", "Networking"]
+    topics: ["research"],
+    formats: ["social"]
   },
 ];
 
@@ -190,6 +198,8 @@ export const clubs: Club[] = [
     featured: true,
     images: ["/logos/ski.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
+    category: "general",
+    interests: [],
   },
   {
     clubId: "fashion-takes-action",
@@ -206,6 +216,8 @@ export const clubs: Club[] = [
     featured: true,
     images: ["/logos/fta.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
+    category: "general",
+    interests: [],
   },
   {
     clubId: "eng-frosh",
@@ -222,6 +234,8 @@ export const clubs: Club[] = [
     featured: true,
     images: ["/frosh1.jpeg", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
+    category: "general",
+    interests: [],
   },
   {
     clubId: "startup-montreal",
@@ -238,6 +252,8 @@ export const clubs: Club[] = [
     featured: false,
     images: ["/logos/mwm.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
+    category: "general",
+    interests: [],
   },
   {
     clubId: "tech-montreal",
@@ -254,6 +270,8 @@ export const clubs: Club[] = [
     featured: true,
     images: ["/logos/persian.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
+    category: "general",
+    interests: [],
   },
   {
     clubId: "montreal-artists",
@@ -270,5 +288,7 @@ export const clubs: Club[] = [
     featured: true,
     images: ["/logos/dolls.png", "/banners/fta.jpg"],
     createdAt: new Date("2025-08-01T09:00:00"),
+    category: "general",
+    interests: [],
   }
 ];

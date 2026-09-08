@@ -10,7 +10,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | ID | Severity | Summary |
 |---|---|---|
 | [BUG-023](#bug-023) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **does not reproduce as of 2026-08-08** |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **reproducing again as of 2026-08-20** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -40,6 +40,14 @@ git worktree at `HEAD` with *only* the duplicate-method fix
 ([BUG-009](fixed_bugs.md#bug-009)) applied — the identical failure reproduces
 (7 run, 1 failure, same assertion).
 It also fails when run in isolation, so it is not test-ordering pollution.
+
+**Reproducing again, 2026-08-20.** Seen during the full `mvn verify` for the
+user-profile backend work, and confirmed the same way: a clean worktree at
+`HEAD` (5a48f34) with none of that work applied fails identically — 7 run, 1
+failure, `semanticSearchMatchesMeaningWithoutSharedKeywords:167`, collection
+size 0. So the 2026-08-08 note that it *does not reproduce* is stale rather than
+a fix, and whatever made it pass that day was environmental. It remains the only
+failing test in a suite of 229.
 
 **What is ruled out:** embedding *writes* are fine.
 `reindexBackfillsMissingEmbeddingsAndRequiresAdmin` passes and asserts

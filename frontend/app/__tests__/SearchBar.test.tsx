@@ -29,7 +29,8 @@ const chessEvent = toEventInstance({
   promoted: false,
   capacity: 20,
   registered: 5,
-  categories: [],
+  topics: [],
+  formats: [],
 });
 
 const chessClub = toClub({
@@ -42,6 +43,8 @@ const chessClub = toClub({
   featured: false,
   images: [],
   createdAt: "2026-07-01T00:00:00Z",
+  category: null,
+  interests: [],
 });
 
 describe("SearchBar", () => {

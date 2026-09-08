@@ -2,10 +2,21 @@ package com.campusvibe.contract;
 
 import com.campusvibe.auth.AuthenticationResponse;
 import com.campusvibe.club.ClubDTO;
+import com.campusvibe.clubadmin.ClubAdminDTO;
+import com.campusvibe.clubadmin.ClubAuditLogDTO;
+import com.campusvibe.clubadmin.ClubInvitationDTO;
+import com.campusvibe.clubadmin.OwnershipTransferDTO;
 import com.campusvibe.clubadmin.ClubAdminRequestDTO;
+import com.campusvibe.clubadmin.ManagedClubDTO;
 import com.campusvibe.event.EventDTO;
 import com.campusvibe.user.MyEventDTO;
 import com.campusvibe.user.UserDTO;
+import com.campusvibe.taxonomy.ClubCategoryDTO;
+import com.campusvibe.taxonomy.EventFormatDTO;
+import com.campusvibe.taxonomy.InterestDTO;
+import com.campusvibe.user.profile.NotificationPreferencesDTO;
+import com.campusvibe.user.profile.ProfileSocialLinksDTO;
+import com.campusvibe.user.profile.UserProfileDTO;
 import com.fasterxml.jackson.databind.BeanDescription;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,6 +70,22 @@ class ApiContractTest {
         CONTRACTED.put("MyEventDTO", MyEventDTO.class);
         CONTRACTED.put("AuthenticationResponse", AuthenticationResponse.class);
         CONTRACTED.put("ClubAdminRequestDTO", ClubAdminRequestDTO.class);
+        CONTRACTED.put("ClubAdminDTO", ClubAdminDTO.class);
+        CONTRACTED.put("ClubInvitationDTO", ClubInvitationDTO.class);
+        CONTRACTED.put("OwnershipTransferDTO", OwnershipTransferDTO.class);
+        CONTRACTED.put("ClubAuditLogDTO", ClubAuditLogDTO.class);
+        CONTRACTED.put("ManagedClubDTO", ManagedClubDTO.class);
+        CONTRACTED.put("UserProfileDTO", UserProfileDTO.class);
+        // Contracted in its own right because the contract records a
+        // nested object as a single field name -- UserProfileDTO
+        // contributes "socialLinks" and nothing about what is inside it,
+        // so without this entry these three names cross the wire
+        // unchecked.
+        CONTRACTED.put("ProfileSocialLinksDTO", ProfileSocialLinksDTO.class);
+        CONTRACTED.put("NotificationPreferencesDTO", NotificationPreferencesDTO.class);
+        CONTRACTED.put("InterestDTO", InterestDTO.class);
+        CONTRACTED.put("ClubCategoryDTO", ClubCategoryDTO.class);
+        CONTRACTED.put("EventFormatDTO", EventFormatDTO.class);
     }
 
     private final ObjectMapper mapper = new ObjectMapper();

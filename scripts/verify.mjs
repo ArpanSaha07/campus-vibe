@@ -264,6 +264,28 @@ function resolveJavaHome() {
 }
 
 function verifyBackend() {
+  // Before the JDK check on purpose, so a machine without a JDK still gets the
+  // migration lint. It needs no Java, takes milliseconds, and guards the one
+  // artifact that is expensive to amend: a migration is immutable once applied,
+  // so a mistake caught here costs an edit and a mistake caught on GitHub costs
+  // a new migration. This is the same script the Database workflow runs.
+  const migrationsOk = run(
+    "migration lint",
+    "node",
+    [join(REPO, "scripts", "lint-migrations.mjs")],
+    { cwd: REPO },
+  );
+
+  // Gate the build on it, the way _database.yml makes `migrate` need
+  // `lint-migrations`. Unlike the other steps here this one is never worth
+  // reporting alongside a build: it is always a hard blocker and always a
+  // one-line fix, so spending two minutes of Maven to tell the developer
+  // something they already have to fix is pure waiting.
+  if (!migrationsOk) {
+    console.error("\nSkipping the backend build - fix the migration first.");
+    return;
+  }
+
   const javaHome = resolveJavaHome();
   if (!javaHome) {
     results.push({

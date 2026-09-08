@@ -33,6 +33,25 @@ export async function me(): Promise<User> {
 }
 
 /**
+ * Renames the signed-in account.
+ *
+ * Separate from saveProfile because the name lives on `users`, not on the
+ * profile -- it is already part of `User`, which the API contract pins. The
+ * edit-profile screen writes both, which is why it makes two calls.
+ *
+ * PATCH, not PUT: this changes one named field and leaves the rest of the
+ * account alone, where the profile write replaces the whole thing. Returns the
+ * updated account so the caller can put it straight back into the auth context.
+ */
+export async function updateMyName(name: string): Promise<User> {
+	return apiFetch<User>(`/api/v1/users/me`, {
+		method: "PATCH",
+		body: JSON.stringify({ name }),
+		auth: true,
+	});
+}
+
+/**
  * Asks for a password-reset link.
  *
  * Resolves the same way whether or not the address has an account — the backend
@@ -102,13 +121,21 @@ export function isAdmin(user: User | null): boolean {
 	return hasRole(user, Role.ADMIN);
 }
 
-export function isClubAdmin(user: User | null): boolean {
-	return hasRole(user, Role.CLUB_ADMIN);
-}
+/**
+ * There is deliberately no `isClubAdmin(user)`.
+ *
+ * Club authority is a relationship with one club, so no property of the user
+ * object can answer "may they manage a club" — and the old version answered it
+ * from a JWT claim that outlived the access it described, so a removed
+ * administrator still saw the dashboard link until their token expired.
+ *
+ * Use `useManagedClubs()` instead, which asks the server. As always this is for
+ * visibility only; the backend re-checks every request.
+ */
 
-/** A user with no elevated roles. */
+/** A user with no elevated platform roles. */
 export function isRegularUser(user: User | null): boolean {
-	return hasRole(user, Role.USER) && !isClubAdmin(user) && !isAdmin(user);
+	return hasRole(user, Role.USER) && !isAdmin(user);
 }
 
 export function logOut(): void {

@@ -9,6 +9,7 @@ import AuthModalUrlTrigger from "./components/auth-components/AuthModalUrlTrigge
 import { AuthProvider } from "./lib/auth-context";
 import { AuthModalProvider } from "./lib/auth-modal-context";
 import { FollowedClubsProvider } from "./lib/followed-clubs-context";
+import { ManagedClubsProvider } from "./lib/managed-clubs-context";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -48,15 +49,20 @@ export default function RootLayout({ children }: RootLayoutProps) {
                   needs both: the follow state, and the modal to raise when
                   there is no one signed in to follow on behalf of. */}
               <FollowedClubsProvider>
-                {children}
-                <AuthModal />
-                {/* Suspense because it reads useSearchParams: without a boundary
-                    here, every prerendered route above it would fall back to
-                    client-side rendering. It renders nothing, so the fallback
-                    is nothing. */}
-                <Suspense fallback={null}>
-                  <AuthModalUrlTrigger />
-                </Suspense>
+                {/* Which clubs the signed-in user manages. Here rather than in
+                    (protected) because the navbar renders on every route and
+                    needs it to decide whether to show a Manage link at all. */}
+                <ManagedClubsProvider>
+                  {children}
+                  <AuthModal />
+                  {/* Suspense because it reads useSearchParams: without a boundary
+                      here, every prerendered route above it would fall back to
+                      client-side rendering. It renders nothing, so the fallback
+                      is nothing. */}
+                  <Suspense fallback={null}>
+                    <AuthModalUrlTrigger />
+                  </Suspense>
+                </ManagedClubsProvider>
               </FollowedClubsProvider>
             </AuthModalProvider>
           </AuthProvider>

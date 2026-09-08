@@ -2,10 +2,17 @@ import Link from "next/link";
 import { Club } from "@/app/types";
 import ClubFollowButton from "@/app/components/club/ClubFollowButton";
 import ClubLogo from "@/app/components/club/ClubLogo";
+import ManageClubPill from "@/app/components/club/ManageClubPill";
 
 export default function ClubProfileComponent({ club }: { club: Club }) {
   return (
-    <div className="flex-shrink-0 w-60 bg-white p-6 rounded-2xl border border-mist-200 lift">
+    // `group` and `relative` are for the Manage pill: it is positioned against
+    // this card and revealed on hover of it, rather than on hover of itself,
+    // which would make a 20px target you have to find first.
+    <div className="group relative flex-shrink-0 w-60 bg-white p-6 rounded-2xl border border-mist-200 lift">
+      {/* Renders nothing unless the viewer can actually manage this club. */}
+      <ManageClubPill clubId={club.clubId} />
+
       {/* Logo. The link wraps the circle rather than sitting inside it, so the
           whole 64px target is clickable instead of just the image. */}
       <Link href={`/clubs/${club.clubId}`} className="mx-auto block w-fit">

@@ -13,7 +13,7 @@ import {
   isMyEventsTab,
   selectMyEvents,
 } from "@/app/lib/my-events";
-import MyEventsTabs from "@/app/components/my-events/MyEventsTabs";
+import ClubEventTabButton, { type EventTab } from "@/app/components/club/ClubEventTabButtons";
 import MyEventsList from "@/app/components/my-events/MyEventsList";
 import EventDateFilter from "@/app/components/my-events/EventDateFilter";
 import EmptyState from "@/app/components/ui/EmptyState";
@@ -64,7 +64,12 @@ function MyEventsContent() {
   // their ranges do not overlap — so a date picked on one tab is often out of
   // bounds on the next. Snap to that tab's own default instead of leaving the
   // list anchored somewhere it cannot reach.
-  function selectTab(next: MyEventsTab) {
+  function selectTab(next: EventTab) {
+    // The pills speak a union wide enough for the manage screen too. This page
+    // never draws Upcoming, so that value can only arrive from a bug — and
+    // isMyEventsTab narrows the rest without a cast.
+    if (!isMyEventsTab(next)) return;
+
     if (!isAnchorAllowed(anchor, next)) {
       setAnchor(defaultAnchorForTab(next));
     }
@@ -72,6 +77,27 @@ function MyEventsContent() {
       scroll: false,
     });
   }
+
+  // Every pill's count, not just the open tab's. Three passes over the list
+  // where the page needs one, on purpose: selectMyEvents is the only
+  // definition of what a tab contains, and a cheaper count-only variant would
+  // be a second one, free to drift from it.
+  //
+  // Counted at the current anchor even for the tabs that anchor is out of
+  // range for, which is safe rather than lucky: out of range always means
+  // looser than that tab's own bound, and isPastEvent enforces that bound
+  // anyway — so each count already equals what selectTab's snap will show.
+  const counts = useMemo(
+    () =>
+      myEvents === null
+        ? null
+        : {
+            going: selectMyEvents(myEvents, "going", anchor).length,
+            saved: selectMyEvents(myEvents, "saved", anchor).length,
+            past: selectMyEvents(myEvents, "past", anchor).length,
+          },
+    [myEvents, anchor],
+  );
 
   const anchorRange = anchorRangeForTab(tab);
 
@@ -91,7 +117,14 @@ function MyEventsContent() {
       <h1 className="mt-4 font-display text-4xl font-bold text-ink-900">Your events</h1>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-        <MyEventsTabs active={tab} onChange={selectTab} />
+        <ClubEventTabButton
+          label="Which of your events"
+          value={tab}
+          onChange={selectTab}
+          goingCount={counts?.going ?? null}
+          savedCount={counts?.saved ?? null}
+          pastCount={counts?.past ?? null}
+        />
         <EventDateFilter
           value={anchor}
           onChange={setAnchor}
@@ -100,7 +133,7 @@ function MyEventsContent() {
         />
       </div>
 
-      <div className="mt-8 mb-30">
+      <div className="mt-8 mb-5">
         {error ? (
           <EmptyState
             title="Your events didn't load"

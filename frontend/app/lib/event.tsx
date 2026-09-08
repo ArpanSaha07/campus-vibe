@@ -73,3 +73,42 @@ export function unsaveEvent(eventId: string): Promise<void> {
 		auth: true,
 	});
 }
+
+/** What the create-event form collects. Mirrors the backend EventCreateRequest. */
+export interface NewEvent {
+  title: string;
+  description: string;
+  /** ISO-8601. The form collects `datetime-local`, which has no zone. */
+  dateTime: string;
+  location: string;
+  price: string;
+  /** The club putting it on — you must be able to manage it. */
+  organizerId: string;
+  capacity: number | null;
+  /** `interest_catalogue` slugs: what the event is about. */
+  topics: string[];
+  /** `event_formats` slugs: what kind of thing it is. */
+  formats: string[];
+}
+
+/**
+ * Creates an event and returns it.
+ *
+ * Authorisation is club-scoped rather than role-based: the backend checks
+ * `canManageClub(organizerId)`, so the form must only offer clubs the signed-in
+ * user actually manages. A 403 here means the club select offered something it
+ * should not have.
+ */
+export async function createEvent(event: NewEvent): Promise<EventInstance> {
+  const created = await apiFetch<ApiEvent>("/api/v1/events", {
+    method: "POST",
+    body: JSON.stringify({
+      ...event,
+      description: event.description.trim() || null,
+      location: event.location.trim() || null,
+      price: event.price.trim() || null,
+    }),
+    auth: true,
+  });
+  return toEventInstance(created);
+}

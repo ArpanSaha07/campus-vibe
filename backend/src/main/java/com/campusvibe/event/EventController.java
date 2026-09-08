@@ -2,6 +2,7 @@ package com.campusvibe.event;
 
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
+import com.campusvibe.taxonomy.TaxonomyService;
 import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
 import jakarta.validation.constraints.Size;
@@ -19,17 +20,29 @@ import java.util.List;
 @Validated // needed for constraints on @RequestParam, unlike @Valid on a body
 @RequestMapping("/api/v1/events")
 public class EventController {
+
+    /**
+     * Per axis, not combined. An event may carry eight topics and eight
+     * formats; in practice it carries two or three of each, and the cap is here
+     * to stop anything that is not the form from tagging an event with the
+     * whole vocabulary and matching every student.
+     */
+    private static final int MAX_EVENT_TAGS = 8;
+
     private final EventService eventService;
     private final SearchService searchService;
     private final S3Service s3Service;
     private final S3Buckets buckets;
+    private final TaxonomyService taxonomyService;
 
     public EventController(EventService eventService, SearchService searchService,
-                           S3Service s3Service, S3Buckets buckets) {
+                           S3Service s3Service, S3Buckets buckets,
+                           TaxonomyService taxonomyService) {
         this.eventService = eventService;
         this.searchService = searchService;
         this.s3Service = s3Service;
         this.buckets = buckets;
+        this.taxonomyService = taxonomyService;
     }
 
     /**
@@ -71,9 +84,13 @@ public class EventController {
         e.setLocation(request.location());
         e.setPrice(request.price());
         e.setCapacity(request.capacity());
-        if (request.categories() != null) {
-            e.setCategories(request.categories());
-        }
+        // Validated against the two vocabularies before anything is written, so
+        // a bad slug is a 400 naming it rather than a foreign-key violation
+        // surfacing as a 500.
+        e.getTopicSlugs().addAll(
+                taxonomyService.requireKnownInterests(request.topics(), MAX_EVENT_TAGS, "topic"));
+        e.getFormatSlugs().addAll(
+                taxonomyService.requireKnownEventFormats(request.formats(), MAX_EVENT_TAGS, "format"));
         return eventService.create(e, request.organizerId());
     }
 

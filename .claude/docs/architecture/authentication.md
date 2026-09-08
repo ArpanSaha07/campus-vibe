@@ -644,15 +644,25 @@ Ordered by how much they matter. Items 1, 2, 8, 9 and 12 were **fixed on
 
 4. ~~Password reset does not exist.~~ **Built 2026-08-15**, end to end.
 
-5. ~~No email verification.~~ **Built 2026-08-15.** Note the gate is **off** by
-   default (`campusvibe.auth.require-verified-email`), so today an unverified
-   account can still do everything a verified one can — the link is sent and
-   works, but nothing yet depends on it. Turning it on is a product decision.
+5. ~~No email verification.~~ **Built 2026-08-15.** Note the sign-in gate is
+   **off** by default (`campusvibe.auth.require-verified-email`), so an
+   unverified account can sign in and do almost everything a verified one can.
+   **One exception since 2026-08-18:** answering a club invitation requires
+   `email_verified`, regardless of that setting, and throws the same
+   `EmailNotVerifiedException` — an invitation names an address, so claiming one
+   has to mean proving that address, or registering someone else's address first
+   would be enough to steal their invitation. See
+   [`club-administration.md`](club-administration.md). Turning the sign-in gate
+   on is still a product decision.
 
 5a. **No mail provider is configured for production.** The logging sender is
    correct for local work and is what CI uses; nothing has been chosen or
-   tested for a real deployment, and `SmtpMailSender` has never sent a message
-   through a real server. Do not assume it works until it has.
+   tested for a real deployment. `SmtpMailSender` has now been *exercised* — on
+   2026-08-18 a club invitation reached it on the dev stack and it failed
+   authentication against the configured host, logged it, and did not throw,
+   which is the contract `MailSender` requires. So the swallow-and-log path is
+   proven; delivery still is not. Do not assume it works until a message has
+   arrived somewhere.
 
 5b. **Reset and verification mail is plain text only**, and delivery is
    fire-and-forget on the request thread. Fine at this volume; a slow SMTP

@@ -32,10 +32,16 @@ public class ClubAdminRequestController {
         return requestService.list(status);
     }
 
+    /**
+     * Approving installs the requester as the club's first {@code CLUB_OWNER}.
+     * The approving admin is recorded on the assignment, so "who put this
+     * person in charge" is answerable later.
+     */
     @PostMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
-    public ClubAdminRequestDTO approve(@PathVariable Long id) {
-        return requestService.approve(id);
+    public ClubAdminRequestDTO approve(@PathVariable Long id, Authentication authentication) {
+        User actor = (User) authentication.getPrincipal();
+        return requestService.approve(id, actor.getId());
     }
 
     @PostMapping("/{id}/reject")

@@ -33,7 +33,9 @@ function club(clubId: string, name: string): Club {
     socialLinks: { email: "" },
     featured: false,
     images: [],
-    createdAt: new Date("2026-07-01T00:00:00Z"),
+    category: null,
+  interests: [],
+  createdAt: new Date("2026-07-01T00:00:00Z"),
   };
 }
 

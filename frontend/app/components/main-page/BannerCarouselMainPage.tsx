@@ -14,6 +14,16 @@ export default function BannerCarousel() {
   // Example banner data (replace with your own)
   const banners = [
     {
+      img: "/science-frosh.jpg",
+      link: "/events/science-frosh",
+      alt: "Science Frosh",
+    },
+    {
+      img: "/mcgill-find-clubs.jpg",
+      link: "/clubs",
+      alt: "Find clubs",
+    },
+    {
       img: "/rave.jpg",
       link: "/events/sat-2025",
       alt: "Event 2",
@@ -22,11 +32,6 @@ export default function BannerCarousel() {
       img: "/party.jpg",
       link: "/events/mts-2025",
       alt: "Event 3",
-    },
-    {
-      img: "/techfair-image.png",
-      link: "https://www.mcgill.ca/careers4engineers/techfair/students",
-      alt: "Tech Fair 2025",
     }
   ];
 

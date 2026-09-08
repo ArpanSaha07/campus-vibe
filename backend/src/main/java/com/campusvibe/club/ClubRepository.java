@@ -2,8 +2,9 @@ package com.campusvibe.club;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.Optional;
-
 public interface ClubRepository extends JpaRepository<Club, String> {
-    Optional<Club> findByClubAdminId(Long clubAdminId);
+    // findByClubAdminId is gone with the clubs.club_admin_id column (V12).
+    // "Which clubs does this user manage?" is now
+    // ClubAdminAssignmentRepository.findByUserIdAndStatus, which can answer it
+    // for more than one club and distinguishes owners from admins.
 }

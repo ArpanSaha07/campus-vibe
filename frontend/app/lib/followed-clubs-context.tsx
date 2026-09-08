@@ -172,6 +172,8 @@ function placeholderClub(clubId: string): Club {
     clubId,
     name: clubId,
     description: "",
+    category: null,
+    interests: [],
     followers: 0,
     logo: "",
     socialLinks: { email: "" },

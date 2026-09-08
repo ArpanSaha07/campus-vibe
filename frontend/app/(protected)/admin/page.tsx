@@ -15,6 +15,7 @@ import SectionHeading from "@/app/components/ui/SectionHeading";
 import StatTile from "@/app/components/ui/StatTile";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
+import Link from "next/link"; 
 
 export default function AdminDashboardPage() {
   const { user, loading } = useAuth();
@@ -79,8 +80,12 @@ export default function AdminDashboardPage() {
 
       {/* Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
-        <StatTile label="Clubs" value={clubCount ?? "—"} hint="Active club pages" />
-        <StatTile label="Events" value={eventCount ?? "—"} hint="All events on the platform" />
+        <Link href={"/clubs"}>
+          <StatTile label="Clubs" value={clubCount ?? "—"} hint="Active club pages" />
+        </Link>
+        <Link href={"/events"}>
+          <StatTile label="Events" value={eventCount ?? "—"} hint="All events on the platform" />
+        </Link>
         <StatTile
           label="Pending requests"
           value={requests === null ? "…" : requests.length}

@@ -1,72 +1,97 @@
+import { ApiError, apiFetch } from "@/app/lib/api";
+import { toClub } from "@/app/lib/adapters";
+import type { ApiClub, Club } from "@/app/types";
+
 /**
- * Club API Service
- * Handles all API calls related to club operations
+ * Creating a club.
+ *
+ * <strong>This file used to call endpoints that do not exist.</strong> It
+ * fetched `/api/clubs/check-name` and `/api/clubs/create` — relative paths, no
+ * version prefix — and there are no Next route handlers in this app, so both
+ * were 404s. Club creation has never worked from the UI. It now goes through
+ * `apiFetch` to the real backend, like every other domain module.
+ *
+ * The multipart half is not here, and that is not an oversight. See
+ * `createClub` below.
  */
 
 /**
- * Check if a club with the given name already exists
+ * The id a club will get, derived from its name.
+ *
+ * `Club.id` is a slug and the backend takes it from the request rather than
+ * generating one, so the client has to decide it. Kept beside the name check
+ * because the two have to agree: checking availability of anything other than
+ * the id that will actually be used answers a different question.
+ */
+export function clubSlug(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Whether a club already holds the slug this name would take.
+ *
+ * A 404 is the answer, not an error — it is how the backend says *nothing here*.
+ * Deliberately uncached: this runs as somebody types, and a stale yes would let
+ * two people both believe a name was free.
+ *
+ * A network failure resolves to `false` rather than throwing. Blocking a form on
+ * an availability check that could not run would be worse than letting it
+ * through: the backend answers 409 on the real create, which is the check that
+ * actually decides.
  */
 export async function checkClubNameExists(clubName: string): Promise<boolean> {
-  if (!clubName.trim()) return false;
+  const slug = clubSlug(clubName);
+  if (!slug) return false;
 
   try {
-    const response = await fetch(
-      `/api/clubs/check-name?name=${encodeURIComponent(clubName)}`
-    );
-    const data = await response.json();
-    return data.exists || false;
+    await apiFetch<ApiClub>(`/api/v1/clubs/${encodeURIComponent(slug)}`);
+    return true;
   } catch (error) {
-    console.error('Error checking club name:', error);
-    throw new Error('Failed to check club name availability');
+    if (error instanceof ApiError && error.status === 404) return false;
+    return false;
   }
 }
 
-/**
- * Create a new club with the provided form data
- */
-export async function createClub(uploadFormData: FormData): Promise<void> {
-  try {
-    const response = await fetch('/api/clubs/create', {
-      method: 'POST',
-      body: uploadFormData,
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || 'Failed to create club');
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error('An error occurred while creating the club');
-  }
+export interface NewClub {
+  name: string;
+  description: string;
+  /** A `club_categories` slug. */
+  category: string | null;
+  /** `interest_catalogue` slugs — at most eight, enforced server-side too. */
+  interests: string[];
 }
 
 /**
- * Prepare FormData from club form data
+ * Creates the club and returns it.
+ *
+ * <strong>Logo, banner images and social links are not sent, and cannot be.</strong>
+ * All three are written by endpoints guarded by `canManageClub`, and creating a
+ * club does not make you its owner — ownership arrives only when a platform
+ * admin approves a club-admin request. So a creator who tried to upload a logo
+ * in the same breath would get a 403.
+ *
+ * Silently dropping the files the form collected would be worse than not
+ * offering them, so the caller is told; see the club-creation items in
+ * `todo.md`. Category and interests ride on the create request itself for
+ * exactly this reason — they are the only descriptive fields a creator can
+ * actually set.
  */
-export function prepareClubFormData(
-  name: string,
-  description: string,
-  logo: File | null,
-  images: File[],
-  socialLinks: Record<string, string>
-): FormData {
-  const formData = new FormData();
-
-  formData.append('name', name);
-  formData.append('description', description);
-
-  if (logo) {
-    formData.append('logo', logo);
-  }
-
-  images.forEach((image, index) => {
-    formData.append(`image_${index}`, image);
+export async function createClub(club: NewClub): Promise<Club> {
+  const created = await apiFetch<ApiClub>("/api/v1/clubs", {
+    method: "POST",
+    body: JSON.stringify({
+      id: clubSlug(club.name),
+      name: club.name.trim(),
+      description: club.description.trim(),
+      category: club.category,
+      interests: club.interests,
+    }),
+    auth: true,
   });
-
-  formData.append('socialLinks', JSON.stringify(socialLinks));
-
-  return formData;
+  return toClub(created);
 }

@@ -16,7 +16,8 @@ const apiEvent: ApiEvent = {
   promoted: false,
   capacity: null,
   registered: 0,
-  categories: ["Games"],
+  topics: ["Games"],
+  formats: [],
 };
 
 const apiClub: ApiClub = {
@@ -29,6 +30,8 @@ const apiClub: ApiClub = {
   featured: false,
   images: [],
   createdAt: "2026-07-01T00:00:00Z",
+  category: null,
+  interests: [],
 };
 
 describe("toEventInstance", () => {
@@ -37,7 +40,10 @@ describe("toEventInstance", () => {
     expect(event.eventId).toBe("7");
     expect(event.organizer).toBe("chess-club");
     expect(event.dateTime).toBeInstanceOf(Date);
-    expect(event.categories).toEqual(["Games"]);
+    // Both axes carried through untouched -- the adapter maps shapes, and
+    // resolving a slug to a label is the page's job, not this one's.
+    expect(event.topics).toEqual(["Games"]);
+    expect(event.formats).toEqual([]);
   });
 
   // Carried through rather than derived. Cards used to title-case the slug,

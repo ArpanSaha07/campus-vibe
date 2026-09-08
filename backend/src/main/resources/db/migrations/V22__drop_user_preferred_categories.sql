@@ -1,0 +1,24 @@
+-- Retire user_preferred_categories, created by V4 and never used.
+--
+-- No entity ever mapped it and no query ever read it: a grep across the whole
+-- repository finds the CREATE TABLE in V4 and nothing else. It has held zero
+-- rows in every environment since the day it was written.
+--
+-- Superseded rather than deleted from V4. Removing the statement from an
+-- applied migration does not undo it -- the flyway_schema_history row stays,
+-- and startup fails validation with 'Detected applied migration not resolved
+-- locally: 4', which means the application does not boot. Forward-only is the
+-- only direction available here.
+--
+-- Why it is going rather than being wired up: it was a third vocabulary. The
+-- design is one shared list of categories and interests across events and
+-- users, not a per-user set of preferred *event categories* sitting beside the
+-- interest catalogue V19 introduced. Two tables that both mean 'things this
+-- person is into' would immediately raise the question of which one a filter
+-- should read, and the honest answer would be 'both, and they disagree'.
+--
+-- Nothing is lost. If a preference for event categories is ever wanted again,
+-- it is a row in user_interests against a catalogue entry, not a table of its
+-- own.
+
+DROP TABLE IF EXISTS user_preferred_categories;

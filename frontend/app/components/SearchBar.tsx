@@ -151,7 +151,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
                     className="block px-4 py-2 hover:bg-lavender-50"
                   >
                     <p className="text-sm font-medium line-clamp-1">{club.name}</p>
-                    <p className="text-xs text-gray-500">{club.followers} followers</p>
+                    {/* <p className="text-xs text-gray-500">{club.followers} followers</p> */}
                   </Link>
                 ))}
               </section>

@@ -24,7 +24,8 @@ export function toEventInstance(api: ApiEvent): EventInstance {
     promoted: api.promoted,
     capacity: api.capacity ?? 0,
     registered: api.registered,
-    categories: api.categories,
+    topics: api.topics,
+    formats: api.formats,
   };
 }
 
@@ -51,6 +52,8 @@ export function toClub(api: ApiClub): Club {
     featured: api.featured,
     images: api.images,
     createdAt: new Date(api.createdAt),
+    category: api.category,
+    interests: api.interests,
   };
 }
 

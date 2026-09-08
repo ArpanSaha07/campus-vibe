@@ -30,7 +30,8 @@ const apiEvent: ApiEvent = {
   promoted: false,
   capacity: null,
   registered: 0,
-  categories: ["Games"],
+  topics: ["Games"],
+  formats: [],
 };
 
 describe("getEvent", () => {
