@@ -4,7 +4,7 @@ Finished work, moved out of [`todo.md`](todo.md) so the queue stays readable.
 Nothing here needs doing. It is kept because *what was already tried, and why it
 was done that way* is the expensive thing to rediscover.
 
-Last updated: **2026-09-06**
+Last updated: **2026-09-07**
 
 **Two halves, and they answer different questions:**
 
@@ -187,6 +187,28 @@ clubs into every environment it touched.
 - [x] **P2** ~~Add `output: "standalone"` to `frontend/next.config.ts`~~ — **done 2026-08-07**, forced by [BUG-016](../bugs/fixed_bugs.md#bug-016) rather than chosen. The `runner` stage copied the whole `node_modules`, which put `tar` — a build-time dependency of `@tailwindcss/oxide`, marked `dev` in the lockfile — into the shipping image and failed the Trivy CRITICAL gate. Now copies `.next/standalone` + `.next/static` + `public`, runs `node server.js`, and **deletes npm from the stage** (its bundled `tar` was a second CRITICAL that no published Node tag fixes). Bundle is 11 top-level packages; image scans clean of fixable HIGH *and* CRITICAL. Two follow-ons came with it: `npm start` now runs `scripts/start-standalone.mjs`, because `next start` does not work with standalone output and fails by serving unstyled pages rather than erroring; and Jest needed `modulePathIgnorePatterns` for the second `package.json` the standalone build writes.
 
 ### Docs
+
+- [x] **P1** ~~Rebuild `.claude/` so a fresh session gets the load-bearing context automatically~~ — **done 2026-09-07**, in thirteen commits from `8b03670` to this one. The problem in one line: `ClubService.create` re-armed a JPA trap that had been diagnosed five weeks earlier, because the diagnosis existed only in an 85 KB `fixed_bugs.md` that `CLAUDE.md` told sessions to grep — and you cannot grep for a trap you do not know exists. Three mechanisms replaced remembering: knowledge that loads **by path** ([`.claude/rules/`](../rules/), six files, every bullet carrying its bug or ADR id), one stamped 48-line [`STATUS.md`](../STATUS.md) injected at session start by `scripts/hooks/session-context.mjs`, and hooks that enforce what prose could not (`guard-migrations.mjs`, `.githooks/commit-msg`).
+
+  **Measured orientation cost — the point of the whole exercise.** Task: start a backend feature touching clubs. Bytes are exact (`wc -c`); tokens use ~4.1 chars/token, the ratio that reproduces the original 26.6k estimate from the same files, so the two are comparable.
+
+  | Before | Bytes | | After | Bytes |
+  |---|---:|---|---|---:|
+  | `CLAUDE.md` @ `9112b43^` | 7,935 | | `CLAUDE.md` | 6,394 |
+  | `todo.md` *Recently shipped* | 5,098 | | `STATUS.md` | 5,022 |
+  | `docs/README.md` | 11,267 | | hook output around it | 885 |
+  | `club-administration.md` | 37,020 | | `rules/backend-clubs.md` | 2,157 |
+  | `club_admin_governance.md` | 36,160 | | `rules/backend-java.md` | 1,745 |
+  | `database-lifecycle/SKILL.md` | 12,076 | | `docs/decisions/README.md` | 4,649 |
+  | **Total** | **109,556** ≈ 26.7k tokens | | **Total** | **20,852** ≈ 5.1k tokens |
+
+  **5.3x less to read, but the estimate was optimistic and it is worth recording where.** The plan predicted 3.0k; the real figure is 5.1k, 70% over. `docs/decisions/README.md` was the worst miss at roughly 4x its 0.3k estimate; `STATUS.md` came in at 1.2k against 0.75k, and `CLAUDE.md` at 1.6k against 0.9k despite landing at exactly 100 lines — the lines are simply long. None of that changes the verdict, but a budget nobody checks is how the old file reached 230 lines.
+
+  **What this number does and does not cover.** It is *orientation* — reaching the point of knowing what to do and which traps are armed. Actually changing club code still means reading `club-administration.md` (37 KB) on top. The saving there is separate and comes from commit 2: the superseded banner on `club_admin_governance.md` means you now read one club doc instead of both, because `club-administration.md:11-15` used to say they disagreed without saying which won.
+
+  **Verified, with the result:** every rule glob matches tracked files (0 of 22 dead) · `check-links.mjs --strict` clean at 462 links, against 12 dead anchors before commit 1 · `check-docs.mjs` parses 7 previously unparseable stamps · `guard-migrations.mjs` correct on 11 cases including `V06` normalising to `V6` · `.githooks/commit-msg` correct on 14 subjects, rejecting the two real ones from this log (`Updated stuff`, and `0357b78`'s) · `verify.mjs --all` green throughout.
+
+  **Not verified, and it needs a fresh session.** The `/context` reading before and after opening `ClubService.java`, which is the only way to confirm the rules fire on Read and that the SessionStart hook prints. Neither could be exercised here: Claude Code captures hooks at startup, so the hook added in `a779071` never ran in the session that wrote it, and this session read files through `cat` rather than the Read tool, so no rule was ever triggered. The numbers above are file sizes, not an observed context window.
 
 - [x] **P2** ~~Document the API surface and the caching model~~ — **done 2026-08-14.** [`.claude/docs/architecture/api-and-caching.md`](../docs/architecture/api-and-caching.md): the `apiFetch` boundary, the three frontend data paths, Next's data cache and the guard that keeps per-user data out of it, the `@EntityGraph` N+1 fix (13 statements against 17, measured), and the error-status mapping. Records two gaps honestly as *absence rather than decision* — **no backend cache layer** and **no cache invalidation**, since `CACHE_TAGS` is passed on every public read but nothing calls `revalidateTag`. Five controllers were not read and are named as undocumented.
 - [x] **P2** ~~Document the CI/CD implementation and its design decisions~~ — **done 2026-08-06.** [`.claude/docs/architecture/ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md), written under the new [`implementation-docs`](../skills/implementation-docs/SKILL.md) skill. Update it, do not fork it, when the pipeline changes.

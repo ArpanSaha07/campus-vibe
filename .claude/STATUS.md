@@ -1,6 +1,6 @@
 # CampusVibe — status
 
-**Code as of:** `0fc7773` · 2026-09-07 · branch `refactor/claude-setup`, off `develop` at `03f818c` — the last commit to touch product code.
+**Code as of:** `76772dd` · 2026-09-07 · branch `refactor/claude-setup`, off `develop` at `03f818c` — still the last commit to touch product code.
 
 Where the project actually is. Orient from this, **not from
 [`todo.md`](TODO/todo.md)** — that is the full queue, this is the digest.
@@ -35,6 +35,7 @@ Where the project actually is. Orient from this, **not from
 
 | Date | What landed |
 |---|---|
+| 2026-09-07 | `.claude/` rebuilt so a fresh session gets the load-bearing context automatically: path-scoped [`rules/`](rules/), this file injected at session start, and hooks enforcing migrations and commit subjects. Orientation for a club feature measured at 20,852 bytes against 109,556 before — [`tasks-completed.md`](TODO/tasks-completed.md) carries the table |
 | 2026-09-05 | `develop` compiles again and a club's category and interests persist at creation ([BUG-036](bugs/fixed_bugs.md#bug-036), [BUG-037](bugs/fixed_bugs.md#bug-037)) |
 | 2026-09-04 | `feature/user-profile` merged into `develop` (`0357b78`) — 19 commits: club governance, profiles, taxonomy, the create forms |
 | 2026-09-03 | Tomcat pinned to 10.1.59 past the BOM, clearing three CRITICALs ([BUG-035](bugs/fixed_bugs.md#bug-035)) |
@@ -44,6 +45,5 @@ Where the project actually is. Orient from this, **not from
 | 2026-08-19 | `/profile` and `/profile/edit` — the profile page and five settings sections behind a rail |
 | 2026-08-18 | Platform admins can manage every club; club governance items 5, 7–10 — [`club-administration.md`](docs/architecture/club-administration.md) |
 | 2026-08-18 | `dev` profile and the admin bootstrap runner — the system can finally have a platform admin |
-| 2026-08-16 | Mock clubs left Flyway for a `dev`-profile seeder (V12 supersedes V6) and club search embeddings fixed ([BUG-034](bugs/fixed_bugs.md#bug-034)) |
 
 Older, with full write-ups: [`tasks-completed.md`](TODO/tasks-completed.md).
