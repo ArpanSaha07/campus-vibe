@@ -6,8 +6,9 @@ gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
 **Code as of:** trigger rework of 2026-08-16, plus the migration-lint
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
-`verify.mjs`) reconciled 2026-08-18. Other sections are unreviewed since
-2026-08-16.
+`verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test
+assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)).
+Other sections are unreviewed since 2026-08-16.
 
 > **Note, 2026-08-16.** The dated banner below is kept as a record of where the
 > pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:
@@ -515,6 +516,32 @@ In order:
    than a fixed count, which proves the backend reached Postgres over the compose
    network rather than merely starting; club search; and a protected route that
    must return 401 or 403 unauthenticated.
+
+   The protected route is `GET /api/v1/users/me/managed-clubs`, and **which
+   route it is matters more than it looks.** It has to be one that no
+   `permitAll` matcher covers — this one falls through to
+   `.anyRequest().authenticated()` — because `SecurityFilterChainConfig`
+   permits GET on `"/api/v1/clubs/**"` wholesale. Anything under `/clubs` is
+   therefore unusable here: it is never challenged, so a "protected" assertion
+   against it tests nothing.
+
+   That is not hypothetical. This step named `GET /api/v1/clubs/my-club` until
+   2026-09-08. When that mapping was deleted the path did not start failing at
+   Security — it fell through to the public `/api/v1/clubs/{id}` handler, looked
+   up a club named "my-club", and answered **404**
+   ([BUG-038](../../bugs/fixed_bugs.md#bug-038)). The step blocked the merge with
+   a message about an unauthenticated request, which is the one thing that had
+   not happened. **A renamed route and a route that quietly stopped being
+   protected both surface only as *not 401/403*,** so 404 is now its own branch
+   with its own message. The status is 403 rather than 401 because
+   `DefaultExceptionHandler` maps `InsufficientAuthenticationException` to 403;
+   the step accepts either, and `ClubAdminListingIT.managedClubsRequiresAuthentication()`
+   pins the same 403 in the integration suite.
+
+   Note what this implies for the fast loop: `scripts/verify.mjs` does not run
+   compose, so **nothing local catches a stale assertion here.** Replay the job
+   by hand (`docker compose up -d --build` from `docker/`, then the curls) when
+   changing an endpoint this step names.
 6. **Build and boot the production frontend image.** Compose pins
    `target: dev`, so the `runner` stage — the image that would actually ship —
    is built nowhere else. Runs on port 3001 to avoid the dev container on 3000.

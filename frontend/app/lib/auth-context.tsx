@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import type { User } from '@/app/types';
 import { me, googleSignIn as googleSignInFn, login, register } from '@/app/lib/user';
-import { getToken, setToken, clearToken } from '@/app/lib/api';
+import { getToken, clearToken } from '@/app/lib/api';
 
 export interface AuthContextType {
   user: User | null;

@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-05**
+Last updated: **2026-09-08**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-038](#bug-038) | Blocker | 2026-09-08 | A deleted endpoint turned the Docker API smoke test into a 404 assertion, blocking every merge to `main` |
 | [BUG-037](#bug-037) | High | 2026-09-05 | A club's category and interests were discarded at creation: `saveAndFlush` returned a different instance from the one being tagged |
 | [BUG-036](#bug-036) | Blocker | 2026-09-05 | Backend CI stopped compiling — the `feature/user-profile` merge changed two signatures and left two call sites behind |
 | [BUG-035](#bug-035) | High | 2026-09-03 | Backend jar shipped Tomcat 10.1.55 with three CRITICAL CVEs, and the parent-version lever that fixed this last time was exhausted |
@@ -31,6 +32,88 @@ Last updated: **2026-09-05**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-038
+**A deleted endpoint turned the Docker API smoke test into a 404 assertion** · Blocker · FIXED 2026-09-08
+
+**Found:** 2026-09-08, on [PR #41](https://github.com/ArpanSaha07/campus-vibe/pull/41)
+(`develop` → `main`). `Docker / Build images and run the stack` was the only
+failing job, which failed the aggregate `CI` gate and left the PR `BLOCKED`.
+Backend, Frontend, Database, Secret scan, both CodeQL analyses and Vercel all
+passed.
+
+**Symptom:** the *Smoke test the API* step, on its last assertion:
+
+```
+--- GET /api/v1/clubs/my-club (expect 401/403) ---
+status: 404
+::error::Protected endpoint returned 404 for an unauthenticated request.
+```
+
+Every earlier assertion passed — `/ping`, `/api/v1/clubs` returning 8, search
+returning 1 hit — so the stack was built, healthy and talking to Postgres. The
+message reads like a security regression: a route that should reject anonymous
+callers apparently did something else.
+
+**Cause.** It is not a security regression. The endpoint no longer exists.
+`GET /api/v1/clubs/my-club` was deleted on this branch — it could only ever
+answer with one club and gated on the platform-wide `ROLE_CLUB_ADMIN`, which no
+longer exists — and superseded by `GET /api/v1/users/me/managed-clubs`
+(`ClubController.java:51`, already recorded in
+[`club-administration.md`](../docs/architecture/club-administration.md#L254)).
+
+The part worth keeping is *why it answers 404 rather than 401*. With the mapping
+gone, `/api/v1/clubs/my-club` does not fall off the end of the router — it falls
+through to `@GetMapping("/{id}")` with `id = "my-club"`. That route sits under
+`SecurityFilterChainConfig`'s GET `"/api/v1/clubs/**"` **permitAll** rule, so the
+request is never challenged at all. It reaches `ClubService.get("my-club")`,
+finds no such club, and answers 404.
+
+A path that used to be protected quietly became public, and the assertion could
+not tell that apart from a rename. Both surface only as *not 401/403*.
+
+**Why it broke only now.** `.github/workflows/_docker.yml` is untouched by this
+PR. It is correct on `main`, which still has `@GetMapping("/my-club")`
+(`git show origin/main:…/ClubController.java` → line 53). The merge is what
+invalidates it — exactly the failure a merge gate exists to catch. The gate
+worked; its message just pointed at the wrong culprit.
+
+**Fix:** retarget the assertion at the endpoint that actually replaced
+`my-club`. `GET /api/v1/users/me/managed-clubs` matches no permitAll matcher —
+there is none for `/api/v1/users/**` — so it falls through to
+`.anyRequest().authenticated()` and is genuinely protected. The smoke test keeps
+testing the same *property* (a protected route rejects anonymous callers) rather
+than being deleted for convenience.
+
+404 is now a separate branch with a message that names the real cause. A missing
+route and an unprotected route are different failures and should not share one
+diagnosis.
+
+**Affected files**
+- `.github/workflows/_docker.yml:199-222` — the retargeted assertion and the 404 branch.
+- `.claude/docs/architecture/ci-cd-pipeline.md` — step 5 named no route; it does
+  now, with the permitAll trap written down.
+
+**Verified:** the compose stack built and run locally, replaying the CI step by
+hand — `/ping` → `Pong: 1`; `/api/v1/clubs` → **8**; `clubs/search?q=coding` →
+**1** hit; `/api/v1/users/me/managed-clubs` → **403**, body *"Full authentication
+is required to access this resource"*, which confirms Security rejected it rather
+than a controller answering. The old path was re-checked in the same run and
+still returns **404**, so the diagnosis was confirmed rather than assumed.
+
+403 and not 401 because `DefaultExceptionHandler:49-59` maps
+`InsufficientAuthenticationException` to 403; the assertion accepts either.
+`ClubAdminListingIT.managedClubsRequiresAuthentication()` already pins that same
+403, so the smoke test and the integration suite now agree on one endpoint.
+
+**Not chased:** nothing else in CI asserts on a stale route — `_database.yml` and
+the rest of `_docker.yml` probe only `/actuator/health`, `/ping`,
+`/api/v1/clubs` and `/api/v1/clubs/search`, all of which still exist. Two
+mentions of `/clubs/my-club` survive in the frontend
+(`club-dashboard/page.tsx:6`, `club-admin-requests.ts:44`); both are comments
+explaining the removal, not calls.
 
 ---
 

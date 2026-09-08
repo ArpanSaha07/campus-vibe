@@ -14,7 +14,6 @@ import {
 export interface UseCreateClubFormReturn {
   formData: ClubFormData;
   errors: FormErrors;
-  isChecking: boolean;
   isSubmitting: boolean;
   logoPreview: string | null;
   imagePreviews: string[];
@@ -49,7 +48,6 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
-  const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -240,7 +238,6 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
   return {
     formData,
     errors,
-    isChecking,
     isSubmitting,
     logoPreview,
     imagePreviews,
