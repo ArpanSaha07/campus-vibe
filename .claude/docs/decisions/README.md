@@ -21,6 +21,9 @@ reads a folder, they read an index.
 | [ADR-001](ADR-001-three-taxonomy-vocabularies.md) | 2026-08-20 | 📝 Proposed — awaiting Arpan | Three naming vocabularies and only three: one shared `interest_catalogue` behind student interests, club tags **and** event topics · 13 `club_categories` · 22 events-only `event_formats` · **events get no category taxonomy at all** | [`user-profiles.md`](../architecture/user-profiles.md) — the interests half only; the club and event halves are unbuilt |
 | [ADR-002](ADR-002-club-id-is-an-assigned-slug.md) | 2026-09-07 | 📝 Proposed — awaiting Arpan | `Club` keeps its assigned slug id and implements `Persistable`, so `save()` stops silently merging and handing back a different instance · rejected a surrogate id (nine foreign keys, a route and the DTO contract) and rule-only mitigation | — not yet built |
 | [ADR-003](ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | 2026-09-07 | 📝 Proposed — awaiting Arpan | `<tomcat.version>` is overridden past the Boot BOM until a parent manages 10.1.58 or newer · rejected a Boot 4 migration as a CVE remedy and a Trivy suppression outright | `backend/pom.xml` — shipped 2026-09-03 |
+| [ADR-004](ADR-004-two-paths-create-a-club.md) | 2026-09-08 | 📝 Proposed — awaiting Arpan | Two paths create a club and neither leaves it ownerless: a platform admin creates directly and becomes owner, an ordinary user proposes and approval installs them · rejected open creation with creator-as-owner, admin-only creation, and an `ownerEmail` branch on create | — not yet built |
+| [ADR-005](ADR-005-club-proposal-is-its-own-table.md) | 2026-09-08 | 📝 Proposed — awaiting Arpan | A proposal lives in `club_creation_requests` and no `clubs` row exists until approval · rejected a status column on `clubs`, whose four filter sites publish an unapproved club if one is missed · slug reserved at submission and re-checked in the approval transaction | — not yet built |
+| [ADR-006](ADR-006-official-email-verified-only-by-round-trip.md) | 2026-09-08 | 📝 Proposed — awaiting Arpan | `official_email_verified_at` is stamped only by redeeming a link mailed to that address, never by an administrative write · `setOfficialEmail` always nulls it · the round trip ships with SES, in a new `club_email_verifications` table rather than `auth_tokens` | — not yet built |
 
 **ADR-001 holds seven decisions rather than one**, against `adr.md`'s
 one-per-file rule, and argues the exception in its own header: they are a single
@@ -38,7 +41,6 @@ or a bug that will be closed and lost.
 | Decision | Forced by | Where it sits today |
 |---|---|---|
 | How the JWT reaches the browser — `localStorage` or an httpOnly cookie | [BUG-003](../../bugs/bugs.md#bug-003) — frontend route protection never executes, and two of its three stated causes may be stale after the Next 16 upgrade | `bugs.md`, open |
-| Whether the creator of a club becomes its `CLUB_OWNER` at create, or club creation moves behind admin approval | The open **P0** in [`todo.md`](../../TODO/todo.md): `POST /api/v1/clubs` grants the creator nothing, so they get a 403 on their own logo upload | `todo.md`, stated as *a decision, not code* |
 | Whether to adopt shadcn/ui alongside the bespoke Tailwind v4 tokens | New UI surfaces keep re-deciding it per component | Nowhere |
 | The deployment target and container registry | Elastic Beanstalk config exists under `docker/`; nothing is provisioned | [`CampusVibe_AWS_Deployment_Guide.md`](../architecture/CampusVibe_AWS_Deployment_Guide.md), as a plan rather than a decision |
 
