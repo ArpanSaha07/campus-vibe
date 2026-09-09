@@ -81,9 +81,9 @@ export default function CreateClubForm() {
   const { categories, failed: categoriesFailed } = useClubCategories();
 
   // Club.id is a slug the client decides, not something the server generates,
-  // so it is derived from the name here and sent as `id`. Showing it is not
-  // decoration: it becomes the club's permanent URL, and a name that reads
-  // fine can slug badly. See `clubSlug`.
+  // so it is derived from the name here and sent as `id` on both paths —
+  // `proposed_slug` on a proposal. It is only *shown* on the admin path; see
+  // the note on the preview below. See `clubSlug`.
   const slug = clubSlug(formData.name);
 
   // A proposal has nowhere to send anyone: no club exists, and nothing notifies
@@ -125,7 +125,7 @@ export default function CreateClubForm() {
           <p className="mt-3 text-ink-600">
             {admin
               ? 'You become its owner, so you can add the rest from its dashboard straight after.'
-              : 'Tell us about the club. An administrator reviews it, and approving it makes you its owner.'}
+              : 'Tell us about the club. The platform administrator reviews it, and approving it makes you its owner.'}
           </p>
         </header>
 
@@ -155,9 +155,16 @@ export default function CreateClubForm() {
               />
             </FormField>
 
-            {/* Rendered only once there is one, so an empty form is not
+            {/* Admin path only. The slug is still derived and still sent on
+                both paths — it is `proposed_slug` on a proposal — but only an
+                admin is choosing it here and now. A proposer's club may not be
+                approved at all, and if it is, the address is settled at
+                approval against whatever else has been created since; showing
+                it while they type promises a URL nobody can hold for them.
+
+                Rendered only once there is one, so an empty form is not
                 fronted by an empty address. */}
-            {slug && !errors.name && (
+            {admin && slug && !errors.name && (
               <p className="-mt-4 flex flex-wrap items-baseline gap-x-2 text-ink-600">
                 <span className="ticket-label">URL</span>
                 {/* font-mono without .ticket-label: that utility uppercases,
@@ -226,7 +233,9 @@ export default function CreateClubForm() {
               selected={formData.interests}
               onChange={setInterests}
               title="What is this club about?"
-              description="Pick up to eight. Students who share these interests will find you."
+              // The cap is not stated here any more: `max` already enforces it,
+              // and InterestPicker says so at the limit, where it matters.
+              description="Students who share these interests will find you."
               max={8}
               capChoices
             />

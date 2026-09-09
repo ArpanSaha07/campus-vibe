@@ -6,6 +6,14 @@ claim below was read from the code, and the endpoint behaviours are covered by
 `MyAccountIT`, all of which run against real PostgreSQL with
 `ddl-auto: validate`.
 
+**The stamp is deliberately not advanced.** `InterestPicker` gained a
+`capChoices` prop on 2026-09-09 for the create-club form, which scrolls the
+unchosen grid inside a fixed height. **It defaults to false and this page does
+not pass it**, so nothing described below changes — that one prop was re-read
+against this document and nothing else was. Moving the sha would claim the
+whole document had been reconciled with every commit since `b2695c6`, which is
+not true and is exactly the false-clean the checker exists to prevent.
+
 **State:** live. Profile content and email preferences persist end to end.
 **Three things are deliberately still missing** and are written up in
 *Known gaps*: nobody can view anybody else's profile, so the two visibility
