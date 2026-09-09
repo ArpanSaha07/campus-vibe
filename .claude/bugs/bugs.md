@@ -437,6 +437,9 @@ moment anyone writes `getCategories().add(...)`.
 
 ### BUG-042
 **Event banners and profile avatars have no read path** · Medium · OPEN
+### BUG-040
+**Production is configured for two S3 buckets that do not exist** · High · OPEN
+
 
 **Found:** 2026-09-09, while building the club media read path for
 [BUG-040](fixed_bugs.md#bug-040).
@@ -456,6 +459,62 @@ index addressing so no caller names an object key, raster-only content types
 with `nosniff` so an uploaded SVG cannot execute, and the same `/media/**`
 rewrite. Replacing all of it with presigned or CDN URLs is an ADR, not a
 per-feature choice — see [`s3-media/SKILL.md`](../skills/s3-media/SKILL.md).
+
+---
+
+**Found:** 2026-09-08, reading the live account while writing
+[`rules/aws-handling.md`](../rules/aws-handling.md). Nothing in the repository
+would have shown this — both halves are individually reasonable and only
+disagree once the account is looked at.
+
+**Symptom:** none yet. The upload endpoints are not reachable from the UI, so
+nothing has ever called them against real S3.
+
+The backend resolves its buckets from two environment variables:
+
+```yaml
+buckets:
+  clubs: ${AWS_S3_BUCKET_CLUBS:campusvibe-clubs}    # application.yml:50
+  events: ${AWS_S3_BUCKET_EVENTS:campusvibe-events} # application.yml:51
+```
+
+The `CampusVibe-Backend-Prod` environment sets **neither**. Its only S3 variable
+is `S3_BUCKET_NAME=campusvibe-prod-media`, and a repository-wide grep finds no
+code that reads that name. So both properties fall back to their defaults, and
+`aws s3api list-buckets` returns exactly two buckets: `campusvibe-prod-media`
+and the Elastic Beanstalk service bucket. Neither `campusvibe-clubs` nor
+`campusvibe-events` exists.
+
+`application-prod.yml:25` sets `aws.s3.mock: false`, so this is a real
+`S3Client`. Every upload in production therefore fails `NoSuchBucket`.
+
+**Two things make it worse than a wrong name:**
+
+1. **The IAM grant would not cover them either.** The inline policy on
+   `CampusVibe-ElasticBeanstalk-EC2Role` allows `GetObject`, `PutObject` and
+   `DeleteObject` on `arn:aws:s3:::campusvibe-prod-media/*` and nothing else —
+   no second bucket, and no `ListBucket` on the bucket itself.
+2. **The plan assumed two buckets.** [`todo.md`](../TODO/todo.md) Phase 3 says
+   *the two S3 buckets*; one was created, with a third name. Fixing this is a
+   choice, not a rename — one bucket with `clubs/` and `events/` prefixes, or
+   two buckets — and the code, the environment and the IAM policy have to agree
+   afterwards.
+
+**What is verified, and the one thing that is not:** the bucket list, the
+environment variables, the IAM policy and the absence of any reader for
+`S3_BUCKET_NAME` were all read directly from the account and the repository.
+`SPRING_PROFILES_ACTIVE` is set on the environment but its **value was not
+read** — the permission classifier refused that call — so *the prod profile is
+active, therefore `mock` is false* is inference from the environment name, not
+measurement. If that profile is not `prod`, uploads hit `FakeS3` and write to
+local disk instead, which is a different and quieter failure.
+
+**Why it is latent:** the club create path 403s before it can upload, and the
+event banner endpoint is unwired ([BUG-006](#bug-006)). Both are near the top of
+[`STATUS.md`](../STATUS.md), so this stops being latent as soon as either lands.
+
+### BUG-039
+**Image uploads let the caller name the S3 object, and validate nothing about it** · High · OPEN
 
 ---
 

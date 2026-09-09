@@ -19,6 +19,7 @@ Where the project actually is. Orient from this, **not from
 ## Open bugs that block
 
 - [BUG-044](bugs/bugs.md#bug-044) High — `Club.images` / `Event.images` lose every write if the CodeQL autofix is accepted.
+- [BUG-039](bugs/bugs.md#bug-039) High — image uploads name the S3 object from the browser's filename and check nothing about it; latent until a read path is wired, which is items 1 and 2 above.
 - [BUG-001](bugs/bugs.md#bug-001) High — semantic-only search match returns 0 results; reproducing again as of 2026-08-20.
 - [BUG-002](bugs/bugs.md#bug-002) High — backend CI on JDK 17 with `-DskipTests`; fix written, never executed.
 - [BUG-003](bugs/bugs.md#bug-003) High — frontend route protection never executes; do not build on it.
@@ -44,11 +45,14 @@ Where the project actually is. Orient from this, **not from
 - Widening a signature leaves call sites and tests behind, and javac stops at the first phase so a `testCompile` break hides ([BUG-036](bugs/fixed_bugs.md#bug-036)); [`rules/backend-java.md`](rules/backend-java.md).
 - **A green branch goes red when an advisory is published, not only when code changes** — three times now. The lever is a property override in `backend/pom.xml`, never a parent bump: `<tomcat.version>` ([BUG-035](bugs/fixed_bugs.md#bug-035), [ADR-003](docs/decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md)) and `<netty.version>` ([BUG-050](bugs/fixed_bugs.md#bug-050), [ADR-008](docs/decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md)). Dependabot maintains neither; [`rules/ci-and-build.md`](rules/ci-and-build.md).
 - A migration already on `origin/develop` or `origin/main` is immutable — supersede it with the next `V` ([`rules/db-migrations.md`](rules/db-migrations.md)).
+- **AWS calls are gated.** `scripts/hooks/guard-aws.mjs` allows reads and S3 writes and refuses everything else, on the CLI *and* the boto3 MCP path; a refusal is stop-and-ask, and `CAMPUSVIBE_ALLOW_AWS_WRITE=1` is the way through once Arpan approves ([`rules/aws-handling.md`](rules/aws-handling.md), [ADR-004](docs/decisions/ADR-004-aws-guardrails-enforced-by-a-hook.md)).
+- `aws-deployment.md` says no RDS, no S3 bucket and no EB exist. All three do, as of 2026-09-08 — do not trust that doc's state section until it is reconciled.
 
 ## Recently shipped
 
 | Date | What landed |
 |---|---|
+<<<<<<< HEAD
 | 2026-09-11 | **PR #45's Trivy gate unblocked, pending its re-run on GitHub ([BUG-050](bugs/fixed_bugs.md#bug-050)).** Two CRITICALs published after the code was written: `next` 16.3.0 (remote code execution) bumped to 16.3.3, and `netty-handler` — shipped only through the AWS SDK's unused async client — pinned to 4.1.137 by the lever ADR-003 uses for Tomcat, over excluding it ([ADR-008](docs/decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md)). CodeQL alert 53 fixed; alerts 1, 15, 44–46 and 48 dismissed with reasons, and 23 and 52 queued |
 | 2026-09-11 | **Uploads no longer name their own S3 object ([BUG-039](bugs/fixed_bugs.md#bug-039)).** The PR #44 security review found that `FakeS3` turned `..` in a browser filename into a file write on disk, which our own entry had ruled out. Keys now come from `s3/MediaKeys` in the `reference.md` §7 layout, with the extension read from the file's own bytes — PNG, JPEG and WebP only. `FakeS3` refuses a key that escapes its bucket; the per-file cap is 5MB and an oversize upload is a 413, not a 500; a replaced logo's old object is deleted after the row commits. The event upload got its first test. Presigned uploads are the next unit, as an ADR |
 | 2026-09-10 | **ADR-004, ADR-005 and ADR-006 accepted, and their revisit triggers wired into the rules.** An ADR is never auto-loaded, so a `Revisit when` section is invisible at the moment it fires — ADR-005's had half-fired twice unnoticed. Each live trigger is now a line in the path-scoped rule that loads with the code that would trip it, and an item in `todo.md` where it is real work. `rules/backend-clubs.md` also turned out not to load for `clubadmin/` at all. ADR-007 indexed; ADR-004 amended a second time to drop a stale claim about the eight V6-seeded clubs |
@@ -59,5 +63,17 @@ Where the project actually is. Orient from this, **not from
 | 2026-09-09 | An uploaded club logo took the `/clubs` page down — `next/image` throws on an S3 object key during render, where `onError` cannot catch it. Fixed at both ends, and clubs got the media read path nothing had ever had ([BUG-040](bugs/fixed_bugs.md#bug-040)) |
 | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the eight clubs it was written to replace, so every seeded club carried a NULL embedding. V32 retires them and the guard is now per club ([BUG-041](bugs/fixed_bugs.md#bug-041)) |
 | 2026-09-08 | The Docker smoke test asserted on `GET /clubs/my-club`, deleted on this branch, so it read 404 and blocked every merge; retargeted at `/users/me/managed-clubs` and taught to name a missing route for what it is ([BUG-038](bugs/fixed_bugs.md#bug-038)) |
+=======
+| 2026-09-08 | The AWS rules made enforceable: `guard-aws.mjs` refuses anything outside a fail-closed allowlist, on the CLI *and* the boto3 MCP path, with `AWS_PROFILE` pinned and 33 cases wired into `verify.mjs` ([ADR-004](docs/decisions/ADR-004-aws-guardrails-enforced-by-a-hook.md)). Reading the account to write the rule found [BUG-040](bugs/bugs.md#bug-040) |
+| 2026-09-08 | The Docker smoke test asserted on `GET /clubs/my-club`, deleted on this branch, so it read 404 and blocked every merge; retargeted at `/users/me/managed-clubs` and taught to name a missing route for what it is ([BUG-038](bugs/fixed_bugs.md#bug-038)) |
+| 2026-09-08 | Four `js/unused-local-variable` CodeQL alerts cleared — the dead `isChecking`, `loaded`, `setToken` and `act` bindings deleted rather than wired up |
+| 2026-09-07 | `.claude/` rebuilt so a fresh session gets the load-bearing context automatically: path-scoped [`rules/`](rules/), this file injected at session start, and hooks enforcing migrations and commit subjects. Orientation for a club feature measured at 20,852 bytes against 109,556 before — [`tasks-completed.md`](TODO/tasks-completed.md) carries the table |
+| 2026-09-05 | `develop` compiles again and a club's category and interests persist at creation ([BUG-036](bugs/fixed_bugs.md#bug-036), [BUG-037](bugs/fixed_bugs.md#bug-037)) |
+| 2026-09-04 | `feature/user-profile` merged into `develop` (`0357b78`) — 19 commits: club governance, profiles, taxonomy, the create forms |
+| 2026-09-03 | Tomcat pinned to 10.1.59 past the BOM, clearing three CRITICALs ([BUG-035](bugs/fixed_bugs.md#bug-035)) |
+| 2026-08-20 | Club and event create forms work end to end (`04ba5ac`); every vocabulary fetched, none hardcoded |
+| 2026-08-20 | Taxonomy (`d1d915f`): V23–V30, the `taxonomy/` package, `ClubService.create(Club, category, interests)` — [ADR-001](docs/decisions/ADR-001-three-taxonomy-vocabularies.md) |
+| 2026-08-20 | User profiles persist: V18–V21, a full-replace `PUT` and one shared profile load — [`user-profiles.md`](docs/architecture/user-profiles.md) |
+>>>>>>> f19f222 (docs(claude): file the aws guardrails and BUG-040)
 
 Ten most recent only — older entries, with their full write-ups, are in [`tasks-completed.md`](TODO/tasks-completed.md).

@@ -10,8 +10,9 @@ gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 `/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 `verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test
-assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)).
-Other sections are unreviewed since 2026-08-16.
+assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)),
+plus the `hooks` component of `verify.mjs` added 2026-09-08. Other sections are
+unreviewed since 2026-08-16.
 
 > **Note, 2026-08-16.** The dated banner below is kept as a record of where the
 > pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:
@@ -416,6 +417,20 @@ Backend runs through the same script, which resolves `JAVA_HOME` itself (no JDK
 is on `PATH` on the dev machine) and reads the exit code from the process rather
 than through a pipe — a piped `mvnw` reports the exit status of `tail`, which is
 how a failed build once looked green.
+
+A third component was added 2026-09-08: `hooks`, which runs
+`scripts/hooks/guard-aws.test.mjs`. It is the **one step here that mirrors no
+workflow, deliberately**. A `PreToolUse` hook guards an agent session on a
+developer's machine; a runner has no session, so there is nothing for a CI job
+to assert against — this is not local/CI drift to be reconciled, and the
+closing summary line says so rather than claiming CI would report the same. It
+is selected when `scripts/hooks/`, `.claude/settings.json` or the rule a hook
+enforces changes, because a hook and its rule are one unit: `guard-aws.mjs` is
+only correct with respect to what `rules/aws-handling.md` claims. It runs first,
+on the migration lint's argument — milliseconds, no toolchain, gates nothing.
+Worth the cost because the failure is silent: a hook that stops refusing does
+not error, the session simply proceeds, and the first sign is an AWS operation
+that should have been blocked.
 
 The backend tier starts with **migration lint**, ahead of the JDK check so it
 still runs on a machine with no Java, and a failure there skips the Maven build
