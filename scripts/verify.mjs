@@ -24,6 +24,14 @@
  *
  * .github/workflows/_backend.yml: ./mvnw -B verify.
  *
+ * WHAT IT RUNS THAT CI DOES NOT
+ *
+ * The hook guards (scripts/hooks/*.test.mjs), and deliberately. A PreToolUse
+ * hook guards a session on a developer's machine; there is no session on a
+ * runner, so there is nothing there for a CI job to assert against. This is the
+ * one step where local is not mirroring CI but covering a place CI cannot go —
+ * so a red hook guard here is NOT a prediction that the pull request will fail.
+ *
  * Two workflows mirror this split. branch-checks.yml runs the same scoped, fast
  * checks on a push; ci.yml runs everything on a pull request to main. This
  * script is what catches the failure BEFORE the push, which is still the only
@@ -41,7 +49,8 @@
  *   node scripts/verify.mjs                 # detect changed components vs origin/main
  *   node scripts/verify.mjs --frontend      # frontend only
  *   node scripts/verify.mjs --backend       # backend only
- *   node scripts/verify.mjs --all           # both
+ *   node scripts/verify.mjs --hooks         # the PreToolUse hook guards only
+ *   node scripts/verify.mjs --all           # everything
  *   node scripts/verify.mjs --full          # backend integration suites too
  *   node scripts/verify.mjs --base <ref>    # detect changes against <ref>
  */
@@ -92,13 +101,24 @@ function changedFiles(base) {
   return res.stdout.split("\n").filter(Boolean);
 }
 
+// A hook and the rule it enforces are one unit: guard-aws.mjs is only correct
+// with respect to what aws-handling.md claims, and settings.json is what
+// registers it at all. Change any of the three and the hook guards run.
+const HOOK_PATHS = [
+  "scripts/hooks/",
+  ".claude/rules/aws-handling.md",
+  ".claude/rules/db-migrations.md",
+  ".claude/settings.json",
+];
+
 function selectComponents() {
-  if (has("--all")) return { frontend: true, backend: true, why: "--all" };
+  if (has("--all")) return { frontend: true, backend: true, hooks: true, why: "--all" };
   if (has("--frontend") && has("--backend")) {
-    return { frontend: true, backend: true, why: "--frontend --backend" };
+    return { frontend: true, backend: true, hooks: false, why: "--frontend --backend" };
   }
-  if (has("--frontend")) return { frontend: true, backend: false, why: "--frontend" };
-  if (has("--backend")) return { frontend: false, backend: true, why: "--backend" };
+  if (has("--frontend")) return { frontend: true, backend: false, hooks: false, why: "--frontend" };
+  if (has("--backend")) return { frontend: false, backend: true, hooks: false, why: "--backend" };
+  if (has("--hooks")) return { frontend: false, backend: false, hooks: true, why: "--hooks" };
 
   const base = valueOf("--base") ?? "origin/main";
   const files = changedFiles(base);
@@ -107,15 +127,17 @@ function selectComponents() {
     return {
       frontend: true,
       backend: true,
+      hooks: true,
       why: `no usable base (${base}); running everything`,
     };
   }
   if (files.some((f) => f.startsWith(".github/workflows/"))) {
-    return { frontend: true, backend: true, why: "workflows changed" };
+    return { frontend: true, backend: true, hooks: true, why: "workflows changed" };
   }
   return {
     frontend: files.some((f) => f.startsWith("frontend/")),
     backend: files.some((f) => f.startsWith("backend/")),
+    hooks: files.some((f) => HOOK_PATHS.some((p) => f.startsWith(p))),
     why: `${files.length} file(s) changed vs ${base}`,
   };
 }
@@ -314,6 +336,23 @@ function verifyBackend() {
 }
 
 // ---------------------------------------------------------------------------
+// Hook guards
+//
+// The odd one out: no CI job mirrors this, because a PreToolUse hook only ever
+// runs on a developer's machine — there is no session on a runner for it to
+// guard. Running it here is not parity with CI, it is the only place the check
+// can happen at all.
+//
+// Worth the two hundred milliseconds because the failure is silent. A hook that
+// stops refusing does not error; the session simply proceeds, and the first
+// sign is an AWS operation that should have been blocked.
+// ---------------------------------------------------------------------------
+
+function verifyHooks() {
+  run("hook guards", "node", [join(REPO, "scripts", "hooks", "guard-aws.test.mjs")], { cwd: REPO });
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -322,16 +361,19 @@ const picked = selectComponents();
 console.log("CampusVibe local CI parity");
 console.log(`  components: ${picked.why}`);
 console.log(
-  `  running:    ${[picked.frontend && "frontend", picked.backend && "backend"]
+  `  running:    ${[picked.frontend && "frontend", picked.backend && "backend", picked.hooks && "hooks"]
     .filter(Boolean)
     .join(" + ") || "nothing"}`,
 );
 
-if (!picked.frontend && !picked.backend) {
+if (!picked.frontend && !picked.backend && !picked.hooks) {
   console.log("\nNothing to verify.");
   process.exit(0);
 }
 
+// First: milliseconds, no toolchain, and it decides nothing else — the same
+// argument the migration lint makes for running ahead of the backend build.
+if (picked.hooks) verifyHooks();
 if (picked.frontend) await verifyFrontend();
 if (picked.backend) verifyBackend();
 
@@ -345,11 +387,15 @@ for (const r of results) {
   );
 }
 
+// The hook guards are the one step with no CI counterpart, so neither closing
+// line may claim CI would have said the same about them.
+const localOnly = picked.hooks ? "\n(The hook guards are local-only - CI has no session to guard.)" : "";
+
 const failed = results.filter((r) => !r.ok);
 if (failed.length > 0) {
   console.log(`\n${failed.length} step(s) failed: ${failed.map((r) => r.name).join(", ")}`);
-  console.log("This is what CI would have reported.\n");
+  console.log(`This is what CI would have reported.${localOnly}\n`);
   process.exit(1);
 }
 
-console.log("\nAll checks passed - this is what CI will run.\n");
+console.log(`\nAll checks passed - this is what CI will run.${localOnly}\n`);
