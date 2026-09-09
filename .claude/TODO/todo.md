@@ -68,6 +68,33 @@ administrator listing, the `/manage/[clubId]` dashboard,
 invite/accept/decline/remove, ownership transfer, and the append-only activity
 log. The rest, in the spec's order:
 
+- [ ] **P1** **A proposal should carry the club's contact links.** Arpan,
+  2026-09-09, reviewing the rebuilt create-club page: the propose path collects
+  name, description, category, interests and a message, and drops the four
+  things every club page shows. Decided — **the links ship, the logo waits.**
+
+  Links: one `social_links TEXT` column on `club_creation_requests` mirroring
+  `Club.socialLinks` (a JSON string in one column, not four columns — see
+  `Club.java:33`), carried onto the club inside
+  `ClubCreationRequestService.approve`. Optional on this path, unlike the admin
+  path where `clubValidator` requires the email. Four edits, not one:
+  `ClubCreationRequestCreateRequest`, `ClubCreationRequestDTO`, its row in
+  `contracts/api-dto-fields.json`, and both contract tests
+  ([`rules/contracts.md`](../rules/contracts.md)). Migration is V33; V32 is the
+  highest applied.
+
+  **The logo is deliberately not in this cut.** A proposal has no club id and no
+  S3 key, so it would need a proposal-scoped key, a copy step at approval, a
+  read endpoint for the admin queue to preview it, and orphan cleanup for every
+  rejected or abandoned proposal. It belongs with the club editor
+  ([BUG-043](../bugs/bugs.md#bug-043)), which is already the next P1 and is
+  where the requester adds it the moment approval makes them the owner.
+
+  **This supersedes ADR-004's text-only rationale** and the note on
+  `ClubCreationRequestCreateRequest` that calls it a decision rather than an
+  oversight. Amend both when it ships — the ADR is accurate until then.
+  Non-trivial: schema plus contract, so it goes through `/start`.
+
 - [ ] **P1** *(item 6, half done)* **The official-email verification round
   trip.** The **admin write shipped 2026-09-09** — `PATCH
   /clubs/{clubId}/official-email` plus an editable panel on `/manage/[clubId]`

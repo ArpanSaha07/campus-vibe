@@ -48,14 +48,10 @@ export async function validateClubForm(
     newErrors.description = 'Description must be at most 1000 characters';
   }
 
-  // Images and social links exist only on the admin path. A proposal carries
+  // The logo and social links exist only on the admin path. A proposal carries
   // neither — it has no club id to hang an S3 key off, so the form renders no
   // controls for them.
   if (mode === 'create') {
-    if (formData.images.length > 10) {
-      newErrors.images = 'Maximum 10 photos allowed';
-    }
-
     // Validate social links - email is required
     if (!formData.socialLinks.email.trim()) {
       newErrors.social = 'Email is required';

@@ -5,9 +5,14 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `0065af8` — re-read on 2026-09-09 for the club ownership spine:
+**Code as of:** `4d11778` — re-read on 2026-09-09 for the club ownership spine:
 `api.tsx` (the multipart branch), `cache.ts` and its first real invalidator,
 `adapters.ts` (the media-URL boundary), and the new club media endpoints.
+Re-read again the same day for the create-club form work, which moved
+`frontend/app/types/index.ts` and `ClubCreateRequest.java` and so is mapped
+here: neither change touches this document. `ClubFormData` is form state, not a
+DTO — it has no row in `api-dto-fields.json` and no contract test asserts it —
+and the `ClubCreateRequest` edit is javadoc only.
 
 **Two older strata, named rather than glossed.** The **storage layers**,
 **rules** and **client-query-library** sections were written on 2026-08-15

@@ -152,9 +152,46 @@ body {
   }
 }
 
+/* A capped scroll area whose bottom edge fades, so a row clipped mid-pill
+   reads as "there is more below" rather than as a rendering fault. The fade is
+   static — it stays once scrolled to the end — which is the accepted trade for
+   not running a scroll listener to animate it. */
+.scroll-fade {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent 100%);
+}
+
+/* The chevron on a native select.
+   `selectClasses` sets appearance-none, and has always reserved the space and
+   the background position for this — but never supplied the image, so every
+   select in the app was a plain pill with no affordance that it opened
+   anything. Kept here rather than as a Tailwind arbitrary value because the
+   data URI contains spaces, which that syntax cannot carry. The stroke is
+   ink-600; it is inlined because a hex in a URL cannot reference a token. */
+.select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d5470' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* Toast: rises from the edge it is anchored to, the short distance a
+   notification should travel. Same 150ms as the auth modal — both are things
+   that appear over the page rather than parts of it loading. */
+.toast-in {
+  animation: toast-in 150ms var(--ease-snap) both;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-up,
-  .auth-modal-card {
+  .auth-modal-card,
+  .toast-in {
     animation: none;
   }
   .lift,

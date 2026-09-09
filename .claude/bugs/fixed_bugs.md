@@ -6,6 +6,8 @@ Last updated: **2026-09-09**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-045](#bug-045) | Medium | 2026-09-09 | A club that was created reported itself as not created: the success callback ran inside the try that wrapped the write |
+| [BUG-046](#bug-046) | Low | 2026-09-09 | Every `select` in the app was a plain pill — `selectClasses` reserved the chevron's space and position but never supplied the image |
 | [BUG-041](#bug-041) | High | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the clubs it was written to replace, so every seeded club had a NULL embedding |
 | [BUG-040](#bug-040) | High | 2026-09-09 | An uploaded club logo took the whole `/clubs` page down — `next/image` throws on an S3 object key, during render, where `onError` cannot catch it |
 | [BUG-038](#bug-038) | Blocker | 2026-09-08 | A deleted endpoint turned the Docker API smoke test into a 404 assertion, blocking every merge to `main` |
@@ -34,6 +36,59 @@ Last updated: **2026-09-09**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-045
+**A club that was created reported itself as not created** · Medium · FIXED 2026-09-09
+
+`useCreateClubForm.handleSubmit` called its `onSuccess` callback **inside** the
+`try` that wrapped the write. That callback is not part of the write: it
+refreshes the managed-clubs provider, revalidates the `clubs` cache tag and
+navigates to `/manage/[clubId]`. Any one of those throwing was caught by the
+same `catch` and rendered as `general` — so the form said the club could not be
+created while sitting on top of a club that had been, and a second attempt hit a
+409 on a slug the user had genuinely just taken.
+
+Fixed by moving the callback past the `try/finally` and reading it through a
+ref, so a failure there is what it actually is: a failure to *leave* a page that
+is still correct. The `catch` now also routes through `parseApiError` rather
+than `error.message` — `ApiError` carries the raw response body, so the message
+a user saw was a line of JSON.
+
+**Reported as `onSuccess is not a function`,** which was a second thing wearing
+the same costume. The running dev container was serving a stale Turbopack bundle
+whose `useCreateClubForm` still took one argument, so the new two-argument call
+bound the string `'create'` to `onSuccess` — truthy, and not callable. The same
+stale cache reported `Module not found: Can't resolve
+'@/app/lib/actions/revalidate'` for a file that was present on disk and in
+`HEAD`, and that `npm run build` compiled cleanly. Restarting
+`campusvibe-frontend` cleared both. The `typeof callback === 'function'` guard
+now makes the first failure impossible rather than merely unlikely; the second
+is an environment trap and is recorded in
+[`rules/frontend.md`](../rules/frontend.md).
+
+---
+
+### BUG-046
+**Every `select` in the app was a plain pill with no affordance that it opened** · Low · FIXED 2026-09-09
+
+`selectClasses` (`frontend/app/components/ui/FormField.tsx`) set
+`appearance-none`, which removes the UA's own chevron, then reserved the slot for
+a replacement — `bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10` —
+and never supplied a `background-image`. Every one of those utilities was doing
+nothing, and there was `pr-10` of unexplained padding on the right of each
+control.
+
+Invisible because a `select` still opens on click, so nothing was broken enough
+to notice; it read as a text input that surprised you. Present wherever
+`selectClasses` is used, which is the create-club category field and the
+interest picker's category filter, not just the page it was found on.
+
+The image is `.select-chevron` in `globals.css` rather than a Tailwind arbitrary
+value, because the data URI contains spaces and that syntax cannot carry them.
+It is folded into `selectClasses` itself, so no future caller can take the
+padding without the chevron.
 
 ---
 

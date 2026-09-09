@@ -1,6 +1,6 @@
 # CampusVibe — status
 
-**Code as of:** `0065af8` · 2026-09-09 · branch `feature/club-governance`. The club ownership spine is **written and verified but uncommitted** — 29 files changed plus 14 new ones in the working tree.
+**Code as of:** `4d11778` · 2026-09-09 · branch `feature/club-governance`. The club ownership spine is committed. The create-club page rebuild is **written and verified but uncommitted** — 10 files changed plus 1 new one in the working tree.
 
 Where the project actually is. Orient from this, **not from
 [`todo.md`](TODO/todo.md)** — that is the full queue, this is the digest.
@@ -8,12 +8,13 @@ Where the project actually is. Orient from this, **not from
 
 ## Now (in order)
 
-1. **Review and commit the club ownership spine** — it is finished and verified but sits uncommitted, and it is the largest thing in the tree. `/generate-commit-message` has written the message.
-2. **P0 — semantic-only search returns 0 results.** Embedding writes are proven fine; the fault is in `SearchRepository.hybridSearchEventIds`. Re-confirmed reproducing 2026-09-09 on clean `HEAD`, so it is the one red test in `verify --full` and is **not** caused by the club work ([BUG-001](bugs/bugs.md#bug-001)).
-3. **P0 — backend CI runs JDK 17 and skips tests.** `_backend.yml` is rewritten; no workflow in this repo has ever run on GitHub, so the fix is unverified ([BUG-002](bugs/bugs.md#bug-002)).
-4. **P1 — a club cannot be edited after creation, from anywhere.** Now the most visible gap: an owner installed by the new approval flow still cannot give their club a logo, because `/manage/[clubId]` has no editor and there is no `updateClub` in the frontend. Every endpoint already exists ([BUG-043](bugs/bugs.md#bug-043)).
-5. **P2 — an event cannot be given a banner image from the UI.** `POST /api/v1/events/{id}/images` is reachable and simply unwired ([BUG-006](bugs/bugs.md#bug-006)) — but wiring it now also needs an event **read** path, which clubs got and events did not ([BUG-042](bugs/bugs.md#bug-042)).
-6. **Commit the secrets-management work** — steps 1–5 are complete and verified.
+1. **Review and commit the create-club page rebuild** — finished and verified, sitting uncommitted. `/generate-commit-message` has written the message. Two fixes in it reach past that page: `selectClasses` now draws a chevron, which every `select` in the app inherits ([BUG-046](bugs/fixed_bugs.md#bug-046)), and `InterestPicker` gained an opt-in `capChoices` that is off on the profile page.
+2. **P1 — a proposal should carry the club's contact links.** The next unit, and the decisions are already taken (Arpan, 2026-09-09): the four social links ship on `club_creation_requests` as one `social_links` column carried onto the club at approval; the **logo waits for the club editor**, because a proposal has no club id and no S3 key. Schema plus contract, so it goes through `/start` first — the write-up in [`todo.md`](TODO/todo.md) under Club governance carries the shape.
+3. **P0 — semantic-only search returns 0 results.** Embedding writes are proven fine; the fault is in `SearchRepository.hybridSearchEventIds`. Re-confirmed reproducing 2026-09-09 on clean `HEAD`, so it is the one red test in `verify --full` and is **not** caused by the club work ([BUG-001](bugs/bugs.md#bug-001)).
+4. **P0 — backend CI runs JDK 17 and skips tests.** `_backend.yml` is rewritten; no workflow in this repo has ever run on GitHub, so the fix is unverified ([BUG-002](bugs/bugs.md#bug-002)).
+5. **P1 — a club cannot be edited after creation, from anywhere.** Now the most visible gap: an owner installed by the new approval flow still cannot give their club a logo, because `/manage/[clubId]` has no editor and there is no `updateClub` in the frontend. Every endpoint already exists ([BUG-043](bugs/bugs.md#bug-043)).
+6. **P2 — an event cannot be given a banner image from the UI.** `POST /api/v1/events/{id}/images` is reachable and simply unwired ([BUG-006](bugs/bugs.md#bug-006)) — but wiring it now also needs an event **read** path, which clubs got and events did not ([BUG-042](bugs/bugs.md#bug-042)).
+7. **Commit the secrets-management work** — steps 1–5 are complete and verified.
 
 ## Open bugs that block
 
@@ -31,7 +32,9 @@ Where the project actually is. Orient from this, **not from
 - **`ClubService.create` no longer exists** — `createOwnedBy` is the only way to make a club, and a null owner means born ownerless, which only the dev seeder may pass ([ADR-004](docs/decisions/ADR-004-two-paths-create-a-club.md)); [`rules/backend-clubs.md`](rules/backend-clubs.md).
 - **A stored S3 key is not a URL, and `next/image` throws on one *during render*** — no `onError` can catch it, so one bad row takes a whole page down ([BUG-040](bugs/fixed_bugs.md#bug-040)); [`rules/frontend.md`](rules/frontend.md).
 - **A deviation recorded as fixed is one nobody re-checks.** `DevDataSeeder` never ran for three weeks because a skill file credited a migration that does not exist ([BUG-041](bugs/fixed_bugs.md#bug-041)); [`rules/db-migrations.md`](rules/db-migrations.md).
-- **Bug ids have now collided twice.** Grep *both* `bugs.md` and `fixed_bugs.md` for the next free id before filing — `BUG-038` was issued to two different bugs, and the open one is now `BUG-044`.
+- **Bug ids have now collided twice.** Grep *both* `bugs.md` and `fixed_bugs.md` for the next free id before filing — `BUG-038` was issued to two different bugs, and the open one is now `BUG-044`. **Highest issued: BUG-046.**
+- **A success callback belongs outside the `try` that wraps the write.** Navigation, a context refresh and `revalidateTag` all run after the write succeeded, so a throw there was caught by the write's own `catch` and the form claimed the club had not been created when it had ([BUG-045](bugs/fixed_bugs.md#bug-045)); [`rules/frontend.md`](rules/frontend.md).
+- **A stale Turbopack dev bundle reports errors that contradict the file on disk** — a `Module not found` for a committed file, and a signature mismatch from a hook that had already changed, both while `tsc` and `npm run build` were clean. Restart `campusvibe-frontend` before debugging ([BUG-045](bugs/fixed_bugs.md#bug-045)); [`rules/frontend.md`](rules/frontend.md).
 - Widening a signature leaves call sites and tests behind, and javac stops at the first phase so a `testCompile` break hides ([BUG-036](bugs/fixed_bugs.md#bug-036)); [`rules/backend-java.md`](rules/backend-java.md).
 - The Tomcat CVE lever is `<tomcat.version>` in `backend/pom.xml`, not a parent bump ([BUG-035](bugs/fixed_bugs.md#bug-035), [ADR-003](docs/decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md)); [`rules/ci-and-build.md`](rules/ci-and-build.md).
 - A migration already on `origin/develop` or `origin/main` is immutable — supersede it with the next `V` ([`rules/db-migrations.md`](rules/db-migrations.md)).
@@ -40,6 +43,7 @@ Where the project actually is. Orient from this, **not from
 
 | Date | What landed |
 |---|---|
+| 2026-09-09 | **The create-club page, rebuilt on the design system.** The submit button was orange against a lavender product and the fields were slate/gray/blue; every token now comes from [`design-guidelines.md`](design-guidelines.md) through the shared `Button`, `FormField` and `inputClasses`. Club photos removed from the form (Arpan's call — they belong to the club editor); submission failures now hover in a `Toast` instead of an inline panel above the fold; the slug that becomes the club's URL is shown rather than derived in silence; required fields say so. Fixed [BUG-045](bugs/fixed_bugs.md#bug-045) and [BUG-046](bugs/fixed_bugs.md#bug-046) on the way |
 | 2026-09-09 | **The club ownership spine.** Two creation paths and neither leaves a club ownerless: a platform admin creates directly and becomes owner, an ordinary user proposes and approval installs them, in one transaction ([ADR-004](docs/decisions/ADR-004-two-paths-create-a-club.md), [ADR-005](docs/decisions/ADR-005-club-proposal-is-its-own-table.md)). `ClubService.create` deleted in favour of `createOwnedBy`. `PATCH /clubs/{id}/official-email` for platform admins, always leaving it unverified ([ADR-006](docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)). The admin dashboard gained the Create a club control it never had, and one merged Pending requests list. Closes the standing P0 |
 | 2026-09-09 | An uploaded club logo took the `/clubs` page down — `next/image` throws on an S3 object key during render, where `onError` cannot catch it. Fixed at both ends, and clubs got the media read path nothing had ever had ([BUG-040](bugs/fixed_bugs.md#bug-040)) |
 | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the eight clubs it was written to replace, so every seeded club carried a NULL embedding. V32 retires them and the guard is now per club ([BUG-041](bugs/fixed_bugs.md#bug-041)) |

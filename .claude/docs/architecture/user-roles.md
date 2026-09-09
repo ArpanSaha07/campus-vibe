@@ -5,7 +5,7 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `0065af8` — the club ownership spine, which makes club creation
+**Code as of:** `4d11778` — the club ownership spine, which makes club creation
 admin-only and gives `ROLE_ADMIN` three more endpoints.
 Everything else described here is committed ahead of it.
 

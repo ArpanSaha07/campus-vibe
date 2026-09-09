@@ -114,7 +114,15 @@ export async function uploadClubLogo(clubId: string, file: File): Promise<void> 
   });
 }
 
-/** A club's banner images. Multipart, part name `files`, sent in one request. */
+/**
+ * A club's banner images. Multipart, part name `files`, sent in one request.
+ *
+ * Not called from the create form: banner photos are a club's own content
+ * rather than part of deciding it should exist, so they belong to the club
+ * editor ([BUG-043](../../../.claude/bugs/bugs.md)) alongside every other field
+ * an owner edits after the fact. The endpoint and the read path (ADR-007) both
+ * exist; only the editor does not.
+ */
 export async function uploadClubImages(clubId: string, files: File[]): Promise<void> {
   if (files.length === 0) return;
   const body = new FormData();
@@ -146,17 +154,16 @@ export async function updateClubSocialLinks(
 
 export interface ClubMedia {
   logo: File | null;
-  images: File[];
   socialLinks: ClubSocialLinks;
 }
 
 /**
  * Creates a club and then attaches everything that needs a club id to exist.
  *
- * Sequential on purpose: all three follow-ups address `/clubs/{id}`, so the
- * club has to be there first. Each is awaited rather than fired in parallel so
- * that a failure names which step failed — a caller told only "upload failed"
- * cannot say whether the club was created.
+ * Sequential on purpose: both follow-ups address `/clubs/{id}`, so the club has
+ * to be there first. Each is awaited rather than fired in parallel so that a
+ * failure names which step failed — a caller told only "upload failed" cannot
+ * say whether the club was created.
  *
  * **The club is created even if a follow-up throws.** That is the honest
  * outcome rather than a bug to paper over: the row exists and the caller now
@@ -168,9 +175,6 @@ export async function createClubWithMedia(club: NewClub, media: ClubMedia): Prom
 
   if (media.logo) {
     await uploadClubLogo(created.clubId, media.logo);
-  }
-  if (media.images.length > 0) {
-    await uploadClubImages(created.clubId, media.images);
   }
   if (Object.values(media.socialLinks).some((v) => v && v.trim() !== "")) {
     await updateClubSocialLinks(created.clubId, media.socialLinks);

@@ -512,15 +512,20 @@ export interface ClubFormData {
   name: string;
   description: string;
   /**
-   * Sent after the club exists, by `createClubWithMedia`. Both uploads go
-   * through endpoints guarded by `canManageClub`, which the creating admin now
-   * passes because ADR-004 makes them the club's owner.
+   * Sent after the club exists, by `createClubWithMedia`. The upload goes
+   * through an endpoint guarded by `canManageClub`, which the creating admin
+   * now passes because ADR-004 makes them the club's owner.
    *
    * Absent entirely on the proposal path: a proposal has no club id and no S3
-   * key, so the form renders no image controls for an ordinary user.
+   * key, so the form renders no image control for an ordinary user.
+   *
+   * Banner photos are deliberately NOT here. They are a club's own content
+   * rather than part of deciding it should exist, and ten file pickers made the
+   * first thing a new club sees a chore. They are set from `/manage/[clubId]`
+   * instead — `uploadClubImages` is the call, and `POST /clubs/{id}/images` has
+   * been reachable all along.
    */
   logo: File | null;
-  images: File[];
   /** A `club_categories` slug. */
   category: string | null;
   /** `interest_catalogue` slugs — what the club is about, capped at eight. */
@@ -557,7 +562,6 @@ export interface FormErrors {
   name?: string;
   description?: string;
   logo?: string;
-  images?: string;
   social?: string;
   /** The proposal path's note to the reviewer. */
   message?: string;

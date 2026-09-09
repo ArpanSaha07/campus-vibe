@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { ClubFormData, FormErrors } from '@/app/types';
+import { ClubFormData, ClubSocialLinks, FormErrors } from '@/app/types';
 import {
   validateClubForm,
   validateImageFile,
@@ -12,34 +12,35 @@ import {
   createClubWithMedia,
 } from '@/app/lib/services/clubService';
 import { proposeClub } from '@/app/lib/club-creation-requests';
+import { parseApiError } from '@/app/lib/auth-errors';
 
 export interface UseCreateClubFormReturn {
   formData: ClubFormData;
   errors: FormErrors;
   isSubmitting: boolean;
   logoPreview: string | null;
-  imagePreviews: string[];
   logoInputRef: React.RefObject<HTMLInputElement>;
-  imagesInputRef: React.RefObject<HTMLInputElement>;
   handleInputChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => void;
   handleLogoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleImagesChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  removeImage: (index: number) => void;
   removeLogo: () => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   setCategory: (slug: string | null) => void;
   setInterests: (slugs: string[]) => void;
+  /** Clears the submission-level error, for the toast's dismiss control. */
+  dismissGeneralError: () => void;
 }
 
 /**
  * What the form does on submit, decided by who is filling it in.
  *
- * `create` posts to the admin-only create endpoint and then chains the logo,
- * banners and social links, all of which work now that the creating admin owns
- * the club. `propose` submits a text-only proposal for review and creates
- * nothing. See ADR-004.
+ * `create` posts to the admin-only create endpoint and then chains the logo and
+ * social links, both of which work now that the creating admin owns the club.
+ * `propose` submits a text-only proposal for review and creates nothing. See
+ * ADR-004.
  */
 export type { ClubFormMode };
 
@@ -47,7 +48,6 @@ const EMPTY_FORM: ClubFormData = {
   name: '',
   description: '',
   logo: null,
-  images: [],
   category: null,
   interests: [],
   socialLinks: {
@@ -74,16 +74,32 @@ export function useCreateClubForm(
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const logoInputRef = useRef<HTMLInputElement>(null!);
-  const imagesInputRef = useRef<HTMLInputElement>(null!);
+
+  // Read through a ref so `handleSubmit` does not have to be rebuilt whenever
+  // the caller passes a fresh inline arrow -- which is every render, since the
+  // callback closes over the router. Callers used to get a stale-identity
+  // dependency instead, and one of them shipped a second argument to a hook
+  // whose bundled signature still took one: `onSuccess` was then the string
+  // 'create', truthy, and calling it threw `onSuccess is not a function` on a
+  // club that had in fact been created. The typeof guard below is what makes
+  // that impossible rather than merely unlikely.
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
 
   const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >
+    ) => {
       const { name, value } = e.target;
 
       if (name.startsWith('social_')) {
-        const socialKey = name.replace('social_', '') as keyof typeof formData.socialLinks;
+        // Keyed off the type rather than `typeof formData.socialLinks`, which
+        // reads as a value reference to the linter and had it demanding
+        // `formData` as a dependency of a callback that never looks at it.
+        const socialKey = name.replace('social_', '') as keyof ClubSocialLinks;
         setFormData((prev) => ({
           ...prev,
           socialLinks: {
@@ -134,58 +150,6 @@ export function useCreateClubForm(
     [errors]
   );
 
-  const handleImagesChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-
-      if (formData.images.length + files.length > 10) {
-        setErrors((prev) => ({
-          ...prev,
-          images: 'Maximum 10 photos allowed',
-        }));
-        return;
-      }
-
-      const validFiles = files.filter((file) => {
-        const validation = validateImageFile(file);
-        if (!validation.valid) {
-          setErrors((prev) => ({
-            ...prev,
-            images: validation.error,
-          }));
-          return false;
-        }
-        return true;
-      });
-
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...validFiles],
-      }));
-
-      validFiles.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setImagePreviews((prev) => [...prev, reader.result as string]);
-        };
-        reader.readAsDataURL(file);
-      });
-
-      if (errors.images) {
-        setErrors((prev) => ({ ...prev, images: undefined }));
-      }
-    },
-    [formData.images.length, errors]
-  );
-
-  const removeImage = useCallback((index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
-    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
   const removeLogo = useCallback(() => {
     setFormData((prev) => ({ ...prev, logo: null }));
     setLogoPreview(null);
@@ -202,14 +166,18 @@ export function useCreateClubForm(
     setFormData((prev) => ({ ...prev, interests: slugs }));
   }, []);
 
+  const dismissGeneralError = useCallback(() => {
+    setErrors((prev) => ({ ...prev, general: undefined }));
+  }, []);
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
 
-      try {
-        setIsSubmitting(true);
+      setIsSubmitting(true);
+      let createdClubId: string | null = null;
 
-        // Validate form
+      try {
         const newErrors = await validateClubForm(formData, checkClubNameExists, mode);
         setErrors(newErrors);
 
@@ -217,14 +185,12 @@ export function useCreateClubForm(
           return;
         }
 
-        let createdClubId: string | null = null;
-
         if (mode === 'create') {
-          // The club is created first, then the logo, banners and links are
-          // attached to it — all three address /clubs/{id}, so they cannot go
-          // in the same request. If one of them fails the club still exists and
-          // the caller owns it, which is why the error below says so rather
-          // than implying nothing happened.
+          // The club is created first, then the logo and links are attached to
+          // it — both address /clubs/{id}, so they cannot go in the same
+          // request. If one of them fails the club still exists and the caller
+          // owns it, which is why the message below says so rather than
+          // implying nothing happened.
           const club = await createClubWithMedia(
             {
               name: formData.name,
@@ -234,7 +200,6 @@ export function useCreateClubForm(
             },
             {
               logo: formData.logo,
-              images: formData.images,
               socialLinks: formData.socialLinks,
             }
           );
@@ -251,26 +216,41 @@ export function useCreateClubForm(
           });
         }
 
-        // Reset form on success
         setFormData({ ...EMPTY_FORM });
         setLogoPreview(null);
-        setImagePreviews([]);
         setErrors({});
-
-        // Call success callback if provided
-        if (onSuccess) {
-          onSuccess(createdClubId);
-        }
       } catch (error) {
         console.error('Error creating club:', error);
-        const errorMessage =
-          error instanceof Error ? error.message : 'An error occurred while creating the club';
-        setErrors({ general: errorMessage });
+        // Through parseApiError, not error.message: ApiError carries the raw
+        // response body, so the message a user saw was a line of JSON. The
+        // fallback is per mode because the two failures are not the same
+        // event -- a proposal that fails created nothing, while a create that
+        // fails after the POST leaves a club the caller already owns.
+        setErrors({
+          general: parseApiError(
+            error,
+            mode === 'create'
+              ? "The club couldn't be created. Nothing was saved unless the club already appears under Manage — check there before trying again."
+              : "Your proposal couldn't be submitted. Nothing was saved, so try again.",
+          ),
+        });
+        return;
       } finally {
         setIsSubmitting(false);
       }
+
+      // Outside the try on purpose. This callback navigates, refreshes the
+      // managed-clubs list and revalidates a cache tag -- all after the write
+      // has succeeded. Inside the try, any one of them throwing was reported as
+      // `general`, so the form said the club could not be created while sitting
+      // on top of a club that had been. A failure here is a failure to *leave*
+      // the page, and the page it fails to leave is still correct.
+      const callback = onSuccessRef.current;
+      if (typeof callback === 'function') {
+        callback(createdClubId);
+      }
     },
-    [formData, mode, onSuccess]
+    [formData, mode]
   );
 
   return {
@@ -278,16 +258,13 @@ export function useCreateClubForm(
     errors,
     isSubmitting,
     logoPreview,
-    imagePreviews,
     logoInputRef,
-    imagesInputRef,
     handleInputChange,
     handleLogoChange,
-    handleImagesChange,
-    removeImage,
     removeLogo,
     handleSubmit,
     setCategory,
     setInterests,
+    dismissGeneralError,
   };
 }

@@ -4,7 +4,7 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `0065af8` for the `next.config.ts` sections (images, the
+**Code as of:** `4d11778` for the `next.config.ts` sections (images, the
 `/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 `verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test

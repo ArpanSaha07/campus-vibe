@@ -43,3 +43,20 @@ paths:
 - **`apiFetch` must not set `Content-Type` for a `FormData` body** — the header
   carries the multipart boundary and only the browser knows it. Set it and every
   `@RequestPart` arrives missing.
+- **Never call a success callback inside the `try` that wraps the write.**
+  Navigation, a context refresh and `revalidateTag` all run *after* the write
+  succeeded, so a throw there is caught by the write's own `catch` and the form
+  tells the user nothing was saved when it was. Call it past the
+  `try/finally`, through a ref, behind `typeof cb === 'function'`. (BUG-045)
+- **`ApiError.message` is the raw response body**, so rendering it shows the
+  user a line of JSON. Go through `parseApiError` (`app/lib/auth-errors.ts`).
+  (BUG-045)
+- **`.ticket-label` uppercases.** It is for printed labels — `DATE`, `URL`,
+  `REQUIRED` — never for a literal value: it rendered a club slug as
+  `QUANTUM-COMPUTING-SOCIETY` in a URL preview. Use `font-mono` alone for
+  values.
+- **A stale Turbopack dev bundle lies about the source.** It reported `Module
+  not found` for a file present on disk and in `HEAD`, and `onSuccess is not a
+  function` for a hook whose signature had changed — both while `npx tsc
+  --noEmit` and `npm run build` were clean. If an error contradicts the file in
+  front of you, restart `campusvibe-frontend` before debugging it. (BUG-045)
