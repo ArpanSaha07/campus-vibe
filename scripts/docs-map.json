@@ -206,6 +206,16 @@
         "scripts/verify.mjs",
         "backend/pom.xml"
       ]
+    },
+    "aws-handling.md": {
+      "reason": "The account it names, the deployed shape it describes, the S3 baseline a new bucket has to match, and the hook that enforces all of it",
+      "paths": [
+        "scripts/hooks/guard-aws.mjs",
+        "backend/src/main/java/com/campusvibe/s3/",
+        "backend/src/main/resources/application-prod.yml",
+        "docker/Dockerrun.aws.json",
+        "docker/EB-DEPLOYMENT.md"
+      ]
     }
   }
 }

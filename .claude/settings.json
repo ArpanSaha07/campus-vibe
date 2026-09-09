@@ -3,6 +3,9 @@
     "aws-core@claude-plugins-official": true
   },
   "autoMemoryEnabled": false,
+  "env": {
+    "AWS_PROFILE": "campusvibe-admin"
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -23,6 +26,16 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard-migrations.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__plugin_aws-core_aws-mcp__aws___run_script",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard-aws.mjs\"",
             "timeout": 10
           }
         ]

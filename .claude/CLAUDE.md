@@ -46,10 +46,11 @@ campusvibe/
 - **This file**, every session — the only one loaded unconditionally.
 - **[`STATUS.md`](STATUS.md)** — a `SessionStart` hook prints it with the last commits and
   the working tree. If it did not arrive, read it. Either way, do not open `todo.md` to orient.
-- **[`rules/`](rules/)** — six short path-scoped files (`backend-clubs`, `backend-java`,
-  `db-migrations`, `contracts`, `frontend`, `ci-and-build`) that load *when you read a
-  matching source file*. Every bullet cites the bug or ADR it came from; that is where the
-  traps are, so do not re-derive them.
+- **[`rules/`](rules/)** — seven short path-scoped files (`backend-clubs`, `backend-java`,
+  `db-migrations`, `contracts`, `frontend`, `ci-and-build`, `aws-handling`) that load *when
+  you read a matching source file*. Every bullet cites the bug or ADR it came from; that is
+  where the traps are, so do not re-derive them. `aws-handling` is the exception that also
+  binds work no file read announces — read it before the first AWS call of a session.
 - **Skills** load on `/name` or when the work matches their description.
 - `frontend/AGENTS.md` is written by `next dev`, not by us.
 

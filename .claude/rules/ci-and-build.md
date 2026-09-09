@@ -28,6 +28,10 @@ paths:
 - **`scripts/verify.mjs` mirrors `_frontend.yml` and `_backend.yml`.** Change a
   workflow and the script together — the moment they drift, local green stops
   meaning CI green, which is the only thing the script is for.
+- **The `hooks` component is the one deliberate exception to that mirror.**
+  `guard-aws.test.mjs` asserts a `PreToolUse` hook, which only ever runs in a
+  session on a developer's machine; a runner has none, so there is nothing for
+  a CI job to assert. It is not drift and it does not want a workflow.
 - **`ci.yml` gates pull requests, `branch-checks.yml` is the fast push loop, and
   `_*.yml` are reusable workflows that are never triggered directly.**
 - **`--no-verify` is not a workflow.** `0357b78` went around the pre-push hook
