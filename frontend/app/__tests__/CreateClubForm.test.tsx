@@ -50,11 +50,34 @@ jest.mock("@/app/hooks/useClubCategories", () => ({
 }));
 
 // Stubbed rather than rendered: it fetches the whole interest catalogue, and
-// nothing here is about interests. The heading is kept so a test can prove the
-// section is present on both paths.
+// nothing here is about interests — a change to the picker should not fail
+// nineteen tests about logos and required markers.
+//
+// It is NOT an inert stub, though. It takes `selected` and `onChange` and
+// drives them, because stubbing the picker away entirely would leave nothing
+// proving that a chosen interest reaches the payload: the form could drop them
+// silently and every other test here would still pass. The heading is kept so
+// a test can prove the section is present on both paths.
 jest.mock("@/app/components/profile/edit/InterestPicker", () => ({
   __esModule: true,
-  default: ({ title }: { title: string }) => <h2>{title}</h2>,
+  default: ({
+    title,
+    selected,
+    onChange,
+  }: {
+    title: string;
+    selected: string[];
+    onChange: (slugs: string[]) => void;
+  }) => (
+    <div>
+      <h2>{title}</h2>
+      {/* type=button, or clicking it would submit the form it sits in. */}
+      <button type="button" onClick={() => onChange([...selected, "chess"])}>
+        stub: add chess
+      </button>
+      <span data-testid="stub-selected">{selected.join(",")}</span>
+    </div>
+  ),
 }));
 
 const mockCreateClubWithMedia = jest.fn();
@@ -143,6 +166,69 @@ describe("CreateClubForm — which controls each path renders", () => {
     currentUser = user(Role.USER);
     render(<CreateClubForm />);
     expect(screen.getByRole("heading", { name: "What is this club about?" })).toBeInTheDocument();
+  });
+});
+
+describe("CreateClubForm — interests reach the payload", () => {
+  // What the picker is *for*. Everything else in this file could pass while the
+  // form quietly discarded every interest, because nothing else looks at them:
+  // they are not a field the user can read back, so a break here is invisible
+  // until a club is tagged with nothing and stops matching anyone.
+
+  it("holds what the picker reports and hands it back to it", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    expect(screen.getByTestId("stub-selected")).toHaveTextContent("");
+    await userEvent.click(screen.getByRole("button", { name: "stub: add chess" }));
+
+    // Round-tripped through the form's state rather than held by the picker.
+    expect(screen.getByTestId("stub-selected")).toHaveTextContent("chess");
+  });
+
+  it("sends them with a proposal", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.click(screen.getByRole("button", { name: "stub: add chess" }));
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    await waitFor(() => expect(mockProposeClub).toHaveBeenCalledTimes(1));
+    expect(mockProposeClub).toHaveBeenCalledWith(
+      expect.objectContaining({ interests: ["chess"] }),
+    );
+  });
+
+  it("sends them when an admin creates the club directly", async () => {
+    currentUser = user(Role.USER, Role.ADMIN);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Contact email/), "hello@yourclub.ca");
+    await userEvent.click(screen.getByRole("button", { name: "stub: add chess" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create club" }));
+
+    await waitFor(() => expect(mockCreateClubWithMedia).toHaveBeenCalledTimes(1));
+    // Two arguments: the club itself, then the media and links. Interests ride
+    // on the first, since they are part of what the club *is*.
+    expect(mockCreateClubWithMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ interests: ["chess"] }),
+      expect.anything(),
+    );
+  });
+
+  it("sends an empty list when nothing was picked", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    await waitFor(() => expect(mockProposeClub).toHaveBeenCalledTimes(1));
+    // An empty array, not undefined or a missing key: the backend caps the list
+    // rather than requiring one, and a null would not survive the JSON body.
+    expect(mockProposeClub).toHaveBeenCalledWith(expect.objectContaining({ interests: [] }));
   });
 });
 
@@ -249,6 +335,15 @@ describe("CreateClubForm — submitting as an admin", () => {
 });
 
 describe("CreateClubForm — how failures surface", () => {
+  // These tests reject on purpose, and the hook logs every failure it handles.
+  // Silenced here rather than suite-wide, so an unexpected console.error
+  // anywhere else still shows up in the run.
+  let logged: jest.SpyInstance;
+  beforeEach(() => {
+    logged = jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => logged.mockRestore());
+
   it("puts a submission failure in the toast, not above the form", async () => {
     currentUser = user(Role.USER);
     mockProposeClub.mockRejectedValue(new Error("The server is not accepting new clubs right now."));
@@ -311,6 +406,9 @@ describe("CreateClubForm — how failures surface", () => {
     expect(alert).toHaveTextContent(/Your club was created/i);
     expect(alert).toHaveTextContent(/under Manage/i);
     expect(alert).not.toHaveTextContent(/could not be created/i);
+    // And it is still logged, so the cause is recoverable from the console
+    // rather than being swallowed by the friendlier message.
+    expect(logged).toHaveBeenCalledWith("Error after creating club:", expect.any(Error));
   });
 
   it("tells a proposer their proposal landed even if the page could not finish", async () => {

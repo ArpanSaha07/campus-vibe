@@ -68,6 +68,17 @@ administrator listing, the `/manage/[clubId]` dashboard,
 invite/accept/decline/remove, ownership transfer, and the append-only activity
 log. The rest, in the spec's order:
 
+- [ ] **P3** **`InterestPicker` has no tests of its own.** It is used by both
+  the profile editor and the create-club form, and `CreateClubForm.test.tsx`
+  stubs it deliberately — the stub proves the *wiring* (a chosen slug reaches
+  the payload) and nothing about the picker's own behaviour. Worth covering:
+  a chosen pill leaves the lower grid rather than greying out in place; the
+  `max` cap disables adding without hiding anything; `capChoices` scrolls the
+  grid without changing which pills exist; and the four distinct empty states
+  it already distinguishes in code — still loading, failed to load, nothing
+  matched the filter, everything already added. The catalogue fetch needs
+  mocking, which is why this is its own unit rather than a rider.
+
 - [ ] **P1** **A proposal should carry the club's contact links.** Arpan,
   2026-09-09, reviewing the rebuilt create-club page: the propose path collects
   name, description, category, interests and a message, and drops the four

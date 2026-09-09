@@ -1,6 +1,6 @@
 # CampusVibe — status
 
-**Code as of:** `36729a9` · 2026-09-09 · branch `feature/club-governance`. The club ownership spine, the create-club page rebuild and the canvas review edits are all committed. Uncommitted: the first test coverage the form and the toast have ever had, and the defect that coverage found ([BUG-047](bugs/fixed_bugs.md#bug-047)).
+**Code as of:** `6964162` · 2026-09-09 · branch `feature/club-governance`. The club ownership spine, the create-club page rebuild, its review edits and its first test coverage are all committed. Uncommitted: four tests proving the interest picker's wiring, and the queue entry for the picker's own missing coverage.
 
 Where the project actually is. Orient from this, **not from
 [`todo.md`](TODO/todo.md)** — that is the full queue, this is the digest.
@@ -8,7 +8,7 @@ Where the project actually is. Orient from this, **not from
 
 ## Now (in order)
 
-1. **Review and commit the create-club tests** — verified, uncommitted, on top of `36729a9`. The first tests `CreateClubForm` and `Toast` have ever had, 27 of them, plus [BUG-047](bugs/fixed_bugs.md#bug-047), which they found on their first run: the BUG-045 fix had left a created club reported as nothing at all. Frontend suite is 209 tests, up from 182.
+1. **Review and commit the interests wiring tests** — verified, uncommitted, on top of `6964162`. `CreateClubForm.test.tsx` stubs `InterestPicker`, and the stub was inert: interests are the one field a user cannot read back off the form, so it could have discarded every one of them with the whole file still green. The stub now drives `selected` and `onChange`, and four tests pin that a chosen slug reaches the payload on both paths. Proved by breaking the wiring — three fail, and only those. Suite is 213.
 2. **P1 — a proposal should carry the club's contact links.** The next unit, and the decisions are already taken (Arpan, 2026-09-09): the four social links ship on `club_creation_requests` as one `social_links` column carried onto the club at approval; the **logo waits for the club editor**, because a proposal has no club id and no S3 key. Schema plus contract, so it goes through `/start` first — the write-up in [`todo.md`](TODO/todo.md) under Club governance carries the shape.
 3. **P0 — semantic-only search returns 0 results.** Embedding writes are proven fine; the fault is in `SearchRepository.hybridSearchEventIds`. Re-confirmed reproducing 2026-09-09 on clean `HEAD`, so it is the one red test in `verify --full` and is **not** caused by the club work ([BUG-001](bugs/bugs.md#bug-001)).
 4. **P0 — backend CI runs JDK 17 and skips tests.** `_backend.yml` is rewritten; no workflow in this repo has ever run on GitHub, so the fix is unverified ([BUG-002](bugs/bugs.md#bug-002)).
