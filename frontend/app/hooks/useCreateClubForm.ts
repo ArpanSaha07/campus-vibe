@@ -63,11 +63,14 @@ const EMPTY_FORM: ClubFormData = {
  * @param mode which creation path this form is on — see {@link ClubFormMode}.
  * @param onSuccess told what was created: the new club's id on the admin path,
  *   or null when a proposal was submitted and no club exists yet. The caller
- *   needs the difference to decide where to send the user.
+ *   needs the difference to decide where to send the user. It is awaited, and
+ *   a rejection is surfaced as its own message rather than as a failed write —
+ *   the typing says `Promise<void>` because every caller so far is async and
+ *   dropping that promise is what BUG-047 was.
  */
 export function useCreateClubForm(
   mode: ClubFormMode = 'create',
-  onSuccess?: (createdClubId: string | null) => void
+  onSuccess?: (createdClubId: string | null) => void | Promise<void>
 ): UseCreateClubFormReturn {
   const [formData, setFormData] = useState<ClubFormData>({ ...EMPTY_FORM });
 
@@ -239,15 +242,32 @@ export function useCreateClubForm(
         setIsSubmitting(false);
       }
 
-      // Outside the try on purpose. This callback navigates, refreshes the
-      // managed-clubs list and revalidates a cache tag -- all after the write
-      // has succeeded. Inside the try, any one of them throwing was reported as
-      // `general`, so the form said the club could not be created while sitting
-      // on top of a club that had been. A failure here is a failure to *leave*
-      // the page, and the page it fails to leave is still correct.
+      // Outside the write's own try on purpose. This callback navigates,
+      // refreshes the managed-clubs list and revalidates a cache tag -- all
+      // after the write has succeeded. Sharing the write's catch was BUG-045:
+      // the form said the club could not be created while sitting on top of a
+      // club that had been.
+      //
+      // But it needs a catch of its own. The callback is async, so simply
+      // calling it drops the promise: a rejection became an unhandled rejection
+      // and the user was left on a form this function had already blanked, with
+      // nothing said at all -- the silent reset the rebuild set out to remove,
+      // reintroduced through the back door. Awaiting it here means the failure
+      // is reported as what it is, which is different from the write failing:
+      // the club exists and the caller owns it. (BUG-047)
       const callback = onSuccessRef.current;
       if (typeof callback === 'function') {
-        callback(createdClubId);
+        try {
+          await callback(createdClubId);
+        } catch (error) {
+          console.error('Error after creating club:', error);
+          setErrors({
+            general:
+              createdClubId === null
+                ? 'Your proposal was submitted, but this page could not finish updating. Reload to see where it got to.'
+                : 'Your club was created, but we could not open its dashboard. You will find it under Manage.',
+          });
+        }
       }
     },
     [formData, mode]

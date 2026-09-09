@@ -6,6 +6,7 @@ Last updated: **2026-09-09**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-047](#bug-047) | Medium | 2026-09-09 | The fix for BUG-045 left the other half silent: the success callback's promise was dropped, so a club was created and the user was told nothing |
 | [BUG-045](#bug-045) | Medium | 2026-09-09 | A club that was created reported itself as not created: the success callback ran inside the try that wrapped the write |
 | [BUG-046](#bug-046) | Low | 2026-09-09 | Every `select` in the app was a plain pill — `selectClasses` reserved the chevron's space and position but never supplied the image |
 | [BUG-041](#bug-041) | High | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the clubs it was written to replace, so every seeded club had a NULL embedding |
@@ -36,6 +37,35 @@ Last updated: **2026-09-09**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-047
+**A club was created and the user was told nothing** · Medium · FIXED 2026-09-09
+
+The other half of [BUG-045](#bug-045), and introduced by its fix. Moving the
+success callback out of the write's `try` stopped the form claiming the club
+could not be created — but the callback is `async`, and it was called without
+`await`, so its promise was dropped on the floor.
+
+A rejection inside it therefore became an **unhandled promise rejection**:
+nothing caught it, nothing rendered, and `handleSubmit` had already blanked the
+form on the line above. The user pressed *Create club*, the club was written,
+the navigation failed, and they were left looking at an empty form with no
+message — the silent reset the whole rebuild set out to remove, reintroduced
+through the back door one commit later.
+
+**Found by a test, not by hand.** Writing coverage for the form surfaced it
+immediately: asserting that no create-failure alert appears made Jest report
+`revalidation exploded` as an unhandled rejection instead. Both hand checks
+before that had exercised the happy path, where the callback never rejects.
+
+Fixed by awaiting the callback inside a `catch` of its own, and saying
+something true rather than nothing: *Your club was created, but we could not
+open its dashboard. You will find it under Manage.* — with a different sentence
+on the proposal path, where no club exists and there is nothing under Manage to
+point at. `onSuccess` is now typed `void | Promise<void>` so the promise cannot
+be dropped silently again.
 
 ---
 

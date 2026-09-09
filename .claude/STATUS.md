@@ -1,6 +1,6 @@
 # CampusVibe — status
 
-**Code as of:** `4e61ad0` · 2026-09-09 · branch `feature/club-governance`. The club ownership spine and the create-club page rebuild are both committed. Uncommitted: three copy and visibility edits pulled back from the design canvas, plus their write-ups — 3 files.
+**Code as of:** `36729a9` · 2026-09-09 · branch `feature/club-governance`. The club ownership spine, the create-club page rebuild and the canvas review edits are all committed. Uncommitted: the first test coverage the form and the toast have ever had, and the defect that coverage found ([BUG-047](bugs/fixed_bugs.md#bug-047)).
 
 Where the project actually is. Orient from this, **not from
 [`todo.md`](TODO/todo.md)** — that is the full queue, this is the digest.
@@ -8,7 +8,7 @@ Where the project actually is. Orient from this, **not from
 
 ## Now (in order)
 
-1. **Review and commit the create-club review edits** — small and verified, sitting uncommitted on top of `4e61ad0`. Three edits Arpan made on the design canvas and asked to be pulled across: the reviewer is named as *the platform administrator*, the interest line drops *Pick up to eight* (`max` enforces it and `InterestPicker` says so at the limit), and the URL preview is now admin-only. Also a note on [`user-profiles.md`](docs/architecture/user-profiles.md) explaining why its stamp was **not** advanced.
+1. **Review and commit the create-club tests** — verified, uncommitted, on top of `36729a9`. The first tests `CreateClubForm` and `Toast` have ever had, 27 of them, plus [BUG-047](bugs/fixed_bugs.md#bug-047), which they found on their first run: the BUG-045 fix had left a created club reported as nothing at all. Frontend suite is 209 tests, up from 182.
 2. **P1 — a proposal should carry the club's contact links.** The next unit, and the decisions are already taken (Arpan, 2026-09-09): the four social links ship on `club_creation_requests` as one `social_links` column carried onto the club at approval; the **logo waits for the club editor**, because a proposal has no club id and no S3 key. Schema plus contract, so it goes through `/start` first — the write-up in [`todo.md`](TODO/todo.md) under Club governance carries the shape.
 3. **P0 — semantic-only search returns 0 results.** Embedding writes are proven fine; the fault is in `SearchRepository.hybridSearchEventIds`. Re-confirmed reproducing 2026-09-09 on clean `HEAD`, so it is the one red test in `verify --full` and is **not** caused by the club work ([BUG-001](bugs/bugs.md#bug-001)).
 4. **P0 — backend CI runs JDK 17 and skips tests.** `_backend.yml` is rewritten; no workflow in this repo has ever run on GitHub, so the fix is unverified ([BUG-002](bugs/bugs.md#bug-002)).
@@ -32,8 +32,9 @@ Where the project actually is. Orient from this, **not from
 - **`ClubService.create` no longer exists** — `createOwnedBy` is the only way to make a club, and a null owner means born ownerless, which only the dev seeder may pass ([ADR-004](docs/decisions/ADR-004-two-paths-create-a-club.md)); [`rules/backend-clubs.md`](rules/backend-clubs.md).
 - **A stored S3 key is not a URL, and `next/image` throws on one *during render*** — no `onError` can catch it, so one bad row takes a whole page down ([BUG-040](bugs/fixed_bugs.md#bug-040)); [`rules/frontend.md`](rules/frontend.md).
 - **A deviation recorded as fixed is one nobody re-checks.** `DevDataSeeder` never ran for three weeks because a skill file credited a migration that does not exist ([BUG-041](bugs/fixed_bugs.md#bug-041)); [`rules/db-migrations.md`](rules/db-migrations.md).
-- **Bug ids have now collided twice.** Grep *both* `bugs.md` and `fixed_bugs.md` for the next free id before filing — `BUG-038` was issued to two different bugs, and the open one is now `BUG-044`. **Highest issued: BUG-046.**
+- **Bug ids have now collided twice.** Grep *both* `bugs.md` and `fixed_bugs.md` for the next free id before filing — `BUG-038` was issued to two different bugs, and the open one is now `BUG-044`. **Highest issued: BUG-047.**
 - **A success callback belongs outside the `try` that wraps the write.** Navigation, a context refresh and `revalidateTag` all run after the write succeeded, so a throw there was caught by the write's own `catch` and the form claimed the club had not been created when it had ([BUG-045](bugs/fixed_bugs.md#bug-045)); [`rules/frontend.md`](rules/frontend.md).
+- **Moving it out is only half of it — `await` it in a `catch` of its own.** These callbacks are async, so calling one without awaiting drops the promise: the club was created, the form had already blanked itself, and the user was told nothing ([BUG-047](bugs/fixed_bugs.md#bug-047)); [`rules/frontend.md`](rules/frontend.md).
 - **A stale Turbopack dev bundle reports errors that contradict the file on disk** — a `Module not found` for a committed file, and a signature mismatch from a hook that had already changed, both while `tsc` and `npm run build` were clean. Restart `campusvibe-frontend` before debugging ([BUG-045](bugs/fixed_bugs.md#bug-045)); [`rules/frontend.md`](rules/frontend.md).
 - Widening a signature leaves call sites and tests behind, and javac stops at the first phase so a `testCompile` break hides ([BUG-036](bugs/fixed_bugs.md#bug-036)); [`rules/backend-java.md`](rules/backend-java.md).
 - The Tomcat CVE lever is `<tomcat.version>` in `backend/pom.xml`, not a parent bump ([BUG-035](bugs/fixed_bugs.md#bug-035), [ADR-003](docs/decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md)); [`rules/ci-and-build.md`](rules/ci-and-build.md).

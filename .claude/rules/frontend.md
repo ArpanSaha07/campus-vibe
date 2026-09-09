@@ -48,6 +48,11 @@ paths:
   succeeded, so a throw there is caught by the write's own `catch` and the form
   tells the user nothing was saved when it was. Call it past the
   `try/finally`, through a ref, behind `typeof cb === 'function'`. (BUG-045)
+- **Then `await` it, in a `catch` of its own.** Moving it out is only half the
+  fix: these callbacks are `async`, so calling one without awaiting drops the
+  promise and a rejection becomes an unhandled rejection — the form has already
+  blanked itself and says nothing at all. Report it as its own outcome, which
+  is not the write failing: the row exists and the caller owns it. (BUG-047)
 - **`ApiError.message` is the raw response body**, so rendering it shows the
   user a line of JSON. Go through `parseApiError` (`app/lib/auth-errors.ts`).
   (BUG-045)
