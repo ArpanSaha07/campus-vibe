@@ -1,17 +1,19 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-07** · Branch: `develop`
+Last updated: **2026-09-09** · Branch: `feature/club-governance`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05).
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041 (2026-09-09).
 
 | ID | Severity | Summary |
 |---|---|---|
-| [BUG-039](#bug-039) | High | Image uploads let the caller name the S3 object, and validate nothing about it |
-| [BUG-038](#bug-038) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **reproducing again as of 2026-08-20** |
+| [BUG-039](#bug-039) | High | Image uploads let the caller name the S3 object, and validate nothing about it — **now reachable, not latent** |
+| [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
+| [BUG-042](#bug-042) | Medium | Event banners and profile avatars have no read path, so an uploaded one can never be displayed |
+| [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **still reproducing, re-confirmed 2026-09-09** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -355,10 +357,10 @@ nothing for Vercel — nor the reverse.
 
 ---
 
-### BUG-038
+### BUG-044
 **`Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted** · High · OPEN
 
-*Renumbered from BUG-023 on 2026-09-06. That id was already taken by the event-detail-page bug in [`fixed_bugs.md`](fixed_bugs.md#bug-023), so for three weeks two different bugs shared it, against the never-reuse rule at the top of this file.*
+*Renumbered twice, and the second time for the same reason as the first. It was BUG-023 until 2026-09-06, when that id turned out to be taken by the event-detail-page bug in [`fixed_bugs.md`](fixed_bugs.md#bug-023); it became BUG-038, and on 2026-09-08 the Docker smoke-test bug was filed as BUG-038 too. Renumbered to 044 on 2026-09-09. The open entry moves rather than the fixed one, so historical records in `tasks-completed.md` and the `STATUS.md` shipped log keep the id they were written with. **Before filing a bug, grep both files for the next free id** — the highest id in either, not the highest in one.*
 
 **Found:** 2026-08-13, while fixing [BUG-022](fixed_bugs.md#bug-022) on PR #27. That
 bug is this one, already detonated, on a different entity.
@@ -477,13 +479,20 @@ the cap is loose rather than absent). And a `..` in a filename is not traversal:
 S3 keys are opaque strings, the `clubs/{id}/` prefix is still prepended
 literally, so prefix-scoped IAM and lifecycle rules are not evaded.
 
-**Why it is High when nothing is broken today.** Like
-[BUG-038](#bug-038) this is mostly armed rather than fired, and for the same
-reason it is not a note. Nothing serves this media back yet — `S3Service.getObject`
-(`S3Service.java:30`) has no caller anywhere in the codebase. The two items at the
-top of [`STATUS.md`](../STATUS.md) are both about wiring exactly that read path.
-The moment one lands, every missing control goes live at once, on top of keys
-that are already accumulating in S3 and in the database and would need migrating.
+**No longer armed — fired.** This entry used to say that nothing served the
+media back, that `S3Service.getObject` had no caller anywhere, and that every
+missing control would go live at once the moment a read path landed. **That
+happened on 2026-09-09** ([BUG-040](fixed_bugs.md#bug-040)): the club create form
+now uploads, and `GET /clubs/{id}/logo` and `/images/{index}` serve the bytes
+back. Every control listed above is now missing on a live path, on top of keys
+that are already in S3 and in the database and would need migrating.
+
+Two of the consequences were closed at the read end rather than the write end,
+and they are mitigations, not the fix: an uploaded SVG is served
+`application/octet-stream` with `nosniff` so it cannot execute on the API's
+origin, and images are addressed by *index* so no caller can name an object key.
+The caller still names the object on upload, still overwrites silently on a
+repeated filename, and nothing checks that the bytes are an image at all.
 An unvalidated SVG or HTML byte stream stored today becomes a stored-XSS question
 the day it is served inline.
 
@@ -494,3 +503,50 @@ presigned uploads is one piece of work; doing it separately means touching the
 same three endpoints twice. Write the ADR before either. The narrow version —
 stop the caller naming the object, keep direct byte upload — is a much smaller
 change and would close 1, 2 and 4 on its own.
+
+---
+
+### BUG-042
+**Event banners and profile avatars have no read path** · Medium · OPEN
+
+**Found:** 2026-09-09, while building the club media read path for
+[BUG-040](fixed_bugs.md#bug-040).
+
+`EventController` stores an S3 object key in `events.images` exactly as
+`ClubController` did for `clubs.logo`, and `ProfileAvatar` notes there is no
+upload anywhere for avatars. Clubs now have `GET /clubs/{id}/logo` and
+`/images/{index}`; **events and avatars have nothing**, so an uploaded event
+banner could never be displayed.
+
+Latent today for the same reason BUG-040 was latent until this week: no UI
+uploads an event image yet (the unwired `POST /events/{id}/images` is the P2
+under Frontend / Features). It stops being latent the moment that is wired.
+
+**The shape when it is built** is the club one, and should not be reinvented:
+index addressing so no caller names an object key, raster-only content types
+with `nosniff` so an uploaded SVG cannot execute, and the same `/media/**`
+rewrite. Replacing all of it with presigned or CDN URLs is an ADR, not a
+per-feature choice — see [`s3-media/SKILL.md`](../skills/s3-media/SKILL.md).
+
+---
+
+### BUG-043
+**A club cannot be edited after creation, so late media has no route in** · Low · OPEN
+
+**Found:** 2026-09-09, wiring the club create form's uploads.
+
+`/manage/[clubId]` has no club-details editor: there is no `updateClub` anywhere
+in the frontend, and no logo or banner control outside the create form. So the
+club-governance work's own promise — *the requester adds images from
+`/manage/[clubId]` once approval makes them the owner* — has no screen behind it.
+A user who proposes a club and is approved owns it and still cannot give it a
+logo.
+
+The endpoints all exist and are reachable by the owner (`PUT /clubs/{id}`,
+`POST /clubs/{id}/logo`, `POST /clubs/{id}/images`); only the UI is missing. It
+overlaps the three taxonomy items in [`todo.md`](../TODO/todo.md) that want the
+same editor for category and tags.
+
+Note also that uploading outside the create flow does not invalidate the
+five-minute `clubs` cache — whatever builds this screen should call
+`revalidateClubs` the way the create form does.

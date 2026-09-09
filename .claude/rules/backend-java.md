@@ -16,7 +16,7 @@ Kept deliberately short: this loads on every backend Java read.
   `@Getter(AccessLevel.NONE)` plus an unmodifiable view plus an `addX` mutator,
   as in `User.java:59-118`. **Do not accept Copilot Autofix on CodeQL alerts 14
   and 15** (`Club.java:44`, `Event.java:48`): it returns a defensive copy, and
-  every write to that copy is then lost. (BUG-038, open)
+  every write to that copy is then lost. (BUG-044, open)
 - **Changed a signature or a record component?** Grep for callers *and* for
   `src/test` before you build. javac stops at the first failing phase, so a
   broken `default-testCompile` hides behind a `default-compile` error and CI

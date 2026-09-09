@@ -71,6 +71,27 @@ export async function getManagedClub(clubId: string): Promise<ManagedClub> {
  * A club's management team. Readable by anyone on it, and by platform admins;
  * 403 for everyone else.
  */
+/**
+ * Sets or clears a club's official email address. **Platform admins only** —
+ * the backend guards this with `hasRole('ADMIN')`, not `isClubOwner`, because
+ * the address is how a club is recovered and the people currently running it
+ * are precisely who must not be able to change it.
+ *
+ * Pass null to clear. Setting an address always leaves it *unverified*:
+ * verified means somebody redeemed a link mailed to that address, and an admin
+ * typing it is not that (ADR-006). The round trip ships with SES.
+ */
+export async function setClubOfficialEmail(
+  clubId: string,
+  officialEmail: string | null,
+): Promise<ManagedClub> {
+  return apiFetch<ManagedClub>(`/api/v1/clubs/${encodeURIComponent(clubId)}/official-email`, {
+    method: "PATCH",
+    body: JSON.stringify({ officialEmail }),
+    auth: true,
+  });
+}
+
 export async function listClubAdmins(clubId: string): Promise<ClubAdmin[]> {
   return apiFetch<ClubAdmin[]>(`/api/v1/clubs/${encodeURIComponent(clubId)}/admins`, {
     auth: true,

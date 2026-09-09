@@ -1,6 +1,6 @@
 import { ApiError, apiFetch } from "@/app/lib/api";
 import { toClub } from "@/app/lib/adapters";
-import type { ApiClub, Club } from "@/app/types";
+import type { ApiClub, Club, ClubSocialLinks } from "@/app/types";
 
 /**
  * Creating a club.
@@ -11,8 +11,9 @@ import type { ApiClub, Club } from "@/app/types";
  * were 404s. Club creation has never worked from the UI. It now goes through
  * `apiFetch` to the real backend, like every other domain module.
  *
- * The multipart half is not here, and that is not an oversight. See
- * `createClub` below.
+ * The multipart half lives here too, as of the club-governance work: a club is
+ * now born with an owner, so the caller of `createClub` can immediately upload
+ * to it. See `uploadClubLogo` and `uploadClubImages`.
  */
 
 /**
@@ -39,10 +40,11 @@ export function clubSlug(name: string): string {
  * Deliberately uncached: this runs as somebody types, and a stale yes would let
  * two people both believe a name was free.
  *
- * A network failure resolves to `false` rather than throwing. Blocking a form on
- * an availability check that could not run would be worse than letting it
- * through: the backend answers 409 on the real create, which is the check that
- * actually decides.
+ * Only a 404 means free. Any other failure rethrows, because answering `false`
+ * to a request that never completed is a false negative: it tells the user the
+ * name is available, and the real create then fails with a 409 they have no way
+ * to have predicted. The caller decides what to do with an availability check
+ * that could not run; it must not be silently reported as a yes.
  */
 export async function checkClubNameExists(clubName: string): Promise<boolean> {
   const slug = clubSlug(clubName);
@@ -53,7 +55,7 @@ export async function checkClubNameExists(clubName: string): Promise<boolean> {
     return true;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return false;
-    return false;
+    throw error;
   }
 }
 
@@ -67,19 +69,18 @@ export interface NewClub {
 }
 
 /**
- * Creates the club and returns it.
+ * Creates the club and returns it. **Platform admins only** — `POST
+ * /api/v1/clubs` requires `hasRole('ADMIN')` since ADR-004. An ordinary user
+ * proposes instead, through `app/lib/club-creation-requests.ts`.
  *
- * <strong>Logo, banner images and social links are not sent, and cannot be.</strong>
- * All three are written by endpoints guarded by `canManageClub`, and creating a
- * club does not make you its owner — ownership arrives only when a platform
- * admin approves a club-admin request. So a creator who tried to upload a logo
- * in the same breath would get a 403.
+ * The creating admin becomes the club's owner in the same transaction, so the
+ * logo, banner and social-link calls below can follow immediately without a
+ * 403. That was the P0 this closed: the form used to collect all three and say
+ * it could not send them.
  *
- * Silently dropping the files the form collected would be worse than not
- * offering them, so the caller is told; see the club-creation items in
- * `todo.md`. Category and interests ride on the create request itself for
- * exactly this reason — they are the only descriptive fields a creator can
- * actually set.
+ * They are separate calls rather than one payload because the backend takes
+ * them separately — images are multipart against `{id}/logo` and `{id}/images`,
+ * social links are a `PUT` on the club. `createClubWithMedia` chains them.
  */
 export async function createClub(club: NewClub): Promise<Club> {
   const created = await apiFetch<ApiClub>("/api/v1/clubs", {
@@ -94,4 +95,86 @@ export async function createClub(club: NewClub): Promise<Club> {
     auth: true,
   });
   return toClub(created);
+}
+
+/**
+ * A club's logo. Multipart, part name `file`, matching
+ * `ClubController.uploadLogo`.
+ *
+ * Requires `canManageClub`, which the creating admin now passes by assignment
+ * as well as by the platform-admin bypass.
+ */
+export async function uploadClubLogo(clubId: string, file: File): Promise<void> {
+  const body = new FormData();
+  body.append("file", file);
+  await apiFetch<void>(`/api/v1/clubs/${encodeURIComponent(clubId)}/logo`, {
+    method: "POST",
+    body,
+    auth: true,
+  });
+}
+
+/** A club's banner images. Multipart, part name `files`, sent in one request. */
+export async function uploadClubImages(clubId: string, files: File[]): Promise<void> {
+  if (files.length === 0) return;
+  const body = new FormData();
+  files.forEach((file) => body.append("files", file));
+  await apiFetch<void>(`/api/v1/clubs/${encodeURIComponent(clubId)}/images`, {
+    method: "POST",
+    body,
+    auth: true,
+  });
+}
+
+/**
+ * The club's public contact links.
+ *
+ * Stored as a JSON *string* in one column rather than as columns, which is why
+ * this stringifies rather than sending an object — see `Club.socialLinks`.
+ */
+export async function updateClubSocialLinks(
+  clubId: string,
+  socialLinks: ClubSocialLinks,
+): Promise<Club> {
+  const updated = await apiFetch<ApiClub>(`/api/v1/clubs/${encodeURIComponent(clubId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ socialLinks: JSON.stringify(socialLinks) }),
+    auth: true,
+  });
+  return toClub(updated);
+}
+
+export interface ClubMedia {
+  logo: File | null;
+  images: File[];
+  socialLinks: ClubSocialLinks;
+}
+
+/**
+ * Creates a club and then attaches everything that needs a club id to exist.
+ *
+ * Sequential on purpose: all three follow-ups address `/clubs/{id}`, so the
+ * club has to be there first. Each is awaited rather than fired in parallel so
+ * that a failure names which step failed — a caller told only "upload failed"
+ * cannot say whether the club was created.
+ *
+ * **The club is created even if a follow-up throws.** That is the honest
+ * outcome rather than a bug to paper over: the row exists and the caller now
+ * owns it, so the recovery is to finish the job from `/manage/[clubId]`, not to
+ * delete a club somebody may already have seen. Callers should say so.
+ */
+export async function createClubWithMedia(club: NewClub, media: ClubMedia): Promise<Club> {
+  const created = await createClub(club);
+
+  if (media.logo) {
+    await uploadClubLogo(created.clubId, media.logo);
+  }
+  if (media.images.length > 0) {
+    await uploadClubImages(created.clubId, media.images);
+  }
+  if (Object.values(media.socialLinks).some((v) => v && v.trim() !== "")) {
+    await updateClubSocialLinks(created.clubId, media.socialLinks);
+  }
+
+  return created;
 }

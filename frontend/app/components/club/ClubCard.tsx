@@ -20,7 +20,7 @@ export default function ClubProfileComponent({ club }: { club: Club }) {
       </Link>
 
       {/* Name + Followers */}
-      <div className="text-center mt-4 mb-8">
+      <div className="text-center mt-4 mb-6">
         <Link href={`/clubs/${club.clubId}`}>
           <h3 className="font-semibold text-ink-900 hover:text-lavender-800">{club.name}</h3>
         </Link>

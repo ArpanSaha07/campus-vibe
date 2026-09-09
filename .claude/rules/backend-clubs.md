@@ -13,7 +13,7 @@ paths:
   `saveAndFlush` take the `em.merge()` branch and return a **different** managed
   instance. The object you passed in stays detached. (BUG-037, ADR-002)
 - **Set every field before the write, then use only the returned instance.**
-  `ClubService.java:51-73`. Tagging `club` after `saveAndFlush` writes to the
+  `ClubService.java:86-118`. Tagging `club` after `saveAndFlush` writes to the
   detached copy and persists nothing — that is exactly what BUG-037 was.
 - **`saveAndFlush`, never `save`.** `indexClub` writes the embedding through
   `JdbcTemplate`, which is not a JPA query: it triggers no flush and checks no
@@ -21,14 +21,30 @@ paths:
 - **`Event.id` is `IDENTITY`** (`Event.java:21-23`), so `EventService` takes the
   `persist()` branch. It reads almost identically and behaves oppositely — it is
   not evidence that this pattern is safe. (BUG-034)
-- **`create(Club, String category, List<String> interests)`.** A null category
-  and an empty interest list are legitimate; that is how pre-V23 clubs seed.
-  `DevDataSeeder.java:68` is a caller and was missed once already. (BUG-036)
-- **`MAX_CLUB_INTERESTS = 8` is load-bearing** (`ClubService.java:24`). An
+- **`createOwnedBy(Club, category, interests, User owner, User createdBy)` is
+  the only way to create a club.** `create` was deleted, not kept beside it, so
+  no path can produce an ownerless club (ADR-004). A null category and an empty
+  interest list are still legitimate; that is how pre-V23 clubs seed.
+  `DevDataSeeder` is a caller and was missed once already (BUG-036).
+- **A null `owner` means born ownerless, and only the dev seeder may pass it.**
+  It leaves two demo clubs unowned so the club-admin claim queue has something
+  to act on locally. Nothing reachable from an HTTP request may pass null.
+- **The owner assignment is written against the instance `saveAndFlush`
+  returned**, never the argument — same reason as the tagging rule above.
+- **`MAX_CLUB_INTERESTS = 8` is load-bearing** (`ClubService.java:30`). An
   uncapped tag list matches every student and degrades everyone's results.
 - **In `update`, clear and refill `interestSlugs` — never reassign it**
-  (`ClubService.java:77-104`). Swapping the `PersistentSet` out makes Hibernate
+  (`ClubService.java:128-155`). Swapping the `PersistentSet` out makes Hibernate
   delete and reinsert every row. Re-index *after* the tags change, not before.
 - **Three vocabularies, and events get no category at all** — ADR-001.
+- **`clubs.logo` and `club_images.url` hold an S3 object *key*, not a URL.**
+  They are read back through `GET /clubs/{id}/logo` and `/images/{index}`, which
+  address by index precisely so no caller can name an arbitrary object. A key
+  that reaches `next/image` throws during render and takes the page down.
+  (BUG-040)
+- **`DevDataSeeder` is idempotent per club, not wholesale.** It skipped for
+  months because V6 had already inserted eight clubs, so it had never run and
+  every seeded club had a null embedding. V32 retires those rows; do not restore
+  a `count() > 0` guard. (BUG-041)
 - **The `Persistable` fix is proposed in ADR-002 and not yet decided.** It
   changes the write path for every club, so it is never a rider on another fix.

@@ -51,6 +51,28 @@ implemented, and the reference does not say so.
 - **There is no presigning at all.** `S3Service.java` has exactly two methods,
   `putObject` (`:22`) and `getObject` (`:30`), both moving raw bytes through the
   backend. Every presigned-URL rule above describes work that has not started.
+- **Reading is done by streaming through the API, and only for clubs.**
+  `GET /api/v1/clubs/{id}/logo` and `/images/{index}`
+  (`ClubController.java:125`, `:142`) are the only read path that exists;
+  `getObject` had no caller at all before 2026-09-09. Chosen over presigned or
+  public URLs because `FakeS3` cannot presign and no bucket or CDN is
+  provisioned to be public with — Arpan, 2026-09-09. **Event banners and
+  profile avatars still have none**, so an uploaded event image cannot be
+  displayed.
+- **Images are addressed by index, never by key.** An endpoint that took a key
+  from the caller would fetch any object in the bucket it was pointed at. The
+  index is resolved against that club's own list.
+- **An uploaded SVG is never served as `image/svg+xml`.** `imageTypeOf`
+  (`ClubController.java:192`) names raster types only and falls back to
+  `application/octet-stream`, with `nosniff`. Nothing validates uploads
+  ([BUG-039](../../bugs/bugs.md#bug-039)), and an SVG is a document that can
+  carry script — serving one as an image would execute it on the API's origin.
+  Do not "fix" this by adding svg to that map.
+- **A stored key is not a URL, and the frontend must never render one.** That is
+  what [BUG-040](../../bugs/fixed_bugs.md#bug-040) was: the key reached
+  `next/image`, which throws at render time rather than failing to load, so the
+  page came down. `adapters.ts` maps keys onto `/media/...` and
+  `next.config.ts` rewrites that to the API.
 - **`aws.s3.mock` swaps the client.** True by default, so `S3Config.java:18-26`
   hands back `FakeS3`, which writes to `~/.arpan/s3` on the local disk
   (`FakeS3.java:24`, carrying its own TODO about Windows). `application-prod.yml`
@@ -75,3 +97,9 @@ once, and existing rows would need a backfill. Ask Arpan, and write an ADR
 rather than a rider on another feature. Stopping the caller naming the object,
 while keeping direct byte upload, is the much narrower fix and closes most of
 [BUG-039](../../bugs/bugs.md#bug-039) on its own.
+
+**Building the missing event and avatar read paths** should follow the club one
+above rather than inventing a second shape — same index addressing, same
+content-type restriction, same `/media/**` rewrite. If that ever stops scaling,
+the replacement is presigned or CDN URLs for *all* media at once, which is an
+ADR, not a per-feature choice.

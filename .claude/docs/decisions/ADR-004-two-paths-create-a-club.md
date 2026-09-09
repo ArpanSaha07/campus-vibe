@@ -6,7 +6,7 @@
 the spec for the club-governance unit of work. No meeting; `.claude/team/` was
 removed in `cef6a07`. Decisions taken by Arpan across four rounds on 2026-09-08.
 **Approved by:** — (pending)
-**Implemented in:** — (added when the work lands)
+**Implemented in:** `ClubController.create`, `ClubService.createOwnedBy`, `clubadmin/ClubCreationRequest*` — shipped 2026-09-09, verified in `ClubCreationFlowIT`.
 
 ## Context
 

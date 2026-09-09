@@ -2,10 +2,12 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-08**
+Last updated: **2026-09-09**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-041](#bug-041) | High | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the clubs it was written to replace, so every seeded club had a NULL embedding |
+| [BUG-040](#bug-040) | High | 2026-09-09 | An uploaded club logo took the whole `/clubs` page down — `next/image` throws on an S3 object key, during render, where `onError` cannot catch it |
 | [BUG-038](#bug-038) | Blocker | 2026-09-08 | A deleted endpoint turned the Docker API smoke test into a 404 assertion, blocking every merge to `main` |
 | [BUG-037](#bug-037) | High | 2026-09-05 | A club's category and interests were discarded at creation: `saveAndFlush` returned a different instance from the one being tagged |
 | [BUG-036](#bug-036) | Blocker | 2026-09-05 | Backend CI stopped compiling — the `feature/user-profile` merge changed two signatures and left two call sites behind |
@@ -32,6 +34,105 @@ Last updated: **2026-09-08**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-041
+**`DevDataSeeder` had never once run, so every seeded club had a NULL embedding** · High · FIXED 2026-09-09
+
+**Found:** 2026-09-09, doing the `docker compose down -v && up` step of the
+club-governance verification — a cold start printed `Dev seed: 8 club(s) already
+present; skipping`, which on an empty database it should not have been able to.
+
+**What was wrong.** `DevDataSeeder` was written on 2026-08-16 to replace
+`V6__insert_mock_clubs.sql`, for two stated reasons: Flyway runs everywhere, so
+production would ship fake clubs; and a raw `INSERT` bypasses the service layer,
+leaving `clubs.embedding` NULL because it is written by `SearchIndexService` as a
+side effect of the normal create path. **The replacement half never happened.**
+No migration ever removed V6's rows, so on every cold start V6 inserted its eight
+clubs and the seeder's guard — *skip if any club exists* — then tripped.
+
+Measured on the cold start: eight clubs, `count(*) FILTER (WHERE embedding IS
+NULL)` = 8. The seeder existed for months, was covered by nothing, and did
+nothing.
+
+**Why nobody noticed.** `database-lifecycle/SKILL.md`'s known-deviations table
+recorded the row as *Retired 2026-08-16 by `V12__remove_mock_club_seed_data.sql`*.
+There is no such file — V12 is `create_club_admin_assignments`. A deviation
+recorded as fixed is one nobody re-checks, which is the general lesson worth more
+than the specific bug.
+
+**The fix.** `V32__retire_mock_club_seed_data.sql` deletes the eight, and the
+seeder's guard became **per club** rather than wholesale, so the two cannot fight
+on a database where one was kept. V32 spares any club that has events or
+assignments attached: `events.organizer_id` and `club_images.club_id` both
+`ON DELETE CASCADE`, so an unqualified delete would destroy a developer's local
+work. Verified on a fresh `down -v` boot: 8 clubs, **0 null embeddings**, 6 owned
+by the demo account and 2 deliberately ownerless.
+
+**Held by** [`rules/backend-clubs.md`](../rules/backend-clubs.md) (do not restore
+a `count() > 0` guard) and [`rules/db-migrations.md`](../rules/db-migrations.md)
+(the cascade guard, and the recorded-as-retired trap).
+
+---
+
+### BUG-040
+**An uploaded club logo took the whole `/clubs` page down** · High · FIXED 2026-09-09
+
+**Found:** 2026-09-09 by Arpan, loading `/clubs` after the club-governance work
+wired the logo upload: `Console TypeError: Failed to construct 'URL': Invalid
+URL` at `ClubLogo.tsx:58`.
+
+**What was wrong.** `ClubController.uploadLogo` stores an S3 object *key* —
+`clubs/{id}/logo-{filename}` — in `clubs.logo`, and `ClubDTO` handed it to the
+browser untouched. There was **no read path turning a key into a URL**, for club
+logos or anything else. `next/image` accepts a root-relative path or an absolute
+http(s) URL and throws on everything else, and it throws **during render**, so
+`ClubLogo`'s own `onError` fallback — written for exactly this class of problem —
+never got a chance and the page came down rather than degrading.
+
+Latent for as long as nothing could upload a logo: before this branch, nothing
+had ever written `clubs.logo` and it was NULL for every club.
+
+**The fix, in two parts.**
+
+1. `ClubLogo` checks a value is addressable before rendering it and falls back to
+   the club's initial otherwise. `javascript:` and `data:` parse as valid URLs, so
+   the protocol check rather than the `try/catch` is what keeps them out of an
+   `img src`.
+2. The read path Arpan chose: `GET /api/v1/clubs/{id}/logo` and
+   `/images/{index}` stream the bytes through the previously uncalled
+   `S3Service.getObject`. Presigned URLs cannot work against `FakeS3`, and no
+   bucket or CDN is provisioned to be public with.
+
+**Three things that did not work on the way**, recorded because each looks
+correct until it is run:
+
+- `images.remotePatterns` pointing at the API host — Next 16 refuses to optimize
+  an upstream image whose hostname resolves to a private IP, which loopback
+  always is in development. 400, with the reason only in the server log.
+- `images.dangerouslyAllowLocalIP` — got past that into `ECONNREFUSED`: the
+  optimizer runs *server-side*, where `localhost:8080` is the frontend container,
+  not the backend.
+- Emitting `API_INTERNAL_URL` server-side and the public URL in the browser would
+  then have been a hydration mismatch on `src`.
+
+All three dissolve into one same-origin `/media/**` rewrite resolving
+`API_INTERNAL_URL` at request time — the split `apiFetch` already makes. So
+`remotePatterns` is Unsplash-only, no SSRF flag is set, and the CSP `img-src` did
+not have to be loosened.
+
+**Verified** in the browser, not only in tests: `/clubs` renders every uploaded
+logo decoded, zero console errors, zero failed requests. 6 tests in `ClubMediaIT`
+(including that an uploaded SVG is served `application/octet-stream` — nothing
+validates uploads, [BUG-039](bugs.md#bug-039), and an SVG can carry script), 8 in
+`ClubLogo.test.tsx`, 3 in `adapters.test.ts`.
+
+**Not fixed:** event banners and profile avatars have the same missing read path.
+Latent for the same reason this was — no UI uploads either yet.
+
+**Held by** [`rules/frontend.md`](../rules/frontend.md) and
+[`rules/backend-clubs.md`](../rules/backend-clubs.md).
 
 ---
 
@@ -62,7 +163,7 @@ callers apparently did something else.
 answer with one club and gated on the platform-wide `ROLE_CLUB_ADMIN`, which no
 longer exists — and superseded by `GET /api/v1/users/me/managed-clubs`
 (`ClubController.java:51`, already recorded in
-[`club-administration.md`](../docs/architecture/club-administration.md#L254)).
+[`club-administration.md`](../docs/architecture/club-administration.md#backend--comcampusvibeclubadmin)).
 
 The part worth keeping is *why it answers 404 rather than 401*. With the mapping
 gone, `/api/v1/clubs/my-club` does not fall off the end of the router — it falls

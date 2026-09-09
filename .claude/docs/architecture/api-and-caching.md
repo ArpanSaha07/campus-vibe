@@ -5,13 +5,19 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `e12cd19` for the backend sections. The **storage layers**,
+**Code as of:** `0065af8` — re-read on 2026-09-09 for the club ownership spine:
+`api.tsx` (the multipart branch), `cache.ts` and its first real invalidator,
+`adapters.ts` (the media-URL boundary), and the new club media endpoints.
+
+**Two older strata, named rather than glossed.** The **storage layers**,
 **rules** and **client-query-library** sections were written on 2026-08-15
 against the working tree at that date — `api.tsx`, `cache.ts`,
 `followed-clubs-context.tsx`, the Server/Client split across every `page.tsx`,
 and a grep confirming no `Cache-Control` or `ETag` anywhere in
-`backend/src/main` were all re-read. The backend controller and repository
-sections were **not** re-read and still describe `e12cd19`.
+`backend/src/main` were all re-read then. The **backend controller and
+repository** sections have not been re-read since `e12cd19` and still describe
+it; the endpoint list below was extended in 2026-09-09 but those two sections
+were not otherwise checked.
 
 ## In one paragraph
 
@@ -181,6 +187,13 @@ revocation mechanism.
 
 ### `frontend/app/lib/api.tsx` — the single HTTP boundary
 
+**Multipart**: `apiFetch` omits its default `Content-Type: application/json`
+when the body is a `FormData`, because that header carries the multipart
+boundary and only the browser knows it. Sending JSON alongside a FormData body
+makes the server read every part as one opaque string and each `@RequestPart`
+arrives missing. This is the first code in the app that ever sent a file.
+
+
 Every request in the application passes through `apiFetch` (`api.tsx:81`). It
 carries four responsibilities that would otherwise be scattered:
 
@@ -205,9 +218,17 @@ returned and cast to `T`; callers of no-body endpoints type them `apiFetch<void>
 
 Three exported constants and a comment explaining what is *not* here. Five
 minutes (`cache.ts:18`) applies to clubs and events (`cache.ts:26-27`), each
-tagged so a future mutation can `revalidateTag` rather than wait out the TTL.
-Nothing revalidates yet — the tags are laid down ahead of the writes that will
-need them.
+tagged so a mutation can invalidate rather than wait out the TTL.
+
+**The `clubs` tag now has a caller**, which it did not until 2026-09-09:
+`app/lib/actions/revalidate.ts` is a Server Action called after a club is
+created and after a proposal is approved. It uses **`updateTag`, not
+`revalidateTag`** — this is a read-your-own-writes case, the person who just
+created the club is the one about to look at the list, and `revalidateTag`'s
+stale-while-revalidate semantics would hand them back the list without their
+club in it. `updateTag` is Server-Action-only, which is the other reason that
+file exists: both callers are client components. The `events` tag still has no
+caller.
 
 Search is deliberately absent (`cache.ts:30`): its query space is unbounded, so
 caching it fills the store with entries nobody asks for twice, and results are
@@ -254,6 +275,23 @@ Maps `ApiEvent`/`ApiClub`/`ApiMyEvent` onto the UI shapes, and is where nullable
 backend fields acquire UI defaults (`Location TBA`, `Free`, a fallback image).
 `parseSocialLinks` tolerates malformed JSON by returning an empty record rather
 than throwing — the club page renders without social links instead of failing.
+
+**It is also where an S3 object key becomes a URL.** `clubs.logo` and
+`club_images.url` hold two different kinds of thing: absolute Unsplash URLs in
+the demo data, and object keys like `clubs/{id}/logo-{filename}` for anything
+uploaded through the product. A key is fetchable by nobody, and handed to
+`next/image` it throws `Failed to construct 'URL': Invalid URL` at render time
+— which `onError` cannot catch, so it takes the page down
+([BUG-040](../../bugs/fixed_bugs.md#bug-040)). `clubLogoUrl` and `clubImageUrls`
+pass absolute URLs through and turn keys into same-origin `/media/clubs/...`
+paths.
+
+The path is same-origin, and deliberately not an absolute API URL, because the
+two sides reach the backend at different hosts — emitting the internal one
+server-side and the public one in the browser would be a hydration mismatch on
+`src`. `next.config.ts` rewrites `/media/**` to `API_INTERNAL_URL`, resolved at
+request time rather than baked, so unlike `NEXT_PUBLIC_*` it is not subject to
+[BUG-004](../../bugs/bugs.md#bug-004).
 
 ### `frontend/app/lib/search.ts` — uncached by design
 
@@ -556,6 +594,16 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- **2026-09-09** — The club ownership spine, and the media read path it made
+  necessary. `apiFetch` learned to leave `Content-Type` alone for a `FormData`
+  body — the first file upload the app has ever sent. `adapters.ts` gained the
+  key-to-URL boundary and `next.config.ts` the `/media/**` rewrite behind it
+  ([BUG-040](../../bugs/fixed_bugs.md#bug-040)). `cache.ts`'s `clubs` tag got
+  its first invalidator, using `updateTag` rather than `revalidateTag` for
+  read-your-own-writes. New endpoints: `POST /club-creation-requests` and its
+  queue, `PATCH /clubs/{id}/official-email`, `GET /clubs/{id}/logo` and
+  `GET /clubs/{id}/images/{index}`. `ClubCreationRequestDTO` was added to
+  `contracts/api-dto-fields.json` and both suites. Implementing agent.
 - **2026-08-16** — Acted on the CodeQL findings from
   [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31). The one with a
   consequence for this document is

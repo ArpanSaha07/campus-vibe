@@ -28,5 +28,18 @@ paths:
 - **Client-side route protection does not execute.** Do not build anything that
   depends on it until BUG-003 is fixed; authorise on the server.
 - **Reuse before adding** — `ClubEventTabButtons`, `ProtectedRoute`.
-- **CSP headers are enforced** (`next.config.ts:62-78`). Inline scripts break
-  them, and `unsafe-eval` is allowed in development only.
+- **CSP headers are enforced** (`next.config.ts`). Inline scripts break them,
+  and `unsafe-eval` is allowed in development only.
+- **Never hand `next/image` a value that is not a root-relative path or an
+  absolute http(s) URL.** It throws `Failed to construct 'URL': Invalid URL`
+  *during render*, which no `onError` can catch, so one bad row takes the whole
+  page down. Uploaded media arrives as an S3 object key and must go through
+  `adapters.ts`, which maps it to `/media/...`. (BUG-040)
+- **`next/image` needs a `remotePatterns` entry for any absolute host**, and
+  Next 16 refuses outright to optimize an upstream image on a private IP — which
+  local development always is. Same-origin paths behind the `/media/**` rewrite
+  avoid both, and avoid the hydration mismatch that emitting a per-side absolute
+  URL would cause. (BUG-040)
+- **`apiFetch` must not set `Content-Type` for a `FormData` body** — the header
+  carries the multipart boundary and only the browser knows it. Set it and every
+  `@RequestPart` arrives missing.

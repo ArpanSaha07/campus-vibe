@@ -5,7 +5,8 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `77bc7c7` — platform-admin access to club dashboards.
+**Code as of:** `0065af8` — the club ownership spine, which makes club creation
+admin-only and gives `ROLE_ADMIN` three more endpoints.
 Everything else described here is committed ahead of it.
 
 > **This file was rewritten on 2026-08-18 and the previous version was wrong.**
@@ -130,6 +131,15 @@ load-bearing: `ClubAdminService` sorts by it to put the owner first.
 **`clubadmin/ClubAdminAssignment.java`** — the row that *is* the club role.
 Documented in full in [`club-administration.md`](club-administration.md).
 
+**Every club now has one from birth.** Since
+[ADR-004](../decisions/ADR-004-two-paths-create-a-club.md), `ClubService`
+exposes only `createOwnedBy`, which writes the club and its `CLUB_OWNER`
+assignment in one transaction — a platform admin creating directly becomes the
+owner, and approving a club proposal installs the requester. The only ownerless
+clubs that exist are the two the dev seeder leaves that way on purpose, so the
+club-admin claim queue has something to act on locally. That claim flow is
+therefore now the *exception* rather than the only route to ownership.
+
 ### Where the two are enforced
 
 **`security/ClubPermissionService.java`** — three questions, and every
@@ -212,12 +222,17 @@ grant would throw and take startup with it, so the runner checks first.
 
 ## Known deviations, gaps and blockers
 
-- **Admin-only endpoints are still few.** Today `hasRole('ADMIN')` guards only
-  the club-admin-request queue (list, approve, reject) and
-  `POST /api/v1/search/reindex`. The Admin Dashboard described in
-  [`todo.md`](../../TODO/todo.md) — managing users, moderating events, creating
-  clubs from an admin surface — is not built, so the role is currently narrower
-  in practice than the model implies.
+- **Admin-only endpoints, as of 2026-09-09:** the club-admin-request queue
+  (list, approve, reject), the club-creation-request queue (list, approve,
+  reject), `POST /api/v1/clubs`, `PATCH /clubs/{clubId}/official-email`, and
+  `POST /api/v1/search/reindex`. Creating clubs from an admin surface is now
+  built; managing users and moderating events are not, so the role is still
+  narrower in practice than the model implies.
+- **Club creation is now gated on there being an administrator at all.** With
+  `POST /api/v1/clubs` admin-only and proposals needing approval, a deployment
+  whose `APP_BOOTSTRAP_ADMIN_*` variables were never set has no way to create a
+  club through the product. That is a deliberate consequence of ADR-004 and the
+  reason the bootstrap runner matters more than it did.
 - **There is no way to grant or revoke `ROLE_ADMIN` through the product.** The
   bootstrap runner grants at startup from an environment variable and never
   revokes; taking the role away means a database statement. Fine while there is
@@ -256,3 +271,9 @@ grant would throw and take startup with it, so the runner checks first.
   frontend's visibility-only role. The unbuilt-dashboard specification that made
   up roughly half the previous file was dropped rather than carried forward —
   it is a product spec, and this is an implementation doc. Implementing agent.
+- 2026-09-09 — clubs are no longer born ownerless. `ClubService.create` was
+  deleted in favour of `createOwnedBy`, so the two creation paths both write a
+  `CLUB_OWNER` assignment in the same transaction as the club
+  ([ADR-004](../decisions/ADR-004-two-paths-create-a-club.md)). The admin
+  endpoint list above was refreshed against the code at the same time.
+  Implementing agent.

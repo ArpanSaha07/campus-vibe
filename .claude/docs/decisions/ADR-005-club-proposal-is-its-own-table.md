@@ -6,7 +6,7 @@
 Follows [ADR-004](ADR-004-two-paths-create-a-club.md), which creates the need
 for a proposal store. Decided by Arpan on 2026-09-08.
 **Approved by:** — (pending)
-**Implemented in:** — (added when the work lands)
+**Implemented in:** `V31__create_club_creation_requests.sql` and `clubadmin/ClubCreationRequest*` — shipped 2026-09-09.
 
 ## Context
 

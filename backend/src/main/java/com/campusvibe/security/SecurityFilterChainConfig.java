@@ -76,6 +76,15 @@ public class SecurityFilterChainConfig {
                                 // Carries officialEmail, which must never
                                 // reach a public club page.
                                 "/api/v1/clubs/*/managed").authenticated()
+                        // Proposals for clubs that do not exist yet. Stated
+                        // rather than left to anyRequest(): the queue names its
+                        // requester and their address, and the path sits one
+                        // hyphen away from "/api/v1/clubs/**" below, which is
+                        // permitAll. It does not in fact match that pattern --
+                        // `club-creation-requests` is a different path segment
+                        // from `clubs` -- but a reader checking whether the
+                        // queue is public should not have to work that out.
+                        .requestMatchers("/api/v1/club-creation-requests/**").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/ping",
                                 "/actuator/**",

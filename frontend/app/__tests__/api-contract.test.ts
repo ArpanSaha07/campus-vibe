@@ -8,6 +8,7 @@ import type {
   AuthResponse,
   ClubAdmin,
   ClubAdminRequest,
+  ClubCreationRequest,
   ClubAuditLog,
   ClubCategory,
   ClubInvitation,
@@ -123,6 +124,23 @@ const clubAdminRequestFields: Record<keyof ClubAdminRequest, true> = {
   reviewedAt: true,
 };
 
+const clubCreationRequestFields: Record<keyof ClubCreationRequest, true> = {
+  id: true,
+  userId: true,
+  userName: true,
+  userEmail: true,
+  proposedSlug: true,
+  name: true,
+  description: true,
+  category: true,
+  interests: true,
+  message: true,
+  status: true,
+  requestedAt: true,
+  reviewedAt: true,
+  createdClubId: true,
+};
+
 const clubAdminFields: Record<keyof ClubAdmin, true> = {
   assignmentId: true,
   userId: true,
@@ -234,6 +252,7 @@ const MIRRORS: Record<string, Record<string, true>> = {
   MyEventDTO: myEventFields,
   AuthenticationResponse: authResponseFields,
   ClubAdminRequestDTO: clubAdminRequestFields,
+  ClubCreationRequestDTO: clubCreationRequestFields,
   ClubAdminDTO: clubAdminFields,
   ClubInvitationDTO: clubInvitationFields,
   OwnershipTransferDTO: ownershipTransferFields,

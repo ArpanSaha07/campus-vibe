@@ -45,6 +45,12 @@
     "status", "requestedAt", "reviewedAt"
   ],
 
+  "ClubCreationRequestDTO": [
+    "id", "userId", "userName", "userEmail", "proposedSlug", "name",
+    "description", "category", "interests", "message", "status", "requestedAt",
+    "reviewedAt", "createdClubId"
+  ],
+
   "ClubAdminDTO": [
     "assignmentId", "userId", "userName", "userEmail", "invitedEmail", "role",
     "status", "createdAt", "activatedAt"

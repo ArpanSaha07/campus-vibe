@@ -5,11 +5,13 @@ import { ClubFormData, FormErrors } from '@/app/types';
 import {
   validateClubForm,
   validateImageFile,
+  type ClubFormMode,
 } from '@/app/lib/validators/clubValidator';
 import {
   checkClubNameExists,
-  createClub,
+  createClubWithMedia,
 } from '@/app/lib/services/clubService';
+import { proposeClub } from '@/app/lib/club-creation-requests';
 
 export interface UseCreateClubFormReturn {
   formData: ClubFormData;
@@ -31,21 +33,43 @@ export interface UseCreateClubFormReturn {
   setInterests: (slugs: string[]) => void;
 }
 
-export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormReturn {
-  const [formData, setFormData] = useState<ClubFormData>({
-    name: '',
-    description: '',
-    logo: null,
-    images: [],
-    category: null,
-    interests: [],
-    socialLinks: {
-      email: '',
-      website: '',
-      facebook: '',
-      instagram: '',
-    },
-  });
+/**
+ * What the form does on submit, decided by who is filling it in.
+ *
+ * `create` posts to the admin-only create endpoint and then chains the logo,
+ * banners and social links, all of which work now that the creating admin owns
+ * the club. `propose` submits a text-only proposal for review and creates
+ * nothing. See ADR-004.
+ */
+export type { ClubFormMode };
+
+const EMPTY_FORM: ClubFormData = {
+  name: '',
+  description: '',
+  logo: null,
+  images: [],
+  category: null,
+  interests: [],
+  socialLinks: {
+    email: '',
+    website: '',
+    facebook: '',
+    instagram: '',
+  },
+  message: '',
+};
+
+/**
+ * @param mode which creation path this form is on — see {@link ClubFormMode}.
+ * @param onSuccess told what was created: the new club's id on the admin path,
+ *   or null when a proposal was submitted and no club exists yet. The caller
+ *   needs the difference to decide where to send the user.
+ */
+export function useCreateClubForm(
+  mode: ClubFormMode = 'create',
+  onSuccess?: (createdClubId: string | null) => void
+): UseCreateClubFormReturn {
+  const [formData, setFormData] = useState<ClubFormData>({ ...EMPTY_FORM });
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,42 +210,56 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
         setIsSubmitting(true);
 
         // Validate form
-        const newErrors = await validateClubForm(formData, checkClubNameExists);
+        const newErrors = await validateClubForm(formData, checkClubNameExists, mode);
         setErrors(newErrors);
 
         if (Object.keys(newErrors).length > 0) {
           return;
         }
 
-        await createClub({
-          name: formData.name,
-          description: formData.description,
-          category: formData.category,
-          interests: formData.interests,
-        });
+        let createdClubId: string | null = null;
+
+        if (mode === 'create') {
+          // The club is created first, then the logo, banners and links are
+          // attached to it — all three address /clubs/{id}, so they cannot go
+          // in the same request. If one of them fails the club still exists and
+          // the caller owns it, which is why the error below says so rather
+          // than implying nothing happened.
+          const club = await createClubWithMedia(
+            {
+              name: formData.name,
+              description: formData.description,
+              category: formData.category,
+              interests: formData.interests,
+            },
+            {
+              logo: formData.logo,
+              images: formData.images,
+              socialLinks: formData.socialLinks,
+            }
+          );
+          createdClubId = club.clubId;
+        } else {
+          // Creates no club. An admin approving this is what creates one, and
+          // installs the requester as its owner.
+          await proposeClub({
+            name: formData.name,
+            description: formData.description,
+            category: formData.category,
+            interests: formData.interests,
+            message: formData.message,
+          });
+        }
 
         // Reset form on success
-        setFormData({
-          name: '',
-          description: '',
-          logo: null,
-          images: [],
-          category: null,
-          interests: [],
-          socialLinks: {
-            email: '',
-            website: '',
-            facebook: '',
-            instagram: '',
-          },
-        });
+        setFormData({ ...EMPTY_FORM });
         setLogoPreview(null);
         setImagePreviews([]);
         setErrors({});
 
         // Call success callback if provided
         if (onSuccess) {
-          onSuccess();
+          onSuccess(createdClubId);
         }
       } catch (error) {
         console.error('Error creating club:', error);
@@ -232,7 +270,7 @@ export function useCreateClubForm(onSuccess?: () => void): UseCreateClubFormRetu
         setIsSubmitting(false);
       }
     },
-    [formData, onSuccess]
+    [formData, mode, onSuccess]
   );
 
   return {

@@ -28,3 +28,8 @@ paths:
 - **Per-user data must never enter Next's data cache.** The guard and the three
   data paths are described in the same document; a DTO that starts carrying
   user-specific fields changes what is safe to cache.
+- **A new DTO is four edits, not one**: the Java record, its row in
+  `api-dto-fields.json`, the `CONTRACTED.put` line in `ApiContractTest`, and the
+  TypeScript interface plus its `MIRRORS` entry in `api-contract.test.ts`. Miss
+  either test registration and the contract silently does not cover the DTO at
+  all — both suites still pass.

@@ -6,7 +6,7 @@
 on building the platform-admin write for `official_email` (governance item 6).
 Decided by Arpan on 2026-09-08.
 **Approved by:** — (pending)
-**Implemented in:** — (added when the work lands)
+**Implemented in:** `ClubAdminService.setOfficialEmail` and `PATCH /clubs/{clubId}/official-email` — the admin-write half, shipped 2026-09-09. The round trip is queued under the SES item and is **not** built.
 
 ## Context
 

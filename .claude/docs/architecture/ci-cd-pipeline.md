@@ -4,7 +4,8 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
+**Code as of:** `0065af8` for the `next.config.ts` sections (images, the
+`/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 `verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test
 assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)).
@@ -916,6 +917,24 @@ but it means **CI cannot prove the Vercel build works** — and did not. No
 every `NEXT_PUBLIC_*` value live only in the Vercel dashboard
 ([BUG-018](../../bugs/bugs.md#bug-018)).
 
+**`next.config.ts` also carries the image and media configuration**, added
+2026-09-09 with the club media read path:
+
+- `images.remotePatterns` names Unsplash only. Uploaded club images are served
+  from this origin through the rewrite below, so they are local as far as
+  `next/image` is concerned. Anything not listed is a *thrown error during
+  render*, not a broken image.
+- `async rewrites()` maps `/media/clubs/:clubId/logo` and `/images/:index` onto
+  `API_INTERNAL_URL`. Three separate problems collapse into this one rule: the
+  optimizer runs server-side where `localhost:8080` is the frontend container
+  rather than the backend; emitting a different absolute URL per side would be a
+  hydration mismatch on `src`; and Next 16 refuses outright to optimize an
+  upstream image whose host resolves to a private IP, which local development
+  always is. **Unlike `NEXT_PUBLIC_*`, `rewrites()` is evaluated at request
+  time**, so this one is not subject to BUG-004.
+- The CSP `img-src` therefore stays `'self'` — the media never comes from the
+  API host directly.
+
 **BUG-004 is unaddressed, and now runs on every full tier.** `NEXT_PUBLIC_*`
 values are inlined at build time and the `builder` stage passes no build args, so
 the production image ships them empty. BUG-016 rebuilt the `runner` stage but did
@@ -971,6 +990,12 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 ## Change log
 
+- **2026-09-09** — `next.config.ts` gained `images.remotePatterns`, an
+  `async rewrites()` proxying `/media/**` to `API_INTERNAL_URL`, and a note on
+  why `img-src` did not have to be loosened. Written for the club media read
+  path ([BUG-040](../../bugs/fixed_bugs.md#bug-040)); described above beside the
+  Vercel branch, since both are places this config differs by environment. No
+  workflow, hook or Dockerfile changed. Implementing agent.
 - **2026-08-16 (c)** — **Branch pushes test again, without the double run
   returning.** Dropping `push` from `ci.yml` had overshot: a branch with no PR
   ran nothing, which a push to `ci/github-actions` demonstrated. Added

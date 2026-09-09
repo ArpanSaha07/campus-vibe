@@ -1,6 +1,34 @@
 # Club ownership spine
 
-**Status:** draft · **Date:** 2026-09-08
+**Status:** shipped 2026-09-09 · **Date:** 2026-09-08
+
+> **Where the work drifted from this spec**, all decided by Arpan on 2026-09-09
+> and recorded here because the spec is the record of what was agreed:
+>
+> 1. **`ClubService.create` was deleted, not kept beside `createOwnedBy`.** The
+>    spec said `create` writes the owner assignment. Arpan asked for one function
+>    and no ownerless create path at all.
+> 2. **The seeded clubs are no longer left ownerless and unbacked.** The spec
+>    decided nothing would backfill them. Instead the dev seeder now creates a
+>    demo owner for six of the eight and leaves **two** unowned, so the club-admin
+>    claim queue still has something to act on locally. This also uncovered that
+>    the seeder had never run at all ([BUG-041](../bugs/fixed_bugs.md#bug-041)),
+>    which needed `V32` — a migration the spec did not anticipate.
+> 3. **The requester gets no view of their pending proposal.** The spec offered a
+>    line on `/manage` and asked whether a screen was wanted; Arpan chose neither
+>    for now — it belongs in the notifications tab, and is queued there.
+> 4. **The spec's security-matcher claim was wrong.** It said a matcher for
+>    `/api/v1/club-creation-requests` must sit above the public-GET block or the
+>    queue would be world-readable. It would not: that path does not match
+>    `/api/v1/clubs/**`, which is a different path segment, so it already fell
+>    through to `anyRequest().authenticated()`. A matcher was added anyway, as
+>    documentation rather than as a fix.
+> 5. **A media read path had to be built** ([ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)).
+>    The spec treated wiring the logo upload as merely making
+>    [BUG-039](../bugs/bugs.md#bug-039) reachable. It also made the *absence of a
+>    read path* reachable, which took the `/clubs` page down
+>    ([BUG-040](../bugs/fixed_bugs.md#bug-040)) — nothing in this codebase had
+>    ever displayed an uploaded image.
 
 ## Goal
 

@@ -10,18 +10,37 @@ import {
   listClubAdminRequests,
   rejectClubAdminRequest,
 } from "@/app/lib/club-admin-requests";
-import type { ClubAdminRequest } from "@/app/types";
+import {
+  approveClubCreationRequest,
+  listClubCreationRequests,
+  rejectClubCreationRequest,
+} from "@/app/lib/club-creation-requests";
+import { revalidateClubs } from "@/app/lib/actions/revalidate";
+import type { ClubAdminRequest, ClubCreationRequest } from "@/app/types";
 import SectionHeading from "@/app/components/ui/SectionHeading";
 import StatTile from "@/app/components/ui/StatTile";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
 import Link from "next/link"; 
 
+/**
+ * One row of the merged Pending requests list.
+ *
+ * The two kinds queue together because that is what a reviewer wants — one list,
+ * oldest first — but they stay separate underneath: a claim installs an owner on
+ * a club that already exists, a proposal has to create the club first. So the
+ * kind decides which endpoint the Approve button calls, and `id` is only unique
+ * within a kind.
+ */
+type PendingRow =
+  | { kind: "claim"; id: number; at: string; request: ClubAdminRequest }
+  | { kind: "proposal"; id: number; at: string; request: ClubCreationRequest };
+
 export default function AdminDashboardPage() {
   const { user, loading } = useAuth();
   const [clubCount, setClubCount] = useState<number | null>(null);
   const [eventCount, setEventCount] = useState<number | null>(null);
-  const [requests, setRequests] = useState<ClubAdminRequest[] | null>(null);
+  const [rows, setRows] = useState<PendingRow[] | null>(null);
   const [requestsError, setRequestsError] = useState(false);
   const [actionError, setActionError] = useState("");
 
@@ -34,11 +53,33 @@ export default function AdminDashboardPage() {
     listEvents()
       .then((events) => !cancelled && setEventCount(events.length))
       .catch(() => !cancelled && setEventCount(null));
-    listClubAdminRequests("PENDING")
-      .then((pending) => !cancelled && setRequests(pending))
+    // Two endpoints, one list. Promise.all rather than sequential so a slow
+    // queue does not hold up the other, and allSettled is deliberately not used:
+    // a half-loaded review queue that looks complete is worse than an error,
+    // because approving from it is a decision made on partial information.
+    Promise.all([listClubAdminRequests("PENDING"), listClubCreationRequests("PENDING")])
+      .then(([claims, proposals]) => {
+        if (cancelled) return;
+        const merged: PendingRow[] = [
+          ...claims.map((request) => ({
+            kind: "claim" as const,
+            id: request.id,
+            at: request.requestedAt,
+            request,
+          })),
+          ...proposals.map((request) => ({
+            kind: "proposal" as const,
+            id: request.id,
+            at: request.requestedAt,
+            request,
+          })),
+        ];
+        merged.sort((a, b) => a.at.localeCompare(b.at));
+        setRows(merged);
+      })
       .catch(() => {
         if (!cancelled) {
-          setRequests([]);
+          setRows([]);
           setRequestsError(true);
         }
       });
@@ -47,17 +88,38 @@ export default function AdminDashboardPage() {
     };
   }, [loading, user]);
 
-  async function review(id: number, action: "approve" | "reject") {
+  async function review(row: PendingRow, action: "approve" | "reject") {
     setActionError("");
     try {
-      if (action === "approve") {
-        await approveClubAdminRequest(id);
+      if (row.kind === "claim") {
+        await (action === "approve" ? approveClubAdminRequest : rejectClubAdminRequest)(row.id);
       } else {
-        await rejectClubAdminRequest(id);
+        await (action === "approve"
+          ? approveClubCreationRequest
+          : rejectClubCreationRequest)(row.id);
       }
-      setRequests((prev) => prev?.filter((r) => r.id !== id) ?? null);
-    } catch {
-      setActionError("That review didn't go through. Refresh and try again.");
+      // Matched on kind as well as id: the two queues number their rows
+      // independently, so claim 3 and proposal 3 both exist.
+      setRows((prev) =>
+        prev?.filter((r) => !(r.kind === row.kind && r.id === row.id)) ?? null,
+      );
+      if (action === "approve" && row.kind === "proposal") {
+        setClubCount((prev) => (prev === null ? prev : prev + 1));
+        // Approving created a club. The clubs list is cached for five minutes,
+        // so drop it rather than let the new club be missing from /clubs while
+        // its owner is being told they have one.
+        await revalidateClubs();
+      }
+    } catch (error) {
+      // The backend refuses an approval whose slug was taken while the proposal
+      // waited, and says so in a sentence. Showing it beats a generic failure:
+      // the reviewer has to reject this one and ask for another name, which
+      // they cannot work out from "didn't go through".
+      const message =
+        error instanceof Error && error.message.trim() !== ""
+          ? error.message
+          : "That review didn't go through. Refresh and try again.";
+      setActionError(message);
     }
   }
 
@@ -75,8 +137,20 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 fade-up">
-      <p className="ticket-label text-lavender-600">Admin dashboard</p>
-      <h1 className="font-display text-3xl font-bold text-ink-900 mt-1">Platform overview</h1>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <p className="ticket-label text-lavender-600">Admin dashboard</p>
+          <h1 className="font-display text-3xl font-bold text-ink-900 mt-1">
+            Platform overview
+          </h1>
+        </div>
+        {/* The only place a club can be created from. POST /api/v1/clubs is
+            admin-only, and the form branches on the same isAdmin check, so an
+            admin arriving here gets the full form with logo, photos and links
+            -- all of which save, because creating a club now makes them its
+            owner. */}
+        <Button href="/create-club">Create a club</Button>
+      </div>
 
       {/* Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
@@ -88,21 +162,21 @@ export default function AdminDashboardPage() {
         </Link>
         <StatTile
           label="Pending requests"
-          value={requests === null ? "…" : requests.length}
-          hint="Club admin access requests"
+          value={rows === null ? "…" : rows.length}
+          hint="New clubs proposed, and claims on ownerless ones"
         />
       </div>
 
-      {/* Club admin requests */}
+      {/* Pending requests -- both kinds, one list */}
       <section className="mt-12">
         <SectionHeading
-          title="Club admin requests"
-          subtitle="Approving assigns the club to the requester and grants club admin access."
+          title="Pending requests"
+          subtitle="Approving a proposal creates the club and makes the requester its owner. Approving a claim hands them an existing club that has none."
         />
 
         {actionError && <p className="text-sm text-alert-600 mb-4">{actionError}</p>}
 
-        {requests === null && (
+        {rows === null && !requestsError && (
           <p className="font-mono text-sm text-ink-600">Loading requests…</p>
         )}
 
@@ -113,42 +187,63 @@ export default function AdminDashboardPage() {
           />
         )}
 
-        {requests && requests.length === 0 && !requestsError && (
+        {rows && rows.length === 0 && !requestsError && (
           <EmptyState
             title="No pending requests"
-            body="When a student asks to manage a club, the request lands here."
+            body="When somebody proposes a club, or asks to run one that has no owner, it lands here."
           />
         )}
 
-        {requests && requests.length > 0 && (
+        {rows && rows.length > 0 && (
           <ul className="space-y-4">
-            {requests.map((request) => (
+            {rows.map((row) => (
               <li
-                key={request.id}
+                key={`${row.kind}-${row.id}`}
                 className="rounded-2xl border border-mist-200 bg-white p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-ink-900">
-                    {request.userName}
-                    <span className="text-ink-600 font-normal"> wants to manage </span>
-                    {request.clubName}
+                  <span className="ticket-label text-lavender-600">
+                    {row.kind === "proposal" ? "New club" : "Ownership claim"}
+                  </span>
+                  <p className="font-semibold text-ink-900 mt-1">
+                    {row.request.userName}
+                    {row.kind === "proposal" ? (
+                      <>
+                        <span className="text-ink-600 font-normal"> wants to start </span>
+                        {row.request.name}
+                        <span className="text-ink-600 font-normal">
+                          {" "}
+                          ({row.request.proposedSlug})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-ink-600 font-normal"> wants to manage </span>
+                        {row.request.clubName}
+                      </>
+                    )}
                   </p>
                   <p className="font-mono text-xs text-ink-600 mt-1">
-                    {request.userEmail} ·{" "}
-                    {new Date(request.requestedAt).toLocaleDateString(undefined, {
+                    {row.request.userEmail} ·{" "}
+                    {new Date(row.at).toLocaleDateString(undefined, {
                       month: "short",
                       day: "numeric",
                     })}
                   </p>
-                  {request.message && (
+                  {row.kind === "proposal" && row.request.description && (
                     <p className="text-sm text-ink-600 mt-2 line-clamp-2">
-                      &ldquo;{request.message}&rdquo;
+                      {row.request.description}
+                    </p>
+                  )}
+                  {row.request.message && (
+                    <p className="text-sm text-ink-600 mt-2 line-clamp-2">
+                      &ldquo;{row.request.message}&rdquo;
                     </p>
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Button onClick={() => review(request.id, "approve")}>Approve</Button>
-                  <Button onClick={() => review(request.id, "reject")} variant="secondary">
+                  <Button onClick={() => review(row, "approve")}>Approve</Button>
+                  <Button onClick={() => review(row, "reject")} variant="secondary">
                     Reject
                   </Button>
                 </div>
@@ -157,6 +252,7 @@ export default function AdminDashboardPage() {
           </ul>
         )}
       </section>
+
     </main>
   );
 }
