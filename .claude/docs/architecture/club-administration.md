@@ -5,8 +5,9 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `4d11778` — the club ownership spine: two creation paths, the
-club-proposal queue, and the platform-admin write for `official_email`.
+**Code as of:** `31c7abb` — the club ownership spine (two creation paths, the
+club-proposal queue, the platform-admin write for `official_email`), plus the
+contact links a proposal now carries.
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
@@ -556,6 +557,26 @@ list must not make the app believe the user manages nothing.
 
 ## Change log
 
+- 2026-09-10 — **a proposal carries the club's contact links.** `V33` adds one
+  `social_links TEXT` column to `club_creation_requests`, mirroring
+  `clubs.social_links` rather than splitting into four columns, and
+  `ClubCreationRequestService.approve` copies it onto the `Club` *before*
+  `createOwnedBy` — after it would write to a detached instance
+  ([BUG-037](../../bugs/fixed_bugs.md#bug-037)). The four fields left the
+  `admin &&` gate on the create form: they need no club id and no S3 key, so
+  the only thing a proposal still cannot carry is the logo. The contact email
+  is required for an admin creating outright and optional on a proposal.
+  **The links are now validated on every write path**, which they never were:
+  `ProfileLinks` moved to `common/WebLinks` and gained a third caller, and
+  `ClubSocialLinks` parses the stored JSON, normalises it and re-serialises, so
+  the column holds our four keys or NULL. That closed
+  [BUG-048](../../bugs/fixed_bugs.md#bug-048) on `ClubService.update`, which
+  predated this work. Instagram is collected as a *handle* and the URL is built
+  server-side (Arpan, 2026-09-10). Also
+  [BUG-049](../../bugs/fixed_bugs.md#bug-049): the form had no `noValidate`, so
+  the browser's own constraint checking silently pre-empted `clubValidator`.
+  Spec: [`2026-09-10-proposal-social-links.md`](../../specs/2026-09-10-proposal-social-links.md).
+  Implementing agent.
 - 2026-09-09 — the club ownership spine. Two creation paths
   ([ADR-004](../decisions/ADR-004-two-paths-create-a-club.md)): `POST
   /api/v1/clubs` moved to `hasRole('ADMIN')` and makes the creating admin the

@@ -74,6 +74,18 @@ public class ClubCreationRequest {
     @Column(columnDefinition = "text")
     private String message;
 
+    /**
+     * The club's four public contact values, as a JSON string in one column
+     * exactly as {@code Club.socialLinks} holds them — which is what lets
+     * {@code approve} carry the value across without translating it.
+     *
+     * <p>Never written raw. {@code ClubSocialLinks.normalise} is the control,
+     * and it runs before this is set, because these links land in an
+     * {@code href} on the club's public page once the proposal is approved.
+     */
+    @Column(name = "social_links", columnDefinition = "text")
+    private String socialLinks;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status = RequestStatus.PENDING;

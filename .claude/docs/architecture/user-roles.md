@@ -5,8 +5,12 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `4d11778` — the club ownership spine, which makes club creation
-admin-only and gives `ROLE_ADMIN` three more endpoints.
+**Code as of:** `31c7abb` — re-stamped on 2026-09-10 after the contact links a
+club proposal now carries. That work moved `clubadmin/`, which is mapped here,
+but touches no role, no assignment and no authorisation check: who may propose,
+approve and manage is exactly as described below. The last change that did
+affect this file is `4d11778`, the club ownership spine, which makes club
+creation admin-only and gives `ROLE_ADMIN` three more endpoints.
 Everything else described here is committed ahead of it.
 
 > **This file was rewritten on 2026-08-18 and the previous version was wrong.**

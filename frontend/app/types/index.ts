@@ -188,7 +188,7 @@ export interface UserProfile {
  * a caller reading one link never has to check two levels.
  *
  * The backend stores only http(s) URLs and refuses anything else on write. Run
- * every one through `normaliseProfileLink` anyway before it reaches an href —
+ * every one through `normaliseWebLink` anyway before it reaches an href —
  * a row written before that rule existed would still render.
  */
 export interface ProfileSocialLinks {
@@ -429,6 +429,13 @@ export interface ClubCreationRequest {
   category: string | null;
   interests: string[];
   message: string | null;
+  /**
+   * The club's four contact values as a JSON string, the same shape
+   * `ApiClub.socialLinks` carries — null when the requester filled in none of
+   * them. Parse it with `parseSocialLinks`; the server normalised it, so what
+   * is here is always our JSON.
+   */
+  socialLinks: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   requestedAt: string;
   reviewedAt: string | null;
@@ -491,6 +498,15 @@ export interface NewClubProposal {
   category: string | null;
   interests: string[];
   message: string;
+  /**
+   * The club's contact links, carried onto the club when an admin approves.
+   *
+   * Optional on this path, unlike the admin form where the contact email is
+   * required — a student proposing a club may not have an address for it yet.
+   * The logo is still absent: it needs a club id and an S3 key, and a proposal
+   * has neither.
+   */
+  socialLinks: ClubSocialLinks;
 }
 
 /**

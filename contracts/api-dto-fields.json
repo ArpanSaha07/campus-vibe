@@ -47,8 +47,8 @@
 
   "ClubCreationRequestDTO": [
     "id", "userId", "userName", "userEmail", "proposedSlug", "name",
-    "description", "category", "interests", "message", "status", "requestedAt",
-    "reviewedAt", "createdClubId"
+    "description", "category", "interests", "message", "socialLinks", "status",
+    "requestedAt", "reviewedAt", "createdClubId"
   ],
 
   "ClubAdminDTO": [

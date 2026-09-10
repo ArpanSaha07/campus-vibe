@@ -116,6 +116,22 @@ tests and a form that branches on `isAdmin`. A proposal cannot carry a logo — 
 needs a club id and there is no club yet — so images move to after approval, and
 the proposal form shows no image fields at all.
 
+> **Amended 2026-09-10, in place, by Arpan's decision.** This paragraph
+> originally continued *…so the proposal is text only*, and the whole branch of
+> the form was built that way. **That was too wide.** The reasoning holds for
+> images and for nothing else: the four contact links need no club id and no S3
+> key, and leaving them out meant a club born by proposal reached its public
+> page with an empty contact block, its new owner adding what nobody had asked
+> them for. A proposal now carries them, and approval writes them onto the club.
+> Only the logo waits.
+>
+> Amending rather than superseding is itself Arpan's call, made knowingly
+> against the frozen-record rule in [`README.md`](README.md): the sentence
+> described a scope that no longer holds, and a second ADR to say so would cost
+> more than it records. The decision this file exists for — two paths, both
+> ending in an owner — is untouched. See
+> [`2026-09-10-proposal-social-links.md`](../../specs/2026-09-10-proposal-social-links.md).
+
 **Foreclosed.** Ordinary users can no longer create a club that is immediately
 public. That is the point, but it is a real reduction: a student now waits for a
 human, and nothing notifies them when the wait ends, because notifications do

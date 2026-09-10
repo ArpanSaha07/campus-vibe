@@ -3,6 +3,7 @@ package com.campusvibe.clubadmin;
 import com.campusvibe.club.Club;
 import com.campusvibe.club.ClubDTO;
 import com.campusvibe.club.ClubRepository;
+import com.campusvibe.club.ClubSocialLinks;
 import com.campusvibe.club.ClubService;
 import com.campusvibe.exception.DuplicateResourceException;
 import com.campusvibe.exception.RequestValidationException;
@@ -76,6 +77,11 @@ public class ClubCreationRequestService {
             req.getInterestSlugs().addAll(request.interests());
         }
         req.setMessage(request.message());
+        // Normalised here rather than at approval, so a bad link is refused
+        // while the person who typed it is still looking at the form -- and so
+        // an approval, which is one click on a queue, cannot be the thing that
+        // fails. What is stored is our JSON, not the string the client sent.
+        req.setSocialLinks(ClubSocialLinks.normalise(request.socialLinks()));
         return toDto(requestRepository.save(req));
     }
 
@@ -117,6 +123,13 @@ public class ClubCreationRequestService {
         club.setId(req.getProposedSlug());
         club.setName(req.getName());
         club.setDescription(req.getDescription());
+        // Set before createOwnedBy, like every other field here, because
+        // Club.id is assigned rather than generated: saveAndFlush goes through
+        // em.merge and returns a different managed instance, so anything set on
+        // this object afterwards would be written to a detached copy and
+        // persisted nowhere (BUG-037, ADR-002). Already normalised at
+        // submission, so this is a copy and not a second validation.
+        club.setSocialLinks(req.getSocialLinks());
 
         ClubDTO created = clubService.createOwnedBy(
                 club,
@@ -187,6 +200,7 @@ public class ClubCreationRequestService {
                 req.getCategorySlug(),
                 List.copyOf(req.getInterestSlugs()),
                 req.getMessage(),
+                req.getSocialLinks(),
                 req.getStatus(),
                 req.getRequestedAt(),
                 req.getReviewedAt(),

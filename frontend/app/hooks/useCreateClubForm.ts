@@ -216,6 +216,10 @@ export function useCreateClubForm(
             category: formData.category,
             interests: formData.interests,
             message: formData.message,
+            // One request, unlike the admin path: the links ride along with the
+            // proposal rather than being a follow-up call, because there is no
+            // club to address yet.
+            socialLinks: formData.socialLinks,
           });
         }
 

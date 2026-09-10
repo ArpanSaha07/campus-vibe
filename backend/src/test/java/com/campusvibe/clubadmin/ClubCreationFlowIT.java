@@ -331,4 +331,128 @@ class ClubCreationFlowIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.category", is(categorySlug)))
                 .andExpect(jsonPath("$.interests", containsInAnyOrder(interests.toArray())));
     }
+
+    // ------------------------------------------------------------ contact links
+
+    @Test
+    void aProposalCarriesItsContactLinksOntoTheCreatedClub() throws Exception {
+        User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        // The Instagram field takes a handle and the server builds the URL, so
+        // what goes up is @robotics and what comes back is the full link.
+        String response = mockMvc.perform(post("/api/v1/club-creation-requests")
+                        .header("Authorization", bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "id", "robotics",
+                                "name", "Robotics",
+                                "description", "We build robots",
+                                "message", "please",
+                                "socialLinks", "{\"email\":\"robotics@campus.com\","
+                                        + "\"website\":\"https://robotics.ca\","
+                                        + "\"instagram\":\"@robotics\"}"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        long requestId = objectMapper.readTree(response).get("id").asLong();
+
+        // The reviewer sees them on the queue, so they have to survive the DTO.
+        mockMvc.perform(get("/api/v1/club-creation-requests")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].socialLinks", containsString("robotics@campus.com")))
+                .andExpect(jsonPath("$[0].socialLinks", containsString("https://instagram.com/robotics")));
+
+        mockMvc.perform(post("/api/v1/club-creation-requests/" + requestId + "/approve")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+
+        // The point of the whole unit: a club born by proposal has its contact
+        // block filled in, rather than its new owner having to go and add what
+        // they were never asked for.
+        mockMvc.perform(get("/api/v1/clubs/robotics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.socialLinks", containsString("https://robotics.ca")))
+                .andExpect(jsonPath("$.socialLinks", containsString("https://instagram.com/robotics")));
+    }
+
+    /**
+     * The reason the links are validated at all, and the half of it that is new:
+     * before this, any signed-in user could put a script in a club's website
+     * field and an approval would publish it on a page with a Website link
+     * (BUG-048).
+     */
+    @Test
+    void aProposalCannotCarryAHostileLink() throws Exception {
+        User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+
+        mockMvc.perform(post("/api/v1/club-creation-requests")
+                        .header("Authorization", bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "id", "robotics",
+                                "name", "Robotics",
+                                "description", "We build robots",
+                                "message", "please",
+                                "socialLinks", "{\"website\":\"javascript:alert(1)\"}"))))
+                .andExpect(status().isBadRequest());
+
+        assertTrue(clubCreationRequestRepository.findAll().isEmpty(),
+                "a refused proposal must not be stored");
+    }
+
+    /**
+     * The half that is not new. This hole predated the proposal work: a club
+     * owner or platform admin could already write anything into these fields,
+     * and the club page renders two of them as hrefs (BUG-048).
+     */
+    @Test
+    void aClubUpdateCannotCarryAHostileLink() throws Exception {
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        mockMvc.perform(post("/api/v1/clubs")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("id", "robotics", "name", "Robotics"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/clubs/robotics")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "socialLinks", "{\"website\":\"javascript:alert(1)\"}"))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/clubs/robotics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.socialLinks", nullValue()));
+    }
+
+    @Test
+    void aProposalWithNoContactLinksIsUnchangedFromBefore() throws Exception {
+        User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        String response = mockMvc.perform(post("/api/v1/club-creation-requests")
+                        .header("Authorization", bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(proposal("Robotics", "robotics"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.socialLinks", nullValue()))
+                .andReturn().getResponse().getContentAsString();
+        long requestId = objectMapper.readTree(response).get("id").asLong();
+
+        mockMvc.perform(post("/api/v1/club-creation-requests/" + requestId + "/approve")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+
+        // NULL, not an empty object: nobody was asked and nobody answered.
+        mockMvc.perform(get("/api/v1/clubs/robotics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.socialLinks", nullValue()));
+    }
 }

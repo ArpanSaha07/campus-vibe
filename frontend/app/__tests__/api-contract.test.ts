@@ -135,6 +135,7 @@ const clubCreationRequestFields: Record<keyof ClubCreationRequest, true> = {
   category: true,
   interests: true,
   message: true,
+  socialLinks: true,
   status: true,
   requestedAt: true,
   reviewedAt: true,

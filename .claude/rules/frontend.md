@@ -56,6 +56,12 @@ paths:
 - **`ApiError.message` is the raw response body**, so rendering it shows the
   user a line of JSON. Go through `parseApiError` (`app/lib/auth-errors.ts`).
   (BUG-045)
+- **A form that validates in JS needs `noValidate` on the `<form>`.** Without
+  it a control with an invalid `type=email` or `type=url` value makes the
+  browser block submission and show its own bubble — the submit handler never
+  runs, so the validator never runs and its message beside the field is never
+  written. `FormField` already refuses to set `required` for this reason
+  (`FormField.tsx:60-63`); the attribute one level up was missed. (BUG-049)
 - **`.ticket-label` uppercases.** It is for printed labels — `DATE`, `URL`,
   `REQUIRED` — never for a literal value: it rendered a club slug as
   `QUANTUM-COMPUTING-SOCIETY` in a URL preview. Use `font-mono` alone for

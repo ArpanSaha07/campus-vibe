@@ -137,15 +137,19 @@ describe("CreateClubForm — which controls each path renders", () => {
     expect(screen.getByLabelText(/Facebook/)).toBeInTheDocument();
   });
 
-  it("renders none of them for an ordinary user, and asks for a message instead", () => {
+  it("withholds only the logo from an ordinary user, and asks for a message instead", () => {
     currentUser = user(Role.USER);
     render(<CreateClubForm />);
 
     expect(screen.getByRole("heading", { name: "Propose a club" })).toBeInTheDocument();
     // Absent, not disabled: a proposal has no club id to upload against.
     expect(screen.queryByLabelText(/Logo/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Contact email/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Website/)).not.toBeInTheDocument();
+    // The links need neither a club id nor an S3 key, and a club page is empty
+    // without them, so a proposal collects them like any other field.
+    expect(screen.getByLabelText(/Contact email/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Website/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Instagram/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Facebook/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Anything the reviewer should know/)).toBeInTheDocument();
   });
 
@@ -232,6 +236,88 @@ describe("CreateClubForm — interests reach the payload", () => {
   });
 });
 
+describe("CreateClubForm — contact links reach the payload", () => {
+  // Same reason the interests have a block of their own: a link is not
+  // something the user reads back off the form after submitting, so the whole
+  // file could stay green while the proposal path dropped every one of them --
+  // which is exactly what it did until 2026-09-10.
+
+  it("sends what was typed with a proposal", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Contact email/), "hello@astronomy.ca");
+    await userEvent.type(screen.getByLabelText(/Website/), "https://astronomy.ca");
+    await userEvent.type(screen.getByLabelText(/Instagram/), "@astronomy");
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    await waitFor(() => expect(mockProposeClub).toHaveBeenCalledTimes(1));
+    expect(mockProposeClub).toHaveBeenCalledWith(
+      expect.objectContaining({
+        socialLinks: expect.objectContaining({
+          email: "hello@astronomy.ca",
+          website: "https://astronomy.ca",
+          // Sent as typed. The handle becomes https://instagram.com/astronomy
+          // on the server, which is the one place that decision lives.
+          instagram: "@astronomy",
+        }),
+      }),
+    );
+  });
+
+  it("refuses an Instagram value that is not a handle", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Instagram/), "evil.com/astronomy");
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    // Not silently turned into an Instagram link that is not one.
+    expect(await screen.findByText(/should be your handle/)).toBeInTheDocument();
+    expect(mockProposeClub).not.toHaveBeenCalled();
+  });
+
+  it("lets a proposal through with none of them, unlike the admin path", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    // A student may not have an address for the club yet, and refusing the
+    // form over it would be refusing the club.
+    await waitFor(() => expect(mockProposeClub).toHaveBeenCalledTimes(1));
+  });
+
+  it("refuses a link that could not go in an href, on the proposal path too", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Website/), "javascript:alert(1)");
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    // The server refuses this too, and that is the control -- this is what
+    // turns its 400 into a message beside the field that caused it.
+    expect(await screen.findByText(/must be a http or https link/)).toBeInTheDocument();
+    expect(mockProposeClub).not.toHaveBeenCalled();
+  });
+
+  it("refuses an address that is not one, without demanding it", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Contact email/), "astronomy.ca");
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    expect(await screen.findByText(/valid email address/)).toBeInTheDocument();
+    expect(mockProposeClub).not.toHaveBeenCalled();
+  });
+});
+
 describe("CreateClubForm — the URL preview", () => {
   it("shows an admin the slug their name will take", async () => {
     currentUser = user(Role.USER, Role.ADMIN);
@@ -283,6 +369,18 @@ describe("CreateClubForm — required fields", () => {
     // aria-required as required, so that matcher cannot tell the two apart —
     // and the whole point here is that one is set and the other is not.
     expect(screen.getByLabelText(/Club name/)).not.toHaveAttribute("required");
+  });
+
+  it("turns off native validation, which pre-empts the validator just as hard", () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    // Without this, a form holding an invalid type=email or type=url control
+    // never fires submit at all: the browser blocks it and shows a bubble, and
+    // the message `clubValidator` wrote beside the field is never rendered.
+    // The contact email is optional on this path, so a typo in it used to be
+    // silently unsubmittable rather than explained.
+    expect(screen.getByLabelText(/Club name/).closest("form")).toHaveAttribute("novalidate");
   });
 });
 

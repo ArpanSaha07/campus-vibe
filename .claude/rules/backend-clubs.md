@@ -46,5 +46,16 @@ paths:
   months because V6 had already inserted eight clubs, so it had never run and
   every seeded club had a null embedding. V32 retires those rows; do not restore
   a `count() > 0` guard. (BUG-041)
+- **`clubs.social_links` is never written raw — go through
+  `ClubSocialLinks.normalise`.** Both writers do (`ClubService.update`,
+  `ClubCreationRequestService.create`), and it validates, canonicalises and
+  re-serialises, so the column holds four known keys or NULL. It was stored as
+  sent until 2026-09-10 and two of those values reach an `href` on the public
+  club page, so a `javascript:` link was a script waiting for a click
+  (BUG-048). A new writer that skips it reopens exactly that.
+- **Instagram is a handle in, a URL out** — `WebLinks.normaliseInstagram`. Do
+  not run it through `WebLinks.normalise`: it has no scheme, so a handle would
+  be read as a bare host. The handle pattern is checked *before* the URL is
+  built by concatenation, which is the only thing making that join safe.
 - **The `Persistable` fix is proposed in ADR-002 and not yet decided.** It
   changes the write path for every club, so it is never a rider on another fix.

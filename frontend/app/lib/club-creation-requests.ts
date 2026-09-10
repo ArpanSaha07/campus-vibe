@@ -16,12 +16,18 @@ import type { ClubCreationRequest, NewClubProposal } from "@/app/types";
  */
 
 /**
- * Submits a proposal. Text only — a proposal carries no logo or banner, because
- * both need a club id and an S3 key and neither exists until approval.
+ * Submits a proposal. No images — a logo or a banner needs a club id and an S3
+ * key, and neither exists until approval.
+ *
+ * The contact links do travel, as one JSON string in the shape
+ * `clubs.social_links` holds, so approval can carry the value onto the club
+ * without translating it. That is why this stringifies rather than sending an
+ * object, the same way `updateClubSocialLinks` does on the admin path.
  *
  * The slug is derived here with the same `clubSlug` the admin create path uses,
  * so the name check the form already ran answers the question that actually
- * decides. The server normalises it again rather than trusting this.
+ * decides. The server normalises it again rather than trusting this — and it
+ * normalises the links too, which is where a `javascript:` URL is refused.
  */
 export async function proposeClub(proposal: NewClubProposal): Promise<ClubCreationRequest> {
   return apiFetch<ClubCreationRequest>(`/api/v1/club-creation-requests`, {
@@ -33,9 +39,19 @@ export async function proposeClub(proposal: NewClubProposal): Promise<ClubCreati
       category: proposal.category,
       interests: proposal.interests,
       message: proposal.message.trim(),
+      // Omitted rather than sent as an object of empty strings when the
+      // requester filled in none of them: the column is NULL for a proposal
+      // nobody answered, and an empty object would claim otherwise.
+      socialLinks: hasAnyLink(proposal.socialLinks)
+        ? JSON.stringify(proposal.socialLinks)
+        : null,
     }),
     auth: true,
   });
+}
+
+function hasAnyLink(links: NewClubProposal["socialLinks"]): boolean {
+  return Object.values(links).some((value) => value && value.trim() !== "");
 }
 
 /** The review queue. Admin only — the backend answers 403 to anyone else. */

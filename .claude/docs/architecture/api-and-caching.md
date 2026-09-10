@@ -5,7 +5,12 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `4d11778` — re-read on 2026-09-09 for the club ownership spine:
+**Code as of:** `31c7abb` — re-read on 2026-09-10 for the contact links a club
+proposal now carries: `ClubCreationRequestDTO` gained `socialLinks` and its row
+in `api-dto-fields.json`, and `parseSocialLinks` in `adapters.ts` became
+exported because the admin queue reads a proposal's links before a club exists.
+Neither changes a data path or what may be cached. Re-read on 2026-09-09 for
+the club ownership spine:
 `api.tsx` (the multipart branch), `cache.ts` and its first real invalidator,
 `adapters.ts` (the media-URL boundary), and the new club media endpoints.
 Re-read again the same day for the create-club form work, which moved
@@ -280,6 +285,11 @@ Maps `ApiEvent`/`ApiClub`/`ApiMyEvent` onto the UI shapes, and is where nullable
 backend fields acquire UI defaults (`Location TBA`, `Free`, a fallback image).
 `parseSocialLinks` tolerates malformed JSON by returning an empty record rather
 than throwing — the club page renders without social links instead of failing.
+It is **exported** since 2026-09-10, because a club proposal carries the same
+JSON string and the admin review queue reads it before any club exists, so the
+translation is no longer only `toClub`'s business. What it parses is now always
+the server's own JSON: `ClubSocialLinks.normalise` validates and re-serialises
+on every write path, so the column holds four known keys or NULL.
 
 **It is also where an S3 object key becomes a URL.** `clubs.logo` and
 `club_images.url` hold two different kinds of thing: absolute Unsplash URLs in

@@ -16,6 +16,8 @@ import {
   rejectClubCreationRequest,
 } from "@/app/lib/club-creation-requests";
 import { revalidateClubs } from "@/app/lib/actions/revalidate";
+import { parseSocialLinks } from "@/app/lib/adapters";
+import { normaliseWebLink } from "@/app/lib/links";
 import type { ClubAdminRequest, ClubCreationRequest } from "@/app/types";
 import SectionHeading from "@/app/components/ui/SectionHeading";
 import StatTile from "@/app/components/ui/StatTile";
@@ -146,9 +148,9 @@ export default function AdminDashboardPage() {
         </div>
         {/* The only place a club can be created from. POST /api/v1/clubs is
             admin-only, and the form branches on the same isAdmin check, so an
-            admin arriving here gets the full form with logo, photos and links
-            -- all of which save, because creating a club now makes them its
-            owner. */}
+            admin arriving here gets the logo field as well -- and it saves,
+            because creating a club now makes them its owner. Everyone else
+            proposes, and fills in everything but the logo. */}
         <Button href="/create-club">Create a club</Button>
       </div>
 
@@ -240,6 +242,9 @@ export default function AdminDashboardPage() {
                       &ldquo;{row.request.message}&rdquo;
                     </p>
                   )}
+                  {row.kind === "proposal" && (
+                    <ProposalContactLinks socialLinks={row.request.socialLinks} />
+                  )}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Button onClick={() => review(row, "approve")}>Approve</Button>
@@ -254,5 +259,50 @@ export default function AdminDashboardPage() {
       </section>
 
     </main>
+  );
+}
+
+/**
+ * A proposal's contact links, on the review row.
+ *
+ * A reviewer is deciding whether a club is real and whether this person should
+ * run it, and a working instagram or a departmental website is the evidence for
+ * both — a queue that shows only a slug and a sentence cannot be reviewed.
+ *
+ * The three links are clickable, and every one goes through `normaliseWebLink`
+ * first. The server already refused anything that is not http(s) on the way in,
+ * so this is the second of the two checks rather than the only one: a row
+ * written before that rule existed would still land in this href.
+ *
+ * The contact email is deliberately not a `mailto:` — it is shown as text. A
+ * reviewer has no reason to mail it from here, and a link that opens a mail
+ * client on a misclick is worse than a string they can copy.
+ */
+function ProposalContactLinks({ socialLinks }: { socialLinks: string | null }) {
+  const links = parseSocialLinks(socialLinks);
+  const web: [string, string | null][] = [
+    ["Website", normaliseWebLink(links.website)],
+    ["Instagram", normaliseWebLink(links.instagram)],
+    ["Facebook", normaliseWebLink(links.facebook)],
+  ];
+  const shown = web.filter(([, href]) => href !== null);
+
+  if (!links.email && shown.length === 0) return null;
+
+  return (
+    <p className="font-mono text-xs text-ink-600 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+      {links.email && <span>{links.email}</span>}
+      {shown.map(([label, href]) => (
+        <a
+          key={label}
+          href={href as string}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-lavender-600 font-semibold hover:text-lavender-800"
+        >
+          {label}
+        </a>
+      ))}
+    </p>
   );
 }

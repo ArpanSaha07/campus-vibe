@@ -2,10 +2,12 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-09**
+Last updated: **2026-09-10**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
+| [BUG-048](#bug-048) | High | 2026-09-10 | A club's social links were stored exactly as sent and rendered into an `href` with no scheme check on either side |
 | [BUG-047](#bug-047) | Medium | 2026-09-09 | The fix for BUG-045 left the other half silent: the success callback's promise was dropped, so a club was created and the user was told nothing |
 | [BUG-045](#bug-045) | Medium | 2026-09-09 | A club that was created reported itself as not created: the success callback ran inside the try that wrapped the write |
 | [BUG-046](#bug-046) | Low | 2026-09-09 | Every `select` in the app was a plain pill — `selectClasses` reserved the chevron's space and position but never supplied the image |
@@ -37,6 +39,72 @@ Last updated: **2026-09-09**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-049
+**A form that validated in JavaScript was overruled by the browser** · Medium · FIXED 2026-09-10
+
+`CreateClubForm`'s `<form>` had no `noValidate`. The contact email is
+`type="email"` and two link fields are `type="url"`, so an invalid value in any
+of them made the browser refuse to fire `submit` at all: `handleSubmit` never
+ran, `clubValidator` never ran, and the message it writes beside the field was
+never rendered. The user got a native bubble instead — or, in a browser that
+shows none, nothing whatsoever.
+
+**This form had already decided the opposite.** `FormField` refuses to set the
+`required` attribute for exactly this reason, and says so in a comment
+(`FormField.tsx:60-63`): validation belongs to `clubValidator`, not to the
+browser's bubbles. The attribute one level up, on the form itself, was missed —
+so the policy was half-applied and looked complete.
+
+**Latent until the contact email became optional.** While it was required on
+every path, a bad address was refused by *some* rule and the outcome looked
+about right. Making it optional on the proposal path turned a typo into
+something silently unsubmittable: no error, no request, no explanation.
+
+**Found by a test that could not pass.** A new case asserting the validator's
+own message for a malformed address failed with the form still on screen and
+`proposeClub` never called — which is not what a validation failure looks like.
+
+Fixed with `noValidate` on the form, plus a test asserting the attribute is
+there, since nothing else would notice its removal. The rule is now in
+[`rules/frontend.md`](../rules/frontend.md).
+
+---
+
+### BUG-048
+**A club's social links reached an `href` with nothing checking them** · High · FIXED 2026-09-10
+
+`ClubService.update` stored `request.socialLinks()` exactly as it arrived — a
+JSON string, unparsed and unvalidated — and the club page put two of its values
+straight into an `href` (`clubs/[clubId]/page.tsx:58`, `:68`). Nothing checked
+the scheme on either side, so a stored `javascript:` link was a script on the
+club's public page waiting for a click.
+
+**The rule to prevent it already existed and could not be reached.** The
+profile side had refused exactly this since it was built, in
+`ProfileLinks.normalise` — a class that was **package-private in
+`com.campusvibe.user.profile`**. Club code could not call it, so clubs simply
+went without. That is the whole defect: not a missing idea, a missing import.
+
+**Severity is about who could write it, and that was changing.** Only a club
+owner or platform admin could reach `PUT /clubs/{id}`, which kept it small. The
+work in progress — a club proposal carrying the same four fields — was about to
+open the same values to every signed-in user, which is what turned a latent
+issue into one worth fixing before shipping.
+
+Fixed by moving the class to `common/WebLinks`, unchanged, and giving it three
+callers: the profile, `ClubService.update`, and `ClubCreationRequestService`.
+`ClubSocialLinks` parses the JSON, normalises each value and re-serialises, so
+the column now holds our four keys or NULL rather than whatever a client sent.
+Two ITs pin it, one per write path — the proposal one is new behaviour, the
+`PUT` one is this bug. The trap is in
+[`rules/backend-clubs.md`](../rules/backend-clubs.md).
+
+**Not fixed here:** the *render* side still trusts nothing and normalises
+anyway, which is correct and stays — a row written before this rule existed
+would otherwise still reach an href.
 
 ---
 

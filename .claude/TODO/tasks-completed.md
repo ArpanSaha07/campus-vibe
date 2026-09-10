@@ -4,7 +4,7 @@ Finished work, moved out of [`todo.md`](todo.md) so the queue stays readable.
 Nothing here needs doing. It is kept because *what was already tried, and why it
 was done that way* is the expensive thing to rediscover.
 
-Last updated: **2026-09-08**
+Last updated: **2026-09-10**
 
 **Two halves, and they answer different questions:**
 
@@ -31,6 +31,16 @@ links resolve unchanged — this file sits in the same directory.
 
 
 ### Club governance
+
+- [x] **A proposal carries the club's contact links** — **done 2026-09-10.** Arpan, 2026-09-09, reviewing the rebuilt create-club page: the propose path collected name, description, category, interests and a message, and dropped the four things every club page shows, so a club born by approval reached its public page with an empty contact block and its new owner had to add what nobody had asked them for. Decided then — **the links ship, the logo waits** — and specified in [`2026-09-10-proposal-social-links.md`](../specs/2026-09-10-proposal-social-links.md).
+
+  **Built as agreed:** `V33` adds one `social_links TEXT` column to `club_creation_requests`, mirroring `clubs.social_links` rather than four columns, and `ClubCreationRequestService.approve` copies it onto the `Club` before `createOwnedBy` — after it would write to a detached instance ([BUG-037](../bugs/fixed_bugs.md#bug-037)). The four fields left the `admin &&` gate on the form; the logo did not, and remains the only thing a proposal cannot carry ([BUG-043](../bugs/bugs.md#bug-043)). The contact email is required for an admin creating outright and optional on a proposal — a student may not have an address for the club yet, and refusing the form over it would be refusing the club.
+
+  **The unit grew one decision and two bugs.** Arpan, 2026-09-10, chose to extract the profile's link rule rather than duplicate it: `ProfileLinks` was package-private in `user.profile`, which is the entire reason a club's links had never been checked at all — not a missing idea, a missing import. It became `common/WebLinks` with three callers, and `ClubSocialLinks` now parses, validates and re-serialises the stored JSON so the column holds four known keys or NULL. That closed [BUG-048](../bugs/fixed_bugs.md#bug-048) on `ClubService.update`, which predated this work and was widening: the proposal was about to open the same values to every signed-in user. [BUG-049](../bugs/fixed_bugs.md#bug-049) surfaced while testing it — the form had no `noValidate`, so the browser blocked submit on an invalid `type=email` and `clubValidator` never ran; the same policy `FormField` already applied to `required`, missed one level up.
+
+  **Instagram became a handle** — Arpan, 2026-09-10, on this form and the profile editor both. The server builds `https://instagram.com/<handle>`, checking the handle pattern *before* the URL is concatenated; a pasted `instagram.com` URL is reduced to its handle and any other host refused. The profile editor strips the stored URL back to a handle on load.
+
+  **Left for its own unit:** seeding a club's `official_email` from the same contact email — Arpan, 2026-09-10, who also decided that editing it stays platform-admin-only rather than opening it to club owners and admins, keeping the trust-anchor property [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md) §6 gives it.
 
 - [x] **The create-club page, rebuilt on the design system** — **done 2026-09-09.** Direct request from Arpan, no spec: the form the ownership spine had just made functional was still wearing the palette it was prototyped in. The submit button was `bg-orange-600` against a lavender product, and the fields were `slate`/`gray`/`blue` throughout — every token now comes from [`design-guidelines.md`](../design-guidelines.md) through the shared `Button`, `FormField` and `inputClasses`.
 

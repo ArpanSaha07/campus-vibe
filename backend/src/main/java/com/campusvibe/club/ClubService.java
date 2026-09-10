@@ -134,7 +134,12 @@ public class ClubService {
             club.setDescription(request.description());
         }
         if (request.socialLinks() != null) {
-            club.setSocialLinks(request.socialLinks());
+            // Normalised, not stored as sent. These three links reach an href on
+            // the public club page, and until this call existed nothing checked
+            // their scheme on either side -- so a stored `javascript:` link was
+            // a script on the club's page (BUG-048). An empty object clears the
+            // column, which is how the editor removes the last link.
+            club.setSocialLinks(ClubSocialLinks.normalise(request.socialLinks()));
         }
         if (request.category() != null) {
             club.setCategorySlug(taxonomyService.requireKnownClubCategory(request.category()));

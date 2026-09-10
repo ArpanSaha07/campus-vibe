@@ -6,7 +6,15 @@ claim below was read from the code, and the endpoint behaviours are covered by
 `MyAccountIT`, all of which run against real PostgreSQL with
 `ddl-auto: validate`.
 
-**The stamp is deliberately not advanced.** `InterestPicker` gained a
+**The stamp is deliberately not advanced, and that is still true after
+2026-09-10.** The link rule moved out of this package that day — `ProfileLinks`
+became `common/WebLinks`, `normaliseProfileLink` became `normaliseWebLink` in
+`app/lib/links.ts`, and Instagram became a handle the server turns into a URL —
+and **the sections describing it below were re-read and rewritten against the
+code**. Nothing else was, so the sha stays where it is; moving it would claim
+the whole document had been reconciled.
+
+`InterestPicker` gained a
 `capChoices` prop on 2026-09-09 for the create-club form, which scrolls the
 unchosen grid inside a fixed height. **It defaults to false and this page does
 not pass it**, so nothing described below changes — that one prop was re-read
@@ -47,11 +55,24 @@ is what stops the editor erasing itself.
   `emptyProfile()` instead of the loaded profile will erase every field it does
   not show, the first time someone presses Save.** `savingReplacesEverythingRatherThanMerging`
   in `UserProfileIT` pins the server half of this.
-- **`ProfileLinks.normalise` checks the scheme before assuming https, and that
+- **`WebLinks.normalise` checks the scheme before assuming https, and that
   order is the security property.** Reversed, `javascript:alert(1)` becomes
   `https://javascript:alert(1)` — an https URL that passes a scheme check and
   reaches an `href`. There is a test named after exactly that on both sides of
-  the wire.
+  the wire. **It was `user.profile.ProfileLinks` and package-private until
+  2026-09-10**, which is why a club's contact links were never checked at all:
+  the rule existed and club code could not reach it
+  ([BUG-048](../../bugs/fixed_bugs.md#bug-048)). It is now
+  `common/WebLinks` with three callers — this profile, `ClubService.update` and
+  a club proposal.
+- **Instagram is a handle, not a link, on both this form and the club's.**
+  `WebLinks.normaliseInstagram` strips a leading `@`, validates against
+  Instagram's own character rule and returns `https://instagram.com/<handle>`;
+  a pasted `instagram.com` URL is reduced to its handle and any other host is
+  refused (Arpan, 2026-09-10). **The pattern is checked before anything is
+  concatenated**, which is what makes building that URL by string join safe.
+  The stored value is still the full URL — that is what an `href` needs — so
+  the editor strips it back to a handle on load.
 - **`UserProfile` is not on `User`, and must not become so.** `User` is the
   Spring Security principal and `JWTAuthenticationFilter` re-loads it on every
   authenticated request. Separately, the frontend contract test keys on
@@ -208,16 +229,28 @@ does not read as an oversight.
 
 ### The check happens twice, on purpose
 
-`normaliseProfileLink` (`frontend/app/lib/profile.ts`) runs in the browser and is
+`normaliseWebLink` (`frontend/app/lib/links.ts`) runs in the browser and is
 therefore **not a control** — anything holding a token can PUT straight past it.
-`ProfileLinks.normalise` (backend) is the control. The frontend copy stays
+`WebLinks.normalise` (backend) is the control. The frontend copy stays
 because it guards the *render*, and a row written before the server rule existed
 would still reach an `href`.
 
+Both moved on 2026-09-10 — from `user.profile.ProfileLinks` and from
+`app/lib/profile.ts` — and neither changed behaviour in the move. They were
+profile-shaped names for a rule that clubs needed too, and being package-private
+was the reason clubs had gone without it
+([BUG-048](../../bugs/fixed_bugs.md#bug-048)).
+
 Both refuse any scheme other than http and https, and both check the scheme
-*before* assuming https for a bare `instagram.com/someone`. Both have a test
+*before* assuming https for a bare `facebook.com/someone`. Both have a test
 named after that ordering, because the failure is silent: reverse the two steps
 and every hostile scheme becomes a valid-looking https URL.
+
+**Instagram no longer goes through that path on the way in.** The field takes a
+handle and the server builds the URL, so what is checked is the handle pattern
+rather than a scheme — see the bullet in *Read this first*. The stored value is
+still an ordinary https URL, so the *render* side is unchanged: it goes through
+`normaliseWebLink` with the other two.
 
 One known false refusal: `instagram.com:443/x` is read as a scheme of
 `instagram.com`, because dots are legal in a scheme, and is refused. Nobody types

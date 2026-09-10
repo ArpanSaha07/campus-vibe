@@ -98,7 +98,14 @@ export function toClub(api: ApiClub): Club {
   };
 }
 
-function parseSocialLinks(raw: string | null): Club["socialLinks"] {
+/**
+ * The JSON string in `clubs.social_links` as an object.
+ *
+ * Exported because a club proposal carries the same string, and the admin queue
+ * reads it before any club exists — so this is not only `toClub`'s business any
+ * more. Shape translation belongs here rather than in a component.
+ */
+export function parseSocialLinks(raw: string | null): Club["socialLinks"] {
   if (!raw) return { email: "" };
   try {
     const parsed = JSON.parse(raw);

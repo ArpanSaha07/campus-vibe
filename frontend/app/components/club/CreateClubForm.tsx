@@ -24,11 +24,16 @@ import { ClubFormErrorBoundary } from './ClubFormErrorBoundary';
  * The one club-creation form, on both paths.
  *
  * A platform admin creates the club directly and becomes its owner, so the logo
- * and links are collected and saved. Everyone else submits a proposal for
- * review, which carries text only — a proposal has no club id and no S3 key, so
- * those controls are **absent** rather than disabled. There is no note
- * promising them later either; the requester adds them from /manage/[clubId]
- * once approval makes them the owner. See ADR-004.
+ * is collected and saved. Everyone else submits a proposal for review, which
+ * carries everything except the logo — a proposal has no club id and no S3 key,
+ * so that one control is **absent** rather than disabled. There is no note
+ * promising it later either; the requester adds it from /manage/[clubId] once
+ * approval makes them the owner. See ADR-004 and its 2026-09-10 amendment.
+ *
+ * The four contact links are on both paths. They were once admin-only for the
+ * same reason as the logo, which was wrong: they need no club id and no S3 key,
+ * and leaving them out meant a club born by proposal reached its public page
+ * with an empty contact block.
  *
  * <strong>Every field here maps to a column on `Club`</strong>, and nothing on
  * `Club` that a creator may set is missing:
@@ -129,7 +134,14 @@ export default function CreateClubForm() {
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} className="mt-10 space-y-10">
+        {/* noValidate for the same reason FormField refuses to set `required`
+            on a control: the browser's own constraint checking pre-empts
+            `clubValidator` entirely. A form with an invalid type=email or
+            type=url control never fires submit at all, so our message beside
+            the field is never written and the user gets a native bubble
+            instead. Found when the contact email became optional on the
+            proposal path -- a typo there was silently unsubmittable. */}
+        <form onSubmit={handleSubmit} noValidate className="mt-10 space-y-10">
           {/* The basics — name, url and description. One group, no heading:
               a heading over the first group of a short form labels the form. */}
           <div className="space-y-6">
@@ -241,11 +253,11 @@ export default function CreateClubForm() {
             />
           </div>
 
-          {/* The logo and links exist only on the admin path. A proposal has no
-              club id and no S3 key, so there is nothing to upload against —
-              they are absent rather than disabled, and nothing here promises
-              them later. The requester adds them from /manage/[clubId] once
-              approval makes them the owner. */}
+          {/* The logo exists only on the admin path. A proposal has no club id
+              and no S3 key, so there is nothing to upload against — it is
+              absent rather than disabled, and nothing here promises it later.
+              The requester adds it from /manage/[clubId] once approval makes
+              them the owner. */}
           {admin && (
             <div className="space-y-6 border-t border-mist-200 pt-10">
               <FormField label="Logo" htmlFor="logo" error={errors.logo}>
@@ -265,17 +277,30 @@ export default function CreateClubForm() {
                   className="sr-only"
                 />
               </FormField>
+            </div>
+          )}
 
+          {/* On both paths. These four are what a club page shows and what
+              somebody looking for the club actually needs; dropping them from
+              the proposal meant a club born by approval arrived with an empty
+              contact block and its new owner had to go and add what nobody had
+              asked them for. Carried onto the club at approval. */}
+          <div className="space-y-6 border-t border-mist-200 pt-10">
               <div className="space-y-6 pt-2">
-                {/* Required on this path only — `clubValidator` checks the
-                    social links in `create` mode alone, because a proposal
-                    renders none of them. */}
+                {/* Required for an admin creating the club outright, optional
+                    for a proposal — a student may not have an address for the
+                    club yet, and refusing the form over it would be refusing
+                    the club. `clubValidator` checks the shape either way. */}
                 <FormField
                   label="Contact email"
                   htmlFor="social_email"
-                  required
+                  required={admin}
                   error={errors.social}
-                  hint="Public, and shown on the club's page."
+                  hint={
+                    admin
+                      ? "Public, and shown on the club's page."
+                      : "Public, and shown on the club's page once it is approved."
+                  }
                 >
                   <input
                     type="email"
@@ -285,7 +310,7 @@ export default function CreateClubForm() {
                     onChange={handleInputChange}
                     placeholder="hello@yourclub.ca"
                     disabled={isSubmitting}
-                    aria-required="true"
+                    aria-required={admin}
                     className={inputClasses}
                   />
                 </FormField>
@@ -303,14 +328,24 @@ export default function CreateClubForm() {
                   />
                 </FormField>
 
-                <FormField label="Instagram" htmlFor="social_instagram">
+                {/* The handle alone, and the server puts instagram.com in front
+                    of it (`WebLinks.normaliseInstagram`) -- Arpan, 2026-09-10.
+                    That half is bookkeeping rather than something a club has to
+                    tell us, and the stored value is still the full URL, which
+                    is what an href needs. A leading @ is stripped, and a pasted
+                    profile URL is reduced to its handle rather than refused. */}
+                <FormField
+                  label="Instagram"
+                  htmlFor="social_instagram"
+                  // hint="Just the club's instagram handle."
+                >
                   <input
                     type="text"
                     id="social_instagram"
                     name="social_instagram"
                     value={formData.socialLinks.instagram}
                     onChange={handleInputChange}
-                    placeholder="@yourclub"
+                    placeholder="yourclub002"
                     disabled={isSubmitting}
                     className={inputClasses}
                   />
@@ -329,8 +364,7 @@ export default function CreateClubForm() {
                   />
                 </FormField>
               </div>
-            </div>
-          )}
+          </div>
 
           {!admin && (
             <div className="border-t border-mist-200 pt-10">
