@@ -431,6 +431,124 @@ class ClubCreationFlowIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.socialLinks", nullValue()));
     }
 
+    // ----------------------------------------------------------- official email
+
+    @Test
+    void anAdminCreatingAClubSeedsItsOfficialEmail() throws Exception {
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        // Mixed case on purpose: stored lowercased, so an admin later re-setting
+        // the same address does not read as a change of address.
+        mockMvc.perform(post("/api/v1/clubs")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "id", "robotics",
+                                "name", "Robotics",
+                                "officialEmail", "Hello@Robotics.ca"))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.officialEmail", is("hello@robotics.ca")))
+                // Seeded is not verified. Only redeeming a mailed link may ever
+                // stamp it (ADR-006), and there is no round trip yet.
+                .andExpect(jsonPath("$.officialEmailVerified", is(false)));
+    }
+
+    @Test
+    void anApprovedProposalCarriesItsContactEmailOntoTheClubAsTheOfficialOne() throws Exception {
+        User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        String response = mockMvc.perform(post("/api/v1/club-creation-requests")
+                        .header("Authorization", bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "id", "robotics",
+                                "name", "Robotics",
+                                "description", "We build robots",
+                                "message", "please",
+                                "socialLinks", "{\"email\":\"hello@robotics.ca\"}"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        long requestId = objectMapper.readTree(response).get("id").asLong();
+
+        mockMvc.perform(post("/api/v1/club-creation-requests/" + requestId + "/approve")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+
+        // Read as the requester, who is now the owner: the whole management team
+        // may see the address, and only a platform admin may change it.
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.officialEmail", is("hello@robotics.ca")))
+                .andExpect(jsonPath("$.officialEmailVerified", is(false)));
+    }
+
+    @Test
+    void aClubCreatedWithNoContactEmailHasNoOfficialEmail() throws Exception {
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        mockMvc.perform(post("/api/v1/clubs")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("id", "robotics", "name", "Robotics"))))
+                .andExpect(status().isOk());
+
+        // NULL, exactly as every club was before seeding existed. The dashboard
+        // says `Not set yet` and an admin can still set one.
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.officialEmail", nullValue()));
+    }
+
+    /**
+     * Seeding does not open the address up. It is set from the form at creation
+     * and is a platform admin's alone to change afterwards — the club's own team
+     * must not be able to repoint the channel used to recover the club from
+     * them (§6).
+     */
+    @Test
+    void aClubOwnerStillCannotChangeTheSeededOfficialEmail() throws Exception {
+        User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        String response = mockMvc.perform(post("/api/v1/club-creation-requests")
+                        .header("Authorization", bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of(
+                                "id", "robotics",
+                                "name", "Robotics",
+                                "description", "We build robots",
+                                "message", "please",
+                                "socialLinks", "{\"email\":\"hello@robotics.ca\"}"))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        long requestId = objectMapper.readTree(response).get("id").asLong();
+
+        mockMvc.perform(post("/api/v1/club-creation-requests/" + requestId + "/approve")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/api/v1/clubs/robotics/official-email")
+                        .header("Authorization", bearer(user))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("officialEmail", "captured@elsewhere.com"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/v1/clubs/robotics/managed")
+                        .header("Authorization", bearer(user)))
+                .andExpect(jsonPath("$.officialEmail", is("hello@robotics.ca")));
+    }
+
     @Test
     void aProposalWithNoContactLinksIsUnchangedFromBefore() throws Exception {
         User user = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);

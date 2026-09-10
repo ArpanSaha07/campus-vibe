@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -116,9 +115,18 @@ public class ClubService {
         // Recorded here rather than at the two call sites, so a club created
         // directly and a club created by approving a proposal produce the same
         // first entry in the club's activity log.
+        // The official email rides on this entry rather than getting a
+        // CLUB_OFFICIAL_EMAIL_SET of its own. It is a governance fact -- §6
+        // expects the log to answer who pointed a club's recovery channel where
+        // it points -- but at creation it was nobody's separate act, and a
+        // second entry a millisecond after the first would read as one.
+        // metadata() drops a null, so a club created without an address simply
+        // has no such key.
         clubAuditService.record(saved.getId(), createdBy, ClubAuditAction.CLUB_CREATED,
                 AuditEntityType.CLUB, saved.getId(),
-                owner == null ? Map.of() : Map.of("ownerEmail", owner.getEmail()));
+                ClubAuditService.metadata(
+                        "ownerEmail", owner == null ? null : owner.getEmail(),
+                        "officialEmail", saved.getOfficialEmail()));
 
         searchIndexService.indexClub(saved);
         return clubMapper.apply(saved);

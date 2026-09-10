@@ -318,6 +318,47 @@ describe("CreateClubForm — contact links reach the payload", () => {
   });
 });
 
+describe("CreateClubForm — the contact email seeds the official one", () => {
+  // The club's own address, and its recovery channel. It had no way of being
+  // set at creation, so every club started without one until a platform admin
+  // went and added it by hand.
+
+  it("sends it with the club an admin creates", async () => {
+    currentUser = user(Role.USER, Role.ADMIN);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Contact email/), "hello@astronomy.ca");
+    await userEvent.click(screen.getByRole("button", { name: "Create club" }));
+
+    await waitFor(() => expect(mockCreateClubWithMedia).toHaveBeenCalledTimes(1));
+    // On the club argument, not the media one: the address is part of what the
+    // club *is*, and it goes in the create call rather than the PUT that
+    // follows. The links carry the same value separately, and the two are
+    // independent from then on.
+    expect(mockCreateClubWithMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ officialEmail: "hello@astronomy.ca" }),
+      expect.objectContaining({
+        socialLinks: expect.objectContaining({ email: "hello@astronomy.ca" }),
+      }),
+    );
+  });
+
+  it("does not send one from a proposal, which has no club to hang it on", async () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Contact email/), "hello@astronomy.ca");
+    await userEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+
+    // The address travels inside the links, and approval reads it out of them.
+    // A second copy on the proposal would be two values that could disagree.
+    await waitFor(() => expect(mockProposeClub).toHaveBeenCalledTimes(1));
+    expect(mockProposeClub.mock.calls[0][0]).not.toHaveProperty("officialEmail");
+  });
+});
+
 describe("CreateClubForm — the URL preview", () => {
   it("shows an admin the slug their name will take", async () => {
     currentUser = user(Role.USER, Role.ADMIN);

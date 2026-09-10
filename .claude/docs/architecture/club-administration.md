@@ -5,9 +5,9 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `31c7abb` — the club ownership spine (two creation paths, the
+**Code as of:** `85b79b4` — the club ownership spine (two creation paths, the
 club-proposal queue, the platform-admin write for `official_email`), plus the
-contact links a proposal now carries.
+contact links a proposal now carries and the official email both paths seed.
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
@@ -107,6 +107,14 @@ a club's `official_email`, which had been unwritable since the column landed.
   Verified means somebody redeemed a link mailed to that address; an
   administrative write is not that. Today the column is NULL everywhere so this
   reads as a no-op, which is exactly why it is easy to "simplify" away — do not.
+- **`official_email` is seeded at creation and changed only by a platform
+  admin.** Both creation paths fill it from the contact email on the create form
+  (Arpan, 2026-09-10); `PATCH /clubs/{clubId}/official-email` stays
+  `hasRole('ADMIN')`. Seeding it does **not** make it the club's own to edit —
+  that separation is the point of §6, and opening it to owners and admins was
+  considered and rejected. It is also seeded rather than *merged* with
+  `social_links.email`: the two are separate columns from the moment the club
+  exists, so editing the public contact address never moves the recovery one.
 - **Do not reintroduce a club-admin role claim,** however convenient. The
   reason is in `V14__remove_global_club_admin_role.sql` and is the single most
   important decision in this change.
@@ -557,6 +565,28 @@ list must not make the app believe the user manages nothing.
 
 ## Change log
 
+- 2026-09-10 — **a club's official email is seeded at creation, on both paths.**
+  It had no way of being set until the club already existed: `ClubCreateRequest`
+  carried no field for it and `PATCH /clubs/{clubId}/official-email` is the only
+  writer, so every club started with no recovery address and somebody had to add
+  one by hand. The contact email the create form already collects now fills it —
+  `ClubController.create` for the admin path, `ClubCreationRequestService.approve`
+  reading it out of the proposal's stored `social_links` for the other. **Seeded,
+  not merged:** `social_links.email` and `official_email` are separate columns
+  with separate rules from that moment on, so editing the public address does not
+  move the recovery one (Arpan, 2026-09-10).
+  [ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md)
+  is untouched — a seeded address is unverified, and there is no stamp at
+  creation to inherit or clear. **Who may change it is unchanged:** `hasRole('ADMIN')`,
+  so the club's own team still cannot repoint the channel used to recover the
+  club from them (§6), and Arpan chose that over opening it to owners and admins
+  when it was put to him. The `/manage/[clubId]` panel needed no change: it
+  already shows the address and its verified state to the whole management team
+  and draws the edit control for a platform admin alone. The `CLUB_CREATED`
+  audit entry now carries the seeded address, so the log answers who pointed a
+  club's recovery channel where it points. Spec:
+  [`2026-09-10-official-email-seeded-at-creation.md`](../../specs/2026-09-10-official-email-seeded-at-creation.md).
+  Implementing agent.
 - 2026-09-10 — **a proposal carries the club's contact links.** `V33` adds one
   `social_links TEXT` column to `club_creation_requests`, mirroring
   `clubs.social_links` rather than splitting into four columns, and

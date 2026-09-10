@@ -5,10 +5,13 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `31c7abb` — re-stamped on 2026-09-10 after the contact links a
+**Code as of:** `85b79b4` — re-stamped on 2026-09-10 after the contact links a
 club proposal now carries. That work moved `clubadmin/`, which is mapped here,
 but touches no role, no assignment and no authorisation check: who may propose,
-approve and manage is exactly as described below. The last change that did
+approve and manage is exactly as described below. Re-read again the same day for
+the official email seeded at creation, which moves `clubadmin/` once more and
+changes nothing here either — seeding an address is not a grant, and
+`PATCH /clubs/&#123;clubId&#125;/official-email` is still `hasRole('ADMIN')`. The last change that did
 affect this file is `4d11778`, the club ownership spine, which makes club
 creation admin-only and gives `ROLE_ADMIN` three more endpoints.
 Everything else described here is committed ahead of it.

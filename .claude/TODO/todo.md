@@ -79,37 +79,6 @@ log. The rest, in the spec's order:
   matched the filter, everything already added. The catalogue fetch needs
   mocking, which is why this is its own unit rather than a rider.
 
-- [ ] **P1** **A club's official email should be seeded from the create form.**
-  Arpan, 2026-09-10, immediately after the contact links shipped. Today
-  `official_email` is unwritable at creation and only a platform admin can set
-  it afterwards, through `PATCH /clubs/{clubId}/official-email` — so every club
-  starts without the address its own recovery and administrator-change notices
-  depend on, and somebody has to go back and add it.
-
-  **Seed, do not merge** — Arpan, 2026-09-10. The form's contact email fills
-  both `social_links.email` and `official_email` at creation, and the two are
-  independent afterwards: editing the public contact address later must not
-  move the recovery anchor. `Club.java:36-42` records why they are distinct.
-
-  **Editing stays platform-admin-only** — Arpan, 2026-09-10, choosing this over
-  opening it to club owners and admins. That keeps the property
-  [`club_admin_governance.md`](../docs/architecture/club_admin_governance.md)
-  §6 gives it: the channel used to recover a club is held outside the control
-  of whoever currently controls the club, so a takeover cannot repoint it. The
-  cost is accepted — a club wanting its own official email corrected has to ask
-  an admin. **No owner/admin edit UI is to be built.**
-
-  Both writes leave `official_email_verified_at` NULL, so
-  [ADR-006](../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)
-  is untouched — only the round trip may ever stamp it. No migration: the
-  column has existed since V13. Touches `ClubCreateRequest` (which today has
-  **no** such field, deliberately, and whose javadoc says so),
-  `ClubService.createOwnedBy`, `ClubCreationRequestService.approve` (reading
-  the address out of the proposal's stored `social_links`), the form on both
-  paths, and the `CreateClubForm.tsx` header comment that currently says
-  official email is never set at creation. It crosses a recorded rationale, so
-  it goes through `/start`.
-
 - [ ] **P1** *(item 6, half done)* **The official-email verification round
   trip.** The **admin write shipped 2026-09-09** — `PATCH
   /clubs/{clubId}/official-email` plus an editable panel on `/manage/[clubId]`

@@ -130,6 +130,14 @@ public class ClubCreationRequestService {
         // persisted nowhere (BUG-037, ADR-002). Already normalised at
         // submission, so this is a copy and not a second validation.
         club.setSocialLinks(req.getSocialLinks());
+        // Seeded from the same contact address, so a club created by approval
+        // has its recovery channel from birth rather than waiting for an admin
+        // to add one by hand (Arpan, 2026-09-10). Read out of the links rather
+        // than held in a second column on the proposal: there is one address on
+        // that form, and two copies of it would eventually disagree. Unverified,
+        // like every administratively written address -- only the mail round
+        // trip may say otherwise (ADR-006).
+        club.setOfficialEmail(ClubSocialLinks.officialEmailFrom(req.getSocialLinks()));
 
         ClubDTO created = clubService.createOwnedBy(
                 club,

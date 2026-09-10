@@ -38,10 +38,15 @@ import { ClubFormErrorBoundary } from './ClubFormErrorBoundary';
  * <strong>Every field here maps to a column on `Club`</strong>, and nothing on
  * `Club` that a creator may set is missing:
  * `id` (derived, shown read-only) · `name` · `description` · `category_slug` ·
- * `club_interests` · `logo` · `social_links`. `followers`, `featured` and
- * `created_at` are the server's to set, and `official_email` is a platform
- * admin's to write afterwards through its own endpoint — never at creation,
- * because writing it must always reset its verified stamp (ADR-006).
+ * `club_interests` · `logo` · `social_links` · `official_email`. `followers`,
+ * `featured` and `created_at` are the server's to set.
+ *
+ * **`official_email` is seeded from the contact email below** and is not a
+ * field of its own (Arpan, 2026-09-10). It was unsettable at creation until
+ * then, on the reasoning that writing it must reset its verified stamp — which
+ * is about a club that already has one. Changing it afterwards is still a
+ * platform admin's alone, through its own endpoint, and a seeded address is
+ * unverified like any other (ADR-006).
  *
  * Banner photos used to be here, ten pickers deep. They are a club's own
  * content rather than part of deciding it should exist, so they moved to the
@@ -298,8 +303,8 @@ export default function CreateClubForm() {
                   error={errors.social}
                   hint={
                     admin
-                      ? "Public, and shown on the club's page."
-                      : "Public, and shown on the club's page once it is approved."
+                      ? "Shown on the club's page, and kept as the club's own address for recovery."
+                      : "Shown on the club's page once it is approved, and kept as the club's own address for recovery."
                   }
                 >
                   <input
@@ -308,7 +313,7 @@ export default function CreateClubForm() {
                     name="social_email"
                     value={formData.socialLinks.email}
                     onChange={handleInputChange}
-                    placeholder="hello@yourclub.ca"
+                    placeholder="hello@ssmu.ca"
                     disabled={isSubmitting}
                     aria-required={admin}
                     className={inputClasses}

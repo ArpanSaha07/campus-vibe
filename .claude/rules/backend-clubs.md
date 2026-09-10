@@ -53,6 +53,11 @@ paths:
   sent until 2026-09-10 and two of those values reach an `href` on the public
   club page, so a `javascript:` link was a script waiting for a click
   (BUG-048). A new writer that skips it reopens exactly that.
+- **`official_email` is seeded at creation, and only `hasRole('ADMIN')` may
+  change it.** Both creation paths fill it from the form's contact email; the
+  two columns are independent from then on, so nothing that edits
+  `social_links.email` may touch it. Seeding does not make it the club's own to
+  edit — that is the §6 separation, and it was put to Arpan and kept.
 - **Instagram is a handle in, a URL out** — `WebLinks.normaliseInstagram`. Do
   not run it through `WebLinks.normalise`: it has no scheme, so a handle would
   be read as a bare host. The handle pattern is checked *before* the URL is

@@ -200,6 +200,10 @@ export function useCreateClubForm(
               description: formData.description,
               category: formData.category,
               interests: formData.interests,
+              // The same address the links carry, seeding the club's own
+              // recovery channel in the create call itself -- the links follow
+              // in a PUT, and the two are independent from then on.
+              officialEmail: formData.socialLinks.email,
             },
             {
               logo: formData.logo,

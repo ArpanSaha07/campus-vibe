@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -109,6 +110,61 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
             // silent null here would clear a club's links.
             throw new IllegalStateException("Could not serialise club social links", e);
         }
+    }
+
+    /**
+     * The contact address inside a stored links object, as an official email.
+     *
+     * <p>A club's official email is seeded from the contact email the create
+     * form already collects (Arpan, 2026-09-10), and the proposal path has only
+     * that JSON string to read it from — there is one address on the form, and
+     * giving a proposal a second column for it would invite the two to
+     * disagree.
+     *
+     * <p><strong>Seeded, not merged.</strong> The two are separate columns with
+     * separate rules from the moment the club exists: {@code social_links.email}
+     * is public and owner-editable, {@code official_email} is the recovery
+     * channel only a platform admin may write ({@code Club.java:36-42}).
+     * Changing one later does not move the other, which is the whole point of
+     * seeding rather than pointing one at the other.
+     *
+     * @param json a stored {@code social_links} value, or null
+     * @return the address, trimmed and lowercased, or null when there is none
+     */
+    public static String officialEmailFrom(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            ClubSocialLinks parsed = MAPPER.readValue(json, ClubSocialLinks.class);
+            return parsed == null ? null : normaliseOfficialEmail(parsed.email());
+        } catch (JsonProcessingException e) {
+            // Only ever reads what normalise() wrote, so this cannot happen
+            // through the API. Null rather than a throw: a club failing to be
+            // created over an unreadable links column would be the worse
+            // outcome, and the address is recoverable by an admin.
+            return null;
+        }
+    }
+
+    /**
+     * An official email as it is stored: trimmed, lowercased, or null.
+     *
+     * <p>Lowercased for the same reason {@code ClubAdminService.setOfficialEmail}
+     * lowercases it — addresses are compared case-insensitively everywhere in
+     * this application, and a club seeded with {@code Hello@x} that an admin
+     * later re-sets as {@code hello@x} must not read as a change of address.
+     *
+     * <p>Validation is the caller's: on both creation paths the same value has
+     * already been through {@link #normalise}, which refuses a malformed
+     * address with a 400 naming the field.
+     */
+    public static String normaliseOfficialEmail(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim().toLowerCase(Locale.ROOT);
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private boolean isEmpty() {

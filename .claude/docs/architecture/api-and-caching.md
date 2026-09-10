@@ -5,7 +5,7 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `31c7abb` — re-read on 2026-09-10 for the contact links a club
+**Code as of:** `85b79b4` — re-read on 2026-09-10 for the contact links a club
 proposal now carries: `ClubCreationRequestDTO` gained `socialLinks` and its row
 in `api-dto-fields.json`, and `parseSocialLinks` in `adapters.ts` became
 exported because the admin queue reads a proposal's links before a club exists.

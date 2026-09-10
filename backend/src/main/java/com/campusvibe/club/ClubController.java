@@ -92,6 +92,13 @@ public class ClubController {
         club.setId(request.id());
         club.setName(request.name());
         club.setDescription(request.description());
+        // Set on this instance, before createOwnedBy, like every other field:
+        // Club.id is assigned rather than generated, so saveAndFlush merges and
+        // returns a different instance, and anything set afterwards would be
+        // written to a detached copy (BUG-037, ADR-002). It leaves
+        // official_email_verified_at at its default of NULL, which is the whole
+        // of ADR-006 that applies here -- there is no stamp yet to clear.
+        club.setOfficialEmail(ClubSocialLinks.normaliseOfficialEmail(request.officialEmail()));
         return clubService.createOwnedBy(club, request.category(), request.interests(),
                 creator, creator);
     }

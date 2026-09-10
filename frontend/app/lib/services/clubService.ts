@@ -66,6 +66,16 @@ export interface NewClub {
   category: string | null;
   /** `interest_catalogue` slugs — at most eight, enforced server-side too. */
   interests: string[];
+  /**
+   * Seeds the club's `official_email` — its recovery channel, and where
+   * administrator-change notices go. Taken from the form's contact email, and
+   * separate from it the moment the club exists: this one only a platform admin
+   * may change, that one the club's own team edits.
+   *
+   * Optional, and a seeded address is always unverified — only redeeming a link
+   * mailed to it can say otherwise (ADR-006).
+   */
+  officialEmail?: string | null;
 }
 
 /**
@@ -91,6 +101,12 @@ export async function createClub(club: NewClub): Promise<Club> {
       description: club.description.trim(),
       category: club.category,
       interests: club.interests,
+      // Seeds `official_email`, which had no way of being set at creation and
+      // so was null on every club until an admin went and added one. The same
+      // address also goes into `social_links` by the PUT below, and the two are
+      // independent from then on: this one is the club's recovery channel and
+      // only a platform admin may change it.
+      officialEmail: club.officialEmail?.trim() || null,
     }),
     auth: true,
   });
