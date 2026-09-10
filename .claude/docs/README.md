@@ -12,8 +12,9 @@ Last updated: **2026-09-10**
 ├── README.md          this index
 ├── product.md         what the product is meant to do, area by area — shipped vs planned
 ├── architecture/      implementation docs — living, describe the code as it is today
-└── decisions/         ADRs — dated, frozen, describe one choice at the moment it was made
-    └── README.md      the ADR index, and the decisions still waiting to be written
+├── decisions/         ADRs — dated, frozen, describe one choice at the moment it was made
+│   └── README.md      the ADR index, and the decisions still waiting to be written
+└── reviews/           product reviews — dated snapshots of one area, never updated
 ```
 
 **[`product.md`](product.md) answers a different question from everything else
@@ -97,6 +98,20 @@ ADR.
 records above, the four decisions still waiting to be written and what forces
 each, and the ones settled inside a bug write-up rather than an ADR. Read it
 before changing architecture, so a choice already made is not quietly remade.
+
+---
+
+## Reviews — dated snapshots
+
+Neither living docs nor decisions. A review reads one area of the product
+against the code on one day and says what is missing, so the gaps are counted in
+one place instead of being rediscovered one at a time. **A review is never
+updated** — it is true as of its date and its stamp says so. Work it finds
+belongs in [`todo.md`](../TODO/todo.md), which is still the only queue.
+
+| Review | Covers |
+|---|---|
+| [`2026-09-10-club-and-event-management.md`](reviews/2026-09-10-club-and-event-management.md) | Club and event management, the two dashboards and the notification layer under them: 27 gaps with the `file:line` for each, marked queued or new, plus 11 product decisions that block them. Written against `10efaa8` |
 
 ---
 
