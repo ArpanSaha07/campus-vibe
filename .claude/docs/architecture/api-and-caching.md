@@ -5,11 +5,15 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `85b79b4` — re-read on 2026-09-10 for the contact links a club
+**Code as of:** `3fec570` — re-read on 2026-09-10 for the contact links a club
 proposal now carries: `ClubCreationRequestDTO` gained `socialLinks` and its row
 in `api-dto-fields.json`, and `parseSocialLinks` in `adapters.ts` became
 exported because the admin queue reads a proposal's links before a club exists.
-Neither changes a data path or what may be cached. Re-read on 2026-09-09 for
+Neither changes a data path or what may be cached. Re-stamped again for
+`3fec570`, the official email seeded at creation: it adds a field to
+`ClubCreateRequest`, which is a request record rather than a DTO — it has no row
+in `api-dto-fields.json` and no contract test asserts it — so nothing here
+moves. Re-read on 2026-09-09 for
 the club ownership spine:
 `api.tsx` (the multipart branch), `cache.ts` and its first real invalidator,
 `adapters.ts` (the media-URL boundary), and the new club media endpoints.

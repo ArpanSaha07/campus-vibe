@@ -1,11 +1,11 @@
 # ADR-006 — A club's official email is verified only by a round trip to that address
 
-**Status:** Proposed — only Arpan moves this to Accepted
+**Status:** Accepted 2026-09-10
 **Date:** 2026-09-08
 **Raised by:** [`2026-09-08-club-ownership-spine.md`](../../specs/2026-09-08-club-ownership-spine.md),
 on building the platform-admin write for `official_email` (governance item 6).
 Decided by Arpan on 2026-09-08.
-**Approved by:** — (pending)
+**Approved by:** — Arpan
 **Implemented in:** `ClubAdminService.setOfficialEmail` and `PATCH /clubs/{clubId}/official-email` — the admin-write half, shipped 2026-09-09. The round trip is queued under the SES item and is **not** built.
 
 ## Context

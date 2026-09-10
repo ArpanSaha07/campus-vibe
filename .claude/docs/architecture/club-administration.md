@@ -5,7 +5,7 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `85b79b4` — the club ownership spine (two creation paths, the
+**Code as of:** `3fec570` — the club ownership spine (two creation paths, the
 club-proposal queue, the platform-admin write for `official_email`), plus the
 contact links a proposal now carries and the official email both paths seed.
 

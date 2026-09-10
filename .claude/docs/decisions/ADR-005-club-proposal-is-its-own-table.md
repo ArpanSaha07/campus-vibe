@@ -1,11 +1,11 @@
 # ADR-005 — A club proposal is its own table, not a pending club row
 
-**Status:** Proposed — only Arpan moves this to Accepted
+**Status:** Accepted 2026-09-10
 **Date:** 2026-09-08
 **Raised by:** [`2026-09-08-club-ownership-spine.md`](../../specs/2026-09-08-club-ownership-spine.md).
 Follows [ADR-004](ADR-004-two-paths-create-a-club.md), which creates the need
 for a proposal store. Decided by Arpan on 2026-09-08.
-**Approved by:** — (pending)
+**Approved by:** — Arpan
 **Implemented in:** `V31__create_club_creation_requests.sql` and `clubadmin/ClubCreationRequest*` — shipped 2026-09-09.
 
 ## Context

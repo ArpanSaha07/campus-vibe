@@ -1,11 +1,17 @@
 ---
-description: Club, seed and taxonomy code — the assigned-id merge trap and the taxonomy contract
+description: Club, club-governance, seed and taxonomy code — the assigned-id merge trap, the taxonomy contract, and the ADR triggers that fire here
 paths:
-  - "backend/src/main/java/com/campusvibe/{club,seed,taxonomy}/**"
-  - "backend/src/test/java/com/campusvibe/{club,taxonomy}/**"
+  - "backend/src/main/java/com/campusvibe/{club,clubadmin,seed,taxonomy}/**"
+  - "backend/src/test/java/com/campusvibe/{club,clubadmin,taxonomy}/**"
 ---
 
 # Clubs, seeding and taxonomy
+
+**`clubadmin/` was added to the paths above on 2026-09-10.** Half the rules
+below govern code that lives there — `createOwnedBy`'s callers, the seeded
+`official_email`, the proposal that carries a club's links — and none of them
+loaded when that code was opened. A rule that does not load is a rule nobody
+reads.
 
 - **`Club.id` is an assigned `String` slug** — `Club.java:20-21`, no
   `@GeneratedValue`, and `Club` does not implement `Persistable`. Spring Data's
@@ -64,3 +70,40 @@ paths:
   built by concatenation, which is the only thing making that join safe.
 - **The `Persistable` fix is proposed in ADR-002 and not yet decided.** It
   changes the write path for every club, so it is never a rider on another fix.
+
+## Accepted decisions that reopen on a condition
+
+These are the triggers from ADR-004, ADR-005 and ADR-006, put where the code
+that would trip them is read. The reasoning stays in the ADR; if a trigger has
+fired, **stop and say so** rather than deciding it alone — reopening an accepted
+decision is a new ADR, and only Arpan flips a status.
+
+- **Adding a field to `ClubCreateRequest`? Add it to the proposal too, or record
+  why not.** The two shapes duplicate each other by design, and
+  [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) says
+  one divergence is a bug, two means unifying them behind a shared embeddable.
+  **The count is at one and a half:** the contact links were missing from the
+  proposal entirely (fixed 2026-09-10), and `officialEmail` now sits on
+  `ClubCreateRequest` alone — legitimately, since the proposal derives it from
+  its stored `social_links`, but the shapes have diverged again. The next one
+  makes it two.
+- **A reviewer wanting to preview a proposed club as a club page is ADR-005's
+  first genuinely awkward requirement.** There is no `clubs` row to render, and
+  the answer is to build the preview from the proposal — not to relax the rule
+  that no row exists before approval.
+- **Never add a *mark as verified* control for `official_email`,** however much
+  it would unblock the §17 notices.
+  [ADR-006](../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)
+  forecloses an administrative override by name: it is the rejected option
+  wearing a different label, and it gets reached for exactly when someone is
+  impatient. Verified means a link mailed to the address was redeemed, and until
+  SES lands nothing is verified, which is accurate rather than broken.
+- **When SES lands, build the round trip** — the table shape is already recorded
+  in ADR-006 so it is not re-derived, and its redeem endpoint's matcher must sit
+  **above** the broad public-GET block in `SecurityFilterChainConfig`.
+- **A club whose proposal nobody reviews holds its slug forever**
+  ([ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md)), and
+  nothing tells the requester anything at all
+  ([ADR-004](../docs/decisions/ADR-004-two-paths-create-a-club.md)). Both are
+  queued in [`todo.md`](../TODO/todo.md); the second stops being a consequence
+  and becomes a bug the day notifications exist.

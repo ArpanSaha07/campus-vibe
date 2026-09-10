@@ -33,3 +33,16 @@ paths:
   TypeScript interface plus its `MIRRORS` entry in `api-contract.test.ts`. Miss
   either test registration and the contract silently does not cover the DTO at
   all — both suites still pass.
+- **`ClubCreateRequest` and `ClubCreationRequestCreateRequest` mirror each
+  other, and nothing enforces it.** A club can be created two ways, so a field
+  added to one and not the other means it silently cannot be proposed — no test
+  fails, because the contract covers DTOs going out, not request records coming
+  in. This rule loads on both files. **Adding a field to either? Add it to the
+  other, or record why it does not belong there.**
+  [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) names
+  this as the standing cost of keeping a proposal in its own table, and sets the
+  threshold: one divergence is a bug, **two means the shapes should be unified
+  behind a shared embeddable**. The count is at one and a half — the contact
+  links were missing outright (fixed 2026-09-10) and `officialEmail` is on the
+  club record alone, which is legitimate only because the proposal derives it
+  from its stored `social_links`. If your change makes two, stop and say so.

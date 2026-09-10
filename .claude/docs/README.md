@@ -5,7 +5,7 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-09-07**
+Last updated: **2026-09-10**
 
 ```
 .claude/docs/
@@ -77,14 +77,15 @@ be a guess. Someone who knows it should add its line.
 
 ## Decisions — ADRs
 
-| Document | Decides | Status |
-|---|---|---|
-| [`ADR-002`](decisions/ADR-002-club-id-is-an-assigned-slug.md) | Whether `Club.id` stays an assigned slug and gains `Persistable`, moves to a surrogate generated id, or is left alone with a rule · the `em.merge` trap that has now cost two bugs in one method | 📝 Proposed 2026-09-07 — awaiting Arpan |
-| [`ADR-003`](decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | Pinning `<tomcat.version>` past the Spring Boot BOM rather than migrating to Boot 4 or suppressing the scanner · the condition for removing the override | 📝 Proposed 2026-09-07 — already shipped in `backend/pom.xml` |
-| [`ADR-004`](decisions/ADR-004-two-paths-create-a-club.md) | How a club comes into being: an admin creates and owns, or a user proposes and approval installs them as owner · why open creation and admin-only creation were both rejected · what a club being born owned forecloses | 📝 Proposed 2026-09-08 — awaiting Arpan |
-| [`ADR-005`](decisions/ADR-005-club-proposal-is-its-own-table.md) | Where a club proposal lives before approval · the four filter sites a status column on `clubs` would have needed, and what happens when one is missed · slug reservation and the re-check | 📝 Proposed 2026-09-08 — awaiting Arpan |
-| [`ADR-006`](decisions/ADR-006-official-email-verified-only-by-round-trip.md) | What *verified* means for a club's official email, and why an administrative write is not it · the two rules binding on code shipping before the round trip exists | 📝 Proposed 2026-09-08 — awaiting Arpan |
-| [`ADR-001`](decisions/ADR-001-three-taxonomy-vocabularies.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan |
+| Document | Decides | Status | Reopens when |
+|---|---|---|---|
+| [`ADR-002`](decisions/ADR-002-club-id-is-an-assigned-slug.md) | Whether `Club.id` stays an assigned slug and gains `Persistable`, moves to a surrogate generated id, or is left alone with a rule · the `em.merge` trap that has now cost two bugs in one method | 📝 Proposed 2026-09-07 — awaiting Arpan | Whenever `save` on a club is touched. Not yet decided, so nothing reopens — it is waiting to be settled. |
+| [`ADR-003`](decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | Pinning `<tomcat.version>` past the Spring Boot BOM rather than migrating to Boot 4 or suppressing the scanner · the condition for removing the override | 📝 Proposed 2026-09-07 — already shipped in `backend/pom.xml` | A parent POM manages Tomcat 10.1.58 or newer, at which point the override comes out. `rules/ci-and-build.md` carries it. |
+| [`ADR-004`](decisions/ADR-004-two-paths-create-a-club.md) | How a club comes into being: an admin creates and owns, or a user proposes and approval installs them as owner · why open creation and admin-only creation were both rejected · what a club being born owned forecloses | ✅ Accepted 2026-09-10 | A student waiting on review becomes the complaint, or one admin becomes the bottleneck — the fix is auto-approval under a trust signal, **not** open creation · **notifications exist**, at which point *nothing tells the requester* becomes a bug. `rules/backend-clubs.md` + `todo.md`. |
+| [`ADR-005`](decisions/ADR-005-club-proposal-is-its-own-table.md) | Where a club proposal lives before approval · the four filter sites a status column on `clubs` would have needed, and what happens when one is missed · slug reservation and the re-check | ✅ Accepted 2026-09-10 | A field is added to `ClubCreateRequest` and not to the proposal — **one is a bug, two means unifying the shapes**, and the count is at one and a half · a reviewer needs a preview of the club page. `rules/contracts.md` (loads on both records) + `rules/backend-clubs.md`. |
+| [`ADR-006`](decisions/ADR-006-official-email-verified-only-by-round-trip.md) | What *verified* means for a club's official email, and why an administrative write is not it · the two rules binding on code shipping before the round trip exists | ✅ Accepted 2026-09-10 | **SES lands** — the trigger to build the round trip, and the point the deferral is spent · anyone proposes a *mark as verified* control or bulk-marking, which is the rejected option renamed. `rules/backend-clubs.md` + `todo.md`. |
+| [`ADR-007`](decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md) | How an uploaded image reaches a browser: the API streams it, addressed by **index** rather than by key, behind a same-origin `/media/**` rewrite · why an uploaded SVG is never served as `image/svg+xml` · rejected presigned URLs and a public bucket | 📝 Proposed 2026-09-09 — awaiting Arpan | A second media consumer appears (events, avatars), or S3 becomes reachable from the browser — presigned URLs were rejected because `FakeS3` cannot presign, which changes if the store does. |
+| [`ADR-001`](decisions/ADR-001-three-taxonomy-vocabularies.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan | Nothing yet — still awaiting a decision. Its own header records when to reopen the taxonomy. |
 
 **That file holds seven decisions rather than one**, against `adr.md`'s
 one-per-file rule, and says in its own header why: they are a single

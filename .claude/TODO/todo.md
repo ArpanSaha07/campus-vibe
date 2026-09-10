@@ -91,6 +91,30 @@ log. The rest, in the spec's order:
   `club_email_verifications` table shape so it is not re-derived. Until it
   lands, every club reads as unverified, which is accurate, and the §17 security
   notices and the §6 invite-verification step stay unbuilt.
+
+  **This is [ADR-006](../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)'s
+  first revisit trigger, and it is the only one that is real work.** SES landing
+  is the point at which that ADR's deferral is spent. Two things it forecloses,
+  and they are what the impatience will reach for: there is **no administrative
+  *mark as verified* control**, and **no bulk marking** to unblock the §17
+  notices — both are the rejected option under another name. If a club genuinely
+  cannot complete the round trip (a shared inbox nobody can open, an address that
+  bounces), the answer is a recovery procedure with an audit trail, not an
+  override switch. Also note the round trip is testable locally without SES once
+  built: `LoggingMailSender` puts the link in `docker compose logs backend`, the
+  way password reset is already tested.
+- [ ] **P3** **If waiting for a human becomes the complaint, the answer is
+  auto-approval under a trust signal — not open creation.**
+  [ADR-004](../docs/decisions/ADR-004-two-paths-create-a-club.md)'s first two
+  revisit triggers, recorded here because they are the ones most likely to be
+  solved the wrong way: a student waiting on review, or one admin becoming the
+  bottleneck as volume grows. That ADR rejected letting any signed-in user
+  create a club outright, because a club page carries an implied claim to
+  represent a real student organisation and curating after the fact is the wrong
+  way round. A verified university address, or some comparable signal, is the
+  shape of the fix. Neither trigger has fired — there is no volume yet — so this
+  is a marker, not work.
+
 - [ ] **P2** *(item 5, follow-up)* **Expire stale invitations.** `EXPIRED` is in
   `AssignmentStatus` and nothing sets it. A PENDING row grants nothing, so this
   is tidiness rather than exposure — but it holds the
@@ -137,6 +161,11 @@ log. The rest, in the spec's order:
       me-scoped endpoint or a filter. **Fold into the notifications work under
       Backend / Features**, and note that nothing tells the requester when a
       proposal is approved or rejected either.
+      **This is [ADR-004](../docs/decisions/ADR-004-two-paths-create-a-club.md)'s
+      third revisit trigger.** That ADR accepted *nothing tells the requester* as
+      a cost of putting club creation behind review, on the explicit condition
+      that it stops being a consequence and becomes a **bug** the day
+      notifications exist. Whoever builds notifications owns this.
 - [ ] **P2** **Nothing can display an uploaded event banner or avatar.**
       `events.images` holds S3 object keys exactly as `clubs.logo` does, and
       clubs got a read path on 2026-09-09 while events and avatars did not.
@@ -148,7 +177,21 @@ log. The rest, in the spec's order:
 - [ ] **P3** **A club proposal never expires**, so an unreviewed one holds its
       slug reservation forever and that name is unavailable to everyone. Same
       shape as the stale-invitation and stale-handover sweeps under Club
-      governance, and wants the same one.
+      governance, and wants the same one. Named as a standing consequence in
+      [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) —
+      the reservation is what makes two students proposing `robotics` collide at
+      submission rather than at approval, and holding it forever is the price.
+
+- [ ] **P3** **A reviewer cannot see a proposed club as a club page**, because
+      there is no `clubs` row to render — which is the whole point of
+      [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) and
+      is named there as **the first requirement this shape makes genuinely
+      awkward**. The queue shows name, slug, description, message, interests and
+      the contact links, which has been enough so far. If it stops being enough,
+      build the preview **from the proposal** — a route that renders the club
+      page shape from `ClubCreationRequestDTO` — rather than relaxing the rule
+      that no row exists before approval. Recorded so the awkwardness is
+      recognised as predicted rather than as evidence the decision was wrong.
 
 
 - [ ] **P2** **An event cannot be given a banner image from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)).

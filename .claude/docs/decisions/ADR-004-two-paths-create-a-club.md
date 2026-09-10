@@ -1,11 +1,11 @@
 # ADR-004 — Two paths create a club, and both end in an owner
 
-**Status:** Proposed — only Arpan moves this to Accepted
+**Status:** Accepted 2026-09-10
 **Date:** 2026-09-08
 **Raised by:** [`2026-09-08-club-ownership-spine.md`](../../specs/2026-09-08-club-ownership-spine.md),
 the spec for the club-governance unit of work. No meeting; `.claude/team/` was
 removed in `cef6a07`. Decisions taken by Arpan across four rounds on 2026-09-08.
-**Approved by:** — (pending)
+**Approved by:** — Arpan
 **Implemented in:** `ClubController.create`, `ClubService.createOwnedBy`, `clubadmin/ClubCreationRequest*` — shipped 2026-09-09, verified in `ClubCreationFlowIT`.
 
 ## Context
@@ -108,8 +108,8 @@ endpoint installs an owner on a club that already has one, and
 **Easier.** The P0 closes: a creator can immediately do everything
 `canManageClub` guards, on both paths. Every club created from now on has
 exactly one owner from birth, which makes *who is responsible for this club* a
-question with an answer, and makes the eight ownerless V6 seeded clubs the only
-exceptions that will ever exist.
+question with an answer, and makes an ownerless club a deliberate local
+exception rather than something the product can produce.
 
 **Harder.** Two creation paths mean two services, two controllers, two sets of
 tests and a form that branches on `isAdmin`. A proposal cannot carry a logo — S3
@@ -138,12 +138,32 @@ human, and nothing notifies them when the wait ends, because notifications do
 not exist. A proposal also has no expiry, so an unreviewed one sits forever
 holding its slug reservation.
 
-**Unchanged.** The claim flow stays for the eight seeded clubs. Platform
+**Unchanged.** The claim flow stays, for whichever clubs are ownerless. Platform
 `ROLE_ADMIN` still bypasses club scope, so an admin can manage any club without
-owning it — which is why the seeded eight are deliberately left ownerless rather
-than backfilled to the admin. A data migration could not have done that anyway:
+owning it — which is why an ownerless club is left alone rather than backfilled
+to the admin. A data migration could not have done that anyway:
 `AdminBootstrapRunner` is an `ApplicationRunner` and runs *after* Flyway, so on a
 cold start there is no admin row for a migration to assign to.
+
+> **Amended 2026-09-10, in place, by Arpan's decision** — the second amendment
+> to this record, and a correction of fact rather than of scope.
+>
+> Both paragraphs above named **the eight ownerless clubs seeded by V6** as the
+> permanent exceptions to *every club has an owner*. That stopped being true the
+> day after this ADR shipped: `V32__retire_mock_club_seed_data.sql` removed
+> those rows, and `DevDataSeeder` now creates the demo clubs through
+> `createOwnedBy` and leaves exactly **two** unowned on purpose —
+> `science-club` and `chess-club` (`DevDataSeeder.java:72`) — so the club-admin
+> claim queue has something to act on locally.
+>
+> The difference matters for a reader deciding what to do about an ownerless
+> club. The old sentence described a fixed historical set that would shrink to
+> nothing; the truth is a dev-profile fixture that is **recreated on every cold
+> start** and is not present in any other environment. Nothing in the decision
+> changes: both creation paths still end in an owner, and nothing reachable from
+> an HTTP request may create a club without one — only the seeder may pass a
+> null owner, which [`rules/backend-clubs.md`](../../rules/backend-clubs.md)
+> states as a rule.
 
 ## Revisit when
 
