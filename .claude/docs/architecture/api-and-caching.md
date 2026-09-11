@@ -5,7 +5,9 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `77baaab` — re-read on 2026-09-11 for the BUG-039 narrow fix:
+**Code as of:** `081d7b3` — re-stamped 2026-09-11: `handleMaxUploadSize` dropped
+its unused exception parameter (CodeQL alert 53) and still answers the same 413;
+nothing this document says about it moved. Before that, `77baaab` — re-read on 2026-09-11 for the BUG-039 narrow fix:
 the upload endpoints on `ClubController` and `EventController`, the new
 `MaxUploadSizeExceededException` → 413 entry in `DefaultExceptionHandler`, and
 the key shape `adapters.ts` receives. No data path, cache policy or DTO field

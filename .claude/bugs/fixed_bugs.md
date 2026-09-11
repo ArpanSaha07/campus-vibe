@@ -6,6 +6,7 @@ Last updated: **2026-09-11**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-050](#bug-050) | Blocker | 2026-09-11 | The Trivy gate blocked PR #45 on two newly published CRITICALs — `next` 16.3.0 and `netty-handler` 4.1.135 — with nothing in the repo having changed |
 | [BUG-039](#bug-039) | High | 2026-09-11 | Uploads named their own S3 object from the browser filename, and against `FakeS3` a `..` in it was a file write anywhere on disk — which our own entry had ruled out |
 | [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
 | [BUG-048](#bug-048) | High | 2026-09-10 | A club's social links were stored exactly as sent and rendered into an `href` with no scheme check on either side |
@@ -40,6 +41,67 @@ Last updated: **2026-09-11**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-050
+**The Trivy gate blocked PR #45 on two CRITICALs nobody wrote** · Blocker · FIXED 2026-09-11
+
+**Found:** 2026-09-11, on [PR #45](https://github.com/ArpanSaha07/campus-vibe/pull/45)
+(`develop` → `main`), immediately after PR #44 merged. Every job passed except
+`Docker / Build images and run the stack`, which failed only at *Scan images for
+known vulnerabilities*; `CI` reported `docker: failure`, and the `Protect main`
+ruleset requires `CI`, so the merge was blocked. The build, the boot and the API
+smoke tests all passed.
+
+**Two fixable CRITICALs, both published after the code was written:**
+
+| Image | Package | Installed | Fixed in | Advisory |
+|---|---|---|---|---|
+| frontend | `next` | 16.3.0 | 16.3.3 | CVE-2026-75604 and GHSA-2xp9-vwfh-vxw4, both unauthenticated remote code execution — the second through the image optimization API |
+| backend | `io.netty:netty-handler` | 4.1.135.Final | 4.1.137.Final | CVE-2026-75595 |
+
+`main` carries the same two versions, so this was not introduced by the PR — it
+is the third time a branch went red from a newly published advisory rather than
+new code ([BUG-019](#bug-019), [BUG-035](#bug-035)). The Vercel preview built from
+the same lockfile, so it was running 16.3.0 too.
+
+**Netty is not used by the app.** `dependency:tree -Dincludes=io.netty` shows it
+arriving only through `software.amazon.awssdk:s3` 2.20.26 → `netty-nio-client`,
+the async HTTP client, while `S3Config` builds the synchronous `S3Client`. Its
+version is the Spring Boot 3.5.16 BOM's.
+
+**Fix:**
+
+- **`<netty.version>4.1.137.Final</netty.version>`** in `backend/pom.xml`,
+  beside `<tomcat.version>` and by the same lever. Arpan chose the override over
+  excluding `netty-nio-client`; the reasoning is
+  [ADR-008](../docs/decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md). All
+  ten `io.netty` artifacts resolve to 4.1.137 afterwards, and the version was
+  checked on Maven Central before pinning — ADR-003's advisory had named a Tomcat
+  release that was never published.
+- **`next` 16.3.3**, with the range raised from `^16.2.0` to `^16.3.3` so a
+  lockfile regeneration cannot slide back below the fix.
+
+**A lockfile drift came out with it.** `npm install next@16.3.3` also removed
+`axios` and five of its dependencies from `package-lock.json`. `axios` was
+listed in the lock's root dependencies but not in `package.json`, and nothing
+imports it — the lock had fallen out of sync when it was removed from the
+manifest. The pruning is correct; it is recorded so the diff is not a surprise.
+
+**Verified:** Trivy run locally from the `aquasec/trivy` image with the gate's
+own flags (`--severity CRITICAL --ignore-unfixed`) — the frontend lockfile and
+the built backend jar both report zero. `verify --all --full` passes except
+`SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords`
+([BUG-001](bugs.md#bug-001)), which fails the same way on a clean checkout and
+passes in GitHub's backend job. **Not yet verified:** the gate itself on GitHub,
+which re-runs when this reaches `develop` and PR #45 picks it up. The lockfile
+scan covers every dependency, a superset of what the standalone production image
+ships, so it is the stricter of the two for the frontend.
+
+**Held by:** [`rules/ci-and-build.md`](../rules/ci-and-build.md) — netty takes the
+Tomcat lever — and [`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md)
+under the Trivy gate.
 
 ---
 
