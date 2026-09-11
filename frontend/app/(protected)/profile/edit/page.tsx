@@ -6,6 +6,7 @@ import { useAuth } from "@/app/lib/auth-context";
 import { useProfile } from "@/app/lib/profile-context";
 import { useEditableForm } from "@/app/hooks/useEditableForm";
 import { emptyProfile } from "@/app/lib/profile";
+import { instagramHandle } from "@/app/lib/links";
 import { updateMyName } from "@/app/lib/user";
 import ProfileAvatar from "@/app/components/profile/ProfileAvatar";
 import ToggleRow from "@/app/components/profile/edit/ToggleRow";
@@ -20,7 +21,7 @@ const NETWORKS = [
     key: "instagram" as const,
     label: "Instagram",
     Icon: Instagram,
-    hint: "instagram.com/your_name, or just your_name",
+    hint: "Just the handle — we add instagram.com for you.",
   },
   {
     key: "facebook" as const,
@@ -60,7 +61,24 @@ export default function EditProfilePage() {
   // save, when applyUser has put the new account into context -- by then the
   // draft already matches, so this only moves the baseline.
   useEffect(() => {
-    if (profile) reinitialise({ name: user?.name ?? "", ...profile });
+    if (profile) {
+      reinitialise({
+        name: user?.name ?? "",
+        ...profile,
+        socialLinks: {
+          ...profile.socialLinks,
+          // Stored as the full URL, edited as a handle -- Arpan, 2026-09-10.
+          // Without this the field asks for `your_name` and is then filled with
+          // `https://instagram.com/your_name`, and saving that round-trips the
+          // URL back through the handle rule every time. The fallback keeps a
+          // value the rule does not recognise visible rather than blanking it,
+          // so nobody loses a link to a silent transform.
+          instagram:
+            instagramHandle(profile.socialLinks.instagram) ??
+            profile.socialLinks.instagram,
+        },
+      });
+    }
   }, [profile, user?.name, reinitialise]);
 
   if (!user) return null;

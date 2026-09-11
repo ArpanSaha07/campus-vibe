@@ -103,4 +103,34 @@ describe("toClub", () => {
   it("leaves a missing logo empty for ClubLogo to fall back on", () => {
     expect(toClub(apiClub).logo).toBe("");
   });
+
+  // What the database stores is an S3 object key, which nothing can fetch --
+  // handed to next/image it throws "Failed to construct 'URL': Invalid URL".
+  // The bucket is private, so the key becomes a same-origin /media path that
+  // next.config.ts rewrites to the API endpoint streaming the bytes.
+  it("turns a stored S3 key into the media path that serves it", () => {
+    const club = toClub({ ...apiClub, logo: "clubs/chess-club/logo-badge.png" });
+
+    expect(club.logo).toBe("/media/clubs/chess-club/logo");
+  });
+
+  it("leaves an absolute logo url alone", () => {
+    // The demo clubs hold Unsplash urls; those are fetched directly and must
+    // not be rewritten to point at an object the bucket does not have.
+    const url = "https://images.unsplash.com/photo-123.jpg";
+
+    expect(toClub({ ...apiClub, logo: url }).logo).toBe(url);
+  });
+
+  it("addresses banner images by index, passing external urls through", () => {
+    const club = toClub({
+      ...apiClub,
+      images: ["clubs/chess-club/images/one.png", "https://images.unsplash.com/two.jpg"],
+    });
+
+    expect(club.images).toEqual([
+      "/media/clubs/chess-club/images/0",
+      "https://images.unsplash.com/two.jpg",
+    ]);
+  });
 });

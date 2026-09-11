@@ -2,10 +2,19 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-08**
+Last updated: **2026-09-11**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-050](#bug-050) | Blocker | 2026-09-11 | The Trivy gate blocked PR #45 on two newly published CRITICALs — `next` 16.3.0 and `netty-handler` 4.1.135 — with nothing in the repo having changed |
+| [BUG-039](#bug-039) | High | 2026-09-11 | Uploads named their own S3 object from the browser filename, and against `FakeS3` a `..` in it was a file write anywhere on disk — which our own entry had ruled out |
+| [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
+| [BUG-048](#bug-048) | High | 2026-09-10 | A club's social links were stored exactly as sent and rendered into an `href` with no scheme check on either side |
+| [BUG-047](#bug-047) | Medium | 2026-09-09 | The fix for BUG-045 left the other half silent: the success callback's promise was dropped, so a club was created and the user was told nothing |
+| [BUG-045](#bug-045) | Medium | 2026-09-09 | A club that was created reported itself as not created: the success callback ran inside the try that wrapped the write |
+| [BUG-046](#bug-046) | Low | 2026-09-09 | Every `select` in the app was a plain pill — `selectClasses` reserved the chevron's space and position but never supplied the image |
+| [BUG-041](#bug-041) | High | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the clubs it was written to replace, so every seeded club had a NULL embedding |
+| [BUG-040](#bug-040) | High | 2026-09-09 | An uploaded club logo took the whole `/clubs` page down — `next/image` throws on an S3 object key, during render, where `onError` cannot catch it |
 | [BUG-038](#bug-038) | Blocker | 2026-09-08 | A deleted endpoint turned the Docker API smoke test into a 404 assertion, blocking every merge to `main` |
 | [BUG-037](#bug-037) | High | 2026-09-05 | A club's category and interests were discarded at creation: `saveAndFlush` returned a different instance from the one being tagged |
 | [BUG-036](#bug-036) | Blocker | 2026-09-05 | Backend CI stopped compiling — the `feature/user-profile` merge changed two signatures and left two call sites behind |
@@ -32,6 +41,454 @@ Last updated: **2026-09-08**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-050
+**The Trivy gate blocked PR #45 on two CRITICALs nobody wrote** · Blocker · FIXED 2026-09-11
+
+**Found:** 2026-09-11, on [PR #45](https://github.com/ArpanSaha07/campus-vibe/pull/45)
+(`develop` → `main`), immediately after PR #44 merged. Every job passed except
+`Docker / Build images and run the stack`, which failed only at *Scan images for
+known vulnerabilities*; `CI` reported `docker: failure`, and the `Protect main`
+ruleset requires `CI`, so the merge was blocked. The build, the boot and the API
+smoke tests all passed.
+
+**Two fixable CRITICALs, both published after the code was written:**
+
+| Image | Package | Installed | Fixed in | Advisory |
+|---|---|---|---|---|
+| frontend | `next` | 16.3.0 | 16.3.3 | CVE-2026-75604 and GHSA-2xp9-vwfh-vxw4, both unauthenticated remote code execution — the second through the image optimization API |
+| backend | `io.netty:netty-handler` | 4.1.135.Final | 4.1.137.Final | CVE-2026-75595 |
+
+`main` carries the same two versions, so this was not introduced by the PR — it
+is the third time a branch went red from a newly published advisory rather than
+new code ([BUG-019](#bug-019), [BUG-035](#bug-035)). The Vercel preview built from
+the same lockfile, so it was running 16.3.0 too.
+
+**Netty is not used by the app.** `dependency:tree -Dincludes=io.netty` shows it
+arriving only through `software.amazon.awssdk:s3` 2.20.26 → `netty-nio-client`,
+the async HTTP client, while `S3Config` builds the synchronous `S3Client`. Its
+version is the Spring Boot 3.5.16 BOM's.
+
+**Fix:**
+
+- **`<netty.version>4.1.137.Final</netty.version>`** in `backend/pom.xml`,
+  beside `<tomcat.version>` and by the same lever. Arpan chose the override over
+  excluding `netty-nio-client`; the reasoning is
+  [ADR-008](../docs/decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md). All
+  ten `io.netty` artifacts resolve to 4.1.137 afterwards, and the version was
+  checked on Maven Central before pinning — ADR-003's advisory had named a Tomcat
+  release that was never published.
+- **`next` 16.3.3**, with the range raised from `^16.2.0` to `^16.3.3` so a
+  lockfile regeneration cannot slide back below the fix.
+
+**A lockfile drift came out with it.** `npm install next@16.3.3` also removed
+`axios` and five of its dependencies from `package-lock.json`. `axios` was
+listed in the lock's root dependencies but not in `package.json`, and nothing
+imports it — the lock had fallen out of sync when it was removed from the
+manifest. The pruning is correct; it is recorded so the diff is not a surprise.
+
+**Verified:** Trivy run locally from the `aquasec/trivy` image with the gate's
+own flags (`--severity CRITICAL --ignore-unfixed`) — the frontend lockfile and
+the built backend jar both report zero. `verify --all --full` passes except
+`SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords`
+([BUG-001](bugs.md#bug-001)), which fails the same way on a clean checkout and
+passes in GitHub's backend job. **Not yet verified:** the gate itself on GitHub,
+which re-runs when this reaches `develop` and PR #45 picks it up. The lockfile
+scan covers every dependency, a superset of what the standalone production image
+ships, so it is the stricter of the two for the frontend.
+
+**Held by:** [`rules/ci-and-build.md`](../rules/ci-and-build.md) — netty takes the
+Tomcat lever — and [`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md)
+under the Trivy gate.
+
+---
+
+### BUG-039
+**Image uploads let the caller name the S3 object, and validate nothing about it** · High · FIXED 2026-09-11
+
+**Found:** 2026-09-07, while distilling `CampusVibe_S3_Media_Security.md` into
+[`s3-media/SKILL.md`](../skills/s3-media/SKILL.md). The document had been sitting
+inside a vendored `aws-s3` skill folder that nothing pointed at, so its rules had
+never been read against the code they govern.
+
+**Symptom:** none visible. Uploads succeed, keys are stored, nothing errors.
+
+All three upload paths build the S3 object key by concatenating the browser's
+own filename:
+
+```java
+String key = "clubs/" + id + "/logo-" + file.getOriginalFilename();   // ClubController.java:82
+String key = "clubs/" + id + "/images/" + file.getOriginalFilename(); // ClubController.java:91
+String key = "events/" + id + "/images/" + file.getOriginalFilename();// EventController.java:108
+```
+
+`reference.md` §7 says *never let a client provide an arbitrary full S3 object
+key*, and §13 says *do not use user-supplied filenames as the canonical S3 object
+name*. Both are violated at every call site.
+
+**What actually goes wrong, in order of how sure it is:**
+
+1. **Silent overwrite.** `putObject` replaces whatever is at the key. Upload
+   `logo.png` twice and the second silently destroys the first. On
+   `/{id}/images` it is worse: the object is replaced but `addImages` still
+   appends the key, so the list holds two entries pointing at one object.
+2. **No stable key, so the documented model cannot be built on top.** §19 needs
+   a new uuid key per upload to do upload → confirm → update database → delete
+   old. With the filename as the key there is no old and new to order.
+3. **Content type is never checked.** The endpoints declare
+   `consumes = MULTIPART_FORM_DATA_VALUE`, which constrains the request, not the
+   part. Any bytes under any name are stored — §12 asks for
+   `image/jpeg`, `image/png`, `image/webp` only.
+4. **`getOriginalFilename()` is nullable**, giving keys like
+   `clubs/24/logo-null`.
+
+**What is NOT wrong, so nobody re-derives it:** size is bounded —
+`application.yml:30-31` caps multipart at 10MB (the reference asks for 5MB, so
+the cap is loose rather than absent). And a `..` in a filename is not traversal:
+S3 keys are opaque strings, the `clubs/{id}/` prefix is still prepended
+literally, so prefix-scoped IAM and lifecycle rules are not evaded.
+
+**No longer armed — fired.** This entry used to say that nothing served the
+media back, that `S3Service.getObject` had no caller anywhere, and that every
+missing control would go live at once the moment a read path landed. **That
+happened on 2026-09-09** ([BUG-040](#bug-040)): the club create form
+now uploads, and `GET /clubs/{id}/logo` and `/images/{index}` serve the bytes
+back. Every control listed above is now missing on a live path, on top of keys
+that are already in S3 and in the database and would need migrating.
+
+Two of the consequences were closed at the read end rather than the write end,
+and they are mitigations, not the fix: an uploaded SVG is served
+`application/octet-stream` with `nosniff` so it cannot execute on the API's
+origin, and images are addressed by *index* so no caller can name an object key.
+The caller still names the object on upload, still overwrites silently on a
+repeated filename, and nothing checks that the bytes are an image at all.
+An unvalidated SVG or HTML byte stream stored today becomes a stored-XSS question
+the day it is served inline.
+
+**The fix is a decision, not a patch.** Generating `{uuid}.webp` keys changes what
+is stored in `clubs.logo_key`, `club_images` and `event_images`, so existing rows
+need a backfill or a compatibility read. Doing it at the same time as the move to
+presigned uploads is one piece of work; doing it separately means touching the
+same three endpoints twice. Write the ADR before either. The narrow version —
+stop the caller naming the object, keep direct byte upload — is a much smaller
+change and would close 1, 2 and 4 on its own.
+
+**Correction, 2026-09-11 — the paragraph above headed *What is NOT wrong* was
+wrong about traversal.** It reasoned from real S3, where a key is an opaque
+string and `..` in one is two characters. But `aws.s3.mock` is true everywhere
+except the `prod` profile (`application.yml:52`, `docker-compose.yml:116`, the
+CI Docker job), and `FakeS3.buildObjectFullPath` concatenated the key onto a
+directory — where `..` climbs. So on every non-prod stack, a club owner, club
+admin or event manager who sent a filename like `../../x` got a file write
+anywhere the backend process could reach, which in the dev compose container is
+root. The same sentence was copied into `s3-media/SKILL.md`, so anyone who read
+the knowledge base before the code was told not to worry about exactly this.
+
+**Found by the Claude security review on PR #44**, not by us. The review's claim
+was checked against the code before anything was done: `FakeS3.java:79-81` did
+join the key onto `~/.arpan/s3/{bucket}/` with no check, and the config does
+default to `FakeS3`. **The write itself was never observed** — by the time a
+test first exercised it, the `FakeS3` guard below was already in place and the
+request answered 500 instead. The claim rests on reading the code. Nor was it
+tested whether Tomcat's multipart parser passes `../` through in a filename;
+the fix does not depend on it, because the filename is no longer read.
+
+**Fix — the narrow one this entry proposed, decided by Arpan 2026-09-11 and
+landed before PR #44 merged**
+([`2026-09-11-upload-keys-generated-server-side.md`](../specs/2026-09-11-upload-keys-generated-server-side.md)):
+
+- **`s3/MediaKeys` is the only thing that builds a key.** `{prefix}/{uuid}.{ext}`
+  in the `reference.md` §7 layout — `clubs/{id}/logos/`, `clubs/{id}/images/`,
+  `events/{id}/banners/`. Closes 1, 2 and 4 above: no caller character reaches
+  the key, a repeated upload is a new object, and there is no `null` to append.
+- **The extension comes from the file's leading bytes**, and only PNG, JPEG and
+  WebP are accepted; the filename and the part's `Content-Type` are ignored,
+  since the caller writes both. Anything else, or an empty file, is a 400. This
+  closes 3. A multi-file upload is checked in full before anything is stored.
+- **`FakeS3` refuses any key that resolves outside its bucket's directory**, on
+  put, get and delete — so the stub is not a traversal primitive for any future
+  caller that builds a key by hand.
+- **5MB per file, 10MB per request**, where it was 10MB / 10MB, and an oversize
+  upload is a 413 with a sentence rather than a 500 through the catch-all.
+- **A replaced logo's old object is deleted**, after `ClubService.updateLogo`
+  commits and only if `MediaKeys.belongsToClub` says it is that club's own. A
+  failed delete is logged, not thrown. Without this, uuid keys would have
+  turned every logo change into an orphan.
+
+**What still differs from `reference.md`, and is not a bug:** there is no
+presigning (§9), which is now an ADR queued in [`todo.md`](../TODO/todo.md)
+rather than part of this entry; images are not re-encoded to WebP (§14); banner
+images have no delete and a deleted club's objects are not deleted (§20). Keys
+stored before 2026-09-11 keep the `logo-{filename}` shape and were not migrated
+— reads use whatever key is stored. **Two read-side mitigations stay** as the
+second line of defence: SVG served `application/octet-stream` with `nosniff`
+([ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)),
+since objects stored before the fix were never checked, and images addressed by
+index.
+
+**Tests, written first and seen failing:** `MediaKeysTest` (19) and
+`FakeS3Test` (8) as plain unit tests; `ClubMediaIT` from 6 to 15; `EventMediaIT`
+(3), the first test the event upload has ever had; and `MediaUploadLimitIT`
+(2), on a real port, because **MockMvc never applies the multipart caps** and
+every other media test is blind to them. Checked against the compose stack with
+a raw `curl` upload naming `../../…/tmp/probe.png`: a uuid key, and no probe
+file.
+
+**Held by:** [`rules/backend-java.md`](../rules/backend-java.md) — never build a
+key from anything the caller wrote — and
+[`rules/backend-clubs.md`](../rules/backend-clubs.md) for the key layout and the
+delete ordering. The lesson that generalises: **a stub that stands in for a
+service does not inherit the service's safety properties**, and a bug entry that
+reasons from the real one can talk the next reader out of the actual defect.
+
+---
+
+### BUG-049
+**A form that validated in JavaScript was overruled by the browser** · Medium · FIXED 2026-09-10
+
+`CreateClubForm`'s `<form>` had no `noValidate`. The contact email is
+`type="email"` and two link fields are `type="url"`, so an invalid value in any
+of them made the browser refuse to fire `submit` at all: `handleSubmit` never
+ran, `clubValidator` never ran, and the message it writes beside the field was
+never rendered. The user got a native bubble instead — or, in a browser that
+shows none, nothing whatsoever.
+
+**This form had already decided the opposite.** `FormField` refuses to set the
+`required` attribute for exactly this reason, and says so in a comment
+(`FormField.tsx:60-63`): validation belongs to `clubValidator`, not to the
+browser's bubbles. The attribute one level up, on the form itself, was missed —
+so the policy was half-applied and looked complete.
+
+**Latent until the contact email became optional.** While it was required on
+every path, a bad address was refused by *some* rule and the outcome looked
+about right. Making it optional on the proposal path turned a typo into
+something silently unsubmittable: no error, no request, no explanation.
+
+**Found by a test that could not pass.** A new case asserting the validator's
+own message for a malformed address failed with the form still on screen and
+`proposeClub` never called — which is not what a validation failure looks like.
+
+Fixed with `noValidate` on the form, plus a test asserting the attribute is
+there, since nothing else would notice its removal. The rule is now in
+[`rules/frontend.md`](../rules/frontend.md).
+
+---
+
+### BUG-048
+**A club's social links reached an `href` with nothing checking them** · High · FIXED 2026-09-10
+
+`ClubService.update` stored `request.socialLinks()` exactly as it arrived — a
+JSON string, unparsed and unvalidated — and the club page put two of its values
+straight into an `href` (`clubs/[clubId]/page.tsx:58`, `:68`). Nothing checked
+the scheme on either side, so a stored `javascript:` link was a script on the
+club's public page waiting for a click.
+
+**The rule to prevent it already existed and could not be reached.** The
+profile side had refused exactly this since it was built, in
+`ProfileLinks.normalise` — a class that was **package-private in
+`com.campusvibe.user.profile`**. Club code could not call it, so clubs simply
+went without. That is the whole defect: not a missing idea, a missing import.
+
+**Severity is about who could write it, and that was changing.** Only a club
+owner or platform admin could reach `PUT /clubs/{id}`, which kept it small. The
+work in progress — a club proposal carrying the same four fields — was about to
+open the same values to every signed-in user, which is what turned a latent
+issue into one worth fixing before shipping.
+
+Fixed by moving the class to `common/WebLinks`, unchanged, and giving it three
+callers: the profile, `ClubService.update`, and `ClubCreationRequestService`.
+`ClubSocialLinks` parses the JSON, normalises each value and re-serialises, so
+the column now holds our four keys or NULL rather than whatever a client sent.
+Two ITs pin it, one per write path — the proposal one is new behaviour, the
+`PUT` one is this bug. The trap is in
+[`rules/backend-clubs.md`](../rules/backend-clubs.md).
+
+**Not fixed here:** the *render* side still trusts nothing and normalises
+anyway, which is correct and stays — a row written before this rule existed
+would otherwise still reach an href.
+
+---
+
+### BUG-047
+**A club was created and the user was told nothing** · Medium · FIXED 2026-09-09
+
+The other half of [BUG-045](#bug-045), and introduced by its fix. Moving the
+success callback out of the write's `try` stopped the form claiming the club
+could not be created — but the callback is `async`, and it was called without
+`await`, so its promise was dropped on the floor.
+
+A rejection inside it therefore became an **unhandled promise rejection**:
+nothing caught it, nothing rendered, and `handleSubmit` had already blanked the
+form on the line above. The user pressed *Create club*, the club was written,
+the navigation failed, and they were left looking at an empty form with no
+message — the silent reset the whole rebuild set out to remove, reintroduced
+through the back door one commit later.
+
+**Found by a test, not by hand.** Writing coverage for the form surfaced it
+immediately: asserting that no create-failure alert appears made Jest report
+`revalidation exploded` as an unhandled rejection instead. Both hand checks
+before that had exercised the happy path, where the callback never rejects.
+
+Fixed by awaiting the callback inside a `catch` of its own, and saying
+something true rather than nothing: *Your club was created, but we could not
+open its dashboard. You will find it under Manage.* — with a different sentence
+on the proposal path, where no club exists and there is nothing under Manage to
+point at. `onSuccess` is now typed `void | Promise<void>` so the promise cannot
+be dropped silently again.
+
+---
+
+### BUG-045
+**A club that was created reported itself as not created** · Medium · FIXED 2026-09-09
+
+`useCreateClubForm.handleSubmit` called its `onSuccess` callback **inside** the
+`try` that wrapped the write. That callback is not part of the write: it
+refreshes the managed-clubs provider, revalidates the `clubs` cache tag and
+navigates to `/manage/[clubId]`. Any one of those throwing was caught by the
+same `catch` and rendered as `general` — so the form said the club could not be
+created while sitting on top of a club that had been, and a second attempt hit a
+409 on a slug the user had genuinely just taken.
+
+Fixed by moving the callback past the `try/finally` and reading it through a
+ref, so a failure there is what it actually is: a failure to *leave* a page that
+is still correct. The `catch` now also routes through `parseApiError` rather
+than `error.message` — `ApiError` carries the raw response body, so the message
+a user saw was a line of JSON.
+
+**Reported as `onSuccess is not a function`,** which was a second thing wearing
+the same costume. The running dev container was serving a stale Turbopack bundle
+whose `useCreateClubForm` still took one argument, so the new two-argument call
+bound the string `'create'` to `onSuccess` — truthy, and not callable. The same
+stale cache reported `Module not found: Can't resolve
+'@/app/lib/actions/revalidate'` for a file that was present on disk and in
+`HEAD`, and that `npm run build` compiled cleanly. Restarting
+`campusvibe-frontend` cleared both. The `typeof callback === 'function'` guard
+now makes the first failure impossible rather than merely unlikely; the second
+is an environment trap and is recorded in
+[`rules/frontend.md`](../rules/frontend.md).
+
+---
+
+### BUG-046
+**Every `select` in the app was a plain pill with no affordance that it opened** · Low · FIXED 2026-09-09
+
+`selectClasses` (`frontend/app/components/ui/FormField.tsx`) set
+`appearance-none`, which removes the UA's own chevron, then reserved the slot for
+a replacement — `bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10` —
+and never supplied a `background-image`. Every one of those utilities was doing
+nothing, and there was `pr-10` of unexplained padding on the right of each
+control.
+
+Invisible because a `select` still opens on click, so nothing was broken enough
+to notice; it read as a text input that surprised you. Present wherever
+`selectClasses` is used, which is the create-club category field and the
+interest picker's category filter, not just the page it was found on.
+
+The image is `.select-chevron` in `globals.css` rather than a Tailwind arbitrary
+value, because the data URI contains spaces and that syntax cannot carry them.
+It is folded into `selectClasses` itself, so no future caller can take the
+padding without the chevron.
+
+---
+
+### BUG-041
+**`DevDataSeeder` had never once run, so every seeded club had a NULL embedding** · High · FIXED 2026-09-09
+
+**Found:** 2026-09-09, doing the `docker compose down -v && up` step of the
+club-governance verification — a cold start printed `Dev seed: 8 club(s) already
+present; skipping`, which on an empty database it should not have been able to.
+
+**What was wrong.** `DevDataSeeder` was written on 2026-08-16 to replace
+`V6__insert_mock_clubs.sql`, for two stated reasons: Flyway runs everywhere, so
+production would ship fake clubs; and a raw `INSERT` bypasses the service layer,
+leaving `clubs.embedding` NULL because it is written by `SearchIndexService` as a
+side effect of the normal create path. **The replacement half never happened.**
+No migration ever removed V6's rows, so on every cold start V6 inserted its eight
+clubs and the seeder's guard — *skip if any club exists* — then tripped.
+
+Measured on the cold start: eight clubs, `count(*) FILTER (WHERE embedding IS
+NULL)` = 8. The seeder existed for months, was covered by nothing, and did
+nothing.
+
+**Why nobody noticed.** `database-lifecycle/SKILL.md`'s known-deviations table
+recorded the row as *Retired 2026-08-16 by `V12__remove_mock_club_seed_data.sql`*.
+There is no such file — V12 is `create_club_admin_assignments`. A deviation
+recorded as fixed is one nobody re-checks, which is the general lesson worth more
+than the specific bug.
+
+**The fix.** `V32__retire_mock_club_seed_data.sql` deletes the eight, and the
+seeder's guard became **per club** rather than wholesale, so the two cannot fight
+on a database where one was kept. V32 spares any club that has events or
+assignments attached: `events.organizer_id` and `club_images.club_id` both
+`ON DELETE CASCADE`, so an unqualified delete would destroy a developer's local
+work. Verified on a fresh `down -v` boot: 8 clubs, **0 null embeddings**, 6 owned
+by the demo account and 2 deliberately ownerless.
+
+**Held by** [`rules/backend-clubs.md`](../rules/backend-clubs.md) (do not restore
+a `count() > 0` guard) and [`rules/db-migrations.md`](../rules/db-migrations.md)
+(the cascade guard, and the recorded-as-retired trap).
+
+---
+
+### BUG-040
+**An uploaded club logo took the whole `/clubs` page down** · High · FIXED 2026-09-09
+
+**Found:** 2026-09-09 by Arpan, loading `/clubs` after the club-governance work
+wired the logo upload: `Console TypeError: Failed to construct 'URL': Invalid
+URL` at `ClubLogo.tsx:58`.
+
+**What was wrong.** `ClubController.uploadLogo` stores an S3 object *key* —
+`clubs/{id}/logo-{filename}` — in `clubs.logo`, and `ClubDTO` handed it to the
+browser untouched. There was **no read path turning a key into a URL**, for club
+logos or anything else. `next/image` accepts a root-relative path or an absolute
+http(s) URL and throws on everything else, and it throws **during render**, so
+`ClubLogo`'s own `onError` fallback — written for exactly this class of problem —
+never got a chance and the page came down rather than degrading.
+
+Latent for as long as nothing could upload a logo: before this branch, nothing
+had ever written `clubs.logo` and it was NULL for every club.
+
+**The fix, in two parts.**
+
+1. `ClubLogo` checks a value is addressable before rendering it and falls back to
+   the club's initial otherwise. `javascript:` and `data:` parse as valid URLs, so
+   the protocol check rather than the `try/catch` is what keeps them out of an
+   `img src`.
+2. The read path Arpan chose: `GET /api/v1/clubs/{id}/logo` and
+   `/images/{index}` stream the bytes through the previously uncalled
+   `S3Service.getObject`. Presigned URLs cannot work against `FakeS3`, and no
+   bucket or CDN is provisioned to be public with.
+
+**Three things that did not work on the way**, recorded because each looks
+correct until it is run:
+
+- `images.remotePatterns` pointing at the API host — Next 16 refuses to optimize
+  an upstream image whose hostname resolves to a private IP, which loopback
+  always is in development. 400, with the reason only in the server log.
+- `images.dangerouslyAllowLocalIP` — got past that into `ECONNREFUSED`: the
+  optimizer runs *server-side*, where `localhost:8080` is the frontend container,
+  not the backend.
+- Emitting `API_INTERNAL_URL` server-side and the public URL in the browser would
+  then have been a hydration mismatch on `src`.
+
+All three dissolve into one same-origin `/media/**` rewrite resolving
+`API_INTERNAL_URL` at request time — the split `apiFetch` already makes. So
+`remotePatterns` is Unsplash-only, no SSRF flag is set, and the CSP `img-src` did
+not have to be loosened.
+
+**Verified** in the browser, not only in tests: `/clubs` renders every uploaded
+logo decoded, zero console errors, zero failed requests. 6 tests in `ClubMediaIT`
+(including that an uploaded SVG is served `application/octet-stream` — nothing
+validates uploads, [BUG-039](#bug-039), and an SVG can carry script), 8 in
+`ClubLogo.test.tsx`, 3 in `adapters.test.ts`.
+
+**Not fixed:** event banners and profile avatars have the same missing read path.
+Latent for the same reason this was — no UI uploads either yet.
+
+**Held by** [`rules/frontend.md`](../rules/frontend.md) and
+[`rules/backend-clubs.md`](../rules/backend-clubs.md).
 
 ---
 
@@ -62,7 +519,7 @@ callers apparently did something else.
 answer with one club and gated on the platform-wide `ROLE_CLUB_ADMIN`, which no
 longer exists — and superseded by `GET /api/v1/users/me/managed-clubs`
 (`ClubController.java:51`, already recorded in
-[`club-administration.md`](../docs/architecture/club-administration.md#L254)).
+[`club-administration.md`](../docs/architecture/club-administration.md#backend--comcampusvibeclubadmin)).
 
 The part worth keeping is *why it answers 404 rather than 401*. With the mapping
 gone, `/api/v1/clubs/my-club` does not fall off the end of the router — it falls

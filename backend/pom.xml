@@ -70,6 +70,24 @@
 		-->
 		<tomcat.version>10.1.59</tomcat.version>
 
+		<!--
+		  Overrides the BOM, for the same reason and by the same lever as
+		  tomcat.version above. spring-boot-starter-parent 3.5.16 manages netty
+		  4.1.135.Final, and CVE-2026-75595 (CRITICAL, netty-handler) is fixed at
+		  4.1.137.Final; the Trivy gate in _docker.yml failed PR #45 on it.
+
+		  Netty is not used by this application. It reaches the jar only through
+		  software.amazon.awssdk:s3 -> netty-nio-client, the async HTTP client,
+		  while the app builds the synchronous S3Client (s3/S3Config.java).
+		  Excluding netty-nio-client was the other option and would end netty
+		  CVEs for good, at the cost of a runtime failure the day anyone adds an
+		  S3AsyncClient. Arpan chose the override, 2026-09-11.
+
+		  The BOM imports netty-bom at this property, so every io.netty artifact
+		  moves together. Drop it once a parent manages 4.1.137 or newer.
+		-->
+		<netty.version>4.1.137.Final</netty.version>
+
 		<jsonwebtoken.version>0.11.5</jsonwebtoken.version>
 	</properties>
 

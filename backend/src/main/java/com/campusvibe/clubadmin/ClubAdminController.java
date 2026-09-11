@@ -113,6 +113,26 @@ public class ClubAdminController {
     }
 
     /**
+     * Sets or clears the club's official email address.
+     *
+     * <p>{@code hasRole('ADMIN')}, not {@code isClubOwner}: this is the address
+     * the club can be recovered through, so the people currently running the
+     * club are precisely who must not be able to change it (§6). PATCH because
+     * it writes one field of a club that already exists.
+     *
+     * <p>Setting an address always leaves it unverified — see
+     * {@code ClubAdminService.setOfficialEmail} and ADR-006.
+     */
+    @PatchMapping("/api/v1/clubs/{clubId}/official-email")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ManagedClubDTO setOfficialEmail(@PathVariable String clubId,
+                                           @Valid @RequestBody ClubOfficialEmailRequest request,
+                                           Authentication authentication) {
+        User actor = (User) authentication.getPrincipal();
+        return clubAdminService.setOfficialEmail(clubId, request.officialEmail(), actor.getId());
+    }
+
+    /**
      * The club's activity log, newest first.
      *
      * <p>Visible to the whole management team, per §19 and §30: an admin who

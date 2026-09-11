@@ -16,6 +16,12 @@ paths:
   `<tomcat.version>` in `backend/pom.xml` instead, and re-check it on every
   parent bump. Spring Boot 4 is a framework migration, not a CVE remedy.
   (BUG-019, BUG-035, ADR-003)
+- **Netty takes the same lever: `<netty.version>`, beside it.** Netty arrives
+  only through the AWS SDK's async client, which nothing runs, so its
+  advisories fail the gate for code that never executes. Pin, do not exclude,
+  unless a second netty advisory fires or you are removing the async client on
+  purpose — and verify the fixed version exists on Maven Central before pinning
+  it. Drop both overrides once a parent catches up. (BUG-050, ADR-008)
 - **Actions are pinned to commit shas, not tags.** Keep the `# vX.Y.Z` comment
   beside the sha when bumping one, or the next reader cannot tell what moved.
 - **Never add `-DskipTests`.** (BUG-002)

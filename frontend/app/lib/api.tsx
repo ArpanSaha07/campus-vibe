@@ -91,8 +91,13 @@ export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {
     );
   }
 
+  // FormData sets its own Content-Type, and it has to: the header carries the
+  // multipart boundary, which only the browser knows. Sending
+  // `application/json` alongside a FormData body makes the server read the
+  // parts as one opaque string and every @RequestPart comes back missing.
+  const isMultipart = typeof FormData !== "undefined" && init.body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isMultipart ? {} : { "Content-Type": "application/json" }),
     ...(opts.headers as Record<string, string> | undefined),
   };
   if (auth) {

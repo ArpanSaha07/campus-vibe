@@ -33,7 +33,6 @@ queue. Every item that was in this section is filed under its topic below.
 ## P0 — Blocking
 
 - [ ] **Backend CI cannot pass — fix written, never executed.** `backend-ci.yml` set up JDK 17 while the project needs Java 25, and ran `-DskipTests`, so no backend test had ever run in CI — which is why a non-compiling merge and a failing search test both slipped through. **The workflow was rewritten** (`_backend.yml`: JDK 25, `./mvnw -B verify`, never `-DskipTests`). **Left open deliberately: no workflow in this repo has run on GitHub yet**, so the fix is unverified and [BUG-002](../bugs/bugs.md#bug-002) is still OPEN. Close both on a green run, not on the diff.
-- [ ] **Creating a club leaves you unable to manage it.** `POST /api/v1/clubs` needs only `ROLE_USER` and grants the creator nothing; ownership arrives only when a platform admin approves a club-admin request. So the logo, the banner images and the social links the create form collects **cannot be sent** — all three go through endpoints guarded by `canManageClub`, and the creator gets a 403 on their own club. The form now says so rather than dropping them silently. Fix is a decision, not code: either the creator becomes `CLUB_OWNER` on create (touches the one-owner invariant in `club_admin_governance.md`), or club creation moves behind admin approval entirely.
 - [ ] **Semantic search returns nothing for meaning-only matches.** Pre-existing; 1 of 40 tests failing. Embedding *writes* are proven fine, so the fault is in `SearchRepository.hybridSearchEventIds`. ([BUG-001](../bugs/bugs.md#bug-001))
 
 ---
@@ -42,14 +41,14 @@ queue. Every item that was in this section is filed under its topic below.
 
 - [ ] **P1** Add `EventService.update(...)` — there is currently no update path at all, so events can never be edited, and their embeddings go stale. Mirror `ClubService.update`, which correctly re-indexes. ([BUG-006](../bugs/bugs.md#bug-006))
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
-- [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-038](../bugs/bugs.md#bug-038))
+- [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-044](../bugs/bugs.md#bug-044))
 - [ ] **P1** **Event lifecycle status — `DRAFT` / `PUBLISHED` / `ARCHIVED`.** `events` has no status column today (`Event.java`), so the club dashboard can only split by `date_time` into upcoming and past, and there is no way to draft an event before announcing it or to retire one without deleting it. Deliberately kept out of the club-governance work on 2026-08-17 so that feature stayed scoped; it is the next thing the club dashboard's Events tab needs.
 
   **The work:** migration adding `events.status TEXT NOT NULL DEFAULT 'PUBLISHED' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED'))` (default `PUBLISHED` so every existing row stays visible), an `EventStatus` enum on `Event`, a publish/unpublish/archive action on `EventService`, and status tabs on `/manage/[clubId]/events`.
 
   **The trap that makes this P1 rather than P2:** *every* public read path must filter to `PUBLISHED`, or drafts leak onto the homepage, the club page, and search. That means `EventRepository` list queries, `SearchRepository.hybridSearchEventIds`, and `SearchIndexService` (a draft should not be indexed at all, and archiving should evict it). Getting the column in without covering all four is worse than not having it. Pair it with `EventService.update` (BUG-006), which is a prerequisite anyway — there is no update path to set the status through.
 - [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload. *(Authorisation for these landed 2026-08-17 — `@clubPermissionService.canManageClub` now covers every club admin, not just one per club. What is still missing is `EventService.update` above, delete, and the upload endpoints being reachable from `/manage/[clubId]`.)*
-- [ ] **P2** Admin Dashboard API: create clubs, manage users, moderate events. *(Assigning the first club owner is done — approving a club-admin request writes the `CLUB_OWNER` assignment. Setting `official_email` is listed under Club governance.)*
+- [ ] **P2** Admin Dashboard API: ~~create clubs~~, manage users, moderate events. *(Creating clubs shipped 2026-09-09 — `POST /api/v1/clubs` is admin-only and makes the creator the owner, and the club-proposal queue approves the other path. Assigning the first club owner was already done. Setting `official_email` shipped in the same unit.)* What is left is **managing users** — there is still no way to grant or revoke `ROLE_ADMIN` through the product — and **moderating events**.
 - [ ] **P2** **Nothing can change an account's email address.** `/profile/edit/account` renders the field and its Save commits locally. Needs a confirm-the-new-address round trip, not a straight update — `auth_tokens` (V11) already carries the machinery and would gain an `EMAIL_CHANGE` purpose, and the address is the login identifier, so an unverified change locks the account out. *(The other half of that screen now works: `PATCH /api/v1/users/me` renames an account, 2026-08-20. Only the email is still local.)*
 - [ ] **P2** **Account closure has no endpoint.** The confirmation panel on `/profile/edit/account` is built and its destructive button is deliberately `disabled` with a note, because the nearest wired action is sign-out and that would tell someone their data was gone while every row of it remained. Overlaps the GDPR item under Security. An owner cannot leave a club without handing it on, so closure has to refuse or force a transfer first.
 - [ ] **P2** **Make `Club` implement `Persistable` so `save()` stops silently merging.** `Club.id` is an assigned slug with no `@GeneratedValue`, so Spring Data's `isNew()` answers false for a brand-new club and `SimpleJpaRepository.save` takes the `em.merge()` branch — which returns a *different* managed instance and leaves the caller holding a detached copy. That has now cost two bugs in the same method: [BUG-034](../bugs/fixed_bugs.md#bug-034) (when the INSERT ran) and [BUG-037](../bugs/fixed_bugs.md#bug-037) (which object you are holding). Both were fixed at the call site; the trap is still armed for the next caller. `Persistable` with a `@Transient` new-flag makes `save()` take `persist()` and hand the same instance back. P2 rather than P1 because it changes the write path for every club, so it wants its own commit and its own test — not a rider on a fix. The three options are written up in [ADR-002](../docs/decisions/ADR-002-club-id-is-an-assigned-slug.md), which recommends this one and is waiting on approval.
@@ -69,13 +68,53 @@ administrator listing, the `/manage/[clubId]` dashboard,
 invite/accept/decline/remove, ownership transfer, and the append-only activity
 log. The rest, in the spec's order:
 
-- [ ] **P1** *(item 6)* **Platform-admin UI for `official_email`.** The column
-  landed in V13 and **nothing can write it**, so every club has `NULL`. Two
-  things are already written and waiting on it: the §17 security notices in
-  `ClubAdminService.notifyClubInbox` fire only when a club has an address, and
-  the official-email verification step §6 puts in the middle of the invite flow
-  was skipped for the same reason. Small, and it unblocks the security half of
-  items 5 and 8.
+- [ ] **P3** **`InterestPicker` has no tests of its own.** It is used by both
+  the profile editor and the create-club form, and `CreateClubForm.test.tsx`
+  stubs it deliberately — the stub proves the *wiring* (a chosen slug reaches
+  the payload) and nothing about the picker's own behaviour. Worth covering:
+  a chosen pill leaves the lower grid rather than greying out in place; the
+  `max` cap disables adding without hiding anything; `capChoices` scrolls the
+  grid without changing which pills exist; and the four distinct empty states
+  it already distinguishes in code — still loading, failed to load, nothing
+  matched the filter, everything already added. The catalogue fetch needs
+  mocking, which is why this is its own unit rather than a rider.
+
+- [ ] **P1** *(item 6, half done)* **The official-email verification round
+  trip.** The **admin write shipped 2026-09-09** — `PATCH
+  /clubs/{clubId}/official-email` plus an editable panel on `/manage/[clubId]`
+  for platform admins — so the column is no longer unwritable. What is left is
+  the half that makes *verified* mean anything: setting an address always leaves
+  `official_email_verified_at` NULL by design
+  ([ADR-006](../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)),
+  and only redeeming a link mailed to that address may stamp it. **Blocked on
+  AWS SES** — see the item under Security, which carries the
+  `club_email_verifications` table shape so it is not re-derived. Until it
+  lands, every club reads as unverified, which is accurate, and the §17 security
+  notices and the §6 invite-verification step stay unbuilt.
+
+  **This is [ADR-006](../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)'s
+  first revisit trigger, and it is the only one that is real work.** SES landing
+  is the point at which that ADR's deferral is spent. Two things it forecloses,
+  and they are what the impatience will reach for: there is **no administrative
+  *mark as verified* control**, and **no bulk marking** to unblock the §17
+  notices — both are the rejected option under another name. If a club genuinely
+  cannot complete the round trip (a shared inbox nobody can open, an address that
+  bounces), the answer is a recovery procedure with an audit trail, not an
+  override switch. Also note the round trip is testable locally without SES once
+  built: `LoggingMailSender` puts the link in `docker compose logs backend`, the
+  way password reset is already tested.
+- [ ] **P3** **If waiting for a human becomes the complaint, the answer is
+  auto-approval under a trust signal — not open creation.**
+  [ADR-004](../docs/decisions/ADR-004-two-paths-create-a-club.md)'s first two
+  revisit triggers, recorded here because they are the ones most likely to be
+  solved the wrong way: a student waiting on review, or one admin becoming the
+  bottleneck as volume grows. That ADR rejected letting any signed-in user
+  create a club outright, because a club page carries an implied claim to
+  represent a real student organisation and curating after the fact is the wrong
+  way round. A verified university address, or some comparable signal, is the
+  shape of the fix. Neither trigger has fired — there is no volume yet — so this
+  is a marker, not work.
+
 - [ ] **P2** *(item 5, follow-up)* **Expire stale invitations.** `EXPIRED` is in
   `AssignmentStatus` and nothing sets it. A PENDING row grants nothing, so this
   is tidiness rather than exposure — but it holds the
@@ -103,6 +142,57 @@ log. The rest, in the spec's order:
   `official_email` to be real first, and needs an admin account to exist.
 
 ## Frontend / Features
+
+- [ ] **P1** **A club cannot be edited after it is created, from anywhere.**
+      `/manage/[clubId]` has no club-details editor and there is no `updateClub`
+      in the frontend at all, so the club-governance work's own promise — *the
+      requester adds a logo and photos from `/manage/[clubId]` once approval
+      makes them the owner* — has no screen behind it. Every endpoint exists and
+      the owner can already reach them (`PUT /clubs/{id}`,
+      `POST /clubs/{id}/logo`, `POST /clubs/{id}/images`); only the UI is
+      missing. Merge this with the three taxonomy items below, which want the
+      same editor for category and tags, and have it call `revalidateClubs` the
+      way the create form does. ([BUG-043](../bugs/bugs.md#bug-043))
+- [ ] **P2** **A requester cannot see their own pending club proposal.** They
+      submit, get a confirmation, and then have no way to check on it —
+      deliberately, for now: Arpan, 2026-09-09, it belongs in the notifications
+      tab rather than getting a screen of its own. `GET
+      /api/v1/club-creation-requests` is admin-only, so this needs either a
+      me-scoped endpoint or a filter. **Fold into the notifications work under
+      Backend / Features**, and note that nothing tells the requester when a
+      proposal is approved or rejected either.
+      **This is [ADR-004](../docs/decisions/ADR-004-two-paths-create-a-club.md)'s
+      third revisit trigger.** That ADR accepted *nothing tells the requester* as
+      a cost of putting club creation behind review, on the explicit condition
+      that it stops being a consequence and becomes a **bug** the day
+      notifications exist. Whoever builds notifications owns this.
+- [ ] **P2** **Nothing can display an uploaded event banner or avatar.**
+      `events.images` holds S3 object keys exactly as `clubs.logo` does, and
+      clubs got a read path on 2026-09-09 while events and avatars did not.
+      Latent only because no UI uploads an event image yet — it stops being
+      latent the moment the unwired `POST /events/{id}/images` below is
+      connected, and the failure mode is a thrown error during render rather
+      than a broken image. Follow the club shape, do not invent a second one.
+      ([BUG-042](../bugs/bugs.md#bug-042))
+- [ ] **P3** **A club proposal never expires**, so an unreviewed one holds its
+      slug reservation forever and that name is unavailable to everyone. Same
+      shape as the stale-invitation and stale-handover sweeps under Club
+      governance, and wants the same one. Named as a standing consequence in
+      [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) —
+      the reservation is what makes two students proposing `robotics` collide at
+      submission rather than at approval, and holding it forever is the price.
+
+- [ ] **P3** **A reviewer cannot see a proposed club as a club page**, because
+      there is no `clubs` row to render — which is the whole point of
+      [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) and
+      is named there as **the first requirement this shape makes genuinely
+      awkward**. The queue shows name, slug, description, message, interests and
+      the contact links, which has been enough so far. If it stops being enough,
+      build the preview **from the proposal** — a route that renders the club
+      page shape from `ClubCreationRequestDTO` — rather than relaxing the rule
+      that no row exists before approval. Recorded so the awkwardness is
+      recognised as predicted rather than as evidence the decision was wrong.
+
 
 - [ ] **P2** **An event cannot be given a banner image from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)).
 
@@ -141,7 +231,9 @@ taxonomy is currently write-only. Ordered by how visible the gap is.
       exist yet, which is a defensible reason to have written them and not a
       reason to leave them unread without a note.
 - [ ] **P2** **Every seeded club is unclassified and every seeded event
-      untagged.** V6 inserts sixteen mock clubs, all with `category_slug` null
+      untagged.** V6 inserted **eight** mock clubs (not sixteen — corrected
+      2026-09-09; it is the first of its two INSERT statements), all with
+      `category_slug` null
       and zero `club_interests` rows, and no migration seeds a topic or format
       assignment. Whatever gets built above will render empty against dev data,
       and so will any eyeball check of it. Classifying the sixteen is one seed
@@ -160,7 +252,7 @@ taxonomy is currently write-only. Ordered by how visible the gap is.
 - [ ] **P3** Whole-list calendar export ("Add to calendar" for a full tab). Needs an .ics feed — a Google template link carries exactly one event, which is why that control lives on each card rather than in the page header.
 - [ ] **P2** Category filtering on the events listing.
 - [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
-- [ ] **P2** Wire Admin Dashboard UI to the backend once those endpoints exist.
+- [ ] **P2** Wire the rest of the Admin Dashboard UI to the backend. *(The club-creation half shipped 2026-09-09: a Create a club control, and one merged Pending requests list reading both the club-admin-request and club-creation-request queues. User management and event moderation have no endpoints to wire yet.)*
 - [ ] **P2** Bookmark UI. `EventLikeButton` posts to `/saved-events` but starts from `initiallySaved={false}` unless the caller knows better, so a saved event still shows an empty heart on the events listing. Same fix as the follow button: a provider holding the saved ids, filled from `GET /api/v1/users/me/events`.
 - [ ] **P3** Show the live follower count on club cards and the club page. `Club.followers` is accurate now that follows move it, but `ClubCard` has its count commented out and the club page's number never refreshes after a follow — the provider only tracks ids.
 - [ ] **P2** **The club page's event tabs still render mock data.** `ClubEventTabs` is wired to the shared pill component but `app/(main)/clubs/[clubId]/page.tsx` passes `popularEvents` for *both* upcoming and past, so the two tabs show the same eight fixtures and the counts are the same number twice. `listEventsByClub(clubId)` already exists and is what `/manage/[clubId]/events` uses — this is a call site, not a feature. Also un-comment the `followers · events` line the page currently has commented out.
@@ -268,6 +360,19 @@ findings.**
   - **Move the send out of the transaction.** `AuthenticationService.register` (`:119`) and `requestPasswordReset` (`:191`) are `@Transactional` and call `mailSender.send` inside. Today that is a no-op write to a log; with SES it pins a database connection across a network round trip on the signup path. `register` is worse: the send happens *before* `respondWithToken`, so anything that rolls the transaction back leaves a live verification link for a user that no longer exists. Move to an `AFTER_COMMIT` transaction listener.
   - **Give the swallowed exception a voice.** `SmtpMailSender` catches everything and logs — correct for forgot-password, since throwing would leak whether an address exists and 500 the caller. But it means a misconfigured SES is invisible outside the log, and during the sandbox period *every* send to a real user fails that way. Add a counter or a health signal so silent total failure is detectable.
   - **Leave `management.health.mail.enabled: false` off.** Tempting to switch on now that mail is real; do not. It makes `/actuator/health` depend on SES reachability, so an SES incident pulls the app out of the load balancer — punishing an outage that is not ours with one that is.
+  - **Then build the official-email verification round trip** (governance item 6,
+    half done above). Recorded here so the shape is not re-derived: a **new
+    `club_email_verifications` table** — `club_id`, the `address` the link was
+    sent to, `token_hash`, `expires_at`, `used_at` — rather than extending
+    `auth_tokens`, whose `user_id` is `NOT NULL` (`V11:10`), whose `purpose`
+    CHECK constrains the enum, and whose `issue()` deletes previous tokens per
+    *user*. A club inbox is not a user and may have no account at all. Recording
+    the address on the row is what lets a later change of address invalidate the
+    old proof instead of carrying it over. The redeem endpoint is `permitAll`
+    and **its matcher must sit above the broad public-GET block** in
+    `SecurityFilterChainConfig` — first match wins. Testable locally without
+    SES: `LoggingMailSender` puts the link in `docker compose logs backend`,
+    which is how password reset is already tested.
   - **Optional follow-up:** switch to the SES v2 API via the AWS SDK (already a dependency for S3, `pom.xml:157`). Buys IAM-role auth on EB instead of static SMTP credentials in env, plus a message id and a real error surface. Not needed to make it work.
 
 - [ ] **P3** **Decide whether to turn on `AUTH_REQUIRE_VERIFIED_EMAIL`.** Blocked on SES above: switching it on before mail actually sends would lock every new user out of their own account.
@@ -276,7 +381,31 @@ findings.**
 - [ ] **P3** **Facebook / Meta sign-in.** Requested 2026-08-15. Low priority, and deliberately sequenced *after* the `auth_provider` migration above — adding a third identity provider while the schema still cannot tell providers apart would make the identity model worse, not better.
 - [ ] **P3** Auth event audit log (sign-in, failure, reset, role change). Cheap to add; most valuable once there is traffic worth reading.
 - [ ] **P3** Account deletion and data export. Needed before any real-user launch under GDPR-like rules; no legal deadline yet.
-- [ ] **P3** **Triage the standing CodeQL alerts that are not defects.** Eight new alerts on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31) were fixed in code on 2026-08-16 ([BUG-032](../bugs/fixed_bugs.md#bug-032), [BUG-033](../bugs/fixed_bugs.md#bug-033)); what remains is the set that is *correct as written* and needs dismissing with a reason, so the queue stops hiding real findings behind noise. Four groups: **(a)** `java/sensitive-log` **and** `java/log-injection`, both on `LoggingMailSender` (alerts 33 and 34) — dismiss them together, same bean, same reason. It logs reset links on purpose, which is the entire reason the bean exists, and `Logs.safeBlock` deliberately preserves newlines because the body is printed as a block; a barrier that keeps `\n` cannot satisfy a newline-sanitiser query, so no rewrite clears 34 without destroying the feature. The per-line `| ` prefix is the real mitigation and static analysis cannot see it. **(b)** `js/empty-password-in-configuration-file` on `application-test.yml` — H2 in-memory, user `sa`, no password, which is the standard for it. **(c)** `java/internal-representation-exposure` on `Club.images` / `Event.images` — accepting the offered autofix here **breaks every write**, which is already logged as [BUG-023](../bugs/bugs.md#bug-023); dismiss it explicitly so nobody accepts it later. **(d)** `java/internal-representation-exposure` again, on `Club.getInterestSlugs` (alert 44), `Event.getTopicSlugs` (45) and `Event.getFormatSlugs` (46) — raised as inline review comments on [PR #41](https://github.com/ArpanSaha07/campus-vibe/pull/41) on 2026-09-08. Same shape as (c) and the same answer: these are Lombok `@Getter`s on JPA collections and callers mutate what they return on purpose, relying on Hibernate dirty-checking inside the transaction — `ClubService.java:69,98,99` (`.addAll`, `.clear`) and `EventController.java:90,92` (`.addAll`). A defensive copy would silently stop persisting club interests and event taxonomy, which is [BUG-037](../bugs/fixed_bugs.md#bug-037) all over again. Dismiss with (c), same reason, same commit. Dismissal is a repo-level action on the Security tab, so it is Arpan's call rather than something to do unasked.
+- [ ] **P3** **Two more `java/internal-representation-exposure` alerts, not yet dealt with.** Found triaging [PR #45](https://github.com/ArpanSaha07/campus-vibe/pull/45) on 2026-09-11, after the standing set was dismissed (see [`tasks-completed.md`](tasks-completed.md) under Security). **Alert 23**, `User.followedClubIds` (`User.java:147`): `MyClubService.java:72,90` adds and removes through the getter on purpose, so it works today, but it is the one collection in `User` without the wrapper pattern the other three already use (`User.java:59-139`) — **apply the pattern rather than dismiss**, since the file already shows how. **Alert 52**, `ClubCreationRequest.getInterestSlugs` (`ClubCreationRequest.java:71`, new with the proposal table): `ClubCreationRequestService.java:77` calls `.addAll` on it, the same shape as group (d) was — dismiss as *Won't fix* with the same comment once it lands on `main`, or give it the wrapper too. **Never accept Copilot Autofix on either** ([BUG-044](../bugs/bugs.md#bug-044)). Also still open on `main` and never queued: **9** (CSRF off — deliberate, reverses with [BUG-003](../bugs/bugs.md#bug-003)) and **37** (missing `@Override` on a Lombok getter), both *Won't fix*; and **47**, **49–51**, unused values in `clubs/[clubId]/page.tsx:41` and `scripts/check-docs.mjs`, which are genuine small cleanups.
+- [ ] **P1** **Write the presigned-upload ADR — the next unit, agreed 2026-09-11.**
+      [BUG-039](../bugs/fixed_bugs.md#bug-039) was closed by the narrow fix
+      (server-generated keys, bytes sniffed, 5MB), and Arpan chose to decide the
+      `reference.md` §9 model separately, with its own `/start`. What the ADR has
+      to answer: [ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)
+      rejected presigning for *reads* because `FakeS3` cannot presign, and that
+      reason applies to uploads too unless the local store changes (MinIO, or a
+      presign stub); whether the §7 keys `MediaKeys` now writes survive it
+      unchanged; and the §19–§21 gaps still open — banner images have no delete,
+      and deleting a club or event deletes none of its objects.
+- [ ] **P3** **`aws.s3.mock` fails open.** `application.yml:52` defaults it to
+      true, so any environment that runs neither the `prod` profile nor sets
+      `AWS_S3_MOCK` stores media on its own disk through `FakeS3`. Production is
+      covered by `application-prod.yml`; a staging box started with the wrong
+      profile would not be. Found during the BUG-039 fix; not changed.
+- [ ] **P3** **The dev backend container runs as root.** `backend/Dockerfile`
+      sets no `USER` (the EB image does, `deploy/eb/Dockerfile:25`). It is what
+      made BUG-039's traversal a write anywhere in the container. Dev only, but
+      the dev image is also what CI's Docker job scans and smoke-tests.
+- [ ] **P3** **Club slugs are not shape-checked.** The id is client-chosen and
+      only lowercased (`ClubCreationRequestService.normaliseSlug`); nothing
+      refuses a slash, a dot segment or a space. Unreachable as a path variable
+      today, and `MediaKeys` refuses such an id for a key, but a slug pattern on
+      both create paths is the real control.
 - [ ] **P2** Authorisation review for the Club Dashboard and Admin Dashboard endpoints as they are built — enforce server-side, never rely on UI restrictions.
 - [ ] **P2** Rotate the local dev `JWT_SECRET` before any real deployment, and use a *different* value in production.
 

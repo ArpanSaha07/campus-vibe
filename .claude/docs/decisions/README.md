@@ -8,6 +8,18 @@ numbering rule and the evidence standard live in
 
 **Status starts at `Proposed`, and only Arpan moves it to `Accepted`.** An
 `Accepted` record he never approved is a process failure, not a shortcut.
+Accepting one changes nothing about where it lives: the file stays here under
+the same name, frozen, and the only edit it takes afterwards is its
+`Implemented in:` link.
+
+**An accepted ADR's `Revisit when` section is the part nobody reads at the right
+moment**, because no ADR loads automatically — `rules/` load with the code they
+govern, ADRs are read only when somebody comes looking. So every live trigger is
+mirrored twice: as a line in the path-scoped rule that loads with the code which
+would trip it, and, where it is foreseeable work, as an item in
+[`todo.md`](../../TODO/todo.md). The **Reopens when** column of the ADR table in
+[`../README.md`](../README.md) lists them all with the rule file that carries
+each. The reasoning stays here; only the trigger travels.
 
 **Adding a record without adding its row here makes it invisible** — nobody
 reads a folder, they read an index.
@@ -21,6 +33,29 @@ reads a folder, they read an index.
 | [ADR-001](ADR-001-three-taxonomy-vocabularies.md) | 2026-08-20 | 📝 Proposed — awaiting Arpan | Three naming vocabularies and only three: one shared `interest_catalogue` behind student interests, club tags **and** event topics · 13 `club_categories` · 22 events-only `event_formats` · **events get no category taxonomy at all** | [`user-profiles.md`](../architecture/user-profiles.md) — the interests half only; the club and event halves are unbuilt |
 | [ADR-002](ADR-002-club-id-is-an-assigned-slug.md) | 2026-09-07 | 📝 Proposed — awaiting Arpan | `Club` keeps its assigned slug id and implements `Persistable`, so `save()` stops silently merging and handing back a different instance · rejected a surrogate id (nine foreign keys, a route and the DTO contract) and rule-only mitigation | — not yet built |
 | [ADR-003](ADR-003-tomcat-pinned-beyond-the-boot-bom.md) | 2026-09-07 | 📝 Proposed — awaiting Arpan | `<tomcat.version>` is overridden past the Boot BOM until a parent manages 10.1.58 or newer · rejected a Boot 4 migration as a CVE remedy and a Trivy suppression outright | `backend/pom.xml` — shipped 2026-09-03 |
+| [ADR-004](ADR-004-two-paths-create-a-club.md) | 2026-09-08 · **amended 2026-09-10** | ✅ Accepted 2026-09-10 | Two paths create a club and neither leaves it ownerless: a platform admin creates directly and becomes owner, an ordinary user proposes and approval installs them · rejected open creation with creator-as-owner, admin-only creation, and an `ownerEmail` branch on create | `ClubService.createOwnedBy` (`create` deleted), `clubadmin/ClubCreationRequest*` — 2026-09-09 |
+| [ADR-005](ADR-005-club-proposal-is-its-own-table.md) | 2026-09-08 | ✅ Accepted 2026-09-10 | A proposal lives in `club_creation_requests` and no `clubs` row exists until approval · rejected a status column on `clubs`, whose four filter sites publish an unapproved club if one is missed · slug reserved at submission and re-checked in the approval transaction | `V31__create_club_creation_requests.sql` — 2026-09-09 |
+| [ADR-006](ADR-006-official-email-verified-only-by-round-trip.md) | 2026-09-08 | ✅ Accepted 2026-09-10 | `official_email_verified_at` is stamped only by redeeming a link mailed to that address, never by an administrative write · `setOfficialEmail` always nulls it · the round trip ships with SES, in a new `club_email_verifications` table rather than `auth_tokens` | `ClubAdminService.setOfficialEmail` — the admin-write half, 2026-09-09. The round trip is **not** built |
+| [ADR-007](ADR-007-uploaded-media-is-streamed-by-the-api.md) | 2026-09-09 | 📝 Proposed — awaiting Arpan | Uploaded media is streamed by the API rather than handed out as a presigned or public S3 URL · images addressed by **index**, never by key · an uploaded SVG is never served as `image/svg+xml` · the frontend reaches it through a same-origin `/media/**` rewrite, not an absolute API URL · rejected presigned URLs (`FakeS3` cannot presign) and a public bucket + CDN (nothing provisioned) | `ClubController.logo`/`.image`, `adapters.ts`, `next.config.ts` — clubs only, 2026-09-09 ([BUG-040](../../bugs/fixed_bugs.md#bug-040)) |
+| [ADR-008](ADR-008-netty-pinned-beyond-the-boot-bom.md) | 2026-09-11 | 📝 Proposed — awaiting Arpan | `<netty.version>` is overridden past the Boot BOM, by the same lever ADR-003 uses for Tomcat · rejected excluding `netty-nio-client`, which nothing executes, because an `S3AsyncClient` would then fail at runtime · rejected a Trivy suppression | `backend/pom.xml` — 2026-09-11 ([BUG-050](../../bugs/fixed_bugs.md#bug-050)) |
+
+**ADR-004 carries two in-place amendments, both dated 2026-09-10 and both
+against the frozen-record rule above.** Arpan decided each knowingly:
+
+1. **Scope.** The record said a club proposal is *text only*, and the reasoning
+   behind it — no club id, no S3 key — only ever applied to images. The four
+   contact links now ship on a proposal, so the sentence described a scope that
+   no longer holds.
+2. **Fact.** It named the eight ownerless clubs seeded by `V6` as the permanent
+   exceptions to *every club has an owner*. `V32` retired those rows the day
+   after the ADR shipped, and `DevDataSeeder` now leaves exactly two unowned on
+   purpose, recreated on every cold start under the `dev` profile alone.
+
+Neither touches the decision the record exists for, both are marked where they
+sit rather than folded into the original prose, and a reversal of the
+*decision* would still get its own numbered ADR. **Two amendments is the
+ceiling** — a third would mean this record is being maintained rather than
+frozen, and the honest answer at that point is a superseding ADR.
 
 **ADR-001 holds seven decisions rather than one**, against `adr.md`'s
 one-per-file rule, and argues the exception in its own header: they are a single
@@ -37,8 +72,8 @@ or a bug that will be closed and lost.
 
 | Decision | Forced by | Where it sits today |
 |---|---|---|
+| Presigned uploads (`reference.md` §9) or keep streaming bytes through the API — and what stands in for S3 locally if presigning is chosen | [BUG-039](../../bugs/fixed_bugs.md#bug-039)'s narrow fix, 2026-09-11: Arpan chose to decide the model separately, as the next unit. [ADR-007](ADR-007-uploaded-media-is-streamed-by-the-api.md) rejected presigning for reads because `FakeS3` cannot presign, and the same reason applies to uploads | [`todo.md`](../../TODO/todo.md), P1 under Security |
 | How the JWT reaches the browser — `localStorage` or an httpOnly cookie | [BUG-003](../../bugs/bugs.md#bug-003) — frontend route protection never executes, and two of its three stated causes may be stale after the Next 16 upgrade | `bugs.md`, open |
-| Whether the creator of a club becomes its `CLUB_OWNER` at create, or club creation moves behind admin approval | The open **P0** in [`todo.md`](../../TODO/todo.md): `POST /api/v1/clubs` grants the creator nothing, so they get a 403 on their own logo upload | `todo.md`, stated as *a decision, not code* |
 | Whether to adopt shadcn/ui alongside the bespoke Tailwind v4 tokens | New UI surfaces keep re-deciding it per component | Nowhere |
 | The deployment target and container registry | Elastic Beanstalk config exists under `docker/`; nothing is provisioned | [`CampusVibe_AWS_Deployment_Guide.md`](../architecture/CampusVibe_AWS_Deployment_Guide.md), as a plan rather than a decision |
 

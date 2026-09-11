@@ -15,6 +15,28 @@ package com.campusvibe.clubadmin;
  */
 public enum ClubAuditAction {
 
+    /** The club was created -- by a platform admin directly, or by approving a proposal. */
+    CLUB_CREATED,
+    /**
+     * The club's first owner was installed.
+     *
+     * <p>Separate from {@link #CLUB_CREATED} because the two are not always the
+     * same person: a proposal is created by the approving admin and owned by the
+     * requester. It is also the first entry on the eight seeded clubs, which
+     * were created before anyone owned them.
+     */
+    CLUB_OWNER_INSTALLED,
+    /** The club arrived by an ordinary user proposing it, and an admin approving. */
+    CLUB_PROPOSAL_APPROVED,
+    /**
+     * A platform admin set or changed the club's official email address.
+     *
+     * <p>Recorded because it is the club's recovery channel: whoever holds that
+     * address can be sent security notices and, once §15 exists, recover the
+     * club. A change of it is exactly the event an owner should be able to see.
+     */
+    CLUB_OFFICIAL_EMAIL_SET,
+
     /** An address was invited to help administer the club. */
     CLUB_ADMIN_INVITED,
     /** An invitation was accepted, and authority actually began. */
