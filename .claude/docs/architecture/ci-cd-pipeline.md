@@ -4,7 +4,9 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `4d11778` for the `next.config.ts` sections (images, the
+**Code as of:** `081d7b3` for the paragraph on BOM pins under the Trivy gate —
+`backend/pom.xml` gained `<netty.version>` on 2026-09-11
+([BUG-050](../../bugs/fixed_bugs.md#bug-050)); no workflow changed. `4d11778` for the `next.config.ts` sections (images, the
 `/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 `verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test
@@ -779,6 +781,20 @@ newer `node:25-alpine` carried an older, worse copy. Bumping the tag would have
 fixed none of them. The gate now reports the finding class instead of asserting a
 cause.
 
+**Most failures of this gate are published, not written.** Three times now a
+green branch went red with nothing in the repo changing — a new advisory
+against a version the Spring Boot BOM picked
+([BUG-019](../../bugs/fixed_bugs.md#bug-019),
+[BUG-035](../../bugs/fixed_bugs.md#bug-035),
+[BUG-050](../../bugs/fixed_bugs.md#bug-050)). The parent is at the last 3.5.x,
+so the lever is a property override in `backend/pom.xml`: `<tomcat.version>`
+([ADR-003](../decisions/ADR-003-tomcat-pinned-beyond-the-boot-bom.md)) and, since
+2026-09-11, `<netty.version>`
+([ADR-008](../decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md)). **Dependabot
+does not bump a property that overrides a BOM**, so this gate is the only thing
+that notices either going stale. BUG-050 also carried `next` 16.3.0 on the
+frontend image, which was an ordinary lockfile bump.
+
 **A limit of image scanning worth stating plainly.** Now that the frontend image
 ships `.next/standalone`, client-side dependencies have no `package.json` in it —
 they are compiled into the browser chunks. Trivy cannot see them, so a green scan
@@ -990,6 +1006,12 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 ## Change log
 
+- **2026-09-11** — The Trivy gate blocked PR #45 on two newly published
+  CRITICALs, `netty-handler` 4.1.135 and `next` 16.3.0
+  ([BUG-050](../../bugs/fixed_bugs.md#bug-050)). `backend/pom.xml` gained
+  `<netty.version>` ([ADR-008](../decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md));
+  added the paragraph on BOM pins under the Trivy gate. No workflow, hook or
+  Dockerfile changed. Implementing agent.
 - **2026-09-09** — `next.config.ts` gained `images.remotePatterns`, an
   `async rewrites()` proxying `/media/**` to `API_INTERNAL_URL`, and a note on
   why `img-src` did not have to be loosened. Written for the club media read

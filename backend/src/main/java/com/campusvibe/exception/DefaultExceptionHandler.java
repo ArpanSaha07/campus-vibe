@@ -176,10 +176,11 @@ public class DefaultExceptionHandler {
     // through to the catch-all and answered 500 -- reachable by any phone photo
     // once the per-file cap went to 5MB (BUG-039). Spring's exception does not
     // say which of the two caps was hit (Tomcat reports -1), so the sentence
-    // names both, read from the same properties that enforce them.
+    // names both, read from the same properties that enforce them. The type is
+    // named on the annotation rather than taken as a parameter, since nothing
+    // here reads the exception (CodeQL java/unused-parameter, alert 53).
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ApiError> handleMaxUploadSize(MaxUploadSizeExceededException e,
-                                                        HttpServletRequest request) {
+    public ResponseEntity<ApiError> handleMaxUploadSize(HttpServletRequest request) {
         ApiError apiError = new ApiError(
                 request.getRequestURI(),
                 "Each image must be %s or smaller, and one upload no more than %s in total"
