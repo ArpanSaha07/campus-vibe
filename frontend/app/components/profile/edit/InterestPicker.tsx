@@ -30,12 +30,23 @@ export default function InterestPicker({
   title = "Your interests",
   description = "We'll use these to suggest clubs and events worth your time.",
   max,
+  capChoices = false,
 }: {
   selected: string[];
   onChange: (interests: string[]) => void;
   /** Overridden where this is not a profile — a club picks topics, not hobbies. */
   title?: string;
   description?: string;
+  /**
+   * Scroll the unchosen grid inside a fixed height instead of letting it run.
+   *
+   * Off by default, which is right on the settings page: that section is the
+   * whole screen, so ninety pills are the content. On the create-club form the
+   * same grid was more than half the page, and it buried the fields below it —
+   * the picker is one question there, not the point of the page. The chosen
+   * pills above are never capped either way; those are the answer.
+   */
+  capChoices?: boolean;
   /**
    * Optional ceiling. A profile has none: somebody interested in everything
    * only gets a busier feed, which is their business. A club has one, because a
@@ -149,7 +160,14 @@ export default function InterestPicker({
       </div>
 
       {available.length > 0 ? (
-        <ul className="mt-4 flex flex-wrap gap-2">
+        <ul
+          className={`mt-4 flex flex-wrap gap-2 ${
+            // No tabIndex on the scroller: every child is a button, so a
+            // keyboard user already scrolls it by tabbing through it. Adding
+            // one would put an announced, unlabelled stop in front of them.
+            capChoices ? "scroll-fade max-h-64 overflow-y-auto pb-6 pr-1" : ""
+          }`}
+        >
           {available.map((interest) => (
             <li key={interest.slug}>
               <button

@@ -1,17 +1,20 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-07** · Branch: `develop`
+Last updated: **2026-09-11** · Branch: `feature/club-governance`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05).
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039 (2026-09-11).
+
+**Highest id issued: BUG-049.** Grep *both* files before taking the next one — BUG-038 was issued twice.
 
 | ID | Severity | Summary |
 |---|---|---|
-| [BUG-039](#bug-039) | High | Image uploads let the caller name the S3 object, and validate nothing about it |
-| [BUG-038](#bug-038) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **reproducing again as of 2026-08-20** |
+| [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
+| [BUG-042](#bug-042) | Medium | Event banners and profile avatars have no read path, so an uploaded one can never be displayed |
+| [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **still reproducing, re-confirmed 2026-09-09** |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -355,10 +358,10 @@ nothing for Vercel — nor the reverse.
 
 ---
 
-### BUG-038
+### BUG-044
 **`Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted** · High · OPEN
 
-*Renumbered from BUG-023 on 2026-09-06. That id was already taken by the event-detail-page bug in [`fixed_bugs.md`](fixed_bugs.md#bug-023), so for three weeks two different bugs shared it, against the never-reuse rule at the top of this file.*
+*Renumbered twice, and the second time for the same reason as the first. It was BUG-023 until 2026-09-06, when that id turned out to be taken by the event-detail-page bug in [`fixed_bugs.md`](fixed_bugs.md#bug-023); it became BUG-038, and on 2026-09-08 the Docker smoke-test bug was filed as BUG-038 too. Renumbered to 044 on 2026-09-09. The open entry moves rather than the fixed one, so historical records in `tasks-completed.md` and the `STATUS.md` shipped log keep the id they were written with. **Before filing a bug, grep both files for the next free id** — the highest id in either, not the highest in one.*
 
 **Found:** 2026-08-13, while fixing [BUG-022](fixed_bugs.md#bug-022) on PR #27. That
 bug is this one, already detonated, on a different entity.
@@ -432,65 +435,47 @@ moment anyone writes `getCategories().add(...)`.
 
 ---
 
-### BUG-039
-**Image uploads let the caller name the S3 object, and validate nothing about it** · High · OPEN
+### BUG-042
+**Event banners and profile avatars have no read path** · Medium · OPEN
 
-**Found:** 2026-09-07, while distilling `CampusVibe_S3_Media_Security.md` into
-[`s3-media/SKILL.md`](../skills/s3-media/SKILL.md). The document had been sitting
-inside a vendored `aws-s3` skill folder that nothing pointed at, so its rules had
-never been read against the code they govern.
+**Found:** 2026-09-09, while building the club media read path for
+[BUG-040](fixed_bugs.md#bug-040).
 
-**Symptom:** none visible. Uploads succeed, keys are stored, nothing errors.
+`EventController` stores an S3 object key in `events.images` exactly as
+`ClubController` did for `clubs.logo`, and `ProfileAvatar` notes there is no
+upload anywhere for avatars. Clubs now have `GET /clubs/{id}/logo` and
+`/images/{index}`; **events and avatars have nothing**, so an uploaded event
+banner could never be displayed.
 
-All three upload paths build the S3 object key by concatenating the browser's
-own filename:
+Latent today for the same reason BUG-040 was latent until this week: no UI
+uploads an event image yet (the unwired `POST /events/{id}/images` is the P2
+under Frontend / Features). It stops being latent the moment that is wired.
 
-```java
-String key = "clubs/" + id + "/logo-" + file.getOriginalFilename();   // ClubController.java:82
-String key = "clubs/" + id + "/images/" + file.getOriginalFilename(); // ClubController.java:91
-String key = "events/" + id + "/images/" + file.getOriginalFilename();// EventController.java:108
-```
+**The shape when it is built** is the club one, and should not be reinvented:
+index addressing so no caller names an object key, raster-only content types
+with `nosniff` so an uploaded SVG cannot execute, and the same `/media/**`
+rewrite. Replacing all of it with presigned or CDN URLs is an ADR, not a
+per-feature choice — see [`s3-media/SKILL.md`](../skills/s3-media/SKILL.md).
 
-`reference.md` §7 says *never let a client provide an arbitrary full S3 object
-key*, and §13 says *do not use user-supplied filenames as the canonical S3 object
-name*. Both are violated at every call site.
+---
 
-**What actually goes wrong, in order of how sure it is:**
+### BUG-043
+**A club cannot be edited after creation, so late media has no route in** · Low · OPEN
 
-1. **Silent overwrite.** `putObject` replaces whatever is at the key. Upload
-   `logo.png` twice and the second silently destroys the first. On
-   `/{id}/images` it is worse: the object is replaced but `addImages` still
-   appends the key, so the list holds two entries pointing at one object.
-2. **No stable key, so the documented model cannot be built on top.** §19 needs
-   a new uuid key per upload to do upload → confirm → update database → delete
-   old. With the filename as the key there is no old and new to order.
-3. **Content type is never checked.** The endpoints declare
-   `consumes = MULTIPART_FORM_DATA_VALUE`, which constrains the request, not the
-   part. Any bytes under any name are stored — §12 asks for
-   `image/jpeg`, `image/png`, `image/webp` only.
-4. **`getOriginalFilename()` is nullable**, giving keys like
-   `clubs/24/logo-null`.
+**Found:** 2026-09-09, wiring the club create form's uploads.
 
-**What is NOT wrong, so nobody re-derives it:** size is bounded —
-`application.yml:30-31` caps multipart at 10MB (the reference asks for 5MB, so
-the cap is loose rather than absent). And a `..` in a filename is not traversal:
-S3 keys are opaque strings, the `clubs/{id}/` prefix is still prepended
-literally, so prefix-scoped IAM and lifecycle rules are not evaded.
+`/manage/[clubId]` has no club-details editor: there is no `updateClub` anywhere
+in the frontend, and no logo or banner control outside the create form. So the
+club-governance work's own promise — *the requester adds images from
+`/manage/[clubId]` once approval makes them the owner* — has no screen behind it.
+A user who proposes a club and is approved owns it and still cannot give it a
+logo.
 
-**Why it is High when nothing is broken today.** Like
-[BUG-038](#bug-038) this is mostly armed rather than fired, and for the same
-reason it is not a note. Nothing serves this media back yet — `S3Service.getObject`
-(`S3Service.java:30`) has no caller anywhere in the codebase. The two items at the
-top of [`STATUS.md`](../STATUS.md) are both about wiring exactly that read path.
-The moment one lands, every missing control goes live at once, on top of keys
-that are already accumulating in S3 and in the database and would need migrating.
-An unvalidated SVG or HTML byte stream stored today becomes a stored-XSS question
-the day it is served inline.
+The endpoints all exist and are reachable by the owner (`PUT /clubs/{id}`,
+`POST /clubs/{id}/logo`, `POST /clubs/{id}/images`); only the UI is missing. It
+overlaps the three taxonomy items in [`todo.md`](../TODO/todo.md) that want the
+same editor for category and tags.
 
-**The fix is a decision, not a patch.** Generating `{uuid}.webp` keys changes what
-is stored in `clubs.logo_key`, `club_images` and `event_images`, so existing rows
-need a backfill or a compatibility read. Doing it at the same time as the move to
-presigned uploads is one piece of work; doing it separately means touching the
-same three endpoints twice. Write the ADR before either. The narrow version —
-stop the caller naming the object, keep direct byte upload — is a much smaller
-change and would close 1, 2 and 4 on its own.
+Note also that uploading outside the create flow does not invalidate the
+five-minute `clubs` cache — whatever builds this screen should call
+`revalidateClubs` the way the create form does.

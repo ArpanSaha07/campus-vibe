@@ -5,14 +5,16 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `14ea46e` — the append-only club activity log. Ownership
-transfer and the admin bootstrap are committed ahead of it.
+**Code as of:** `3fec570` — the club ownership spine (two creation paths, the
+club-proposal queue, the platform-admin write for `official_email`), plus the
+contact links a proposal now carries and the official email both paths seed.
 
 The spec this implements is
 [`club_admin_governance.md`](club_admin_governance.md). That file is the
 *design*, written before the code and covering fifteen MVP items. **This file
-describes what actually shipped, which is items 1–5 and 7–10 of that list.**
-Where the two disagree, this one describes reality.
+describes what actually shipped, which is items 1–5 and 7–10 of that list, plus
+the admin-write half of item 6.** Where the two disagree, this one describes
+reality.
 
 ---
 
@@ -38,6 +40,15 @@ nobody or two people in charge. All of it lands in an activity log the whole
 team can read and nobody can rewrite — the database refuses an update or a
 delete on that table outright, so the guarantee does not rest on the application
 behaving itself.
+
+Since 2026-09-09 a club also cannot be *born* without somebody in charge of it.
+Creating one is admin-only and makes the creating admin its owner; everybody
+else submits the same form as a proposal, which stores no club at all until an
+admin approves it and installs the requester as owner in one transaction. That
+closed the standing P0 in which creating a club granted the creator nothing, so
+the logo, banners and social links the form collected all answered 403 against
+`canManageClub` and the form had to say so. A platform admin can now also write
+a club's `official_email`, which had been unwritable since the column landed.
 
 ---
 
@@ -78,6 +89,32 @@ behaving itself.
   (`PostgresTestContainer`) with `ddl-auto: validate`, so an entity that drifts
   from a migration fails a test instead of a container boot. `*Test` unit suites
   are still H2 and still fast.
+- **Two paths create a club, and neither leaves it ownerless** —
+  [ADR-004](../decisions/ADR-004-two-paths-create-a-club.md). `POST
+  /api/v1/clubs` is `hasRole('ADMIN')`; everyone else posts to
+  `/api/v1/club-creation-requests`. Both end in `ClubService.createOwnedBy`,
+  which is the **only** way to create a club — there is deliberately no
+  ownerless create, and `create` was deleted rather than kept beside it.
+- **A proposal is its own table, not a `clubs` row with a status column** —
+  [ADR-005](../decisions/ADR-005-club-proposal-is-its-own-table.md). A club row
+  is public the moment it exists, so gating visibility would mean filtering in
+  four places and missing one publishes an unreviewed club. The slug is reserved
+  at submission by a partial unique index over PENDING rows **and re-checked
+  inside the approval transaction** — the reservation cannot see a club created
+  directly in the meantime.
+- **`setOfficialEmail` always writes `official_email_verified_at = NULL`** —
+  [ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md).
+  Verified means somebody redeemed a link mailed to that address; an
+  administrative write is not that. Today the column is NULL everywhere so this
+  reads as a no-op, which is exactly why it is easy to "simplify" away — do not.
+- **`official_email` is seeded at creation and changed only by a platform
+  admin.** Both creation paths fill it from the contact email on the create form
+  (Arpan, 2026-09-10); `PATCH /clubs/{clubId}/official-email` stays
+  `hasRole('ADMIN')`. Seeding it does **not** make it the club's own to edit —
+  that separation is the point of §6, and opening it to owners and admins was
+  considered and rejected. It is also seeded rather than *merged* with
+  `social_links.email`: the two are separate columns from the moment the club
+  exists, so editing the public contact address never moves the recovery one.
 - **Do not reintroduce a club-admin role claim,** however convenient. The
   reason is in `V14__remove_global_club_admin_role.sql` and is the single most
   important decision in this change.
@@ -86,6 +123,11 @@ behaving itself.
   any further migration, [`design-guidelines.md`](../../design-guidelines.md)
   for the dashboard UI, and `contracts/api-dto-fields.json` — two DTOs were
   added there and both test suites assert against it.
+- **Uploaded club media is served by the API, not by S3 directly.**
+  `clubs.logo` holds an object *key*; `GET /clubs/{id}/logo` streams the bytes
+  and the frontend addresses it through a same-origin `/media/...` rewrite. A
+  key handed to `next/image` throws at render time and takes the page down —
+  see [BUG-040](../../bugs/fixed_bugs.md#bug-040).
 - **[`user-roles.md`](user-roles.md) is now actively wrong** about
   `ROLE_CLUB_ADMIN` and about `Club.club_admin_id`. Its banner already says not
   to trust it; this document supersedes it on everything club-related.
@@ -523,6 +565,64 @@ list must not make the app believe the user manages nothing.
 
 ## Change log
 
+- 2026-09-10 — **a club's official email is seeded at creation, on both paths.**
+  It had no way of being set until the club already existed: `ClubCreateRequest`
+  carried no field for it and `PATCH /clubs/{clubId}/official-email` is the only
+  writer, so every club started with no recovery address and somebody had to add
+  one by hand. The contact email the create form already collects now fills it —
+  `ClubController.create` for the admin path, `ClubCreationRequestService.approve`
+  reading it out of the proposal's stored `social_links` for the other. **Seeded,
+  not merged:** `social_links.email` and `official_email` are separate columns
+  with separate rules from that moment on, so editing the public address does not
+  move the recovery one (Arpan, 2026-09-10).
+  [ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md)
+  is untouched — a seeded address is unverified, and there is no stamp at
+  creation to inherit or clear. **Who may change it is unchanged:** `hasRole('ADMIN')`,
+  so the club's own team still cannot repoint the channel used to recover the
+  club from them (§6), and Arpan chose that over opening it to owners and admins
+  when it was put to him. The `/manage/[clubId]` panel needed no change: it
+  already shows the address and its verified state to the whole management team
+  and draws the edit control for a platform admin alone. The `CLUB_CREATED`
+  audit entry now carries the seeded address, so the log answers who pointed a
+  club's recovery channel where it points. Spec:
+  [`2026-09-10-official-email-seeded-at-creation.md`](../../specs/2026-09-10-official-email-seeded-at-creation.md).
+  Implementing agent.
+- 2026-09-10 — **a proposal carries the club's contact links.** `V33` adds one
+  `social_links TEXT` column to `club_creation_requests`, mirroring
+  `clubs.social_links` rather than splitting into four columns, and
+  `ClubCreationRequestService.approve` copies it onto the `Club` *before*
+  `createOwnedBy` — after it would write to a detached instance
+  ([BUG-037](../../bugs/fixed_bugs.md#bug-037)). The four fields left the
+  `admin &&` gate on the create form: they need no club id and no S3 key, so
+  the only thing a proposal still cannot carry is the logo. The contact email
+  is required for an admin creating outright and optional on a proposal.
+  **The links are now validated on every write path**, which they never were:
+  `ProfileLinks` moved to `common/WebLinks` and gained a third caller, and
+  `ClubSocialLinks` parses the stored JSON, normalises it and re-serialises, so
+  the column holds our four keys or NULL. That closed
+  [BUG-048](../../bugs/fixed_bugs.md#bug-048) on `ClubService.update`, which
+  predated this work. Instagram is collected as a *handle* and the URL is built
+  server-side (Arpan, 2026-09-10). Also
+  [BUG-049](../../bugs/fixed_bugs.md#bug-049): the form had no `noValidate`, so
+  the browser's own constraint checking silently pre-empted `clubValidator`.
+  Spec: [`2026-09-10-proposal-social-links.md`](../../specs/2026-09-10-proposal-social-links.md).
+  Implementing agent.
+- 2026-09-09 — the club ownership spine. Two creation paths
+  ([ADR-004](../decisions/ADR-004-two-paths-create-a-club.md)): `POST
+  /api/v1/clubs` moved to `hasRole('ADMIN')` and makes the creating admin the
+  owner, and `club_creation_requests` (V31) holds an ordinary user's proposal
+  until an admin approves it, at which point the club and the owner assignment
+  are written together
+  ([ADR-005](../decisions/ADR-005-club-proposal-is-its-own-table.md)).
+  `ClubService.create` was **deleted** in favour of `createOwnedBy`, so no code
+  path can create an ownerless club except the dev seeder, which passes null
+  deliberately. `PATCH /clubs/{clubId}/official-email` gives platform admins the
+  write that MVP item 6 needed, always leaving the address unverified
+  ([ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md)).
+  The admin dashboard gained the Create a club control it had never had, and one
+  merged Pending requests list reading both queues. 17 new backend tests
+  (`ClubCreationFlowIT`, `ClubMediaIT`); the whole flow re-run against the
+  running stack from an empty database. Implementing agent.
 - 2026-08-17 — created, covering MVP items 1–4 of
   [`club_admin_governance.md`](club_admin_governance.md): the assignment table,
   the two club roles, the one-owner invariant, the authorisation rewrite, and

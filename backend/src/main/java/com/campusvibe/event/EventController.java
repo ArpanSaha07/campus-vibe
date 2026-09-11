@@ -1,5 +1,6 @@
 package com.campusvibe.event;
 
+import com.campusvibe.s3.MediaKeys;
 import com.campusvibe.s3.S3Buckets;
 import com.campusvibe.s3.S3Service;
 import com.campusvibe.taxonomy.TaxonomyService;
@@ -103,11 +104,18 @@ public class EventController {
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
     public void uploadImages(@PathVariable Long id, @RequestPart("files") List<MultipartFile> files) throws IOException {
+        // Keys come from MediaKeys, never from the upload's filename (BUG-039).
+        // Every file is checked before any is stored, so one refused file does
+        // not leave the ones ahead of it uploaded and the request answering 400.
+        List<byte[]> contents = new ArrayList<>();
         List<String> keys = new ArrayList<>();
         for (MultipartFile file : files) {
-            String key = "events/" + id + "/images/" + file.getOriginalFilename();
-            s3Service.putObject(buckets.getEvents(), key, file.getBytes());
-            keys.add(key);
+            byte[] bytes = file.getBytes();
+            contents.add(bytes);
+            keys.add(MediaKeys.eventBanner(id, bytes));
+        }
+        for (int i = 0; i < keys.size(); i++) {
+            s3Service.putObject(buckets.getEvents(), keys.get(i), contents.get(i));
         }
         eventService.addImages(id, keys);
     }

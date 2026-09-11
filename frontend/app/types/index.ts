@@ -188,7 +188,7 @@ export interface UserProfile {
  * a caller reading one link never has to check two levels.
  *
  * The backend stores only http(s) URLs and refuses anything else on write. Run
- * every one through `normaliseProfileLink` anyway before it reaches an href —
+ * every one through `normaliseWebLink` anyway before it reaches an href —
  * a row written before that rule existed would still render.
  */
 export interface ProfileSocialLinks {
@@ -409,6 +409,40 @@ export interface ClubAuditLog {
   createdAt: string;
 }
 
+/**
+ * A proposal for a club that does not exist yet.
+ *
+ * <p>Mirrors ClubCreationRequestDTO. Distinct from ClubAdminRequest, which is a
+ * claim on a club that already exists: the two render as one Pending requests
+ * list on /admin but approve through different endpoints, because approving a
+ * proposal has to create the club first.
+ */
+export interface ClubCreationRequest {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  /** What clubs.id becomes on approval. Reserved while the proposal is pending. */
+  proposedSlug: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  interests: string[];
+  message: string | null;
+  /**
+   * The club's four contact values as a JSON string, the same shape
+   * `ApiClub.socialLinks` carries — null when the requester filled in none of
+   * them. Parse it with `parseSocialLinks`; the server normalised it, so what
+   * is here is always our JSON.
+   */
+  socialLinks: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedAt: string;
+  reviewedAt: string | null;
+  /** The club the approval produced. Null on every pending and rejected row. */
+  createdClubId: string | null;
+}
+
 export interface ClubAdminRequest {
   id: number;
   userId: number;
@@ -451,28 +485,74 @@ export type PillProps = {
     className?: string
 }
 
+/**
+ * What an ordinary user submits to propose a club.
+ *
+ * The same descriptive fields as `NewClub` plus a message, and deliberately no
+ * images: a proposal has no club id to hang an S3 key off. The requester adds
+ * them from `/manage/[clubId]` once approval makes them the owner.
+ */
+export interface NewClubProposal {
+  name: string;
+  description: string;
+  category: string | null;
+  interests: string[];
+  message: string;
+  /**
+   * The club's contact links, carried onto the club when an admin approves.
+   *
+   * Optional on this path, unlike the admin form where the contact email is
+   * required — a student proposing a club may not have an address for it yet.
+   * The logo is still absent: it needs a club id and an S3 key, and a proposal
+   * has neither.
+   */
+  socialLinks: ClubSocialLinks;
+}
+
+/**
+ * A club's public contact links.
+ *
+ * Stored backend-side as a JSON string in one `clubs.social_links` column, not
+ * as columns — `ApiClub.socialLinks` is therefore `string | null` and
+ * `adapters.toClub` parses it. Named here so the create form, the update call
+ * and `Club` all agree on the shape rather than repeating the object literal.
+ */
+export interface ClubSocialLinks {
+  email: string;
+  website: string;
+  facebook: string;
+  instagram: string;
+}
+
 export interface ClubFormData {
   name: string;
   description: string;
   /**
-   * Collected, previewed, and **not sent yet**. Both uploads go through
-   * endpoints guarded by `canManageClub`, and creating a club does not make you
-   * its owner — see the note on `createClub` and the club-creation items in
-   * `todo.md`.
+   * Sent after the club exists, by `createClubWithMedia`. The upload goes
+   * through an endpoint guarded by `canManageClub`, which the creating admin
+   * now passes because ADR-004 makes them the club's owner.
+   *
+   * Absent entirely on the proposal path: a proposal has no club id and no S3
+   * key, so the form renders no image control for an ordinary user.
+   *
+   * Banner photos are deliberately NOT here. They are a club's own content
+   * rather than part of deciding it should exist, and ten file pickers made the
+   * first thing a new club sees a chore. They are set from `/manage/[clubId]`
+   * instead — `uploadClubImages` is the call, and `POST /clubs/{id}/images` has
+   * been reachable all along.
    */
   logo: File | null;
-  images: File[];
   /** A `club_categories` slug. */
   category: string | null;
   /** `interest_catalogue` slugs — what the club is about, capped at eight. */
   interests: string[];
-  /** Also collected and not sent yet, for the same reason as the uploads. */
-  socialLinks: {
-    email: string;
-    website: string;
-    facebook: string;
-    instagram: string;
-  };
+  /** Sent as a `PUT` on the club once it exists, like the uploads above. */
+  socialLinks: ClubSocialLinks;
+  /**
+   * Why the requester should run this club. Proposal path only — a platform
+   * admin creating a club directly is not asking anyone's permission.
+   */
+  message: string;
 }
 
 export interface LogoPreviewProps {
@@ -498,7 +578,8 @@ export interface FormErrors {
   name?: string;
   description?: string;
   logo?: string;
-  images?: string;
   social?: string;
+  /** The proposal path's note to the reviewer. */
+  message?: string;
   general?: string;
 }
