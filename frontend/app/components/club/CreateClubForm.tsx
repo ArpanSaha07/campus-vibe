@@ -17,6 +17,7 @@ import { isAdmin } from '@/app/lib/user';
 import { useManagedClubs } from '@/app/lib/managed-clubs-context';
 import { revalidateClubs } from '@/app/lib/actions/revalidate';
 import { clubSlug } from '@/app/lib/services/clubService';
+import { ACCEPTED_IMAGE_TYPES } from '@/app/lib/validators/clubValidator';
 import { LogoPreview } from '../PhotoFileUploadPreview';
 import { ClubFormErrorBoundary } from './ClubFormErrorBoundary';
 
@@ -276,7 +277,7 @@ export default function CreateClubForm() {
                   ref={logoInputRef}
                   id="logo"
                   type="file"
-                  accept="image/*"
+                  accept={ACCEPTED_IMAGE_TYPES.join(',')}
                   onChange={handleLogoChange}
                   disabled={isSubmitting}
                   className="sr-only"

@@ -25,7 +25,7 @@
 >    documentation rather than as a fix.
 > 5. **A media read path had to be built** ([ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)).
 >    The spec treated wiring the logo upload as merely making
->    [BUG-039](../bugs/bugs.md#bug-039) reachable. It also made the *absence of a
+>    [BUG-039](../bugs/fixed_bugs.md#bug-039) reachable. It also made the *absence of a
 >    read path* reachable, which took the `/clubs` page down
 >    ([BUG-040](../bugs/fixed_bugs.md#bug-040)) — nothing in this codebase had
 >    ever displayed an uploaded image.
@@ -82,7 +82,7 @@ a `CLUB_ADMIN`, then offer ownership through `ClubOwnershipService`.
   somebody asks for it. Nothing else in this spec depended on it.
 - **Audit call sites** for club-page and event edits (items 9 and 10
   follow-ups). The actions added here are logged; the existing gaps stay.
-- **[BUG-039](../bugs/bugs.md#bug-039)** — S3 object keys taken from the
+- **[BUG-039](../bugs/fixed_bugs.md#bug-039)** — S3 object keys taken from the
   browser's filename with no validation. Wiring the logo upload makes it
   reachable rather than latent. Arpan's call, 2026-09-08: ship, fix next.
 - **Notification separation** (items 11 to 13), blocked on a mail system. A
@@ -304,7 +304,7 @@ Then in the running stack, with a second non-admin account alongside
   **half done** (the admin write ships, the §6 verification round trip does
   not) and add the round trip to the AWS SES item under Security, carrying the
   `club_email_verifications` shape recorded above. Note that
-  [BUG-039](../bugs/bugs.md#bug-039) is now reachable rather than latent, and
+  [BUG-039](../bugs/fixed_bugs.md#bug-039) is now reachable rather than latent, and
   that club proposals have no expiry. Also correct `todo.md:143`, which says V6
   inserts *sixteen* mock clubs — it inserts eight, in the first of its two
   INSERT statements.

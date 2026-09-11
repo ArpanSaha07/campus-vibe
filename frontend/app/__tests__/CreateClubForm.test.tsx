@@ -137,6 +137,18 @@ describe("CreateClubForm — which controls each path renders", () => {
     expect(screen.getByLabelText(/Facebook/)).toBeInTheDocument();
   });
 
+  it("offers only the image types the server will store", () => {
+    // `image/*` let the picker offer an SVG or a HEIC photo that the backend
+    // then refused (BUG-039). The picker now narrows to what will be kept.
+    currentUser = user(Role.USER, Role.ADMIN);
+    render(<CreateClubForm />);
+
+    expect(screen.getByLabelText(/Logo/)).toHaveAttribute(
+      "accept",
+      "image/png,image/jpeg,image/webp"
+    );
+  });
+
   it("withholds only the logo from an ordinary user, and asks for a message instead", () => {
     currentUser = user(Role.USER);
     render(<CreateClubForm />);

@@ -8,7 +8,8 @@ export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
  *
  * Two different things live in `clubs.logo` and `club_images.url`. The demo
  * data holds absolute Unsplash URLs; anything uploaded through the product
- * holds an S3 **object key** — `clubs/{id}/logo-{filename}` — which is not
+ * holds an S3 **object key** — `clubs/{id}/logos/{uuid}.png`, or
+ * `clubs/{id}/logo-{filename}` for one stored before 2026-09-11 — which is not
  * fetchable by anyone and, handed to next/image, throws
  * `Failed to construct 'URL': Invalid URL`.
  *

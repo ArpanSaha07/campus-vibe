@@ -168,11 +168,20 @@ public class ClubService {
         return clubMapper.apply(club);
     }
 
+    /**
+     * Points the club at a new logo and returns the key it held before, or null.
+     *
+     * <p>The caller deletes that object, and only once this has returned: the
+     * transaction commits on return, so deleting inside it would leave the row
+     * pointing at a deleted object whenever the commit failed.
+     */
     @Transactional
-    public void updateLogo(String id, String logoKey) {
+    public String updateLogo(String id, String logoKey) {
         Club club = findClub(id);
+        String previous = club.getLogo();
         club.setLogo(logoKey);
         clubRepository.save(club);
+        return previous;
     }
 
     @Transactional

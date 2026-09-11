@@ -71,6 +71,7 @@ or a bug that will be closed and lost.
 
 | Decision | Forced by | Where it sits today |
 |---|---|---|
+| Presigned uploads (`reference.md` §9) or keep streaming bytes through the API — and what stands in for S3 locally if presigning is chosen | [BUG-039](../../bugs/fixed_bugs.md#bug-039)'s narrow fix, 2026-09-11: Arpan chose to decide the model separately, as the next unit. [ADR-007](ADR-007-uploaded-media-is-streamed-by-the-api.md) rejected presigning for reads because `FakeS3` cannot presign, and the same reason applies to uploads | [`todo.md`](../../TODO/todo.md), P1 under Security |
 | How the JWT reaches the browser — `localStorage` or an httpOnly cookie | [BUG-003](../../bugs/bugs.md#bug-003) — frontend route protection never executes, and two of its three stated causes may be stale after the Next 16 upgrade | `bugs.md`, open |
 | Whether to adopt shadcn/ui alongside the bespoke Tailwind v4 tokens | New UI surfaces keep re-deciding it per component | Nowhere |
 | The deployment target and container registry | Elastic Beanstalk config exists under `docker/`; nothing is provisioned | [`CampusVibe_AWS_Deployment_Guide.md`](../architecture/CampusVibe_AWS_Deployment_Guide.md), as a plan rather than a decision |

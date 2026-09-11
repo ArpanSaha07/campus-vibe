@@ -73,7 +73,7 @@ rather than incidental:
    index is resolved against that club's own list.
 2. **Only raster content types are named; everything else, an SVG included, is
    served `application/octet-stream` with `nosniff`.** Nothing validates what is
-   uploaded ([BUG-039](../../bugs/bugs.md#bug-039)), and an SVG is a document
+   uploaded ([BUG-039](../../bugs/fixed_bugs.md#bug-039)), and an SVG is a document
    that can carry script — serving one as `image/svg+xml` would execute it on
    the API's origin.
 

@@ -48,6 +48,13 @@ reads.
   address by index precisely so no caller can name an arbitrary object. A key
   that reaches `next/image` throws during render and takes the page down.
   (BUG-040)
+- **Keys are `clubs/{id}/logos/{uuid}.{ext}` and `clubs/{id}/images/{uuid}.{ext}`,
+  built only by `MediaKeys`** — rows from before 2026-09-11 still hold
+  `clubs/{id}/logo-{filename}`, so never parse a key's shape. Replacing a logo
+  deletes the old object *after* `updateLogo` commits and only if
+  `MediaKeys.belongsToClub` says it is this club's; deleting inside the
+  transaction leaves the row pointing at nothing when the commit fails.
+  (BUG-039)
 - **`DevDataSeeder` is idempotent per club, not wholesale.** It skipped for
   months because V6 had already inserted eight clubs, so it had never run and
   every seeded club had a null embedding. V32 retires those rows; do not restore

@@ -1,6 +1,6 @@
 # ADR-006 — A club's official email is verified only by a round trip to that address
 
-**Status:** Accepted 2026-09-10
+**Status:** Accepted **Date:** 2026-09-10
 **Date:** 2026-09-08
 **Raised by:** [`2026-09-08-club-ownership-spine.md`](../../specs/2026-09-08-club-ownership-spine.md),
 on building the platform-admin write for `official_email` (governance item 6).

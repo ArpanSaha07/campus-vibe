@@ -382,6 +382,30 @@ findings.**
 - [ ] **P3** Auth event audit log (sign-in, failure, reset, role change). Cheap to add; most valuable once there is traffic worth reading.
 - [ ] **P3** Account deletion and data export. Needed before any real-user launch under GDPR-like rules; no legal deadline yet.
 - [ ] **P3** **Triage the standing CodeQL alerts that are not defects.** Eight new alerts on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31) were fixed in code on 2026-08-16 ([BUG-032](../bugs/fixed_bugs.md#bug-032), [BUG-033](../bugs/fixed_bugs.md#bug-033)); what remains is the set that is *correct as written* and needs dismissing with a reason, so the queue stops hiding real findings behind noise. Four groups: **(a)** `java/sensitive-log` **and** `java/log-injection`, both on `LoggingMailSender` (alerts 33 and 34) — dismiss them together, same bean, same reason. It logs reset links on purpose, which is the entire reason the bean exists, and `Logs.safeBlock` deliberately preserves newlines because the body is printed as a block; a barrier that keeps `\n` cannot satisfy a newline-sanitiser query, so no rewrite clears 34 without destroying the feature. The per-line `| ` prefix is the real mitigation and static analysis cannot see it. **(b)** `js/empty-password-in-configuration-file` on `application-test.yml` — H2 in-memory, user `sa`, no password, which is the standard for it. **(c)** `java/internal-representation-exposure` on `Club.images` / `Event.images` — accepting the offered autofix here **breaks every write**, which is already logged as [BUG-044](../bugs/bugs.md#bug-044); dismiss it explicitly so nobody accepts it later. **(d)** `java/internal-representation-exposure` again, on `Club.getInterestSlugs` (alert 44), `Event.getTopicSlugs` (45) and `Event.getFormatSlugs` (46) — raised as inline review comments on [PR #41](https://github.com/ArpanSaha07/campus-vibe/pull/41) on 2026-09-08. Same shape as (c) and the same answer: these are Lombok `@Getter`s on JPA collections and callers mutate what they return on purpose, relying on Hibernate dirty-checking inside the transaction — `ClubService.java:69,98,99` (`.addAll`, `.clear`) and `EventController.java:90,92` (`.addAll`). A defensive copy would silently stop persisting club interests and event taxonomy, which is [BUG-037](../bugs/fixed_bugs.md#bug-037) all over again. Dismiss with (c), same reason, same commit. Dismissal is a repo-level action on the Security tab, so it is Arpan's call rather than something to do unasked.
+- [ ] **P1** **Write the presigned-upload ADR — the next unit, agreed 2026-09-11.**
+      [BUG-039](../bugs/fixed_bugs.md#bug-039) was closed by the narrow fix
+      (server-generated keys, bytes sniffed, 5MB), and Arpan chose to decide the
+      `reference.md` §9 model separately, with its own `/start`. What the ADR has
+      to answer: [ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)
+      rejected presigning for *reads* because `FakeS3` cannot presign, and that
+      reason applies to uploads too unless the local store changes (MinIO, or a
+      presign stub); whether the §7 keys `MediaKeys` now writes survive it
+      unchanged; and the §19–§21 gaps still open — banner images have no delete,
+      and deleting a club or event deletes none of its objects.
+- [ ] **P3** **`aws.s3.mock` fails open.** `application.yml:52` defaults it to
+      true, so any environment that runs neither the `prod` profile nor sets
+      `AWS_S3_MOCK` stores media on its own disk through `FakeS3`. Production is
+      covered by `application-prod.yml`; a staging box started with the wrong
+      profile would not be. Found during the BUG-039 fix; not changed.
+- [ ] **P3** **The dev backend container runs as root.** `backend/Dockerfile`
+      sets no `USER` (the EB image does, `deploy/eb/Dockerfile:25`). It is what
+      made BUG-039's traversal a write anywhere in the container. Dev only, but
+      the dev image is also what CI's Docker job scans and smoke-tests.
+- [ ] **P3** **Club slugs are not shape-checked.** The id is client-chosen and
+      only lowercased (`ClubCreationRequestService.normaliseSlug`); nothing
+      refuses a slash, a dot segment or a space. Unreachable as a path variable
+      today, and `MediaKeys` refuses such an id for a key, but a slug pattern on
+      both create paths is the real control.
 - [ ] **P2** Authorisation review for the Club Dashboard and Admin Dashboard endpoints as they are built — enforce server-side, never rely on UI restrictions.
 - [ ] **P2** Rotate the local dev `JWT_SECRET` before any real deployment, and use a *different* value in production.
 

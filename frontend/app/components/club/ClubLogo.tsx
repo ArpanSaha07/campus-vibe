@@ -23,7 +23,7 @@ const sizes: Record<Size, { box: string; initial: string; px: number }> = {
  * long after this has already taken the page down.
  *
  * What actually arrives here that is neither: a raw S3 object key.
- * `ClubController.uploadLogo` stores `clubs/{id}/logo-{filename}` in
+ * `ClubController.uploadLogo` stores `clubs/{id}/logos/{uuid}.png` in
  * `clubs.logo`, and `ClubDTO` hands that key to the browser untouched, because
  * there is no read path that turns a key into a URL — not for club logos, club
  * images, event banners or avatars. Until there is, a club whose logo has been

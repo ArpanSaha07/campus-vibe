@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-10**
+Last updated: **2026-09-11**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-039](#bug-039) | High | 2026-09-11 | Uploads named their own S3 object from the browser filename, and against `FakeS3` a `..` in it was a file write anywhere on disk — which our own entry had ruled out |
 | [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
 | [BUG-048](#bug-048) | High | 2026-09-10 | A club's social links were stored exactly as sent and rendered into an `href` with no scheme check on either side |
 | [BUG-047](#bug-047) | Medium | 2026-09-09 | The fix for BUG-045 left the other half silent: the success callback's promise was dropped, so a club was created and the user was told nothing |
@@ -39,6 +40,146 @@ Last updated: **2026-09-10**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-039
+**Image uploads let the caller name the S3 object, and validate nothing about it** · High · FIXED 2026-09-11
+
+**Found:** 2026-09-07, while distilling `CampusVibe_S3_Media_Security.md` into
+[`s3-media/SKILL.md`](../skills/s3-media/SKILL.md). The document had been sitting
+inside a vendored `aws-s3` skill folder that nothing pointed at, so its rules had
+never been read against the code they govern.
+
+**Symptom:** none visible. Uploads succeed, keys are stored, nothing errors.
+
+All three upload paths build the S3 object key by concatenating the browser's
+own filename:
+
+```java
+String key = "clubs/" + id + "/logo-" + file.getOriginalFilename();   // ClubController.java:82
+String key = "clubs/" + id + "/images/" + file.getOriginalFilename(); // ClubController.java:91
+String key = "events/" + id + "/images/" + file.getOriginalFilename();// EventController.java:108
+```
+
+`reference.md` §7 says *never let a client provide an arbitrary full S3 object
+key*, and §13 says *do not use user-supplied filenames as the canonical S3 object
+name*. Both are violated at every call site.
+
+**What actually goes wrong, in order of how sure it is:**
+
+1. **Silent overwrite.** `putObject` replaces whatever is at the key. Upload
+   `logo.png` twice and the second silently destroys the first. On
+   `/{id}/images` it is worse: the object is replaced but `addImages` still
+   appends the key, so the list holds two entries pointing at one object.
+2. **No stable key, so the documented model cannot be built on top.** §19 needs
+   a new uuid key per upload to do upload → confirm → update database → delete
+   old. With the filename as the key there is no old and new to order.
+3. **Content type is never checked.** The endpoints declare
+   `consumes = MULTIPART_FORM_DATA_VALUE`, which constrains the request, not the
+   part. Any bytes under any name are stored — §12 asks for
+   `image/jpeg`, `image/png`, `image/webp` only.
+4. **`getOriginalFilename()` is nullable**, giving keys like
+   `clubs/24/logo-null`.
+
+**What is NOT wrong, so nobody re-derives it:** size is bounded —
+`application.yml:30-31` caps multipart at 10MB (the reference asks for 5MB, so
+the cap is loose rather than absent). And a `..` in a filename is not traversal:
+S3 keys are opaque strings, the `clubs/{id}/` prefix is still prepended
+literally, so prefix-scoped IAM and lifecycle rules are not evaded.
+
+**No longer armed — fired.** This entry used to say that nothing served the
+media back, that `S3Service.getObject` had no caller anywhere, and that every
+missing control would go live at once the moment a read path landed. **That
+happened on 2026-09-09** ([BUG-040](#bug-040)): the club create form
+now uploads, and `GET /clubs/{id}/logo` and `/images/{index}` serve the bytes
+back. Every control listed above is now missing on a live path, on top of keys
+that are already in S3 and in the database and would need migrating.
+
+Two of the consequences were closed at the read end rather than the write end,
+and they are mitigations, not the fix: an uploaded SVG is served
+`application/octet-stream` with `nosniff` so it cannot execute on the API's
+origin, and images are addressed by *index* so no caller can name an object key.
+The caller still names the object on upload, still overwrites silently on a
+repeated filename, and nothing checks that the bytes are an image at all.
+An unvalidated SVG or HTML byte stream stored today becomes a stored-XSS question
+the day it is served inline.
+
+**The fix is a decision, not a patch.** Generating `{uuid}.webp` keys changes what
+is stored in `clubs.logo_key`, `club_images` and `event_images`, so existing rows
+need a backfill or a compatibility read. Doing it at the same time as the move to
+presigned uploads is one piece of work; doing it separately means touching the
+same three endpoints twice. Write the ADR before either. The narrow version —
+stop the caller naming the object, keep direct byte upload — is a much smaller
+change and would close 1, 2 and 4 on its own.
+
+**Correction, 2026-09-11 — the paragraph above headed *What is NOT wrong* was
+wrong about traversal.** It reasoned from real S3, where a key is an opaque
+string and `..` in one is two characters. But `aws.s3.mock` is true everywhere
+except the `prod` profile (`application.yml:52`, `docker-compose.yml:116`, the
+CI Docker job), and `FakeS3.buildObjectFullPath` concatenated the key onto a
+directory — where `..` climbs. So on every non-prod stack, a club owner, club
+admin or event manager who sent a filename like `../../x` got a file write
+anywhere the backend process could reach, which in the dev compose container is
+root. The same sentence was copied into `s3-media/SKILL.md`, so anyone who read
+the knowledge base before the code was told not to worry about exactly this.
+
+**Found by the Claude security review on PR #44**, not by us. The review's claim
+was checked against the code before anything was done: `FakeS3.java:79-81` did
+join the key onto `~/.arpan/s3/{bucket}/` with no check, and the config does
+default to `FakeS3`. **The write itself was never observed** — by the time a
+test first exercised it, the `FakeS3` guard below was already in place and the
+request answered 500 instead. The claim rests on reading the code. Nor was it
+tested whether Tomcat's multipart parser passes `../` through in a filename;
+the fix does not depend on it, because the filename is no longer read.
+
+**Fix — the narrow one this entry proposed, decided by Arpan 2026-09-11 and
+landed before PR #44 merged**
+([`2026-09-11-upload-keys-generated-server-side.md`](../specs/2026-09-11-upload-keys-generated-server-side.md)):
+
+- **`s3/MediaKeys` is the only thing that builds a key.** `{prefix}/{uuid}.{ext}`
+  in the `reference.md` §7 layout — `clubs/{id}/logos/`, `clubs/{id}/images/`,
+  `events/{id}/banners/`. Closes 1, 2 and 4 above: no caller character reaches
+  the key, a repeated upload is a new object, and there is no `null` to append.
+- **The extension comes from the file's leading bytes**, and only PNG, JPEG and
+  WebP are accepted; the filename and the part's `Content-Type` are ignored,
+  since the caller writes both. Anything else, or an empty file, is a 400. This
+  closes 3. A multi-file upload is checked in full before anything is stored.
+- **`FakeS3` refuses any key that resolves outside its bucket's directory**, on
+  put, get and delete — so the stub is not a traversal primitive for any future
+  caller that builds a key by hand.
+- **5MB per file, 10MB per request**, where it was 10MB / 10MB, and an oversize
+  upload is a 413 with a sentence rather than a 500 through the catch-all.
+- **A replaced logo's old object is deleted**, after `ClubService.updateLogo`
+  commits and only if `MediaKeys.belongsToClub` says it is that club's own. A
+  failed delete is logged, not thrown. Without this, uuid keys would have
+  turned every logo change into an orphan.
+
+**What still differs from `reference.md`, and is not a bug:** there is no
+presigning (§9), which is now an ADR queued in [`todo.md`](../TODO/todo.md)
+rather than part of this entry; images are not re-encoded to WebP (§14); banner
+images have no delete and a deleted club's objects are not deleted (§20). Keys
+stored before 2026-09-11 keep the `logo-{filename}` shape and were not migrated
+— reads use whatever key is stored. **Two read-side mitigations stay** as the
+second line of defence: SVG served `application/octet-stream` with `nosniff`
+([ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)),
+since objects stored before the fix were never checked, and images addressed by
+index.
+
+**Tests, written first and seen failing:** `MediaKeysTest` (19) and
+`FakeS3Test` (8) as plain unit tests; `ClubMediaIT` from 6 to 15; `EventMediaIT`
+(3), the first test the event upload has ever had; and `MediaUploadLimitIT`
+(2), on a real port, because **MockMvc never applies the multipart caps** and
+every other media test is blind to them. Checked against the compose stack with
+a raw `curl` upload naming `../../…/tmp/probe.png`: a uuid key, and no probe
+file.
+
+**Held by:** [`rules/backend-java.md`](../rules/backend-java.md) — never build a
+key from anything the caller wrote — and
+[`rules/backend-clubs.md`](../rules/backend-clubs.md) for the key layout and the
+delete ordering. The lesson that generalises: **a stub that stands in for a
+service does not inherit the service's safety properties**, and a bug entry that
+reasons from the real one can talk the next reader out of the actual defect.
 
 ---
 
@@ -278,7 +419,7 @@ not have to be loosened.
 **Verified** in the browser, not only in tests: `/clubs` renders every uploaded
 logo decoded, zero console errors, zero failed requests. 6 tests in `ClubMediaIT`
 (including that an uploaded SVG is served `application/octet-stream` — nothing
-validates uploads, [BUG-039](bugs.md#bug-039), and an SVG can carry script), 8 in
+validates uploads, [BUG-039](#bug-039), and an SVG can carry script), 8 in
 `ClubLogo.test.tsx`, 3 in `adapters.test.ts`.
 
 **Not fixed:** event banners and profile avatars have the same missing read path.

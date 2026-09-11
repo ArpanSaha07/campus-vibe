@@ -3,7 +3,8 @@ import ClubLogo from "@/app/components/club/ClubLogo";
 
 /**
  * The crash this pins down: `ClubController.uploadLogo` stores a raw S3 object
- * key (`clubs/{id}/logo-{filename}`) in `clubs.logo`, and `ClubDTO` hands it to
+ * key (`clubs/{id}/logos/{uuid}.png`; `clubs/{id}/logo-{filename}` before
+ * 2026-09-11, the shape used below) in `clubs.logo`, and `ClubDTO` hands it to
  * the browser untouched. next/image throws on it —
  * `Failed to construct 'URL': Invalid URL` — which is a render-time throw, so
  * the component's own onError fallback never gets a chance and the whole

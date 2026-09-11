@@ -102,7 +102,18 @@ export async function validateClubForm(
 }
 
 /**
- * Validates a single file
+ * The image types the backend will store, and the file picker's `accept` list.
+ *
+ * Advisory, like every check in this file: the server reads the file's own
+ * leading bytes and refuses anything else (`MediaKeys.java`, BUG-039), whatever
+ * the browser says the type is. This only stops a user waiting on an upload
+ * that was always going to be refused.
+ */
+export const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/**
+ * Validates a single file. 5MB matches `max-file-size` in the backend's
+ * `application.yml`; over it, the server answers 413.
  */
 export function validateImageFile(
   file: File,
@@ -117,10 +128,10 @@ export function validateImageFile(
     };
   }
 
-  if (!file.type.startsWith('image/')) {
+  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
     return {
       valid: false,
-      error: 'Please upload an image file',
+      error: 'Images must be PNG, JPEG or WebP',
     };
   }
 

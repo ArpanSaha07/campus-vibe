@@ -1,6 +1,6 @@
 # ADR-005 — A club proposal is its own table, not a pending club row
 
-**Status:** Accepted 2026-09-10
+**Status:** Accepted **Date:** 2026-09-10
 **Date:** 2026-09-08
 **Raised by:** [`2026-09-08-club-ownership-spine.md`](../../specs/2026-09-08-club-ownership-spine.md).
 Follows [ADR-004](ADR-004-two-paths-create-a-club.md), which creates the need
