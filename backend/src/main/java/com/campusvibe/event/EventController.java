@@ -1,7 +1,7 @@
 package com.campusvibe.event;
 
 import com.campusvibe.s3.MediaKeys;
-import com.campusvibe.s3.S3Buckets;
+import com.campusvibe.s3.MediaBucket;
 import com.campusvibe.s3.S3Service;
 import com.campusvibe.taxonomy.TaxonomyService;
 import com.campusvibe.search.SearchLimits;
@@ -33,16 +33,16 @@ public class EventController {
     private final EventService eventService;
     private final SearchService searchService;
     private final S3Service s3Service;
-    private final S3Buckets buckets;
+    private final MediaBucket mediaBucket;
     private final TaxonomyService taxonomyService;
 
     public EventController(EventService eventService, SearchService searchService,
-                           S3Service s3Service, S3Buckets buckets,
+                           S3Service s3Service, MediaBucket mediaBucket,
                            TaxonomyService taxonomyService) {
         this.eventService = eventService;
         this.searchService = searchService;
         this.s3Service = s3Service;
-        this.buckets = buckets;
+        this.mediaBucket = mediaBucket;
         this.taxonomyService = taxonomyService;
     }
 
@@ -115,7 +115,7 @@ public class EventController {
             keys.add(MediaKeys.eventBanner(id, bytes));
         }
         for (int i = 0; i < keys.size(); i++) {
-            s3Service.putObject(buckets.getEvents(), keys.get(i), contents.get(i));
+            s3Service.putObject(mediaBucket.name(), keys.get(i), contents.get(i));
         }
         eventService.addImages(id, keys);
     }

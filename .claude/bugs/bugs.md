@@ -1,20 +1,21 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-11** · Branch: `feature/club-governance`
+Last updated: **2026-09-12** · Branch: `infra/s3-pipeline`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
 **Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11).
 
-**Highest id issued: BUG-050.** Grep *both* files before taking the next one — BUG-038 was issued twice.
+**Highest id issued: BUG-051.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
+| [BUG-051](#bug-051) | High | Production names no S3 bucket the code reads — code side fixed 2026-09-12, **environment properties still unset, so a deploy will not boot** |
 | [BUG-042](#bug-042) | Medium | Event banners and profile avatars have no read path, so an uploaded one can never be displayed |
 | [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **still reproducing, re-confirmed 2026-09-09** |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — reproduced 2026-09-11, **passed in two full local runs 2026-09-12**; open until a GitHub run |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -122,6 +123,13 @@ record was to fix it or annotate **the single method** `@Disabled("BUG-001: …"
 (disabling the whole class would also lose the 6 passing search tests). Do not
 apply that annotation now: it would disable a test that currently passes, on the
 very run that could finally explain it.
+
+**Passed locally again, 2026-09-12 — twice.** `SearchIT` ran 7 of 7 green in
+both full `verify.mjs --all --full` runs of the S3 work, on this machine,
+against a fresh `pgvector/pgvector:pg15` container. It had been re-confirmed
+reproducing on 2026-09-11 on a clean worktree at `77baaab`. Nothing in the S3
+work touches search, so this is the same unexplained flip as 2026-08-08, not a
+fix, and the rule above stands: close it on a green GitHub run.
 
 ---
 
@@ -437,9 +445,6 @@ moment anyone writes `getCategories().add(...)`.
 
 ### BUG-042
 **Event banners and profile avatars have no read path** · Medium · OPEN
-### BUG-040
-**Production is configured for two S3 buckets that do not exist** · High · OPEN
-
 
 **Found:** 2026-09-09, while building the club media read path for
 [BUG-040](fixed_bugs.md#bug-040).
@@ -460,7 +465,61 @@ with `nosniff` so an uploaded SVG cannot execute, and the same `/media/**`
 rewrite. Replacing all of it with presigned or CDN URLs is an ADR, not a
 per-feature choice — see [`s3-media/SKILL.md`](../skills/s3-media/SKILL.md).
 
+**Update 2026-09-12:** an uploaded event banner now reaches a real bucket —
+MinIO locally, `campusvibe-prod-media` in production — under
+`events/{id}/banners/{uuid}.{ext}`, verified on the compose stack. Nothing
+serves it back, so this bug is unchanged, and one step more reachable
+([ADR-011](../docs/decisions/ADR-011-minio-replaces-fakes3.md),
+[ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md)).
+
 ---
+
+### BUG-051
+**Production is configured for S3 buckets that do not exist** · High · OPEN — the code side is fixed, the environment is not
+
+**Renumbered 2026-09-12 — this was filed as BUG-040**, an id the club-logo
+crash in [`fixed_bugs.md`](fixed_bugs.md#bug-040) also carries. Ids are never
+reused, so this one took the next free number and its links were retargeted.
+
+**Where it stands, 2026-09-12.** The code, the defaults and the IAM grant now
+agree with each other and with the account
+([ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md), with
+[ADR-011](../docs/decisions/ADR-011-minio-replaces-fakes3.md)):
+
+- **One bucket.** `S3Buckets` (`clubs`, `events`) is replaced by `MediaBucket`,
+  reading `aws.s3.bucket` from `AWS_S3_BUCKET` with **no default** and a blank
+  check, so an environment that names no bucket fails at startup rather than on
+  the first upload. `MediaKeys` already wrote `clubs/…` and `events/…`, so no
+  key moved. The inline grant on `CampusVibe-ElasticBeanstalk-EC2Role` already
+  names exactly `campusvibe-prod-media/*`: **no IAM change**.
+- **`aws.region` defaults to `ca-central-1`.** See the second failure below.
+- **There is no mock flag.** The client is always a real `S3Client`, pointed at
+  MinIO locally and in CI through `aws.s3.endpoint`, and at AWS when that is
+  unset.
+
+**Verified:** 287 integration tests green, the media suites against a MinIO
+container; and on the compose stack, a club logo, a club banner and an event
+banner uploaded through the API, read back byte-identical, and listed out of
+one bucket under both prefixes.
+
+**What is left is the environment, and only Arpan can change it** — production
+environment variables are *ask first* under
+[`rules/aws-handling.md`](../rules/aws-handling.md). `CampusVibe-Backend-Prod`
+still sets neither `AWS_S3_BUCKET` nor `AWS_REGION`, and still sets
+`S3_BUCKET_NAME`, which no code has ever read. **Until they are set, a deploy of
+current code refuses to start** — deliberately, since the bucket has no default.
+`SPRING_PROFILES_ACTIVE`'s value is also still unread. Queued as a P1 in
+[`todo.md`](../TODO/todo.md) under Infrastructure. **Close this on the first
+upload that lands in `campusvibe-prod-media` through the deployed environment.**
+
+**A second failure was stacked under this one, found while fixing it.**
+`aws.region` defaulted to `us-east-1` (`application.yml:48`, repeated at
+`docker-compose.yml:117`), and `campusvibe-prod-media` is in `ca-central-1`. No
+real `S3Client` had ever been built — the mock flag defaulted to true
+everywhere but `prod` — so neither the wrong bucket nor the wrong region had
+ever been exercised.
+
+**As found, 2026-09-08:**
 
 **Found:** 2026-09-08, reading the live account while writing
 [`rules/aws-handling.md`](../rules/aws-handling.md). Nothing in the repository
@@ -512,9 +571,6 @@ local disk instead, which is a different and quieter failure.
 **Why it is latent:** the club create path 403s before it can upload, and the
 event banner endpoint is unwired ([BUG-006](#bug-006)). Both are near the top of
 [`STATUS.md`](../STATUS.md), so this stops being latent as soon as either lands.
-
-### BUG-039
-**Image uploads let the caller name the S3 object, and validate nothing about it** · High · OPEN
 
 ---
 

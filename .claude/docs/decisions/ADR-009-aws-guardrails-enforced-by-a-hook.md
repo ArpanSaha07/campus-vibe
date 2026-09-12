@@ -89,7 +89,7 @@ Prose is kept as well, not replaced: the hook says no, the rule says why.
   the default.
 - Three gaps are accepted and documented in the hook's header: a command string
   can hide its verb behind a variable or a script file; an allowed `s3 cp` still
-  overwrites an unversioned key ([BUG-039](../../bugs/bugs.md#bug-039)); and the
+  overwrites an unversioned key ([BUG-039](../../bugs/fixed_bugs.md#bug-039)); and the
   hook reads the command, not the account it lands in.
 
 ## Revisit when

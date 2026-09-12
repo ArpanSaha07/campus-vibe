@@ -39,9 +39,17 @@ Everything below binds to both.
 - **`CampusVibe-Backend-Prod`** on Elastic Beanstalk, whose EC2 role carries an
   inline grant of `GetObject`/`PutObject`/`DeleteObject` on
   `campusvibe-prod-media/*` and nothing wider.
-- The backend reads `AWS_S3_BUCKET_CLUBS` and `AWS_S3_BUCKET_EVENTS`
-  (`application.yml:50-51`) and the environment sets neither; it sets
-  `S3_BUCKET_NAME`, which no code reads. Do not wire S3 believing prod works.
+- **The backend reads one variable, `AWS_S3_BUCKET`**, and it has no default —
+  an environment that does not set it fails to start (ADR-012, BUG-051).
+  `AWS_REGION` defaults to `ca-central-1`, where the bucket actually is. The
+  `CampusVibe-Backend-Prod` environment still sets **neither**, and still sets
+  `S3_BUCKET_NAME`, which no code has ever read: until those properties are
+  changed, a deploy of current code **will not boot**. That is deliberate — it
+  is the loud version of the silent `NoSuchBucket` this used to be.
+- **Outside production nothing talks to AWS at all.** `AWS_S3_ENDPOINT` points
+  the same real `S3Client` at MinIO locally and in CI (ADR-011); production
+  leaves it unset and resolves the instance role. There is no mock flag any
+  more.
 
 ## Free — no approval
 

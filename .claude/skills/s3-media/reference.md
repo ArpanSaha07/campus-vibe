@@ -338,6 +338,15 @@ without rewriting stored database data.
 
 # 9. Presigned Upload Flow
 
+> **DECIDED AGAINST, 2026-09-12 — see
+> [ADR-010](../../docs/decisions/ADR-010-uploads-stream-through-the-api.md).**
+> Everything in this section describes a model this codebase evaluated and
+> rejected. Uploads stream through the API instead, because a presigned PUT
+> hands S3 whatever the browser sends and the content sniffing that is the whole
+> of the BUG-039 fix cannot run before the object lands. It is not unbuilt work.
+> The same applies to the presigned *read* URLs in §8, §11 and §16, and to the
+> presigned-URL checks in the testing section: rejected by ADR-007.
+
 User uploads must use backend-authorized presigned PUT URLs.
 
 Target flow:
