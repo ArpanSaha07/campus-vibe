@@ -23,6 +23,13 @@ first write of a session.
 
 Never request, create, display, store or commit AWS access keys.
 
+**One named exception —
+[ADR-013](../docs/decisions/ADR-013-ses-mail-over-smtp-credentials.md):** the
+SES SMTP credentials production mail is sent with. Arpan creates them in the SES
+console, never a session; the IAM user may only `ses:SendRawEmail` on the
+`campusvibe-mcgill.com` identity; the values live in two Elastic Beanstalk
+properties and nowhere else. It is not a precedent for any other key.
+
 **Two ways in, one rulebook.** The AWS CLI, and the aws-core MCP tool
 `aws___run_script`, which runs arbitrary boto3 and never passes through Bash.
 Everything below binds to both.
@@ -50,6 +57,19 @@ Everything below binds to both.
   the same real `S3Client` at MinIO locally and in CI (ADR-011); production
   leaves it unset and resolves the instance role. There is no mock flag any
   more.
+- **`campusvibe-prod-db`** — PostgreSQL **18.3**, private, TLS forced,
+  deletion protection on. Its master password is RDS-managed and **rotates every
+  7 days** until switched to self-managed, and the database security group still
+  admits one personal address.
+- **The Elastic Beanstalk environment is load balanced** — an ALB on HTTP only,
+  health check on `/` — not the single instance the guide describes. Kept on
+  2026-09-12; HTTPS comes from ACM on that ALB.
+- **SES is in the sandbox** with no verified identity.
+- **What is left to connect, service by service:**
+  [`connecting-rds.md`](../docs/architecture/connecting-rds.md),
+  [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md),
+  [`connecting-s3.md`](../docs/architecture/connecting-s3.md),
+  [`connecting-ses.md`](../docs/architecture/connecting-ses.md).
 
 ## Free — no approval
 

@@ -18,6 +18,14 @@ have **not been started**. Nothing of CampusVibe runs on AWS yet.
 > [`todo.md`](../../TODO/todo.md) — so the `Code as of` stamp deliberately does
 > not move.
 
+> **2026-09-12 — two decisions below are superseded, by Arpan's choice.**
+> *HTTPS without an ALB, through Cloudflare* is replaced: the environment that
+> exists is load balanced, DNS is at Namecheap, and TLS will terminate on the
+> ALB with an ACM certificate. *RDS will run PostgreSQL 15.x* is replaced: RDS
+> runs 18.3 and the repository's five pins move to 18. The runbooks are
+> [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) and
+> [`connecting-rds.md`](connecting-rds.md).
+
 Plan of record: [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md).
 This document records what was actually built and where it departs from that plan.
 

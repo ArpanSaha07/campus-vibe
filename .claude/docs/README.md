@@ -5,7 +5,7 @@ way. If you are about to change a subsystem, read its document first — it exis
 so you do not have to re-derive reasoning that was already worked out, and so you
 do not undo a constraint whose purpose is not visible in the code.
 
-Last updated: **2026-09-10**
+Last updated: **2026-09-12**
 
 ```
 .claude/docs/
@@ -58,6 +58,11 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`search.md`](architecture/search.md) | Why hybrid semantic search (embeddings in pgvector + keyword rank) rather than the alternatives | ⚠ Pre-implementation design note |
 | [`aws-deployment.md`](architecture/aws-deployment.md) | Production packaging for Elastic Beanstalk: the second Dockerfile and why it exists, `scripts/package-eb.mjs`, the JVM sizing for a 1 GiB instance, the PostgreSQL 15 pin, and the HTTPS-without-an-ALB resolution | ⚠ **Phase 1 only** · packaging verified locally; nothing runs on AWS yet |
 | [`CampusVibe_AWS_Deployment_Guide.md`](architecture/CampusVibe_AWS_Deployment_Guide.md) | The AWS plan of record: target architecture and the six phases — packaging, RDS, S3, Elastic Beanstalk, the Vercel/Cloudflare front, CI/CD — written to be followed in order | 📐 **Plan, not as-built** · `aws-deployment.md` records what exists |
+| [`connecting-rds.md`](architecture/connecting-rds.md) | Runbook 1 of 4 — RDS PostgreSQL: the self-managed password, removing the personal-address rule, a Session Manager path to a private database, the pgvector check, the connection string, moving the repo to PostgreSQL 18 | 📋 Checklist · account read 2026-09-12 |
+| [`connecting-elastic-beanstalk.md`](architecture/connecting-elastic-beanstalk.md) | Runbook 2 of 4 — cleanup and cost, the health check path, HTTPS with ACM on the ALB, the redirect, **the exact environment property table**, the first deploy and end-to-end checks | 📋 Checklist · account read 2026-09-12 |
+| [`connecting-s3.md`](architecture/connecting-s3.md) | Runbook 3 of 4 — the one property left, the unused CORS rule, the duplicate policy, verifying the first upload | 📋 Checklist · account read 2026-09-12 |
+| [`connecting-ses.md`](architecture/connecting-ses.md) | Runbook 4 of 4 — code gates first, domain identity and DKIM at Namecheap, MAIL FROM on `bounce.`, DMARC, production access, SMTP credentials under ADR-013 | 📋 Checklist · account read 2026-09-12 |
+| [`connecting-beanstalk-to-rds.md`](architecture/connecting-beanstalk-to-rds.md) | The security-group walkthrough that lets the Elastic Beanstalk instance reach RDS on 5432 | ✅ Done in the account, 2026-09-12 |
 
 **On the ⚠ marks.** These predate the documentation standard and were moved into
 this folder on 2026-08-06 without being re-verified against the code. Each
@@ -90,6 +95,7 @@ be a guess. Someone who knows it should add its line.
 | [`ADR-010`](decisions/ADR-010-uploads-stream-through-the-api.md) | How an uploaded image gets *into* S3 — the API streams it, as ADR-007 has the API stream it out · why presigned `PUT` would undo the BUG-039 content check rather than merely change where bytes go · `reference.md` §9 recorded as decided-against, not unbuilt | ✅ Accepted 2026-09-12 | Media grows past 5MB items · upload traffic is a measurable share of backend memory. Then it is presigned or CDN URLs for **all** media at once, not one kind. `rules/aws-handling.md` + `s3-media/SKILL.md`. |
 | [`ADR-011`](decisions/ADR-011-minio-replaces-fakes3.md) | What stands in for S3 outside production: MinIO, with `FakeS3` and the commented `adobe/s3mock` block both deleted · why a stub that was *sufficient* was still the wrong answer — the production branch of `S3Config` had never executed · the three things that ride along: `aws.s3.mock` deleted, the traversal guard moved, `commons-io` dropped | ✅ Accepted 2026-09-12 | A developer cannot run Docker · MinIO and real S3 disagree about something this code leans on · LocalStack arrives for SES, at which point two emulators is one too many. `s3-media/SKILL.md`. |
 | [`ADR-012`](decisions/ADR-012-one-media-bucket-with-prefixes.md) | One media bucket separated by key prefix, settling the code side of [BUG-051](../bugs/bugs.md#bug-051)'s four-way disagreement between code, environment, IAM and plan · why two properties pointing at one bucket was rejected as the fix that regenerates the bug | ✅ Accepted 2026-09-12 | A media kind needs a different policy, retention or audience — a prefix condition first, a second bucket only once that condition is in more than one policy · a shared staging environment, which is a different axis. `rules/aws-handling.md`. |
+| [`ADR-013`](decisions/ADR-013-ses-mail-over-smtp-credentials.md) | Production mail goes over SES SMTP with SMTP credentials rather than the SES API through the instance role · the one named exception to the no-access-keys rule, and the fence around it | 📝 Proposed 2026-09-12 — awaiting Arpan | A second environment · the key is suspected leaked · per-message tracking is wanted · Secrets Manager or the SES SDK arrives for another reason. `rules/aws-handling.md`. |
 | [`ADR-001`](decisions/ADR-001-three-taxonomy-vocabularies.md) | Seven decisions on how this platform names things: three vocabularies, one shared topic list behind student interests, club tags **and** event topics, 13 club categories, 22 events-only formats · **events get no category taxonomy at all** · what that costs and when to reopen it | 📝 Proposed 2026-08-20 — awaiting Arpan | Nothing yet — still awaiting a decision. Its own header records when to reopen the taxonomy. |
 
 **That file holds seven decisions rather than one**, against `adr.md`'s
