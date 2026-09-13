@@ -26,6 +26,14 @@ have **not been started**. Nothing of CampusVibe runs on AWS yet.
 > [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) and
 > [`connecting-rds.md`](connecting-rds.md).
 
+> **2026-09-12 — three infrastructure changes, approved and run by Arpan.**
+> The CORS rule on `campusvibe-prod-media` was deleted, since no browser calls
+> the bucket. `s3:ListBucket` on the bucket was added to the inline
+> `CampusVibe-S3-Media-Access` policy on `CampusVibe-ElasticBeanstalk-EC2Role`,
+> so a missing object answers NoSuchKey rather than AccessDenied.
+> `CampusVibe-Backend-Prod` gained `AWS_S3_BUCKET` and lost `S3_BUCKET_NAME`.
+> The reasoning and verification are in [`connecting-s3.md`](connecting-s3.md).
+
 Plan of record: [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md).
 This document records what was actually built and where it departs from that plan.
 

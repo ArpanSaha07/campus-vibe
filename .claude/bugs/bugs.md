@@ -12,7 +12,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | ID | Severity | Summary |
 |---|---|---|
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
-| [BUG-051](#bug-051) | High | Production names no S3 bucket the code reads — code side fixed 2026-09-12, **environment properties still unset, so a deploy will not boot** |
+| [BUG-051](#bug-051) | High | Production names no S3 bucket the code reads — code fixed and `AWS_S3_BUCKET` set 2026-09-12; **open until the first upload through a deployed backend** |
 | [BUG-042](#bug-042) | Medium | Event banners and profile avatars have no read path, so an uploaded one can never be displayed |
 | [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — reproduced 2026-09-11, **passed in two full local runs 2026-09-12**; open until a GitHub run |
@@ -472,6 +472,16 @@ serves it back, so this bug is unchanged, and one step more reachable
 ([ADR-011](../docs/decisions/ADR-011-minio-replaces-fakes3.md),
 [ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md)).
 
+**Update 2026-09-12, later:** worse than a missing read path. `adapters.ts:65`
+passes `events.images` through untouched, so an uploaded key reaches
+`next/image` at `events/[eventId]/page.tsx:88`, `EventCard.tsx:31` and
+`MyEventCard.tsx:31` and throws during render — the BUG-040 crash, for events.
+**The events half is specced and approved:**
+[`specs/2026-09-12-event-images-served-and-eb-upload-limit.md`](../specs/2026-09-12-event-images-served-and-eb-upload-limit.md).
+Arpan also ruled that there is no banner prefix: event photos move to
+`events/{id}/images/`, and a banner becomes a photo a club asks the platform
+owner to feature, queued separately. Avatars stay in this bug.
+
 ---
 
 ### BUG-051
@@ -502,15 +512,16 @@ container; and on the compose stack, a club logo, a club banner and an event
 banner uploaded through the API, read back byte-identical, and listed out of
 one bucket under both prefixes.
 
-**What is left is the environment, and only Arpan can change it** — production
-environment variables are *ask first* under
-[`rules/aws-handling.md`](../rules/aws-handling.md). `CampusVibe-Backend-Prod`
-still sets neither `AWS_S3_BUCKET` nor `AWS_REGION`, and still sets
-`S3_BUCKET_NAME`, which no code has ever read. **Until they are set, a deploy of
-current code refuses to start** — deliberately, since the bucket has no default.
-`SPRING_PROFILES_ACTIVE`'s value is also still unread. Queued as a P1 in
-[`todo.md`](../TODO/todo.md) under Infrastructure. **Close this on the first
-upload that lands in `campusvibe-prod-media` through the deployed environment.**
+**The environment was set on 2026-09-12, by Arpan.** `CampusVibe-Backend-Prod`
+now sets `AWS_S3_BUCKET=campusvibe-prod-media` and `AWS_REGION=ca-central-1`,
+and `S3_BUCKET_NAME` is gone; read back by option name. In the same pass
+`s3:ListBucket` went onto the instance role, because without it a missing key
+is a 403 that `S3Service` would have turned into a 500. Nothing has run on
+the environment yet — it still holds the sample application, and the backend
+also needs its database and `JWT_SECRET` properties before it will boot.
+`SPRING_PROFILES_ACTIVE`'s value is still unread. **Close this on the first
+upload that lands in `campusvibe-prod-media` through the deployed environment**
+— `connecting-s3.md` §5.
 
 **A second failure was stacked under this one, found while fixing it.**
 `aws.region` defaulted to `us-east-1` (`application.yml:48`, repeated at

@@ -1,6 +1,6 @@
 # Connecting Elastic Beanstalk
 
-**Code as of:** 806a1d0 · **Account read:** 2026-09-12, read-only
+**Code as of:** f8d32ba · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — `AWS_S3_BUCKET` set, `S3_BUCKET_NAME` removed
 **Order:** 2 of 4 — after [`connecting-rds.md`](connecting-rds.md) §1–§5. The S3 and SES properties from [`connecting-s3.md`](connecting-s3.md) and [`connecting-ses.md`](connecting-ses.md) go in the same property pass.
 **Related:** guide §12–§19 in [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md) · packaging in [`aws-deployment.md`](aws-deployment.md) · property reference in [`docker/EB-DEPLOYMENT.md`](../../../docker/EB-DEPLOYMENT.md)
 
@@ -22,7 +22,8 @@ Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central
 | Listener | **HTTP on 80 only** — no certificate | ⚠ §2 |
 | Health check | Target group checks **`/`** for a 200 | ⚠ §1 — CampusVibe answers 401 there |
 | Instance role | `CampusVibe-ElasticBeanstalk-EC2Role`: WebTier, **WorkerTier**, **MulticontainerDocker**, and the inline S3 grant | ⚠ §0 |
-| Properties set | `AWS_REGION DB_HOST DB_NAME DB_PORT DB_USERNAME FRONTEND_URL S3_BUCKET_NAME SPRING_PROFILES_ACTIVE` | ⚠ §4 — six are read by nothing, and the required ones are missing |
+| Properties set | `AWS_REGION AWS_S3_BUCKET DB_HOST DB_NAME DB_PORT DB_USERNAME FRONTEND_URL SPRING_PROFILES_ACTIVE` — `AWS_S3_BUCKET` replaced `S3_BUCKET_NAME` 2026-09-12 | ⚠ §4 — five are read by nothing, and the database and JWT ones are missing |
+| Proxy | **nginx**, default request body limit **1 MB** — under the 5 MB upload cap | ⚠ §3 |
 | Logs | Streamed to CloudWatch, 7-day retention | ✅ |
 | Loose ends | **Two Elastic IP addresses associated with nothing**, still billed | ⚠ §0 |
 | Domain | `api.campusvibe-mcgill.com` does not resolve; DNS is at Namecheap | §2 |
@@ -147,6 +148,12 @@ redirect has to ship inside the bundle.
   ```
 - [ ] Teach `scripts/package-eb.mjs` to stage `.ebextensions/` beside
   `Dockerfile` and `app.jar` — today it copies exactly those two.
+- [ ] **Raise nginx's request body limit** — the platform's nginx refuses
+  bodies over 1 MB by default, under the 5 MB upload cap, and no local test has
+  an nginx to catch it. `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf`
+  at `10M`, staged the same way; part of the approved
+  [event photo unit](../../specs/2026-09-12-event-images-served-and-eb-upload-limit.md),
+  which also teaches the script to stage hidden directories generally.
 - [ ] **Verify:** `curl -sI http://api.campusvibe-mcgill.com/actuator/health` → `301` with an `https://` location.
 
 Until this lands, every client uses the `https://` address explicitly.
@@ -167,7 +174,7 @@ application.
 | `SPRING_DATASOURCE_USERNAME` | the RDS master user | Until the dedicated user lands |
 | `SPRING_DATASOURCE_PASSWORD` | **secret** | The self-managed password from [`connecting-rds.md`](connecting-rds.md) §1 |
 | `JWT_SECRET` | **secret** — `openssl rand -hex 32` | At least 32 bytes; must differ from development |
-| `AWS_S3_BUCKET` | `campusvibe-prod-media` | [`connecting-s3.md`](connecting-s3.md); no default |
+| `AWS_S3_BUCKET` | `campusvibe-prod-media` | **Set 2026-09-12.** [`connecting-s3.md`](connecting-s3.md); no default |
 
 **Required for correct behaviour:**
 
@@ -191,7 +198,7 @@ application.
   and remove the email.
 
 **Remove — read by no code:** `DB_HOST`, `DB_NAME`, `DB_PORT`, `DB_USERNAME`,
-`FRONTEND_URL`, `S3_BUCKET_NAME`.
+`FRONTEND_URL`. (`S3_BUCKET_NAME` was removed 2026-09-12.)
 
 **Never set:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`; and
 `AWS_S3_ENDPOINT`, `AWS_S3_ACCESS_KEY`, `AWS_S3_SECRET_KEY`, which point the S3

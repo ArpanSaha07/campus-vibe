@@ -1,6 +1,6 @@
 # Connecting S3
 
-**Code as of:** 806a1d0 · **Account read:** 2026-09-12, read-only
+**Code as of:** f8d32ba · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan
 **Order:** 3 of 4 — the property goes in the same pass as [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) §4; verification needs its §5 deploy.
 **Related:** [ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md) · [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) · [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) · [`s3-media/SKILL.md`](../../skills/s3-media/SKILL.md) · [BUG-051](../../bugs/bugs.md#bug-051)
 
@@ -21,11 +21,20 @@ the bucket and grant already match it.
 | Bucket | `campusvibe-prod-media`, ca-central-1, empty | ✅ one bucket, by prefix — ADR-012 |
 | Access | All four public access blocks on, `BucketOwnerEnforced`, no bucket policy | ✅ |
 | Encryption | SSE-S3 with bucket keys | ✅ |
-| Grant | Inline on `CampusVibe-ElasticBeanstalk-EC2Role`: `GetObject`, `PutObject`, `DeleteObject` on `campusvibe-prod-media/*` | ✅ exactly what `S3Service` calls |
-| CORS | `GET,PUT` from `https://www.campusvibe-mcgill.com` | ⚠ §2 — nothing uses it |
-| Duplicate policy | `CampusVibeProdMediaS3Access`, attached to nothing | ⚠ §3 |
+| Grant | Inline `CampusVibe-S3-Media-Access` on `CampusVibe-ElasticBeanstalk-EC2Role`: `GetObject`, `PutObject`, `DeleteObject` on `campusvibe-prod-media/*`, and `ListBucket` on the bucket | ✅ `ListBucket` added 2026-09-12 — see below |
+| CORS | None | ✅ deleted 2026-09-12, §2 |
+| Duplicate policy | `CampusVibeProdMediaS3Access`, attached to nothing | ⚠ §3 — not approved for deletion yet |
 | Versioning, lifecycle | Neither | §4 |
-| Environment | `AWS_S3_BUCKET` **not set**; `S3_BUCKET_NAME` set and read by nothing | ⚠ §1 — the app refuses to start |
+| Environment | `AWS_S3_BUCKET=campusvibe-prod-media`, `AWS_REGION=ca-central-1`; `S3_BUCKET_NAME` removed | ✅ 2026-09-12, §1 |
+| Proxy | Elastic Beanstalk's **nginx**, default body limit **1 MB**, under the 5 MB upload cap | ⚠ code unit — [spec](../../specs/2026-09-12-event-images-served-and-eb-upload-limit.md) |
+| Event photos | Stored, never served; an uploaded one crashes the page showing it | ⚠ code unit — same spec, [BUG-042](../../bugs/bugs.md#bug-042) |
+
+**Why `ListBucket`, when nothing lists.** Without it S3 answers a key that does
+not exist with **403 AccessDenied**, not NoSuchKey. `S3Service.getObject`
+catches only `NoSuchKeyException`, so a row pointing at a missing object would
+be a 500 in production and a 404 everywhere else — MinIO's root credentials can
+always list. Arpan chose the grant over mapping 403 to 404 in code, which would
+also have disguised a real permission fault as *not found*.
 
 ## Already done
 
@@ -40,12 +49,13 @@ the bucket and grant already match it.
 
 In the property pass of [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md#4-environment-properties--arpan--console):
 
-- [ ] `AWS_S3_BUCKET` = `campusvibe-prod-media` — no default, and a blank value
+- [x] `AWS_S3_BUCKET` = `campusvibe-prod-media` — no default, and a blank value
   is rejected, so a missing one stops startup rather than failing on the first
-  upload
-- [ ] `AWS_REGION` = `ca-central-1` — already set
-- [ ] Remove `S3_BUCKET_NAME`
-- [ ] Leave `AWS_S3_ENDPOINT`, `AWS_S3_ACCESS_KEY` and `AWS_S3_SECRET_KEY`
+  upload. **Set 2026-09-12**
+- [x] `AWS_REGION` = `ca-central-1` — already set
+- [x] Remove `S3_BUCKET_NAME` — **removed 2026-09-12**, in the same
+  `update-environment`
+- [x] Leave `AWS_S3_ENDPOINT`, `AWS_S3_ACCESS_KEY` and `AWS_S3_SECRET_KEY`
   **unset** — setting an endpoint points the client away from AWS
 
 ## 2. Remove the unused CORS rule — Arpan · console
@@ -56,8 +66,10 @@ the API ([ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md),
 rule is the shape a presigned-upload flow needs, and that flow was decided
 against, so it grants a capability nothing uses.
 
-- [ ] **S3 → `campusvibe-prod-media` → Permissions → Cross-origin resource
-  sharing (CORS) → Edit** → empty the editor → **Save changes**.
+- [x] **S3 → `campusvibe-prod-media` → Permissions → Cross-origin resource
+  sharing (CORS) → Edit** → empty the editor → **Save changes**. **Done
+  2026-09-12** with `aws s3api delete-bucket-cors`, run by Arpan — the guard
+  hook refuses every `delete-*`, bucket configuration included.
 
 **Verify:**
 ```bash
@@ -100,6 +112,13 @@ and the first administrator:
   aws s3api list-objects-v2 --bucket campusvibe-prod-media --prefix clubs/ \
     --query 'Contents[].Key'                  # clubs/<club-id>/logos/<uuid>.png
   ```
+- [ ] **A logo between 1 MB and 5 MB uploads** — a 3 MB file returns 200, not
+  nginx's HTML 413. Proves the `deploy/eb/.platform/` body limit, which no local
+  test can reach
+- [ ] **An event photo renders** — once the event photo unit has shipped: upload
+  through `POST /api/v1/events/<event-id>/images`, then open the event page
+  through Vercel; the object lists under `events/<event-id>/images/`
+- [ ] **A missing object is a 404, not a 500** — the `ListBucket` grant working
 - [ ] **This closes [BUG-051](../../bugs/bugs.md#bug-051)** — move it at the next wrap-up.
 
 Deleting the test club afterwards leaves its object behind (see below);
@@ -109,7 +128,7 @@ deleting an object is Arpan's.
 
 ## Known gaps — not needed to connect
 
-- An uploaded **event banner** has no read path, so it lands in the bucket and cannot be displayed — [BUG-042](../../bugs/bugs.md#bug-042)
+- An uploaded **event photo** has no read path and crashes the page it is shown on — [BUG-042](../../bugs/bugs.md#bug-042), specced as the next unit. **There is no banner prefix:** a banner is one event photo a club asks the platform owner to feature, queued in [`todo.md`](../../TODO/todo.md) as its own unit
 - **Objects outlive their rows**: deleting a club or event deletes none of its objects — queued in [`todo.md`](../../TODO/todo.md)
 
 ## Appendix — how this was read

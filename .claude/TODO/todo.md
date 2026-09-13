@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-09-08** · Branch: `infra/aws-pipeline`
+Last updated: **2026-09-12** · Branch: `infra/s3-pipeline`
 
 **This is the full queue, not the orientation file.** Do not read it to find out
 where the project is — [`../STATUS.md`](../STATUS.md) answers that in forty
@@ -166,7 +166,7 @@ log. The rest, in the spec's order:
       a cost of putting club creation behind review, on the explicit condition
       that it stops being a consequence and becomes a **bug** the day
       notifications exist. Whoever builds notifications owns this.
-- [ ] **P2** **Nothing can display an uploaded event banner or avatar.**
+- [ ] **P1** **Nothing can display an uploaded event photo or avatar.**
       `events.images` holds S3 object keys exactly as `clubs.logo` does, and
       clubs got a read path on 2026-09-09 while events and avatars did not.
       Latent only because no UI uploads an event image yet — it stops being
@@ -174,6 +174,13 @@ log. The rest, in the spec's order:
       connected, and the failure mode is a thrown error during render rather
       than a broken image. Follow the club shape, do not invent a second one.
       ([BUG-042](../bugs/bugs.md#bug-042))
+      **Events half specced and approved 2026-09-12 — the next unit:**
+      [`specs/2026-09-12-event-images-served-and-eb-upload-limit.md`](../specs/2026-09-12-event-images-served-and-eb-upload-limit.md).
+      Event photos move to `events/{id}/images/` (no banner prefix — a banner
+      is not a stored kind, see the request item below), served by
+      `GET /api/v1/events/{id}/images/{index}` through a `/media/events/**`
+      rewrite, with the image response shared with `ClubController`. Rides
+      with the nginx body limit under Infrastructure. Avatars stay here.
 - [ ] **P3** **A club proposal never expires**, so an unreviewed one holds its
       slug reservation forever and that name is unavailable to everyone. Same
       shape as the stale-invitation and stale-handover sweeps under Club
@@ -194,7 +201,16 @@ log. The rest, in the spec's order:
       recognised as predicted rather than as evidence the decision was wrong.
 
 
-- [ ] **P2** **An event cannot be given a banner image from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)).
+- [ ] **P2** **An event cannot be given photos from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)). *Renamed 2026-09-12 from banner image: by Arpan's definition these are the event's photos, and a banner is chosen from them later.* Needs the event photo read path above first, or the first uploaded photo crashes the page it appears on.
+
+**The event banner request — queued 2026-09-12 by Arpan, after the event photo unit.** A banner is **not** a stored media kind and has no prefix of its own: it is one of an event's existing photos, which the club asks the platform owner to feature. Four items, in dependency order:
+
+- [ ] **P2** **A club requests a banner for its event.** A club owner or club admin picks **at most one** photo from an event's images and submits it to the platform owner for approval — one live request or approved banner per event. Backend: the request record, its create and withdraw endpoints behind `canManageEvent`, and a platform-admin approve and reject. **Its data shape is a real choice and wants a Proposed ADR at its `/start`:** a request table in the ADR-005 mould versus the existing unused `events.promoted` flag (`Event.java:53`, `findByPromotedTrue`) plus a chosen image index — and how an approved banner survives the photo it points at being removed, since images are addressed by index. Nothing notifies the requester of the outcome; that joins the notifications work.
+- [ ] **P2** **The platform owner's banner queue.** Pending requests beside the club proposals in the admin dashboard: the event, the chosen photo rendered through `/media/events/**`, the requesting club, approve and reject.
+- [ ] **P2** **The homepage carousel shows approved banners.** `BannerCarouselMainPage.tsx` renders four hard-coded slides from `public/`; replace them with approved event banners, each linking to its event, with an empty state when there are none. Placement chosen by Arpan 2026-09-12.
+- [ ] **P2** **An approved banner is the event page's hero.** `events/[eventId]/page.tsx:88` takes `event.images[0]`; an event with an approved banner shows that photo instead. Also chosen by Arpan 2026-09-12.
+
+- [ ] **P2** **Club banner images are rendered nowhere.** `POST /clubs/{id}/images` stores them and `GET /clubs/{id}/images/{index}` serves them, and `adapters.ts` maps them, but no page draws `club.images`. Needs the club editor first to have any way to upload one ([BUG-043](../bugs/bugs.md#bug-043)). Queued 2026-09-12 alongside the banner work; kept `clubs/{id}/images/`, no rename.
 
 ### Taxonomy — built, and almost entirely unread
 
@@ -333,11 +349,11 @@ Implementation Sequence.
   4. A Vercel project + deploy token, if the frontend goes there rather than to EB.
 - [ ] **P1** Use **GitHub OIDC** (`aws-actions/configure-aws-credentials` with `role-to-assume`) for AWS auth in CI. Do not add long-lived `AWS_ACCESS_KEY_ID` repo secrets. No LLM key should ever enter CI.
 - [ ] **P2** First Elastic Beanstalk deployment — follow [`docker/EB-DEPLOYMENT.md`](../../docker/EB-DEPLOYMENT.md) for the environment-property list.
-- [ ] **P2** Attach an IAM instance role granting S3 access, so the default credential chain resolves in production (`s3/S3Config.java` already expects this). **The grant already matches the decided topology** ([ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md), 2026-09-12): `CampusVibe-ElasticBeanstalk-EC2Role` carries an inline `GetObject`/`PutObject`/`DeleteObject` on `campusvibe-prod-media/*` — exactly one bucket, and exactly the three verbs `S3Service` calls, so no `ListBucket` is needed. **What is left:** it has never been exercised, so it is unverified until the first upload through the deployed environment ([BUG-051](../bugs/bugs.md#bug-051)); and a customer-managed policy `CampusVibeProdMediaS3Access` duplicates it and is attached to nothing — delete it or attach it, which is Arpan's under `aws-handling.md`.
-- [ ] **P1** **Set the S3 environment properties on `CampusVibe-Backend-Prod` — Arpan's, and a deploy of current code will not boot without them** ([BUG-051](../bugs/bugs.md#bug-051)). Since 2026-09-12 the backend reads `AWS_S3_BUCKET` with no default (`application.yml:62`) and `AWS_REGION`, defaulting to `ca-central-1`. Set `AWS_S3_BUCKET=campusvibe-prod-media` and `AWS_REGION=ca-central-1`; remove `S3_BUCKET_NAME`, which no code has ever read; leave `AWS_S3_ENDPOINT` and both `AWS_S3_*_KEY` **unset**, since setting an endpoint points the client away from AWS. While there, read `SPRING_PROFILES_ACTIVE` by `OptionName` and confirm it is `prod` — the one fact BUG-051 still holds as inference. Production environment variables are *ask first*. Closes BUG-051 on the first upload that lands in the bucket.
+- [ ] **P2** Attach an IAM instance role granting S3 access, so the default credential chain resolves in production (`s3/S3Config.java` already expects this). **The grant already matches the decided topology** ([ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md), 2026-09-12): `CampusVibe-ElasticBeanstalk-EC2Role` carries an inline `GetObject`/`PutObject`/`DeleteObject` on `campusvibe-prod-media/*` — exactly one bucket and the three verbs `S3Service` calls. **`s3:ListBucket` on the bucket itself was added 2026-09-12** (statement `CampusVibeMediaBucketList`): without it S3 answers an absent key with 403 AccessDenied rather than NoSuchKey, which `S3Service` does not catch, so a missing object would have been a 500 in production and a 404 against MinIO. **What is left:** it has never been exercised, so it is unverified until the first upload through the deployed environment ([BUG-051](../bugs/bugs.md#bug-051)); and a customer-managed policy `CampusVibeProdMediaS3Access` duplicates it and is attached to nothing — delete it or attach it, which is Arpan's under `aws-handling.md`.
+- [ ] **P1** **Let uploads over 1 MB past Elastic Beanstalk's nginx.** The Docker platform proxies through nginx (`ProxyServer nginx`, read 2026-09-12), whose default `client_max_body_size` is 1 MB — under the 5 MB per-file cap in `application.yml:34`. `scripts/package-eb.mjs` ships only `Dockerfile` and `app.jar`, so nothing raises it, and local and CI have no nginx, so no test can see it. Rides with the event photo unit: `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf` at `10M`, staged by `package-eb.mjs`, proved by a 3 MB upload after the first deploy ([spec](../specs/2026-09-12-event-images-served-and-eb-upload-limit.md)).
 - [ ] **P1** **Switch the RDS master password to self-managed — before 2026-09-18, and before the first deploy.** Arpan's, console. It is RDS-managed and rotates every 7 days, and secrets are going in Elastic Beanstalk properties (decided 2026-09-12), so a copied password dies at the next rotation. [`connecting-rds.md`](../docs/architecture/connecting-rds.md) §1.
 - [ ] **P1** **Change the EB health check path from `/` to `/actuator/health` before the first real deploy.** Arpan's, console. CampusVibe answers 401 at `/`, so the first deploy would be marked unhealthy. [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md) §1.
-- [ ] **P1** **Set the EB environment properties the code actually reads.** Arpan's, console. Six of the eight set (`DB_HOST`, `DB_NAME`, `DB_PORT`, `DB_USERNAME`, `FRONTEND_URL`, `S3_BUCKET_NAME`) are read by nothing, and `SPRING_DATASOURCE_*`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`, `APP_BASE_URL` and `AUTH_RATE_LIMIT_TRUST_XFF` are missing. The full table is [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md) §4.
+- [ ] **P1** **Set the EB environment properties the code actually reads.** Arpan's, console. Five of the eight set (`DB_HOST`, `DB_NAME`, `DB_PORT`, `DB_USERNAME`, `FRONTEND_URL`) are read by nothing — `S3_BUCKET_NAME` was replaced by `AWS_S3_BUCKET` on 2026-09-12 — and `SPRING_DATASOURCE_*`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`, `APP_BASE_URL` and `AUTH_RATE_LIMIT_TRUST_XFF` are missing. The full table is [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md) §4.
 - [ ] **P1** **HTTPS on the ALB** — an ACM certificate for `api.campusvibe-mcgill.com` validated at Namecheap, a 443 listener, and the `api` CNAME. Arpan's, console; ALB kept by his decision on 2026-09-12. [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md) §2.
 - [ ] **P2** **Redirect HTTP to HTTPS from inside the bundle** — `deploy/eb/.ebextensions/https-redirect.config`, and `scripts/package-eb.mjs` staging `.ebextensions/`, which it does not today. Code unit. [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md) §3.
 - [ ] **P2** **Account cleanup before launch.** Arpan's, console: release the two unattached Elastic IPs, detach `AWSElasticBeanstalkWorkerTier` and `AWSElasticBeanstalkMulticontainerDocker` from the instance role, remove the personal `/32` rule on `campusvibe-database-sg`, cap the environment at one instance. [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md) §0 and [`connecting-rds.md`](../docs/architecture/connecting-rds.md) §2.
@@ -350,7 +366,6 @@ Implementation Sequence.
 - [ ] **P2** **Set `AUTH_RATE_LIMIT_TRUST_XFF=true` in the EB environment**, and only there. Behind the load balancer (kept 2026-09-12, replacing the Cloudflare plan) every request arrives from a proxy address, so the limiter would otherwise treat the whole internet as one client. It must stay `false` anywhere the app is directly reachable, where it would let a caller forge an IP per request.
 - [ ] **P3** **PostgreSQL 15 reaches end of life in November 2027.** **Superseded 2026-09-12:** RDS runs 18.3 and the repository moves to 18 — see the P2 pin item above. Production will be pinned to 15.x to match `pgvector/pgvector:pg15` in Compose, both Testcontainers suites and `_database.yml`. Moving majors means all four pins plus an RDS upgrade plus a local volume rebuild — schedule it, do not discover it.
 - [ ] **P3** Migrate secrets from EB environment properties to **AWS Secrets Manager** as the app grows. Reachable via `spring-cloud-aws-starter-secrets-manager` + `spring.config.import` with **no feature-code changes** — that is the point of routing everything through `OpenAiProperties` and placeholders now.
-- [ ] **P3** **Narrow the CORS rule on `campusvibe-prod-media`.** It allows `GET,PUT` from the prod origin (`rules/aws-handling.md`), which is the shape a browser-direct presigned flow needs. [ADR-010](../docs/decisions/ADR-010-uploads-stream-through-the-api.md) and [ADR-007](../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md) route every byte through the API, so no browser ever calls the bucket and the rule grants a capability nothing uses. Remove it, or record why not — a bucket setting, so *ask first*.
 - [ ] **P3** **`verify.mjs` scopes itself from commits, not from the working tree.** It diffs `origin/main...HEAD`, so a hand run on uncommitted backend work on 2026-09-12 reported *hooks* only and skipped the backend. Correct for the pre-push hook, which only carries commits; misleading from a terminal. Either fold in the worktree's changed files when run by hand, or print a line naming the uncommitted files it did not consider. `--all` is the workaround.
 
 ## Security
