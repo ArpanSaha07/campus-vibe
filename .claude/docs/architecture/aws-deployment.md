@@ -8,6 +8,32 @@
 Phases 2–6 — RDS, S3, Elastic Beanstalk, the Vercel/Cloudflare front, CI/CD —
 have **not been started**. Nothing of CampusVibe runs on AWS yet.
 
+> **2026-09-12 — the state above is stale, and its S3 half is recorded
+> elsewhere.** A bucket exists (`campusvibe-prod-media`, `ca-central-1`), and the
+> code now reads exactly one bucket from `AWS_S3_BUCKET` —
+> [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) and
+> [`rules/aws-handling.md`](../../rules/aws-handling.md). An Elastic Beanstalk
+> environment and a database host exist too. This document has **not** been
+> reconciled with the account — that is its own item in
+> [`todo.md`](../../TODO/todo.md) — so the `Code as of` stamp deliberately does
+> not move.
+
+> **2026-09-12 — two decisions below are superseded, by Arpan's choice.**
+> *HTTPS without an ALB, through Cloudflare* is replaced: the environment that
+> exists is load balanced, DNS is at Namecheap, and TLS will terminate on the
+> ALB with an ACM certificate. *RDS will run PostgreSQL 15.x* is replaced: RDS
+> runs 18.3 and the repository's five pins move to 18. The runbooks are
+> [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) and
+> [`connecting-rds.md`](connecting-rds.md).
+
+> **2026-09-12 — three infrastructure changes, approved and run by Arpan.**
+> The CORS rule on `campusvibe-prod-media` was deleted, since no browser calls
+> the bucket. `s3:ListBucket` on the bucket was added to the inline
+> `CampusVibe-S3-Media-Access` policy on `CampusVibe-ElasticBeanstalk-EC2Role`,
+> so a missing object answers NoSuchKey rather than AccessDenied.
+> `CampusVibe-Backend-Prod` gained `AWS_S3_BUCKET` and lost `S3_BUCKET_NAME`.
+> The reasoning and verification are in [`connecting-s3.md`](connecting-s3.md).
+
 Plan of record: [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md).
 This document records what was actually built and where it departs from that plan.
 

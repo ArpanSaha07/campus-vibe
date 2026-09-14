@@ -18,39 +18,57 @@ No secret is committed, and no application code changes between environments.
 Set these under **Configuration → Updates, monitoring, and logging →
 Environment properties** in the EB console (or via `eb setenv`).
 
+Step-by-step runbooks, with the order and the account as it stood on
+2026-09-12: `.claude/docs/architecture/connecting-elastic-beanstalk.md`, and
+`connecting-rds.md`, `connecting-s3.md` and `connecting-ses.md` beside it.
+
 ### Required
+
+The application refuses to start without these.
 
 | Property | Notes |
 |---|---|
 | `SPRING_PROFILES_ACTIVE` | `prod` — activates `application-prod.yml` |
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<rds-endpoint>:5432/campusvibe` |
-| `SPRING_DATASOURCE_USERNAME` | RDS master username |
-| `SPRING_DATASOURCE_PASSWORD` | RDS password. **Secret** |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<rds-endpoint>:5432/campusvibe?sslmode=require` — RDS forces TLS |
+| `SPRING_DATASOURCE_USERNAME` | RDS master username, until a dedicated application user exists |
+| `SPRING_DATASOURCE_PASSWORD` | **Secret.** A self-managed master password — an RDS-managed one rotates and breaks this copy |
 | `JWT_SECRET` | **Secret.** Min 32 bytes; the app refuses to start otherwise. Generate with `openssl rand -hex 32`. Must differ from the development value |
-| `CORS_ALLOWED_ORIGINS` | The deployed frontend origin, e.g. `https://campusvibe.vercel.app` |
+| `AWS_S3_BUCKET` | `campusvibe-prod-media`. No default, and blank is rejected (ADR-012) |
+
+### Required for correct behaviour
+
+| Property | Notes |
+|---|---|
+| `CORS_ALLOWED_ORIGINS` | The deployed frontend origin: `https://www.campusvibe-mcgill.com` |
+| `APP_BASE_URL` | The public frontend URL links in mail point at |
+| `AUTH_RATE_LIMIT_TRUST_XFF` | `true` behind the load balancer, and only there |
 
 ### Optional
 
 | Property | Default | Notes |
 |---|---|---|
+| `AWS_REGION` | `ca-central-1` | Where the bucket is |
 | `OPENAI_API_KEY` | *(blank)* | **Secret.** Blank runs search in keyword-only mode with no OpenAI calls. Use a key from a **separate OpenAI project** from development |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | |
 | `OPENAI_CONNECT_TIMEOUT` | `2s` | |
 | `OPENAI_READ_TIMEOUT` | `10s` | |
 | `OPENAI_MAX_RETRIES` | `2` | Retries 429/5xx only |
 | `GOOGLE_CLIENT_ID` | *(blank)* | Public client id, not a secret |
-| `AWS_REGION` | `us-east-1` | |
-| `AWS_S3_BUCKET_CLUBS` | `campusvibe-clubs` | |
-| `AWS_S3_BUCKET_EVENTS` | `campusvibe-events` | |
+| `SPRING_MAIL_HOST` | *(unset)* | `email-smtp.ca-central-1.amazonaws.com`. Unset means mail is logged, not sent |
+| `SPRING_MAIL_PORT` | | `587` |
+| `SPRING_MAIL_USERNAME` | | SES SMTP user name (ADR-013) |
+| `SPRING_MAIL_PASSWORD` | | **Secret.** SES SMTP password (ADR-013) |
+| `MAIL_FROM` | `no-reply@campusvibe.local` | Must be an address at the verified SES domain |
+| `APP_BOOTSTRAP_ADMIN_ENABLED` | `false` | Set `true` once, with `APP_BOOTSTRAP_ADMIN_EMAIL`, to grant the first administrator; switch it back off after |
 
-`application-prod.yml` sets `aws.s3.mock: false`, so real S3 is used without
-any environment property. Note that setting `AWS_S3_MOCK` explicitly *would*
-override it — OS environment variables outrank profile config files in Spring's
-property precedence. Leave it unset in production.
+There is no S3 mock flag any more. The client is always real; setting
+`AWS_S3_ENDPOINT` points it at an S3-compatible store instead of AWS, which is
+what local development does with MinIO and production must never do (ADR-011).
 
 ### Never set
 
-`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The backend uses the AWS
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; and `AWS_S3_ENDPOINT`,
+`AWS_S3_ACCESS_KEY` and `AWS_S3_SECRET_KEY`. The backend uses the AWS
 default credential provider chain (`s3/S3Config.java`), which resolves the EC2
 instance role automatically. Attach an IAM role granting S3 access to the EB
 environment instead — static keys in environment properties are strictly worse.

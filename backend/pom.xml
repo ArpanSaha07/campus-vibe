@@ -208,11 +208,14 @@
             <artifactId>s3</artifactId>
             <version>2.20.26</version>
         </dependency>
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.11.0</version>
-        </dependency>
+        <!--
+          commons-io was removed on 2026-09-12. It had one consumer in the whole
+          backend, s3/FakeS3.java, which ADR-011 deleted when MinIO replaced it.
+          The pin was also the last of the hard-pinned, BOM-free block flagged by
+          Trivy (2.11.0 -> 2.14.0, CVE-2024-47554); removing the dependency
+          removes the finding, so step (b) of the gate item in todo.md is done
+          and the gate wants re-measuring.
+        -->
 
 		<!-- Google ID token verification -->
 		<dependency>

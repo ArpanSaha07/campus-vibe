@@ -37,13 +37,55 @@ services:
           path: ../db
           target: /docker-entrypoint-initdb.d
 
-  # s3:
-  #   image: adobe/s3mock:3.1.0
-  #   container_name: campusvibe-s3
-  #   ports:
-  #     - "9090:9090"
-  #   environment:
-  #     - initialBuckets=campusvibe-clubs,campusvibe-events,campusvibe-user
+  # The object store. Not a stand-in that behaves like S3 -- a store that
+  # speaks S3, which a real S3Client talks to with nothing changed but its
+  # endpoint (ADR-011). It replaced FakeS3, a filesystem stub, on 2026-09-12;
+  # the commented adobe/s3mock block that used to sit here went with it, because
+  # two half-adopted stand-ins was the problem rather than the choice between
+  # them.
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: campusvibe-minio
+    environment:
+      # Local, non-secret, and not AWS credentials -- MinIO's own root user.
+      # Overridable from docker/.env like the database password; the defaults
+      # are deliberately obvious so nothing here ever resembles a real key.
+      MINIO_ROOT_USER: ${AWS_S3_ACCESS_KEY:-campusvibe-local}
+      MINIO_ROOT_PASSWORD: ${AWS_S3_SECRET_KEY:-campusvibe-local-secret}
+    command: server /data --console-address ":9001"
+    ports:
+      # 9000 is the S3 API, 9001 the browser console -- handy for seeing that an
+      # upload actually landed, and under what key.
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # Answers without credentials once the API is accepting requests. The
+      # image ships curl; busybox wget is not present.
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Creates the bucket and exits. MinIO starts empty, and the backend does not
+  # create its own bucket -- in production it has no permission to, the instance
+  # role grants object verbs on one bucket and nothing else. Idempotent, so a
+  # restart is a no-op rather than an error.
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: campusvibe-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000
+      ${AWS_S3_ACCESS_KEY:-campusvibe-local}
+      ${AWS_S3_SECRET_KEY:-campusvibe-local-secret} &&
+      mc mb --ignore-existing local/${AWS_S3_BUCKET:-campusvibe-media} &&
+      echo 'Bucket ${AWS_S3_BUCKET:-campusvibe-media} is ready.'
+      "
 
   backend:
     build:
@@ -111,17 +153,30 @@ services:
       AUTH_RATE_LIMIT_LOCKOUT: ${AUTH_RATE_LIMIT_LOCKOUT:-15m}
       AUTH_RATE_LIMIT_TRUST_XFF: ${AUTH_RATE_LIMIT_TRUST_XFF:-false}
 
-      # No AWS credentials here: the SDK's default provider chain resolves an
-      # IAM role in production and your local profile in development.
-      AWS_S3_MOCK: ${AWS_S3_MOCK:-true}
-      AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_S3_BUCKET_CLUBS: ${AWS_S3_BUCKET_CLUBS:-campusvibe-clubs}
-      AWS_S3_BUCKET_EVENTS: ${AWS_S3_BUCKET_EVENTS:-campusvibe-events}
+      # One bucket for every media kind, separated by key prefix (ADR-012).
+      # Production sets this to campusvibe-prod-media; application.yml gives it
+      # no default, so an environment that forgets it fails to start rather than
+      # failing NoSuchBucket on the first upload -- which is what BUG-051 was.
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-campusvibe-media}
+      AWS_REGION: ${AWS_REGION:-ca-central-1}
+
+      # Setting an endpoint is what points the real S3Client at MinIO instead of
+      # AWS. Production leaves it unset and the SDK's default provider chain
+      # resolves the EC2 instance role. There is no mock flag any more: the
+      # client is always real, and only where it points changes (ADR-011).
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-http://minio:9000}
+      AWS_S3_ACCESS_KEY: ${AWS_S3_ACCESS_KEY:-campusvibe-local}
+      AWS_S3_SECRET_KEY: ${AWS_S3_SECRET_KEY:-campusvibe-local-secret}
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+      # Waits for the bucket, not just the store: the backend does not create
+      # it, so starting before minio-init has run would mean NoSuchBucket on
+      # the first upload of a cold stack.
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
       # busybox wget, already in eclipse-temurin:25-jdk-alpine, so no extra
       # package. Its exit code is enough: actuator answers 200 only when the
@@ -222,3 +277,6 @@ services:
 
 volumes:
   db_data:
+  # Uploaded media survives `docker compose down`, the way the database does.
+  # `down -v` drops both together, which is the reset a developer wants.
+  minio_data:

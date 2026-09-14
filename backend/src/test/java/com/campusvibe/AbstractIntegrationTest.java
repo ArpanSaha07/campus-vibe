@@ -34,9 +34,14 @@ import java.util.Set;
  * Requires a working Docker daemon; the fast {@code *Test} unit suites do not
  * and still run on H2.
  *
+ * <p>Two containers, not one: PostgreSQL and MinIO. The object store used to be
+ * a filesystem stub, so the S3 client production builds had never executed in a
+ * test — see {@link MinioTestContainer}.
+ *
  * <p>Profiles are ordered: {@code test} supplies the shared test configuration
- * (mock S3, disabled rate limits, throwaway JWT secret) and {@code it} overrides
- * its H2-specific half.
+ * (disabled rate limits, throwaway JWT secret) and {@code it} overrides its
+ * H2-specific half. The S3 properties come from the container rather than from
+ * either file, because {@code @DynamicPropertySource} outranks both.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,6 +51,7 @@ public abstract class AbstractIntegrationTest {
     @DynamicPropertySource
     static void datasourceFromContainer(DynamicPropertyRegistry registry) {
         PostgresTestContainer.registerTo(registry);
+        MinioTestContainer.registerTo(registry);
     }
 
     @Autowired protected MockMvc mockMvc;
