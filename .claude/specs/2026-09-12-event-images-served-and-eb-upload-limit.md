@@ -1,6 +1,6 @@
 # Event images served, and uploads over 1 MB reach the API on Elastic Beanstalk
 
-**Status:** approved by Arpan 2026-09-12 · **Date:** 2026-09-12
+**Status:** shipped 2026-09-12 (approved by Arpan the same day) · **Date:** 2026-09-12
 
 ## Goal
 
@@ -141,3 +141,27 @@ upload (proves nginx) and an event photo read through Vercel.
   spec and SKILL carry the change
 - **`aws-deployment.md`** — the three 2026-09-12 account changes recorded
 - **This spec** — `Status: shipped`
+
+## Shipped 2026-09-12 — where the work drifted from this spec
+
+- **A second packaging defect, not in scope and fixed anyway.** Windows
+  PowerShell 5.1's `ZipFile.CreateFromDirectory` wrote the nested nginx file as
+  `.platform\nginx\conf.d\...`; the instance would have unzipped it as one
+  misnamed file, the deploy would have succeeded, and the limit would have stayed
+  1 MB. `package-eb.mjs` now writes each entry with forward slashes. Without
+  this the spec's goal was not reachable, so it rode along.
+- **The shared class is `s3/StoredImageResponses`**, a Spring component, and it
+  answers 404 for a root-relative stored value as well as an absolute URL — a
+  small behaviour change for clubs, where such a value used to reach
+  `assertSafeKey` and be refused as an error.
+- **`EventMediaIT` has 6 tests, not a reworked 3.** The three upload tests were
+  renamed from banner to photo; three read-path tests were added.
+- **Verified beyond the spec's commands:** the round trip ran on an isolated
+  compose project (`-p campusvibe-probe`, torn down afterwards), not Arpan's
+  stack. The rules gained lines in `backend-clubs`, `frontend`, `ci-and-build`
+  and `aws-handling`, and the s3-media skill was updated.
+- **Found alongside, not part of the unit:** Arpan's compose database had run an
+  uncommitted draft of V12 and refused to start. Reset with his approval on
+  2026-09-13, with MinIO; recorded in `rules/db-migrations.md`.
+- **Not verified: production** — the nginx limit and an event photo through
+  Vercel wait on the first deploy (`connecting-s3.md` §5).

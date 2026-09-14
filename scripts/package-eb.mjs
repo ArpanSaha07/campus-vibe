@@ -94,16 +94,30 @@ console.log(`    jar: ${jars[0]} (${jarMB} MB)`);
 // ---------------------------------------------------------------------------
 // 3. Stage the bundle contents
 //
-// Flat on purpose. Every file sits at the zip root because that is where EB
-// looks for the Dockerfile, and because a flat tree sidesteps the separator
-// and hidden-file quirks of the Windows zip implementations below.
+// Flat, apart from the platform directories. The Dockerfile and jar sit at the
+// zip root because that is where EB looks for them.
+//
+// Every hidden directory under deploy/eb/ is carried over too, because EB reads
+// its platform configuration only from the bundle root: .platform/ (nginx
+// overrides, among them the upload body limit) and .ebextensions/ (environment
+// resources, such as the HTTPS redirect). A missing one does not fail the
+// deploy — nginx simply keeps refusing uploads over 1 MB — so they are copied
+// by discovery rather than by a list someone has to remember to extend.
 // ---------------------------------------------------------------------------
 
-step("staging deploy/eb/Dockerfile + app.jar");
+const platformDirs = readdirSync(EB_SRC, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && entry.name.startsWith("."))
+  .map((entry) => entry.name)
+  .sort();
+
+step(`staging deploy/eb/Dockerfile + app.jar${platformDirs.map((d) => ` + ${d}/`).join("")}`);
 rmSync(STAGE, { recursive: true, force: true });
 mkdirSync(STAGE, { recursive: true });
 cpSync(join(EB_SRC, "Dockerfile"), join(STAGE, "Dockerfile"));
 cpSync(jar, join(STAGE, "app.jar"));
+for (const dir of platformDirs) {
+  cpSync(join(EB_SRC, dir), join(STAGE, dir), { recursive: true });
+}
 
 // ---------------------------------------------------------------------------
 // 4. Zip it
@@ -127,13 +141,26 @@ step(`zipping -> ${zip}`);
 rmSync(zip, { force: true });
 
 if (WIN) {
-  // CreateFromDirectory rather than Compress-Archive: PowerShell 5.1's cmdlet
-  // has a long history of writing entry names with backslashes, which the
-  // Linux-side unzip on the EB instance reads as one file with a slash in its
-  // name. The .NET API writes forward slashes.
+  // Entry by entry, with every name forced to forward slashes. Both built-in
+  // shortcuts write backslashes on Windows PowerShell 5.1: Compress-Archive
+  // always has, and ZipFile.CreateFromDirectory does too for anything below
+  // the root -- invisible while the bundle was two root-level files, and found
+  // on 2026-09-12 when .platform/nginx/conf.d/ was added. The Linux-side unzip
+  // on the EB instance reads `.platform\nginx\conf.d\x.conf` as one file with
+  // backslashes in its name, so nginx never sees it and the deploy still
+  // succeeds, silently keeping the 1 MB upload limit.
+  // -Force includes hidden files; directories need no entries of their own.
   const ps = [
+    "Add-Type -AssemblyName System.IO.Compression;",
     "Add-Type -AssemblyName System.IO.Compression.FileSystem;",
-    `[System.IO.Compression.ZipFile]::CreateFromDirectory('${STAGE}', '${zip}')`,
+    `$root = (Resolve-Path -LiteralPath '${STAGE}').Path.TrimEnd('\\') + '\\';`,
+    `$archive = [System.IO.Compression.ZipFile]::Open('${zip}', 'Create');`,
+    "try {",
+    `  Get-ChildItem -LiteralPath '${STAGE}' -Recurse -File -Force | ForEach-Object {`,
+    "    $name = $_.FullName.Substring($root.Length).Replace('\\', '/');",
+    "    [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $_.FullName, $name)",
+    "  }",
+    "} finally { $archive.Dispose() }",
   ].join(" ");
   const res = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ps], {
     stdio: "inherit",
@@ -151,7 +178,7 @@ console.log(`
 
 Contents (zip root):
   Dockerfile
-  app.jar
+  app.jar${platformDirs.map((d) => `\n  ${d}/`).join("")}
 
 Next: upload it as a new Application Version in the Elastic Beanstalk console,
 or  aws elasticbeanstalk create-application-version  followed by

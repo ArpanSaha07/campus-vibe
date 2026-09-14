@@ -81,10 +81,11 @@ const nextConfig: NextConfig = {
   },
 
   /**
-   * Uploaded club media, proxied to the API.
+   * Uploaded club and event media, proxied to the API.
    *
    * What the database stores is an S3 object key, and the bucket is private, so
-   * the bytes are streamed by `GET /api/v1/clubs/{id}/logo`. Pointing an
+   * the bytes are streamed by `GET /api/v1/clubs/{id}/logo`, `/clubs/{id}/images/{index}`
+   * and, since 2026-09-12, `/events/{id}/images/{index}` (BUG-042). Pointing an
    * <Image> straight at the API host does not work, for three separate reasons
    * that this one rewrite removes together:
    *
@@ -113,6 +114,10 @@ const nextConfig: NextConfig = {
       {
         source: "/media/clubs/:clubId/images/:index",
         destination: `${apiInternal}/api/v1/clubs/:clubId/images/:index`,
+      },
+      {
+        source: "/media/events/:eventId/images/:index",
+        destination: `${apiInternal}/api/v1/events/:eventId/images/:index`,
       },
     ];
   },

@@ -1,6 +1,6 @@
 # Connecting S3
 
-**Code as of:** f8d32ba · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan
+**Code as of:** 680da0e plus the event photo unit (`s3/StoredImageResponses`, `MediaKeys.eventImage`) · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan
 **Order:** 3 of 4 — the property goes in the same pass as [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) §4; verification needs its §5 deploy.
 **Related:** [ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md) · [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) · [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) · [`s3-media/SKILL.md`](../../skills/s3-media/SKILL.md) · [BUG-051](../../bugs/bugs.md#bug-051)
 
@@ -26,8 +26,8 @@ the bucket and grant already match it.
 | Duplicate policy | `CampusVibeProdMediaS3Access`, attached to nothing | ⚠ §3 — not approved for deletion yet |
 | Versioning, lifecycle | Neither | §4 |
 | Environment | `AWS_S3_BUCKET=campusvibe-prod-media`, `AWS_REGION=ca-central-1`; `S3_BUCKET_NAME` removed | ✅ 2026-09-12, §1 |
-| Proxy | Elastic Beanstalk's **nginx**, default body limit **1 MB**, under the 5 MB upload cap | ⚠ code unit — [spec](../../specs/2026-09-12-event-images-served-and-eb-upload-limit.md) |
-| Event photos | Stored, never served; an uploaded one crashes the page showing it | ⚠ code unit — same spec, [BUG-042](../../bugs/bugs.md#bug-042) |
+| Proxy | Elastic Beanstalk's **nginx**, default body limit **1 MB**, under the 5 MB upload cap | ✅ raised to `10M` in the bundle, 2026-09-12 — proved by §5 after a deploy |
+| Event photos | `events/{id}/images/`, served by `GET /events/{id}/images/{index}` | ✅ 2026-09-12, [BUG-042](../../bugs/bugs.md#bug-042) events half — verified on compose |
 
 **Why `ListBucket`, when nothing lists.** Without it S3 answers a key that does
 not exist with **403 AccessDenied**, not NoSuchKey. `S3Service.getObject`
@@ -115,7 +115,7 @@ and the first administrator:
 - [ ] **A logo between 1 MB and 5 MB uploads** — a 3 MB file returns 200, not
   nginx's HTML 413. Proves the `deploy/eb/.platform/` body limit, which no local
   test can reach
-- [ ] **An event photo renders** — once the event photo unit has shipped: upload
+- [ ] **An event photo renders** — the code shipped 2026-09-12: upload
   through `POST /api/v1/events/<event-id>/images`, then open the event page
   through Vercel; the object lists under `events/<event-id>/images/`
 - [ ] **A missing object is a 404, not a 500** — the `ListBucket` grant working
@@ -128,7 +128,7 @@ deleting an object is Arpan's.
 
 ## Known gaps — not needed to connect
 
-- An uploaded **event photo** has no read path and crashes the page it is shown on — [BUG-042](../../bugs/bugs.md#bug-042), specced as the next unit. **There is no banner prefix:** a banner is one event photo a club asks the platform owner to feature, queued in [`todo.md`](../../TODO/todo.md) as its own unit
+- **Profile avatars** have no upload or read path — what is left of [BUG-042](../../bugs/bugs.md#bug-042); event photos got theirs 2026-09-12. **There is no banner prefix:** a banner is one event photo a club asks the platform owner to feature, queued in [`todo.md`](../../TODO/todo.md) as its own unit
 - **Objects outlive their rows**: deleting a club or event deletes none of its objects — queued in [`todo.md`](../../TODO/todo.md)
 
 ## Appendix — how this was read

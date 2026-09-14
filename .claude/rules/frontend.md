@@ -34,7 +34,10 @@ paths:
   absolute http(s) URL.** It throws `Failed to construct 'URL': Invalid URL`
   *during render*, which no `onError` can catch, so one bad row takes the whole
   page down. Uploaded media arrives as an S3 object key and must go through
-  `adapters.ts`, which maps it to `/media/...`. (BUG-040)
+  `adapters.ts`, which maps it to `/media/...`. (BUG-040) **Event photos too**,
+  through `eventImageUrls` — they reached `next/image` raw until 2026-09-12. A
+  new place that reads `api.images` directly instead of the adapted
+  `EventInstance` reopens that crash. (BUG-042)
 - **`next/image` needs a `remotePatterns` entry for any absolute host**, and
   Next 16 refuses outright to optimize an upstream image on a private IP — which
   local development always is. Same-origin paths behind the `/media/**` rewrite
