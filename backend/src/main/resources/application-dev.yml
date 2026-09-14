@@ -20,8 +20,9 @@ campusvibe:
 #
 # DELIBERATELY ALMOST EMPTY, and that is the point rather than an oversight.
 # application.yml already defaults to the development shape: `show-sql: true`,
-# `include-message: always`, `AWS_S3_MOCK=true`, mail unset so messages are
-# logged rather than sent. It is application-prod.yml that overrides those back
+# `include-message: always`, mail unset so messages are logged rather than sent.
+# (S3 is no longer among them: the store is chosen by AWS_S3_ENDPOINT, which
+# docker-compose.yml sets to MinIO, not by a profile -- ADR-011.) It is application-prod.yml that overrides those back
 # to something safe. So there is very little for this file to say.
 #
 # WHAT IT BUYS is an *active* profile for `@Profile("dev")` beans to attach to.

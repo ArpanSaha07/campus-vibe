@@ -2,7 +2,7 @@ package com.campusvibe.club;
 
 import com.campusvibe.common.Logs;
 import com.campusvibe.s3.MediaKeys;
-import com.campusvibe.s3.S3Buckets;
+import com.campusvibe.s3.MediaBucket;
 import com.campusvibe.s3.S3Service;
 import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
@@ -39,14 +39,14 @@ public class ClubController {
     private final ClubService clubService;
     private final SearchService searchService;
     private final S3Service s3Service;
-    private final S3Buckets buckets;
+    private final MediaBucket mediaBucket;
 
     public ClubController(ClubService clubService, SearchService searchService,
-                          S3Service s3Service, S3Buckets buckets) {
+                          S3Service s3Service, MediaBucket mediaBucket) {
         this.clubService = clubService;
         this.searchService = searchService;
         this.s3Service = s3Service;
-        this.buckets = buckets;
+        this.mediaBucket = mediaBucket;
     }
 
     @GetMapping
@@ -128,10 +128,10 @@ public class ClubController {
      * next/image threw {@code Failed to construct 'URL': Invalid URL} on it.
      *
      * <p>Serving the bytes through the API rather than handing out a presigned
-     * or public S3 URL keeps the bucket private and works identically against
-     * {@code FakeS3} locally and real S3 in production — presigning cannot work
-     * against a filesystem stub, and no bucket or CDN is provisioned to be
-     * public with.
+     * or public S3 URL keeps the bucket private, and is the same decision that
+     * governs writes (ADR-007 for reads, ADR-010 for uploads). It works
+     * identically against MinIO locally and real S3 in production, because both
+     * are reached by the same client through the same calls (ADR-011).
      *
      * <p>Unauthenticated, like the club page it appears on. It falls under the
      * {@code GET /api/v1/clubs/**} permitAll matcher and needs no entry of its
@@ -177,7 +177,7 @@ public class ClubController {
                     "Club [%s] image is an external URL, not a stored object".formatted(clubId));
         }
 
-        byte[] bytes = s3Service.getObject(buckets.getClubs(), key);
+        byte[] bytes = s3Service.getObject(mediaBucket.name(), key);
         return ResponseEntity.ok()
                 .contentType(imageTypeOf(key))
                 // Every upload gets a new key, but the URL is the club's --
@@ -227,7 +227,7 @@ public class ClubController {
     public void uploadLogo(@PathVariable String id, @RequestPart("file") MultipartFile file) throws IOException {
         byte[] bytes = file.getBytes();
         String key = MediaKeys.clubLogo(id, bytes);
-        s3Service.putObject(buckets.getClubs(), key, bytes);
+        s3Service.putObject(mediaBucket.name(), key, bytes);
         // If this throws, the object just stored is orphaned. Accepted: S3 and
         // PostgreSQL are not one transaction (§21), and an orphan is harmless.
         String previous = clubService.updateLogo(id, key);
@@ -247,7 +247,7 @@ public class ClubController {
             return;
         }
         try {
-            s3Service.deleteObject(buckets.getClubs(), previousKey);
+            s3Service.deleteObject(mediaBucket.name(), previousKey);
         } catch (RuntimeException e) {
             log.warn("Could not delete the replaced logo {} of club {}; the object is orphaned",
                     Logs.safe(previousKey), Logs.safe(clubId), e);
@@ -267,7 +267,7 @@ public class ClubController {
             keys.add(MediaKeys.clubImage(id, bytes));
         }
         for (int i = 0; i < keys.size(); i++) {
-            s3Service.putObject(buckets.getClubs(), keys.get(i), contents.get(i));
+            s3Service.putObject(mediaBucket.name(), keys.get(i), contents.get(i));
         }
         clubService.addImages(id, keys);
     }

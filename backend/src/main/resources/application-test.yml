@@ -1,6 +1,9 @@
 aws:
   s3:
-    mock: true
+    # Set so a Spring context can start. The fast *Test suites never touch S3;
+    # the media ITs override all four properties from the MinIO container
+    # (MinioTestContainer), which outranks any property file.
+    bucket: campusvibe-test
 
 # Test-only, non-production values. These exist so tests never depend on the
 # developer's environment: an exported OPENAI_API_KEY must not cause a test run

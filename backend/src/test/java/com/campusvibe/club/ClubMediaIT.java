@@ -1,7 +1,7 @@
 package com.campusvibe.club;
 
 import com.campusvibe.AbstractIntegrationTest;
-import com.campusvibe.s3.S3Buckets;
+import com.campusvibe.s3.MediaBucket;
 import com.campusvibe.s3.S3Service;
 import com.campusvibe.user.RoleName;
 import com.campusvibe.user.User;
@@ -49,7 +49,7 @@ class ClubMediaIT extends AbstractIntegrationTest {
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
     @Autowired private S3Service s3Service;
-    @Autowired private S3Buckets buckets;
+    @Autowired private MediaBucket mediaBucket;
 
     private User admin() {
         return createUser("Root", "root@campus.com", "password123",
@@ -162,7 +162,7 @@ class ClubMediaIT extends AbstractIntegrationTest {
     void aStoredSvgIsNeverServedAsSvg() throws Exception {
         Club club = createClub("robotics", "Robotics");
         String key = "clubs/robotics/logo-evil.svg";
-        s3Service.putObject(buckets.getClubs(), key,
+        s3Service.putObject(mediaBucket.name(), key,
                 "<svg xmlns=\"http://www.w3.org/2000/svg\"><script/></svg>".getBytes(StandardCharsets.UTF_8));
         club.setLogo(key);
         clubRepository.save(club);
@@ -178,10 +178,13 @@ class ClubMediaIT extends AbstractIntegrationTest {
      * The traversal the PR #44 security review found.
      *
      * <p>The filename is the one a raw multipart request can set to anything.
-     * Before 2026-09-11 it was concatenated into the key, and {@code FakeS3}
-     * joined the key onto a directory, so this wrote a file wherever it
-     * pointed. Now the filename is never read: the key is generated, and the
-     * probe path is never created.
+     * Before 2026-09-11 it was concatenated into the key, and the filesystem
+     * stub that then stood in for S3 joined the key onto a directory, so this
+     * wrote a file wherever it pointed. Now the filename is never read: the key
+     * is generated, and the probe path is never created. The store is MinIO
+     * since 2026-09-12 (ADR-011), which would not have been vulnerable to this
+     * at all — the assertion stays because what it pins is the controller
+     * ignoring the name, not the store surviving it.
      *
      * <p>MockMvc does not run Tomcat's multipart parser, so this proves the
      * controller ignores the name, not what Spring would have passed through.
@@ -256,7 +259,7 @@ class ClubMediaIT extends AbstractIntegrationTest {
         String newKey = uploadLogo(admin, OTHER_PNG);
 
         assertThat(newKey).isNotEqualTo(oldKey);
-        assertThatThrownBy(() -> s3Service.getObject(buckets.getClubs(), oldKey))
+        assertThatThrownBy(() -> s3Service.getObject(mediaBucket.name(), oldKey))
                 .isInstanceOf(RuntimeException.class);
         byte[] served = mockMvc.perform(get("/api/v1/clubs/robotics/logo"))
                 .andExpect(status().isOk())
@@ -270,14 +273,14 @@ class ClubMediaIT extends AbstractIntegrationTest {
         createClubAs(admin, "robotics");
         // What uploadLogo wrote before 2026-09-11.
         String legacyKey = "clubs/robotics/logo-badge.png";
-        s3Service.putObject(buckets.getClubs(), legacyKey, PNG);
+        s3Service.putObject(mediaBucket.name(), legacyKey, PNG);
         Club club = clubRepository.findById("robotics").orElseThrow();
         club.setLogo(legacyKey);
         clubRepository.save(club);
 
         uploadLogo(admin, OTHER_PNG);
 
-        assertThatThrownBy(() -> s3Service.getObject(buckets.getClubs(), legacyKey))
+        assertThatThrownBy(() -> s3Service.getObject(mediaBucket.name(), legacyKey))
                 .isInstanceOf(RuntimeException.class);
     }
 

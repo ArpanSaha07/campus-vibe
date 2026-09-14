@@ -519,7 +519,7 @@ callers apparently did something else.
 answer with one club and gated on the platform-wide `ROLE_CLUB_ADMIN`, which no
 longer exists — and superseded by `GET /api/v1/users/me/managed-clubs`
 (`ClubController.java:51`, already recorded in
-[`club-administration.md`](../docs/architecture/club-administration.md#backend--comcampusvibeclubadmin)).
+[`club-administration.md`](../docs/architecture/club-administration.md#backend--elsewhere)).
 
 The part worth keeping is *why it answers 404 rather than 401*. With the mapping
 gone, `/api/v1/clubs/my-club` does not fall off the end of the router — it falls

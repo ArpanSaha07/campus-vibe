@@ -25,6 +25,38 @@
   ],
 
   "docs": {
+    "connecting-rds.md": {
+      "covers": "Runbook for connecting RDS: credentials, TLS, the admin path, pgvector, and the PostgreSQL version every pin must match",
+      "paths": [
+        "backend/src/main/resources/db/migrations/V8__search_embeddings.sql",
+        "backend/src/test/java/com/campusvibe/PostgresTestContainer.java",
+        ".github/workflows/_database.yml"
+      ]
+    },
+    "connecting-elastic-beanstalk.md": {
+      "covers": "Runbook for Elastic Beanstalk: health check, HTTPS, the environment property table, packaging and the first deploy",
+      "paths": [
+        "deploy/eb/",
+        "scripts/package-eb.mjs",
+        "backend/src/main/resources/application-prod.yml",
+        "backend/src/main/java/com/campusvibe/security/CorsConfig.java",
+        "backend/src/main/java/com/campusvibe/bootstrap/",
+        "docker/EB-DEPLOYMENT.md"
+      ]
+    },
+    "connecting-s3.md": {
+      "covers": "Runbook for S3: the bucket property, CORS, policies and first-upload verification",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/s3/"
+      ]
+    },
+    "connecting-ses.md": {
+      "covers": "Runbook for SES: code gates, domain identity, DKIM, MAIL FROM, DMARC, production access, SMTP credentials and mail properties",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/mail/",
+        "backend/src/main/java/com/campusvibe/security/ratelimit/"
+      ]
+    },
     "api-and-caching.md": {
       "covers": "The apiFetch boundary, the caching model, DTO mapping, error-status mapping, and the DTO contract both sides assert against",
       "paths": [
@@ -205,6 +237,16 @@
         ".githooks/",
         "scripts/verify.mjs",
         "backend/pom.xml"
+      ]
+    },
+    "aws-handling.md": {
+      "reason": "The account it names, the deployed shape it describes, the S3 baseline a new bucket has to match, and the hook that enforces all of it",
+      "paths": [
+        "scripts/hooks/guard-aws.mjs",
+        "backend/src/main/java/com/campusvibe/s3/",
+        "backend/src/main/resources/application-prod.yml",
+        "docker/Dockerrun.aws.json",
+        "docker/EB-DEPLOYMENT.md"
       ]
     }
   }
