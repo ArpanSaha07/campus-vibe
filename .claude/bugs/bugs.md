@@ -11,12 +11,6 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 
 | ID | Severity | Summary |
 |---|---|---|
-<<<<<<< HEAD
-| [BUG-040](#bug-040) | High | Production is configured for two S3 buckets that do not exist |
-| [BUG-039](#bug-039) | High | Image uploads let the caller name the S3 object, and validate nothing about it |
-| [BUG-038](#bug-038) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **reproducing again as of 2026-08-20** |
-=======
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-051](#bug-051) | High | Production names no S3 bucket the code reads — code fixed and `AWS_S3_BUCKET` set 2026-09-12; **open until the first upload through a deployed backend** |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
