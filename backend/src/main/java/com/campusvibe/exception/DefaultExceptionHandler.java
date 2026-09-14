@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.time.LocalDateTime;
 
@@ -32,6 +34,12 @@ import java.time.LocalDateTime;
 public class DefaultExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultExceptionHandler.class);
+
+    @Value("${spring.servlet.multipart.max-file-size}")
+    private String maxFileSize;
+
+    @Value("${spring.servlet.multipart.max-request-size}")
+    private String maxRequestSize;
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiError> handleResourceNotFound(ResourceNotFoundException e,
@@ -162,6 +170,26 @@ public class DefaultExceptionHandler {
         );
 
         return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    // An upload over the multipart caps in application.yml. Without this it fell
+    // through to the catch-all and answered 500 -- reachable by any phone photo
+    // once the per-file cap went to 5MB (BUG-039). Spring's exception does not
+    // say which of the two caps was hit (Tomcat reports -1), so the sentence
+    // names both, read from the same properties that enforce them. The type is
+    // named on the annotation rather than taken as a parameter, since nothing
+    // here reads the exception (CodeQL java/unused-parameter, alert 53).
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSize(HttpServletRequest request) {
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                "Each image must be %s or smaller, and one upload no more than %s in total"
+                        .formatted(maxFileSize, maxRequestSize),
+                HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.PAYLOAD_TOO_LARGE);
     }
 
     // Right password, unconfirmed address. 403 rather than 401 so the client

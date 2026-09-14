@@ -27,7 +27,11 @@ spring:
     validate-on-migrate: true   # Fail fast if the schema is out of sync with the migrations. This value is true by default.
   servlet:
     multipart:
-      max-file-size: 10MB
+      # 5MB per image, per s3-media/reference.md §12 -- was 10MB until
+      # 2026-09-11 (BUG-039). The request cap stays at 10MB so a multi-banner
+      # POST /clubs/{id}/images still fits. DefaultExceptionHandler reads both
+      # into the 413 it answers with.
+      max-file-size: 5MB
       max-request-size: 10MB
 
 management:

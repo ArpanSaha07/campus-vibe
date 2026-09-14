@@ -16,7 +16,7 @@ Kept deliberately short: this loads on every backend Java read.
   `@Getter(AccessLevel.NONE)` plus an unmodifiable view plus an `addX` mutator,
   as in `User.java:59-118`. **Do not accept Copilot Autofix on CodeQL alerts 14
   and 15** (`Club.java:44`, `Event.java:48`): it returns a defensive copy, and
-  every write to that copy is then lost. (BUG-038, open)
+  every write to that copy is then lost. (BUG-044, open)
 - **Changed a signature or a record component?** Grep for callers *and* for
   `src/test` before you build. javac stops at the first failing phase, so a
   broken `default-testCompile` hides behind a `default-compile` error and CI
@@ -25,6 +25,15 @@ Kept deliberately short: this loads on every backend Java read.
   before it runs. (BUG-034)
 - **Scrub caller-supplied text through `common/Logs` before logging it.**
   (BUG-033)
+- **Never build an S3 key from `getOriginalFilename()`, or from anything else
+  the caller wrote — go through `s3/MediaKeys`.** `FakeS3`, the client in every
+  environment but `prod`, joins the key onto a directory, so `..` in a filename
+  was a file write anywhere the backend could reach — as root, in the dev
+  compose container (`backend/Dockerfile` sets no `USER`).
+  Real S3 would have shrugged; that is why the knowledge base missed it.
+  (BUG-039)
+- **MockMvc never applies the multipart size caps.** A test asserting an upload
+  limit needs a real port — see `MediaUploadLimitIT`. (BUG-039)
 - **Assigned and generated ids make `save()` behave differently** — see
   [`backend-clubs.md`](backend-clubs.md) before touching a club write path.
 - **`@Profile("dev")` beans never run under test.** `@ActiveProfiles`

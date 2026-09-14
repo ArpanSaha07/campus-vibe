@@ -1,5 +1,6 @@
 package com.campusvibe.user.profile;
 
+import com.campusvibe.common.WebLinks;
 import com.campusvibe.exception.RequestValidationException;
 import com.campusvibe.exception.ResourceNotFoundException;
 import com.campusvibe.taxonomy.TaxonomyService;
@@ -79,11 +80,11 @@ public class UserProfileService {
 
 		ProfileSocialLinksRequest links = request.socialLinks();
 		profile.setInstagramUrl(links == null
-				? null : ProfileLinks.normalise(links.instagram(), "Instagram"));
+				? null : WebLinks.normaliseInstagram(links.instagram(), "Instagram"));
 		profile.setFacebookUrl(links == null
-				? null : ProfileLinks.normalise(links.facebook(), "Facebook"));
+				? null : WebLinks.normalise(links.facebook(), "Facebook"));
 		profile.setLinkedinUrl(links == null
-				? null : ProfileLinks.normalise(links.linkedin(), "LinkedIn"));
+				? null : WebLinks.normalise(links.linkedin(), "LinkedIn"));
 
 		profile.setShowInterests(request.showInterests());
 		profile.setShowSocialLinks(request.showSocialLinks());

@@ -30,3 +30,11 @@ before changing anything here.** It is mandatory, not a suggestion.
   maintains. Reindex instead. (BUG-034)
 - **Structure changes need a migration; content changes do not**
   (`SKILL.md:276-285`). Add a column, yes. A user editing their profile, no.
+- **A migration that deletes seeded rows must spare rows something was built
+  on.** `events.organizer_id` and `club_images.club_id` both `ON DELETE
+  CASCADE`, so an unqualified `DELETE FROM clubs` takes a developer's events
+  with it. `V32` guards with `NOT EXISTS` on events and assignments. (BUG-041)
+- **Recording a deviation as retired, when nothing retired it, hides it for
+  months.** `database-lifecycle/SKILL.md` claimed V12 removed V6's mock clubs;
+  V12 creates `club_admin_assignments` and no migration removed them until V32.
+  Check the file, not the note. (BUG-041)

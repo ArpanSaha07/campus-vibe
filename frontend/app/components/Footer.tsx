@@ -51,7 +51,7 @@ export default function Footer() {
 
         {/* Copyright Section */}
         <div className="flex flex-col sm:flex-row sm:items-center mt-10 space-y-3 sm:space-y-0 sm:space-x-6 text-mist-200/70">
-          <span className="text-white">© {currentYear} CampusVibe</span>
+          {/* <span className="text-white">© {currentYear} CampusVibe</span> */}
           <a href="#" className={linkClasses}>Terms of service</a>
           <a href="#" className={linkClasses}>Privacy policy</a>
           <a href="#" className={linkClasses}>Cookie policy</a>

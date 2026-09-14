@@ -2,9 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 import { useManageClub } from "@/app/lib/manage-club-context";
-import { listClubAdmins } from "@/app/lib/club-admin-requests";
+import { listClubAdmins, setClubOfficialEmail } from "@/app/lib/club-admin-requests";
+import { useAuth } from "@/app/lib/auth-context";
+import { isAdmin } from "@/app/lib/user";
 import { listEventsByClub } from "@/app/lib/event";
-import type { EventInstance } from "@/app/types";
+import type { EventInstance, ManagedClub } from "@/app/types";
 import SectionHeading from "@/app/components/ui/SectionHeading";
 import StatTile from "@/app/components/ui/StatTile";
 import EmptyState from "@/app/components/ui/EmptyState";
@@ -119,31 +121,131 @@ export default function ClubOverviewPage({
         )}
       </section>
 
-      {/* The official club email is organisational, and only a platform admin
-          can change it — so this states the fact rather than offering a field
-          that would be refused. */}
-      <section className="rounded-2xl border border-mist-200 p-6">
+      <OfficialEmailPanel clubId={clubId} club={club} />
+
+    </div>
+  );
+}
+
+/**
+ * The club's official email, and — for a platform admin — the field that writes
+ * it.
+ *
+ * <p>Read-only for everyone else, and that is the design rather than a
+ * limitation: the address is the club's recovery channel, so whoever currently
+ * runs the club must not be able to point it somewhere they control. The
+ * backend enforces it with `hasRole('ADMIN')`; this only decides what to draw.
+ *
+ * <p>Saving always leaves the address unverified. That is not a bug in this
+ * panel — verified means somebody opened the club inbox and redeemed a link
+ * sent to it, which no administrative write can stand in for (ADR-006). The
+ * round trip ships with SES; until then every club reads as unverified, which
+ * is true.
+ */
+function OfficialEmailPanel({ clubId, club }: { clubId: string; club: ManagedClub }) {
+  const { user } = useAuth();
+  const platformAdmin = isAdmin(user);
+
+  // Seeded from the club the layout resolved, then owned locally: the context
+  // holds one immutable club and has no setter, so without this the panel would
+  // go on showing the old address until a reload.
+  const [officialEmail, setOfficialEmail] = useState(club?.officialEmail ?? null);
+  const [verified, setVerified] = useState(club?.officialEmailVerified ?? false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(club?.officialEmail ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setError("");
+    setSaving(true);
+    try {
+      const trimmed = draft.trim();
+      const updated = await setClubOfficialEmail(clubId, trimmed === "" ? null : trimmed);
+      setOfficialEmail(updated.officialEmail);
+      setVerified(updated.officialEmailVerified);
+      setEditing(false);
+    } catch {
+      setError("That didn't save. Check the address and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-mist-200 p-6">
+      <div className="flex items-start justify-between gap-4">
         <h2 className="font-display text-xl font-bold text-ink-900">Official club email</h2>
-        {club?.officialEmail ? (
-          <>
-            <p className="mt-2 font-mono text-sm text-ink-900">{club.officialEmail}</p>
-            <p className="mt-2 text-sm text-ink-600">
-              {club.officialEmailVerified
-                ? "Verified. Security notices about your club go here."
-                : "Not verified yet, so it can't be used to confirm admin changes."}
-            </p>
-          </>
-        ) : (
-          <p className="mt-2 text-sm text-ink-600">
-            Not set yet. This is your club&apos;s own address — the one that stays with the
-            club as execs change — and it&apos;s where security notices go.
-          </p>
+        {platformAdmin && !editing && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDraft(officialEmail ?? "");
+              setEditing(true);
+            }}
+          >
+            {officialEmail ? "Change" : "Set"}
+          </Button>
         )}
+      </div>
+
+      {editing ? (
+        <div className="mt-4">
+          <label htmlFor="officialEmail" className="block text-sm font-medium text-ink-900">
+            Address
+          </label>
+          <input
+            id="officialEmail"
+            type="email"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={saving}
+            placeholder="robotics@campus.com"
+            className="mt-1 w-full rounded-lg border border-mist-200 px-3 py-2 font-mono text-sm"
+          />
+          <p className="mt-2 text-xs text-ink-600">
+            Leave it empty to clear the address. Saving always marks it unverified — the
+            club has to confirm it from that inbox, which is what makes it trustworthy.
+          </p>
+          {error && <p className="mt-2 text-sm text-alert-600">{error}</p>}
+          <div className="mt-3 flex gap-2">
+            <Button onClick={save} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setEditing(false);
+                setError("");
+              }}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : officialEmail ? (
+        <>
+          <p className="mt-2 font-mono text-sm text-ink-900">{officialEmail}</p>
+          <p className="mt-2 text-sm text-ink-600">
+            {verified
+              ? "Verified. Security notices about your club go here."
+              : "Not verified yet, so it can't be used to confirm admin changes."}
+          </p>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-ink-600">
+          Not set yet. This is your club&apos;s own address — the one that stays with the
+          club as execs change — and it&apos;s where security notices go.
+        </p>
+      )}
+
+      {!platformAdmin && (
         <p className="mt-3 text-xs text-ink-600">
           Only the CampusVibe team can set or change this, so it stays a reliable way to
           recover the club. Email us to have it updated.
         </p>
-      </section>
-    </div>
+      )}
+    </section>
   );
 }

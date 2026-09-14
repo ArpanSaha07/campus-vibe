@@ -138,11 +138,13 @@ class ClubTaxonomyIT extends AbstractIntegrationTest {
 
 	@Test
 	void aClubCanBeClassifiedAtCreation() throws Exception {
-		// Creation is the only moment a creator can set these: PUT demands
-		// canManageClub, and creating a club does not make you its owner. So
-		// the create request carries them, or a new club could never say what
-		// it is until somebody else granted ownership.
-		User anyone = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+		// The create request carries the taxonomy because classifying a club is
+		// part of describing it, and asking at creation is the natural moment.
+		// The creator can also change it afterwards now -- POST /clubs is
+		// admin-only since ADR-004 and makes the creator the club's owner, so
+		// canManageClub passes for them on the PUT as well.
+		User admin = createUser("Root", "root@campus.com", "password123",
+				RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
 
 		Map<String, Object> create = new HashMap<>();
 		create.put("id", "quantum-society");
@@ -152,7 +154,7 @@ class ClubTaxonomyIT extends AbstractIntegrationTest {
 		create.put("interests", List.of("tech", "research"));
 
 		mockMvc.perform(post("/api/v1/clubs")
-						.header("Authorization", bearer(anyone))
+						.header("Authorization", bearer(admin))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(create)))
 				.andExpect(status().isOk())
@@ -164,7 +166,8 @@ class ClubTaxonomyIT extends AbstractIntegrationTest {
 	void abadSlugRefusesTheWholeCreation() throws Exception {
 		// Validated before the insert, so a misclassified club never exists at
 		// all rather than existing and being wrong.
-		User anyone = createUser("Uma", "uma@campus.com", "password123", RoleName.ROLE_USER);
+		User admin = createUser("Root", "root@campus.com", "password123",
+				RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
 
 		Map<String, Object> create = new HashMap<>();
 		create.put("id", "quantum-society");
@@ -174,7 +177,7 @@ class ClubTaxonomyIT extends AbstractIntegrationTest {
 		create.put("interests", List.of());
 
 		mockMvc.perform(post("/api/v1/clubs")
-						.header("Authorization", bearer(anyone))
+						.header("Authorization", bearer(admin))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(objectMapper.writeValueAsString(create)))
 				.andExpect(status().isBadRequest());

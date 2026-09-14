@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -190,7 +191,17 @@ public class ClubAdminService {
         assignment.setRole(ClubRole.CLUB_OWNER);
         assignment.setInvitedByUserId(grantedByUserId);
         assignment.activate();
-        return assignmentRepository.save(assignment);
+        ClubAdminAssignment saved = assignmentRepository.save(assignment);
+
+        // Logged here rather than at the two call sites, so both ways of
+        // acquiring a first owner -- approving a claim on an existing club, and
+        // creating a club that is owned from birth -- produce the same entry.
+        User actor = grantedByUserId == null
+                ? null
+                : userRepository.findById(grantedByUserId).orElse(null);
+        auditService.recordAssignment(club, actor, ClubAuditAction.CLUB_OWNER_INSTALLED, saved,
+                Map.of("ownerEmail", user.getEmail()));
+        return saved;
     }
 
     /**
@@ -559,6 +570,50 @@ public class ClubAdminService {
         } catch (DataIntegrityViolationException e) {
             throw new RequestValidationException(message);
         }
+    }
+
+    /**
+     * Sets or clears the club's official email address. Platform admins only.
+     *
+     * <p>The address belongs to the organisation rather than to whoever runs the
+     * club this year: it is the durable channel for verifying administrator
+     * changes, delivering the §17 security notices, and recovering a club whose
+     * owner graduated without handing over. That is why a club owner cannot
+     * write it -- otherwise whoever currently controls the club could capture
+     * its recovery channel -- and why the field is absent from
+     * {@code ClubUpdateRequest} entirely rather than guarded at runtime here.
+     *
+     * <p><strong>This always clears {@code officialEmailVerifiedAt}.</strong>
+     * Verified means somebody opened the club inbox and redeemed a link mailed
+     * to that address; an administrative write is not that, because the admin is
+     * naming a third party's mailbox usually copied from a message, which proves
+     * they believe it and nothing more (ADR-006). Today the column is NULL
+     * everywhere, so this reads as a no-op -- but once the round trip ships with
+     * SES, an admin correcting a typo must not inherit the proof that belonged
+     * to the previous address. Cheap now, a security bug to retrofit later.
+     */
+    @Transactional
+    public ManagedClubDTO setOfficialEmail(String clubId, String email, Long actorUserId) {
+        Club club = clubRepository.findById(clubId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Club [%s] not found".formatted(clubId)));
+
+        String normalised = normalise(email);
+        if (normalised != null && normalised.isBlank()) {
+            normalised = null;
+        }
+        club.setOfficialEmail(normalised);
+        club.setOfficialEmailVerifiedAt(null);
+        clubRepository.save(club);
+
+        User actor = actorUserId == null ? null : userRepository.findById(actorUserId).orElse(null);
+        auditService.record(club.getId(), actor, ClubAuditAction.CLUB_OFFICIAL_EMAIL_SET,
+                AuditEntityType.CLUB, club.getId(),
+                normalised == null ? Map.of() : Map.of("officialEmail", normalised));
+
+        // Role null: a platform admin holds no assignment, which is exactly the
+        // case managedClub documents.
+        return toManagedClubDto(club, null);
     }
 
     /** Whichever address this row can be reached at: the account's, or the invited one. */

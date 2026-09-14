@@ -61,6 +61,9 @@ const csp = [
   "form-action 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://accounts.google.com`,
   "style-src 'self' 'unsafe-inline'",
+  // Uploaded club images are same-origin: they come through the /media rewrite
+  // below rather than from the API host directly, so 'self' covers them and
+  // img-src does not have to name the API.
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin} https://accounts.google.com`,
@@ -69,6 +72,50 @@ const csp = [
 
 const nextConfig: NextConfig = {
   output: isVercel ? undefined : "standalone",
+
+  images: {
+    // Only Unsplash, which the demo clubs' photos come from. Uploaded images
+    // are served from this origin through the /media rewrite below, so they are
+    // local as far as next/image is concerned and need no entry here.
+    remotePatterns: [new URL("https://images.unsplash.com/**")],
+  },
+
+  /**
+   * Uploaded club media, proxied to the API.
+   *
+   * What the database stores is an S3 object key, and the bucket is private, so
+   * the bytes are streamed by `GET /api/v1/clubs/{id}/logo`. Pointing an
+   * <Image> straight at the API host does not work, for three separate reasons
+   * that this one rewrite removes together:
+   *
+   *  - the optimizer runs on the *server*, where `localhost:8080` is the
+   *    frontend container itself, not the backend — it fetches API_INTERNAL_URL
+   *    here instead, the same split `apiFetch` already makes;
+   *  - emitting a different absolute URL per side would make the server and
+   *    client renders disagree about `src`, which is a hydration mismatch;
+   *  - Next 16 refuses to optimize an upstream image on a private IP, which
+   *    local development always is.
+   *
+   * So the src is a plain same-origin path — `/media/clubs/{id}/logo` — which
+   * is identical on both sides, needs no remotePatterns entry, and is covered
+   * by `img-src 'self'`.
+   *
+   * Read at request time rather than baked, so unlike NEXT_PUBLIC_* this one
+   * is not subject to [BUG-004].
+   */
+  async rewrites() {
+    const apiInternal = process.env.API_INTERNAL_URL || apiOrigin;
+    return [
+      {
+        source: "/media/clubs/:clubId/logo",
+        destination: `${apiInternal}/api/v1/clubs/:clubId/logo`,
+      },
+      {
+        source: "/media/clubs/:clubId/images/:index",
+        destination: `${apiInternal}/api/v1/clubs/:clubId/images/:index`,
+      },
+    ];
+  },
 
   async headers() {
     return [

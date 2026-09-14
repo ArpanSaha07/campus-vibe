@@ -2,45 +2,6 @@ import { apiFetch } from "@/app/lib/api";
 import type { NotificationPreferences, UserProfile } from "@/app/types";
 
 /**
- * Turns something a user typed into an href, or into null.
- *
- * Kept out of the component, and pure, so the refusals below can be tested
- * directly — every one of them is a case where getting it wrong is a security
- * bug rather than a cosmetic one.
- *
- * Two jobs, in this order and not the other:
- *
- *  1. Reject any scheme that is not http or https. `javascript:alert(1)` is a
- *     perfectly valid URL and React will happily put it in an href, so a
- *     profile link is a stored-XSS vector unless something refuses it. This
- *     runs on read rather than only on write because that is where the harm
- *     would happen — the edit form should refuse it too, but a row already in
- *     the database from before that form existed would still render.
- *  2. Only then, accept `instagram.com/someone` by assuming https. Trying the
- *     bare string as a URL first is what makes this safe: `javascript:...`
- *     parses on the first attempt and is rejected on its scheme, so it never
- *     reaches the line that would prepend https and disguise it.
- */
-export function normaliseProfileLink(value: string | null | undefined): string | null {
-  const raw = value?.trim();
-  if (!raw) return null;
-
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    // Not absolute — the usual way someone types a profile link.
-    try {
-      parsed = new URL(`https://${raw}`);
-    } catch {
-      return null;
-    }
-  }
-
-  return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
-}
-
-/**
  * A profile with nothing filled in.
  *
  * The editor needs a complete object to bind its inputs to -- a controlled

@@ -1,5 +1,5 @@
 import { Facebook, Instagram, Linkedin, type LucideIcon } from "lucide-react";
-import { normaliseProfileLink } from "@/app/lib/profile";
+import { normaliseWebLink } from "@/app/lib/links";
 import type { UserProfile } from "@/app/types";
 
 // Ordered here rather than at the call site, so two profiles never list the
@@ -38,7 +38,7 @@ export default function ProfileSocialLinks({
   // proves would be the longer way round.
   const shown: { key: string; label: string; Icon: LucideIcon; href: string }[] = [];
   for (const { key, label, Icon } of NETWORKS) {
-    const href = normaliseProfileLink(links?.[key]);
+    const href = normaliseWebLink(links?.[key]);
     if (href) shown.push({ key, label, Icon, href });
   }
 

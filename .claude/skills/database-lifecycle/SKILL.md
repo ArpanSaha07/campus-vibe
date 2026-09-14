@@ -30,9 +30,21 @@ not silently rewrite them.
 
 | Deviation | Status |
 |---|---|
-| `V6__insert_mock_clubs.sql` seeds 8 clubs + images through Flyway | **Retired 2026-08-16** by `V12__remove_mock_club_seed_data.sql`. Both files stay: deleting V6 breaks Flyway validation. The clubs now come from `seed/DevDataSeeder` under the `dev` profile. |
+| `V6__insert_mock_clubs.sql` seeds 8 clubs + images through Flyway | **Retired 2026-09-09** by `V32__retire_mock_club_seed_data.sql`. Both files stay: deleting V6 breaks Flyway validation. The clubs now come from `seed/DevDataSeeder` under the `dev` profile. |
 | `V7__multi_role_rbac.sql` creates tables AND inserts the 3 role rows | Applied. Mixes schema with reference data. Leave as-is; keep them separate going forward. |
 | No `dev` profile or `application-dev.yml` exists | **Resolved 2026-08-16.** `application-dev.yml` exists and `docker-compose.yml` sets `SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}`. |
+**This row said `V12` and said it since 2026-08-16, and it was wrong.** V12 is
+`create_club_admin_assignments`; **no migration ever removed V6's rows.** So on
+every cold start V6 inserted its eight clubs, `DevDataSeeder`'s guard (*skip if
+any club exists*) then tripped, and **the seeder had never once run** — which
+also meant all eight clubs still had `embedding IS NULL`, the precise defect the
+seeder was written to fix. Found 2026-09-09 by running
+`docker compose down -v && up` and reading the log line `Dev seed: 8 club(s)
+already present; skipping`. The lesson is the one this table exists for: a
+deviation recorded as *fixed* stops anyone checking. Two guards now keep it
+honest — V32 removes the rows, and the seeder is idempotent **per club** rather
+than skipping wholesale, so the two cannot fight.
+
 The `dev` profile is live, so a seeder annotated `@Profile("dev")` will actually
 execute locally — which was not true before 2026-08-18, when such a bean would
 have compiled, deployed and silently never run. Confirm with the startup banner:

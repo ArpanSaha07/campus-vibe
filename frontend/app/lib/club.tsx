@@ -59,11 +59,11 @@ export async function getClubById(id: string): Promise<Club | null> {
 // just its slug with capitals. EventDTO now carries organizerName, so the three
 // call sites read it off the event instead of deriving it.
 
-export async function createClub(name: string): Promise<string> {
-    const club_name: string = name.trim().toLowerCase().replace(/\s+/g, '-');
-    // return name.trim().toLowerCase().replace(/\s+/g, '-');
-    return apiFetch<string>(`/api/v1/clubs`, { method: "POST", body: JSON.stringify({ club_name }) });
-}
+// createClub used to live here, and never worked: it POSTed `{ club_name }`
+// where the backend reads `{ id, name, description, category, interests }`,
+// sent no bearer token, and expected a string back. Nothing imported it. The
+// real one is `createClub` in lib/services/clubService.ts, which is also where
+// the logo, banner and social-link calls now chain off it.
 
 /**
  * How many events a club has run.

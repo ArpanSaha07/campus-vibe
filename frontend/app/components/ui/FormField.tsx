@@ -12,8 +12,23 @@ import type { ReactNode } from "react";
 export const inputClasses =
   "w-full rounded-full border border-transparent bg-mist-100 px-4 py-2.5 text-ink-900 placeholder-ink-600/60 transition-colors focus:bg-white focus:outline-none";
 
-/** The same, plus room for the chevron a native select draws on the right. */
-export const selectClasses = `${inputClasses} appearance-none bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10`;
+/**
+ * The same, plus the chevron a native select needs once `appearance-none` has
+ * taken its own away. The image itself is `.select-chevron` in `globals.css` —
+ * a data URI cannot go in a Tailwind arbitrary value, because it has spaces in
+ * it.
+ */
+export const selectClasses = `${inputClasses} select-chevron appearance-none bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10`;
+
+/**
+ * The same, squared off for multi-line text.
+ *
+ * A pill radius is right for a control one line tall and wrong for one that is
+ * six: the curve eats the first and last lines of text. design-guidelines.md
+ * gives inputs a 12px radius, which is what `rounded-xl` is — `inputClasses`
+ * only goes full because every single-line control in the app is a pill.
+ */
+export const textareaClasses = `${inputClasses} rounded-xl resize-y`;
 
 /**
  * Label, optional hint, optional error, wrapped around one control.
@@ -27,18 +42,36 @@ export default function FormField({
   htmlFor,
   hint,
   error,
+  required = false,
   children,
 }: {
   label: string;
   htmlFor: string;
   hint?: string;
   error?: string;
+  /**
+   * Marks the field required in the label.
+   *
+   * Says so where the decision is made rather than at submit time. It is a
+   * word, not an asterisk: an asterisk needs a legend somewhere else on the
+   * page to mean anything, and mono uppercase is already how this system
+   * prints machine facts.
+   *
+   * It does NOT set the control's `required` attribute — that would hand
+   * validation to the browser's own bubbles and pre-empt the messages in
+   * `clubValidator`. Pass `aria-required` on the control for that half.
+   */
+  required?: boolean;
   children: ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="block text-sm font-semibold text-ink-900">
+      <label
+        htmlFor={htmlFor}
+        className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-ink-900"
+      >
         {label}
+        {required && <span className="ticket-label text-ink-600">Required</span>}
       </label>
       <div className="mt-2">{children}</div>
       {/* Hint is hidden once there is an error: two lines of small print under

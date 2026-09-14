@@ -7,6 +7,7 @@ import com.campusvibe.clubadmin.ClubAuditLogDTO;
 import com.campusvibe.clubadmin.ClubInvitationDTO;
 import com.campusvibe.clubadmin.OwnershipTransferDTO;
 import com.campusvibe.clubadmin.ClubAdminRequestDTO;
+import com.campusvibe.clubadmin.ClubCreationRequestDTO;
 import com.campusvibe.clubadmin.ManagedClubDTO;
 import com.campusvibe.event.EventDTO;
 import com.campusvibe.user.MyEventDTO;
@@ -70,6 +71,7 @@ class ApiContractTest {
         CONTRACTED.put("MyEventDTO", MyEventDTO.class);
         CONTRACTED.put("AuthenticationResponse", AuthenticationResponse.class);
         CONTRACTED.put("ClubAdminRequestDTO", ClubAdminRequestDTO.class);
+        CONTRACTED.put("ClubCreationRequestDTO", ClubCreationRequestDTO.class);
         CONTRACTED.put("ClubAdminDTO", ClubAdminDTO.class);
         CONTRACTED.put("ClubInvitationDTO", ClubInvitationDTO.class);
         CONTRACTED.put("OwnershipTransferDTO", OwnershipTransferDTO.class);

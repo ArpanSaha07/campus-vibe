@@ -5,6 +5,7 @@ import com.campusvibe.club.ClubRepository;
 import com.campusvibe.clubadmin.ClubAdminAssignment;
 import com.campusvibe.clubadmin.ClubAdminAssignmentRepository;
 import com.campusvibe.clubadmin.ClubAdminRequestRepository;
+import com.campusvibe.clubadmin.ClubCreationRequestRepository;
 import com.campusvibe.clubadmin.ClubOwnershipTransferRepository;
 import com.campusvibe.clubadmin.ClubRole;
 import com.campusvibe.event.EventRepository;
@@ -55,6 +56,7 @@ public abstract class AbstractIntegrationTest {
     @Autowired protected ClubRepository clubRepository;
     @Autowired protected EventRepository eventRepository;
     @Autowired protected ClubAdminRequestRepository clubAdminRequestRepository;
+    @Autowired protected ClubCreationRequestRepository clubCreationRequestRepository;
     @Autowired protected ClubAdminAssignmentRepository clubAdminAssignmentRepository;
     @Autowired protected ClubOwnershipTransferRepository clubOwnershipTransferRepository;
     @Autowired protected PasswordEncoder passwordEncoder;
@@ -76,6 +78,9 @@ public abstract class AbstractIntegrationTest {
         clubOwnershipTransferRepository.deleteAll();
         clubAdminAssignmentRepository.deleteAll();
         clubAdminRequestRepository.deleteAll();
+        // Holds FKs to both users and clubs (and to the club it created), so it
+        // goes before either of them.
+        clubCreationRequestRepository.deleteAll();
         eventRepository.deleteAll();
         clubRepository.deleteAll();
         userRepository.deleteAll();
