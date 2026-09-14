@@ -203,7 +203,7 @@ Measured on 2026-08-18, on Windows 10 with Docker 29.4.3 and Temurin 25.0.3:
 | Check | Result |
 |---|---|
 | Bundle builds | `dist/eb/…-d4afe79-dirty.zip`, 68.7 MB from a 77.2 MB jar |
-| Zip root is flat | Entries are exactly `app.jar` and `Dockerfile`, forward-slash separators |
+| Zip root is flat | Entries are exactly `app.jar` and `Dockerfile`, forward-slash separators. **Since 2026-09-12 also `.platform/nginx/conf.d/client_max_body_size.conf`**, and the forward slashes are enforced by the script: Windows PowerShell's `CreateFromDirectory` wrote backslashes for the nested file |
 | Image builds from the bundle root, as EB does | `docker build dist/eb/bundle` succeeded in 6.5 s |
 | Container starts under `SPRING_PROFILES_ACTIVE=prod` | `Started Main in 14.972 seconds` |
 | Flyway against a real database | `Current version of schema public: 12 … no migration necessary` |

@@ -38,8 +38,16 @@ public final class MediaKeys {
         return key("clubs/" + segment(clubId) + "/images", bytes);
     }
 
-    public static String eventBanner(Long eventId, byte[] bytes) {
-        return key("events/" + eventId + "/banners", bytes);
+    /**
+     * An event photo, the same shape as a club's images.
+     *
+     * <p>{@code events/{id}/banners/} until 2026-09-12. Arpan ruled that a
+     * banner is not a stored kind: it is one of an event's photos, which a club
+     * asks the platform owner to feature. Rows written before the rename keep
+     * their old keys and still read, because nothing parses a key's shape.
+     */
+    public static String eventImage(Long eventId, byte[] bytes) {
+        return key("events/" + eventId + "/images", bytes);
     }
 
     /**

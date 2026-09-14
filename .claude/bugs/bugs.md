@@ -19,7 +19,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 =======
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-051](#bug-051) | High | Production names no S3 bucket the code reads — code fixed and `AWS_S3_BUCKET` set 2026-09-12; **open until the first upload through a deployed backend** |
-| [BUG-042](#bug-042) | Medium | Event banners and profile avatars have no read path, so an uploaded one can never be displayed |
+| [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
 | [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — reproduced 2026-09-11, **passed in two full local runs 2026-09-12**; open until a GitHub run |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
@@ -450,7 +450,7 @@ moment anyone writes `getCategories().add(...)`.
 ---
 
 ### BUG-042
-**Event banners and profile avatars have no read path** · Medium · OPEN
+**Event banners and profile avatars have no read path** · ~~Medium~~ Low · OPEN — **events fixed 2026-09-12; avatars remain**
 
 **Found:** 2026-09-09, while building the club media read path for
 [BUG-040](fixed_bugs.md#bug-040).
@@ -487,6 +487,17 @@ passes `events.images` through untouched, so an uploaded key reaches
 Arpan also ruled that there is no banner prefix: event photos move to
 `events/{id}/images/`, and a banner becomes a photo a club asks the platform
 owner to feature, queued separately. Avatars stay in this bug.
+
+**Events half fixed 2026-09-12.** `GET /api/v1/events/{id}/images/{index}`
+serves an event photo in the club shape — by index, public, streamed — and
+`eventImageUrls` in `adapters.ts` maps keys to `/media/events/{id}/images/{index}`
+behind a new `next.config.ts` rewrite. The response itself, with its raster-only
+content types and `nosniff`, now lives once in `s3/StoredImageResponses` for
+clubs and events alike. Verified by `EventMediaIT` and `adapters.test.ts`, and
+on a compose stack: upload, read back byte-identical through the API and the
+rewrite, and the event page rendering the `/media` path with no raw key. Kept
+open, downgraded to Low, for **profile avatars**, which still have no upload,
+column or read path.
 
 ---
 

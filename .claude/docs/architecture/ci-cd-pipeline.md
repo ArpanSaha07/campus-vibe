@@ -959,7 +959,8 @@ every `NEXT_PUBLIC_*` value live only in the Vercel dashboard
   from this origin through the rewrite below, so they are local as far as
   `next/image` is concerned. Anything not listed is a *thrown error during
   render*, not a broken image.
-- `async rewrites()` maps `/media/clubs/:clubId/logo` and `/images/:index` onto
+- `async rewrites()` maps `/media/clubs/:clubId/logo`, `/media/clubs/:clubId/images/:index`
+  and, since 2026-09-12, `/media/events/:eventId/images/:index` onto
   `API_INTERNAL_URL`. Three separate problems collapse into this one rule: the
   optimizer runs server-side where `localhost:8080` is the frontend container
   rather than the backend; emitting a different absolute URL per side would be a

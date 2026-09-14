@@ -22,6 +22,13 @@ paths:
   unless a second netty advisory fires or you are removing the async client on
   purpose — and verify the fixed version exists on Maven Central before pinning
   it. Drop both overrides once a parent catches up. (BUG-050, ADR-008)
+- **The Elastic Beanstalk zip must use forward slashes in every entry name.**
+  Windows PowerShell 5.1's `ZipFile.CreateFromDirectory` writes backslashes for
+  anything below the root, and Linux unzip on the instance reads
+  `.platform\nginx\conf.d\x.conf` as one oddly named file — the deploy succeeds
+  and the config silently does nothing. `scripts/package-eb.mjs` builds entries
+  one by one for this; check with `unzip -l` after changing it. Found
+  2026-09-12, when the bundle first had a nested file.
 - **Actions are pinned to commit shas, not tags.** Keep the `# vX.Y.Z` comment
   beside the sha when bumping one, or the next reader cannot tell what moved.
 - **Never add `-DskipTests`.** (BUG-002)

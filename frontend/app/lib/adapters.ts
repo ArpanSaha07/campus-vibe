@@ -45,6 +45,25 @@ function clubImageUrls(clubId: string, images: string[]): string[] {
   );
 }
 
+/**
+ * An event's photos as URLs, in the order the backend returned them.
+ *
+ * The club shape, by index against `GET /events/{id}/images/{index}`. Until
+ * 2026-09-12 the stored values were passed through untouched, so an uploaded
+ * photo's S3 key reached next/image and threw during render (BUG-042).
+ *
+ * Unlike club images, a root-relative path passes through too: it points into
+ * the frontend's own `public/` folder, which is where the demo data's event
+ * pictures live, and next/image accepts it as it is.
+ */
+function eventImageUrls(eventId: number, images: string[]): string[] {
+  return images.map((image, index) =>
+    isAbsoluteUrl(image) || image.startsWith("/")
+      ? image
+      : `/media/events/${encodeURIComponent(String(eventId))}/images/${index}`,
+  );
+}
+
 /** Maps a backend EventDTO to the EventInstance shape the UI components use. */
 export function toEventInstance(api: ApiEvent): EventInstance {
   return {
@@ -62,7 +81,7 @@ export function toEventInstance(api: ApiEvent): EventInstance {
     organizer: api.organizerId,
     organizerName: api.organizerName,
     followers: api.followers,
-    images: api.images.length > 0 ? api.images : [FALLBACK_EVENT_IMAGE],
+    images: api.images.length > 0 ? eventImageUrls(api.id, api.images) : [FALLBACK_EVENT_IMAGE],
     promoted: api.promoted,
     capacity: api.capacity ?? 0,
     registered: api.registered,

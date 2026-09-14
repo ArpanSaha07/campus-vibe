@@ -55,7 +55,9 @@ Everything below binds to both.
   credentials always list, so no test shows it. Added 2026-09-12. An unattached
   duplicate, `CampusVibeProdMediaS3Access`, still exists; deleting it is
   Arpan's. The environment proxies through **nginx**, whose 1 MB default body
-  limit sits under the 5 MB upload cap until `deploy/eb/.platform/` raises it.
+  limit sits under the 5 MB upload cap. `deploy/eb/.platform/nginx/conf.d/`
+  raises it to `10M` from 2026-09-12, but only once a bundle carrying it is
+  deployed — proved by a 3 MB upload, never by a local test.
 - **The backend reads one variable, `AWS_S3_BUCKET`**, and it has no default —
   an environment that does not set it fails to start (ADR-012, BUG-051).
   `AWS_REGION` defaults to `ca-central-1`, where the bucket actually is. The
