@@ -70,8 +70,11 @@ State the outcome, not the mechanism — `fix(search): return results for
 semantic-only queries` beats `fix(search): change SQL in SearchRepository`.
 
 **Body — lead with why.** One to three sentences on the problem, the constraint,
-or the thing that forced this change. Then up to six bullets for what changed.
-A body that only lists changes has no reason to exist; the diff already lists
+or the thing that forced this change. Then up to six bullets for what changed,
+**in the past tense** (*Added* — not *Add*): the
+bullets record work already done, and an imperative reads as an instruction
+still to carry out. Only the subject stays imperative.
+
 them, more accurately. What the diff cannot show is the reasoning: why this
 approach, what alternative was rejected, what breaks if someone undoes it. Wrap
 at 72. Surface what a reviewer would otherwise have to discover — a deliberate
@@ -125,8 +128,8 @@ missing NEXT_PUBLIC_GOOGLE_CLIENT_ID produced a sign-in button that
 never rendered, with no error in the console or the network tab. Typing
 the GIS surface makes the same mistake a compile error instead.
 
-- Replace the window cast with app/types/google-identity.d.ts
-- Re-bind client id after the guard so init sees a string
+- Replaced the window cast with app/types/google-identity.d.ts
+- Re-bound client id after the guard so init sees a string
 
 Fixes #42
 ```
