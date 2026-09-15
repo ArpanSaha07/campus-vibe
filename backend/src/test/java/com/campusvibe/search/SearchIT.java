@@ -173,14 +173,83 @@ class SearchIT {
     }
 
     private Event createIndexedEvent(String title, String description, String organizerId) {
+        return createIndexedEvent(title, description, organizerId, Instant.now().plusSeconds(86400));
+    }
+
+    private Event createIndexedEvent(String title, String description, String organizerId, Instant dateTime) {
         Event event = new Event();
         event.setTitle(title);
         event.setDescription(description);
-        event.setDateTime(Instant.now().plusSeconds(86400));
+        event.setDateTime(dateTime);
         event.setOrganizer(clubRepository.findById(organizerId).orElseThrow());
         Event saved = eventRepository.save(event);
         searchIndexService.indexEvent(saved);
         return saved;
+    }
+
+    @Autowired com.campusvibe.club.ClubService clubService;
+
+    @Test
+    void semanticSearchSurvivesACommaDecimalLocale() throws Exception {
+        // BUG-001: the weights were formatted into the SQL with %f, so under a
+        // French FORMAT locale 0.7 became "0,700000" and Postgres split the score
+        // expression into separate columns. A GitHub runner is en_US and would
+        // never catch it, so the locale is forced here rather than left to the
+        // machine running the suite.
+        Locale previous = Locale.getDefault(Locale.Category.FORMAT);
+        Locale.setDefault(Locale.Category.FORMAT, Locale.CANADA_FRENCH);
+        try {
+            Event aiEvent = createIndexedEvent(
+                    "AI Networking Night", "Meet artificial intelligence researchers", "coding-club");
+
+            mockMvc.perform(get("/api/v1/events/search").param("q", "machine learning"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$", hasSize(1)))
+                    .andExpect(jsonPath("$[0].id", is(aiEvent.getId().intValue())));
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, previous);
+        }
+    }
+
+    @Test
+    void pastEventsAreNotReturned() throws Exception {
+        createIndexedEvent("Chess Blitz", "Last week's games", "chess-club", Instant.now().minusSeconds(86400));
+        Event upcoming = createIndexedEvent("Chess Blitz Rematch", "Next week's games", "chess-club");
+
+        // Both the hybrid query and the keyword fallback must drop it.
+        mockMvc.perform(get("/api/v1/events/search").param("q", "blitz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(upcoming.getId().intValue())));
+
+        EMBEDDINGS_ENABLED.set(false);
+        mockMvc.perform(get("/api/v1/events/search").param("q", "blitz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(upcoming.getId().intValue())));
+    }
+
+    @Test
+    void renamingAClubReindexesItsEvents() {
+        Event event = createIndexedEvent("Hack Night", "Build something", "coding-club");
+        String before = embeddingOf(event.getId());
+        try {
+            clubService.update("coding-club",
+                    new com.campusvibe.club.ClubUpdateRequest("Programming Guild", null, null, null, null));
+
+            // The event's text carries its organizer's name (BUG-006).
+            String after = embeddingOf(event.getId());
+            org.junit.jupiter.api.Assertions.assertNotEquals(before, after,
+                    "the event must be re-embedded under the club's new name");
+        } finally {
+            clubService.update("coding-club",
+                    new com.campusvibe.club.ClubUpdateRequest("Coding Club", null, null, null, null));
+        }
+    }
+
+    private String embeddingOf(Long eventId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT embedding::text FROM events WHERE id = ?", String.class, eventId);
     }
 
     @Test

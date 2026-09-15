@@ -1,21 +1,21 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-14** · Branch: `develop`
+Last updated: **2026-09-15** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14).
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15).
 
-**Highest id issued: BUG-052.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-054.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
-| [BUG-051](#bug-051) | High | Production names no S3 bucket the code reads — code fixed and `AWS_S3_BUCKET` set 2026-09-12; **open until the first upload through a deployed backend** |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
 | [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — reproduced 2026-09-11, **passed in two full local runs 2026-09-12**; open until a GitHub run |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **root cause found and fixed 2026-09-14** (weights formatted into SQL under a `fr_CA` locale); open until a GitHub run |
+| [BUG-053](#bug-053) | Low | A URL with no handler answers 500 and logs an ERROR stack trace, instead of 404 — `/actuator/env` included |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -130,6 +130,35 @@ against a fresh `pgvector/pgvector:pg15` container. It had been re-confirmed
 reproducing on 2026-09-11 on a clean worktree at `77baaab`. Nothing in the S3
 work touches search, so this is the same unexplained flip as 2026-08-08, not a
 fix, and the rule above stands: close it on a green GitHub run.
+
+**Root cause found and fixed, 2026-09-14. It was cause 3 after all.** The
+2026-08-08 ruling-down above was wrong. `0,700000 * COALESCE(...) + 0,300000 *
+(...) AS score` is *valid* SQL: Postgres reads three select-list items, `0`,
+`700000 * COALESCE(...) + 0` and `300000 * (...) AS score`. So there is no
+missing column and no 500. `score` silently becomes `300000 × keyword rank`,
+every meaning-only match scores 0, and the response is a 200 with zero rows,
+exactly the recorded symptom. The flips followed which JVM ran the suite, not
+the code: this machine's JBR runs a `fr_CA` FORMAT locale, and the Linux
+container and a GitHub runner never do.
+
+Proven in the test itself with temporary diagnostics, since removed. The event's
+embedding was present, the cosine was 0.7746 as computed, the date was in the
+future, and `hybridSearchEventIds` still returned `[]`. Under this JBR, `%f`
+applied to `0.7` prints `0,700000`.
+
+**Fix:**
+- The weights are bound as `?` parameters in both hybrid queries of
+  `SearchRepository`.
+- `SearchIT.semanticSearchSurvivesACommaDecimalLocale` forces `fr_CA`, so an
+  en_US runner still catches a regression.
+- The test JVMs are pinned to en_US and UTC in `backend/pom.xml`, and the runtime
+  JVM in `backend/Dockerfile`.
+- The traps are recorded in `rules/backend-java.md` and `rules/ci-and-build.md`.
+
+`SearchIT` ran 10 of 10 in `verify.mjs --full`, 290 integration tests green.
+
+**Still OPEN, by this entry's own rule.** Close it on a green GitHub full-tier
+run and move it to `fixed_bugs.md` then.
 
 ---
 
@@ -278,11 +307,25 @@ Related: the duplicate-method merge damage ([BUG-009](fixed_bugs.md#bug-009)) re
 `ClubService.update` variant that omitted the re-index call — the surviving copy
 is the correct one.
 
+**Narrowed 2026-09-14.** One stale path did exist even without an event update
+endpoint. An event's embedded text carries its organizer's name
+(`SearchableText.forEvent`), and `ClubService.update` could rename a club without
+touching its events. **That half is fixed:**
+- `update` calls `SearchIndexService.indexEventsByOrganizer` when the name
+  actually changes;
+- `SearchIT.renamingAClubReindexesItsEvents` covers it;
+- the rule is in `rules/backend-clubs.md`.
+
+**What remains is the missing `EventService.update` itself.** This stays open
+until that exists and re-indexes.
+
 **Affected files**
 - `backend/src/main/java/com/campusvibe/event/EventService.java` (no update path)
-- `backend/src/main/java/com/campusvibe/club/ClubService.java:51-65` (correct reference implementation)
+- `backend/src/main/java/com/campusvibe/club/ClubService.java` `update` (correct reference implementation, including the rename re-index)
 
-**Affected tests:** none. Add one asserting the embedding changes after an update.
+**Affected tests:** `SearchIT.renamingAClubReindexesItsEvents` covers the rename
+path. The event update path needs its own test asserting the embedding changes,
+once it is built.
 
 ---
 
@@ -495,104 +538,39 @@ column or read path.
 
 ---
 
-### BUG-051
-**Production is configured for S3 buckets that do not exist** · High · OPEN — the code side is fixed, the environment is not
+### BUG-053
+**A URL with no handler answers 500 and logs an ERROR stack trace, instead of 404** · Low · OPEN
 
-**Renumbered 2026-09-12 — this was filed as BUG-040**, an id the club-logo
-crash in [`fixed_bugs.md`](fixed_bugs.md#bug-040) also carries. Ids are never
-reused, so this one took the next free number and its links were retargeted.
+**Found:** 2026-09-15, probing the freshly deployed backend at
+`https://api.campusvibe-mcgill.com`.
 
-**Where it stands, 2026-09-12.** The code, the defaults and the IAM grant now
-agree with each other and with the account
-([ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md), with
-[ADR-011](../docs/decisions/ADR-011-minio-replaces-fakes3.md)):
+**Symptom.** `GET /actuator/env`, `/actuator/metrics` and
+`/actuator/does-not-exist` each answer `500` with
+`{"message":"Something went wrong. Please try again.","statusCode":500,…}`.
+`/api/v1/nope` answers 403 instead, because `/api/**` is authenticated before
+dispatch.
 
-- **One bucket.** `S3Buckets` (`clubs`, `events`) is replaced by `MediaBucket`,
-  reading `aws.s3.bucket` from `AWS_S3_BUCKET` with **no default** and a blank
-  check, so an environment that names no bucket fails at startup rather than on
-  the first upload. `MediaKeys` already wrote `clubs/…` and `events/…`, so no
-  key moved. The inline grant on `CampusVibe-ElasticBeanstalk-EC2Role` already
-  names exactly `campusvibe-prod-media/*`: **no IAM change**.
-- **`aws.region` defaults to `ca-central-1`.** See the second failure below.
-- **There is no mock flag.** The client is always a real `S3Client`, pointed at
-  MinIO locally and in CI through `aws.s3.endpoint`, and at AWS when that is
-  unset.
+**Cause.** `/actuator/**` is `permitAll` (`SecurityFilterChainConfig.java:90`)
+and only `health,info` are exposed (`application.yml:41`). So an unexposed or
+unknown path passes security and reaches Spring MVC with no handler.
+`NoResourceFoundException` has no `@ExceptionHandler`, and falls to the
+catch-all `handleUnexpected` (`DefaultExceptionHandler.java:253`), which logs at
+ERROR with the stack trace and returns 500. The same holds for any unmapped path
+that security lets through.
 
-**Verified:** 287 integration tests green, the media suites against a MinIO
-container; and on the compose stack, a club logo, a club banner and an event
-banner uploaded through the API, read back byte-identical, and listed out of
-one bucket under both prefixes.
+**Why it matters, and why it is only Low.** Nothing leaks: the body is the fixed
+string BUG-029 introduced, and the exposure ceiling holds. But the service is
+public now. Every scanner probing `/actuator/*` writes a stack trace into
+CloudWatch at ERROR, which buries a real 500. It also tells a prober the path
+exists in some form.
 
-**The environment was set on 2026-09-12, by Arpan.** `CampusVibe-Backend-Prod`
-now sets `AWS_S3_BUCKET=campusvibe-prod-media` and `AWS_REGION=ca-central-1`,
-and `S3_BUCKET_NAME` is gone; read back by option name. In the same pass
-`s3:ListBucket` went onto the instance role, because without it a missing key
-is a 403 that `S3Service` would have turned into a 500. Nothing has run on
-the environment yet — it still holds the sample application, and the backend
-also needs its database and `JWT_SECRET` properties before it will boot.
-`SPRING_PROFILES_ACTIVE`'s value is still unread. **Close this on the first
-upload that lands in `campusvibe-prod-media` through the deployed environment**
-— `connecting-s3.md` §5.
+**Why no test caught it.** `ActuatorHealthEndpointTest` asserts that
+`/actuator/env` does **not** return 200 (`ActuatorHealthEndpointTest.java:62`),
+which a 500 satisfies.
 
-**A second failure was stacked under this one, found while fixing it.**
-`aws.region` defaulted to `us-east-1` (`application.yml:48`, repeated at
-`docker-compose.yml:117`), and `campusvibe-prod-media` is in `ca-central-1`. No
-real `S3Client` had ever been built — the mock flag defaulted to true
-everywhere but `prod` — so neither the wrong bucket nor the wrong region had
-ever been exercised.
-
-**As found, 2026-09-08:**
-
-**Found:** 2026-09-08, reading the live account while writing
-[`rules/aws-handling.md`](../rules/aws-handling.md). Nothing in the repository
-would have shown this — both halves are individually reasonable and only
-disagree once the account is looked at.
-
-**Symptom:** none yet. The upload endpoints are not reachable from the UI, so
-nothing has ever called them against real S3.
-
-The backend resolves its buckets from two environment variables:
-
-```yaml
-buckets:
-  clubs: ${AWS_S3_BUCKET_CLUBS:campusvibe-clubs}    # application.yml:50
-  events: ${AWS_S3_BUCKET_EVENTS:campusvibe-events} # application.yml:51
-```
-
-The `CampusVibe-Backend-Prod` environment sets **neither**. Its only S3 variable
-is `S3_BUCKET_NAME=campusvibe-prod-media`, and a repository-wide grep finds no
-code that reads that name. So both properties fall back to their defaults, and
-`aws s3api list-buckets` returns exactly two buckets: `campusvibe-prod-media`
-and the Elastic Beanstalk service bucket. Neither `campusvibe-clubs` nor
-`campusvibe-events` exists.
-
-`application-prod.yml:25` sets `aws.s3.mock: false`, so this is a real
-`S3Client`. Every upload in production therefore fails `NoSuchBucket`.
-
-**Two things make it worse than a wrong name:**
-
-1. **The IAM grant would not cover them either.** The inline policy on
-   `CampusVibe-ElasticBeanstalk-EC2Role` allows `GetObject`, `PutObject` and
-   `DeleteObject` on `arn:aws:s3:::campusvibe-prod-media/*` and nothing else —
-   no second bucket, and no `ListBucket` on the bucket itself.
-2. **The plan assumed two buckets.** [`todo.md`](../TODO/todo.md) Phase 3 says
-   *the two S3 buckets*; one was created, with a third name. Fixing this is a
-   choice, not a rename — one bucket with `clubs/` and `events/` prefixes, or
-   two buckets — and the code, the environment and the IAM policy have to agree
-   afterwards.
-
-**What is verified, and the one thing that is not:** the bucket list, the
-environment variables, the IAM policy and the absence of any reader for
-`S3_BUCKET_NAME` were all read directly from the account and the repository.
-`SPRING_PROFILES_ACTIVE` is set on the environment but its **value was not
-read** — the permission classifier refused that call — so *the prod profile is
-active, therefore `mock` is false* is inference from the environment name, not
-measurement. If that profile is not `prod`, uploads hit `FakeS3` and write to
-local disk instead, which is a different and quieter failure.
-
-**Why it is latent:** the club create path 403s before it can upload, and the
-event banner endpoint is unwired ([BUG-006](#bug-006)). Both are near the top of
-[`STATUS.md`](../STATUS.md), so this stops being latent as soon as either lands.
+**Fix, not started:** a `NoResourceFoundException` handler answering 404 through
+`ApiError`, logged below ERROR. Then tighten the test to expect 404. Queued in
+[`todo.md`](../TODO/todo.md).
 
 ---
 

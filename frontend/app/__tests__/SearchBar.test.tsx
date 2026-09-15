@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import SearchBar from "@/app/components/SearchBar";
 import { searchClubs, searchEvents } from "@/app/lib/search";
 import { toClub, toEventInstance } from "@/app/lib/adapters";
+import { ApiError } from "@/app/lib/api";
 
 jest.mock("@/app/lib/search");
 
@@ -95,6 +96,33 @@ describe("SearchBar", () => {
     await userEvent.type(screen.getByRole("textbox"), "zzzz");
 
     expect(await screen.findByText(/no matches for/i)).toBeInTheDocument();
+  });
+
+  it("discards a response that lands after the query was deleted", async () => {
+    let resolveEvents: (value: typeof chessEvent[]) => void = () => {};
+    mockedSearchEvents.mockImplementation(
+      () => new Promise((resolve) => { resolveEvents = resolve; })
+    );
+    render(<SearchBar />);
+    const input = screen.getByRole("textbox");
+
+    await userEvent.type(input, "ch");
+    await waitFor(() => expect(mockedSearchEvents).toHaveBeenCalled());
+    await userEvent.clear(input);
+    resolveEvents([chessEvent]);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText("Chess Night")).not.toBeInTheDocument();
+  });
+
+  it("reports a rate limit rather than an empty result", async () => {
+    mockedSearchEvents.mockRejectedValue(new ApiError(429, ""));
+    render(<SearchBar />);
+
+    await userEvent.type(screen.getByRole("textbox"), "chess");
+
+    expect(await screen.findByText(/too many searches/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no matches for/i)).not.toBeInTheDocument();
   });
 
   it("closes the panel and navigates when a result is clicked", async () => {

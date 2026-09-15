@@ -1,6 +1,6 @@
 # Connecting RDS PostgreSQL
 
-**Code as of:** 806a1d0 · **Account read:** 2026-09-12, read-only
+**Code as of:** `11c9993` · **Account read:** 2026-09-15, read-only
 **Order:** 1 of 4 — before [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md), whose first deploy is the first Flyway run against this database.
 **Related:** [`connecting-beanstalk-to-rds.md`](connecting-beanstalk-to-rds.md) (the security-group walkthrough, already done) · guide §5–§7, §14 in [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md)
 
@@ -11,6 +11,13 @@ change, started with `/start` · **Check** — read-only, anyone may run it.
 Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central-1`.
 
 ---
+
+> **2026-09-15 — connected. The table below is the 2026-09-12 reading, kept as history.**
+> - **§1 done:** the password is self-managed and `MasterUserSecret` reads `None`.
+> - **§2 done:** the personal `/32` was revoked.
+> - **§4 and §7, answered by the first boot rather than `psql`:** the log shows `PostgreSQL 18.3`, Flyway `Successfully applied 33 migrations … now at version v33`, V8's `CREATE EXTENSION vector` included, as `campusvibe_admin`, and `/api/v1/clubs` returned `[]`.
+> - **Not done:** §3 (no SSM path), §6 (the repo still pins `pg15`), and the dedicated application user.
+> - **New:** Flyway warns it has not been tested against PostgreSQL 18 — queued in `todo.md`.
 
 ## Where it stands
 

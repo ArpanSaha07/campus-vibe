@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { ApiError } from "@/app/lib/api";
 import { searchClubs, searchEvents } from "@/app/lib/search";
 import type { Club, EventInstance } from "@/app/types";
 
@@ -20,6 +21,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const requestSeq = useRef(0);
   const router = useRouter();
@@ -27,8 +29,12 @@ export default function SearchBar({ className = "" }: { className?: string }) {
   useEffect(() => {
     const q = query.trim();
     if (q.length < MIN_QUERY_LENGTH) {
+      // Bumped here too, or a request already in flight still matches the
+      // sequence and re-opens the panel after the text was deleted.
+      requestSeq.current++;
       setEvents([]);
       setClubs([]);
+      setError(null);
       setOpen(false);
       setLoading(false);
       return;
@@ -44,11 +50,19 @@ export default function SearchBar({ className = "" }: { className?: string }) {
         if (seq !== requestSeq.current) return; // stale response
         setEvents(eventResults);
         setClubs(clubResults);
+        setError(null);
         setOpen(true);
-      } catch {
+      } catch (err) {
         if (seq !== requestSeq.current) return;
         setEvents([]);
         setClubs([]);
+        // A refused or failed search is not an empty one; saying "No matches"
+        // tells the student the thing they want does not exist.
+        setError(
+          err instanceof ApiError && err.status === 429
+            ? "Too many searches. Try again in a moment."
+            : "Search is unavailable right now."
+        );
         setOpen(true);
       } finally {
         if (seq === requestSeq.current) setLoading(false);
@@ -107,7 +121,13 @@ export default function SearchBar({ className = "" }: { className?: string }) {
               <p className="px-4 py-3 text-sm text-ink-600">Searching…</p>
             )}
 
-            {!loading && !hasResults && (
+            {!loading && error && (
+              <p role="status" className="px-4 py-3 text-sm text-ink-600">
+                {error}
+              </p>
+            )}
+
+            {!loading && !error && !hasResults && (
               <p className="px-4 py-3 text-sm text-ink-600">
                 No matches for &ldquo;{query.trim()}&rdquo;
               </p>

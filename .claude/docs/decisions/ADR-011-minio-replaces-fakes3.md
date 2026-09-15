@@ -30,7 +30,7 @@ anywhere the backend could reach. The stub was not a weaker S3; it was a
 It has a second, quieter cost. `S3Config` has two branches and only one of them
 has ever executed, so every behaviour real S3 has and `FakeS3` does not —
 region resolution, credential chain, error shapes, `NoSuchBucket`,
-`NoSuchKey` — is untested by construction. [BUG-051](../../bugs/bugs.md#bug-051)
+`NoSuchKey` — is untested by construction. [BUG-051](../../bugs/fixed_bugs.md#bug-051)
 is exactly that class of defect, and so is the wrong-region default this unit
 found alongside it (`application.yml:48` says `us-east-1`;
 `campusvibe-prod-media` is in `ca-central-1`).

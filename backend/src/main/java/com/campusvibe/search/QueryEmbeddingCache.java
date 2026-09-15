@@ -1,6 +1,6 @@
 package com.campusvibe.search;
 
-import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executors;
 
 /**
  * Caches embeddings of *search queries* ([BUG-005]).
@@ -27,15 +29,21 @@ import java.util.Optional;
  * results, which change whenever an event is added and must never be served
  * stale.
  *
+ * <p>An <b>async</b> cache, so a query already being embedded is joined rather
+ * than embedded again. The search box fires the event and club searches at the
+ * same moment, and nearly every query it sends is new, so a plain
+ * check-then-put cache let both miss and paid the provider twice per search.
+ *
  * <p>A miss that returns empty — no API key configured, or a provider failure —
- * is <b>not</b> cached. Caching it would pin search into keyword-only mode for
- * the whole TTL after a single blip.
+ * is <b>not</b> cached. Caffeine drops an entry whose future completes with null
+ * or exceptionally; caching it would pin search into keyword-only mode for the
+ * whole TTL after a single blip.
  */
 @Component
 public class QueryEmbeddingCache {
 
     private final EmbeddingService embeddingService;
-    private final Cache<String, float[]> cache;
+    private final AsyncCache<String, float[]> cache;
 
     public QueryEmbeddingCache(
             EmbeddingService embeddingService,
@@ -45,19 +53,22 @@ public class QueryEmbeddingCache {
         this.cache = Caffeine.newBuilder()
                 .maximumSize(maxEntries)
                 .expireAfterWrite(ttl)
-                .build();
+                // The provider call blocks on HTTP for up to its read timeout.
+                // Caffeine's default executor is ForkJoinPool.commonPool, which
+                // is sized to the CPU count and shared by the whole JVM.
+                .executor(Executors.newVirtualThreadPerTaskExecutor())
+                .buildAsync();
     }
 
     public Optional<float[]> embed(String query) {
         if (query == null || query.isBlank()) return Optional.empty();
 
-        String key = normalise(query);
-        float[] hit = cache.getIfPresent(key);
-        if (hit != null) return Optional.of(hit);
-
-        Optional<float[]> fresh = embeddingService.embed(query);
-        fresh.ifPresent(vector -> cache.put(key, vector));
-        return fresh;
+        try {
+            return Optional.ofNullable(cache.get(normalise(query),
+                    key -> embeddingService.embed(query).orElse(null)).join());
+        } catch (CompletionException e) {
+            return Optional.empty();
+        }
     }
 
     private static String normalise(String query) {
@@ -66,12 +77,12 @@ public class QueryEmbeddingCache {
 
     /** Test seam. */
     public void clear() {
-        cache.invalidateAll();
+        cache.synchronous().invalidateAll();
     }
 
     /** Test seam: how many distinct queries are held. */
     public long size() {
-        cache.cleanUp();
-        return cache.estimatedSize();
+        cache.synchronous().cleanUp();
+        return cache.synchronous().estimatedSize();
     }
 }

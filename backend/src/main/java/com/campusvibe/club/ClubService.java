@@ -135,7 +135,9 @@ public class ClubService {
     @Transactional
     public ClubDTO update(String id, ClubUpdateRequest request) {
         Club club = findClub(id);
+        boolean renamed = false;
         if (request.name() != null && !request.name().isBlank()) {
+            renamed = !request.name().equals(club.getName());
             club.setName(request.name());
         }
         if (request.description() != null) {
@@ -165,6 +167,10 @@ public class ClubService {
         // Re-indexed after the tags change, not before: the embedded text
         // includes them, so indexing first would describe the club as it was.
         searchIndexService.indexClub(club);
+        // Each event's embedding carries its organizer's name (BUG-006).
+        if (renamed) {
+            searchIndexService.indexEventsByOrganizer(club.getId());
+        }
         return clubMapper.apply(club);
     }
 

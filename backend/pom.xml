@@ -283,9 +283,33 @@
 			  declaring the plugin activates that binding. Adding our own
 			  execution would run every IT twice.
 			-->
+			<!--
+			  Both test JVMs run in a fixed locale and time zone, so a teammate's
+			  machine language cannot change a result (BUG-001: a French FORMAT
+			  locale turned 0.7 into 0,700000 inside a SQL string). Testcontainers
+			  only containerises Postgres; the code under test runs in this forked
+			  JVM, which otherwise inherits the host's settings.
+
+			  The user.*.format pair is not redundant. On Windows the JDK takes the
+			  FORMAT locale from the region setting, separately from the display
+			  language, so user.language alone can leave FORMAT at fr_CA.
+
+			  Keep the two argLines identical. SearchIT still forces fr_CA on
+			  purpose in semanticSearchSurvivesACommaDecimalLocale.
+			-->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<argLine>-Duser.language=en -Duser.country=US -Duser.language.format=en -Duser.country.format=US -Duser.timezone=UTC</argLine>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<argLine>-Duser.language=en -Duser.country=US -Duser.language.format=en -Duser.country.format=US -Duser.timezone=UTC</argLine>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
