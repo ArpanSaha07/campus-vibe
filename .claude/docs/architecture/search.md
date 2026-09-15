@@ -11,7 +11,7 @@ code. See the banner above; do not read a distance into this.
 >
 > It is kept because it is genuinely useful: it is the only record of why
 > embeddings-in-Postgres was chosen over the alternatives, and
-> [BUG-006](../../bugs/bugs.md#bug-006) was found by comparing `EventService`
+> [BUG-006](../../bugs/fixed_bugs.md#bug-006) was found by comparing `EventService`
 > against lines 150-177 of this file. Treat it as a rejected-alternatives
 > archive, not as a description of current behaviour.
 >

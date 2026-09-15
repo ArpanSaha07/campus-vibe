@@ -39,19 +39,18 @@ queue. Every item that was in this section is filed under its topic below.
 
 ## Backend / Features
 
-- [ ] **P1** Add `EventService.update(...)` — there is currently no update path at all, so events can never be edited, and their embeddings go stale. Mirror `ClubService.update`, which correctly re-indexes. The organizer-rename half of the bug was fixed 2026-09-14: `ClubService.update` re-indexes a club's events when its name changes. What remains is this update path. ([BUG-006](../bugs/bugs.md#bug-006))
 - [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
 - [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-044](../bugs/bugs.md#bug-044))
 - [ ] **P1** **Event lifecycle status — `DRAFT` / `PUBLISHED` / `ARCHIVED`.** `events` has no status column today (`Event.java`), so the club dashboard can only split by `date_time` into upcoming and past, and there is no way to draft an event before announcing it or to retire one without deleting it. Deliberately kept out of the club-governance work on 2026-08-17 so that feature stayed scoped; it is the next thing the club dashboard's Events tab needs.
 
   **The work:** migration adding `events.status TEXT NOT NULL DEFAULT 'PUBLISHED' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED'))` (default `PUBLISHED` so every existing row stays visible), an `EventStatus` enum on `Event`, a publish/unpublish/archive action on `EventService`, and status tabs on `/manage/[clubId]/events`.
 
-  **The trap that makes this P1 rather than P2:** *every* public read path must filter to `PUBLISHED`, or drafts leak onto the homepage, the club page, and search. That means `EventRepository` list queries, `SearchRepository.hybridSearchEventIds`, and `SearchIndexService` (a draft should not be indexed at all, and archiving should evict it). Getting the column in without covering all four is worse than not having it. Pair it with `EventService.update` (BUG-006), which is a prerequisite anyway — there is no update path to set the status through.
-- [ ] **P2** Club Dashboard API: create / edit / delete events for the admin's own club; banner and logo upload. *(Authorisation for these landed 2026-08-17 — `@clubPermissionService.canManageClub` now covers every club admin, not just one per club. What is still missing is `EventService.update` above, delete, and the upload endpoints being reachable from `/manage/[clubId]`.)*
+  **The trap that makes this P1 rather than P2:** *every* public read path must filter to `PUBLISHED`, or drafts leak onto the homepage, the club page, and search. That means `EventRepository` list queries, `SearchRepository.hybridSearchEventIds`, and `SearchIndexService` (a draft should not be indexed at all, and archiving should evict it). Getting the column in without covering all four is worse than not having it. The update path it needed exists since 2026-09-15 (`PUT /api/v1/events/{id}`, [BUG-006](../bugs/fixed_bugs.md#bug-006)), so the status can be set through it.
 - [ ] **P2** Admin Dashboard API: ~~create clubs~~, manage users, moderate events. *(Creating clubs shipped 2026-09-09 — `POST /api/v1/clubs` is admin-only and makes the creator the owner, and the club-proposal queue approves the other path. Assigning the first club owner was already done. Setting `official_email` shipped in the same unit.)* What is left is **managing users** — there is still no way to grant or revoke `ROLE_ADMIN` through the product — and **moderating events**.
 - [ ] **P2** **Nothing can change an account's email address.** `/profile/edit/account` renders the field and its Save commits locally. Needs a confirm-the-new-address round trip, not a straight update — `auth_tokens` (V11) already carries the machinery and would gain an `EMAIL_CHANGE` purpose, and the address is the login identifier, so an unverified change locks the account out. *(The other half of that screen now works: `PATCH /api/v1/users/me` renames an account, 2026-08-20. Only the email is still local.)*
 - [ ] **P2** **Account closure has no endpoint.** The confirmation panel on `/profile/edit/account` is built and its destructive button is deliberately `disabled` with a note, because the nearest wired action is sign-out and that would tell someone their data was gone while every row of it remained. Overlaps the GDPR item under Security. An owner cannot leave a club without handing it on, so closure has to refuse or force a transfer first.
 - [ ] **P2** **Make `Club` implement `Persistable` so `save()` stops silently merging.** `Club.id` is an assigned slug with no `@GeneratedValue`, so Spring Data's `isNew()` answers false for a brand-new club and `SimpleJpaRepository.save` takes the `em.merge()` branch — which returns a *different* managed instance and leaves the caller holding a detached copy. That has now cost two bugs in the same method: [BUG-034](../bugs/fixed_bugs.md#bug-034) (when the INSERT ran) and [BUG-037](../bugs/fixed_bugs.md#bug-037) (which object you are holding). Both were fixed at the call site; the trap is still armed for the next caller. `Persistable` with a `@Transient` new-flag makes `save()` take `persist()` and hand the same instance back. P2 rather than P1 because it changes the write path for every club, so it wants its own commit and its own test — not a rider on a fix. The three options are written up in [ADR-002](../docs/decisions/ADR-002-club-id-is-an-assigned-slug.md), which recommends this one and is waiting on approval.
+- [ ] **P2** **Nothing can delete, archive or deactivate a club** (CEM-04, from the [2026-09-10 review](../docs/reviews/2026-09-10-club-and-event-management.md)). There is no club delete at any level, platform admin included, so a duplicate approved by mistake or a club that folded stays public and in search. Blocked on **D-4** — who may, and what happens to its events, followers and audit log; §22 forbids deleting audit history, which points at archive rather than delete. Likely an ADR.
 - [ ] **P3** Notifications.
 - [ ] **P3** Ticket purchasing flow.
 - [ ] **P3** Move `application-test.yml` from `src/main/resources` to `src/test/resources` so test config stops shipping in the production jar. ([BUG-007](../bugs/bugs.md#bug-007))
@@ -129,9 +128,10 @@ log. The rest, in the spec's order:
   The audit log covers administration and ownership only, so a club with a stable
   team has an empty Activity tab — and §21's own UI example shows exactly the
   entries that are missing. `ClubAuditService.record` and the `CLUB` / `EVENT`
-  entity types already exist; what is needed is call sites in `ClubService` and
-  `EventService`. Pairs with `EventService.update` (BUG-006), which has to touch
-  those paths regardless.
+  entity types already exist. **The write paths all exist since 2026-09-15** and
+  none records anything: `ClubService.update`, the logo and photo uploads,
+  `EventService.update`, `removeImage`, `makeBanner` and event delete (CEM-06,
+  left out of that unit by Arpan's scope).
 - [ ] **P3** *(items 11–13)* **Notification separation.** Club-operational mail
   to the official club email, personal mail to the user, optional personal
   copies for admins, and the §17 security notices that cannot be opted out of.
@@ -143,16 +143,6 @@ log. The rest, in the spec's order:
 
 ## Frontend / Features
 
-- [ ] **P1** **A club cannot be edited after it is created, from anywhere.**
-      `/manage/[clubId]` has no club-details editor and there is no `updateClub`
-      in the frontend at all, so the club-governance work's own promise — *the
-      requester adds a logo and photos from `/manage/[clubId]` once approval
-      makes them the owner* — has no screen behind it. Every endpoint exists and
-      the owner can already reach them (`PUT /clubs/{id}`,
-      `POST /clubs/{id}/logo`, `POST /clubs/{id}/images`); only the UI is
-      missing. Merge this with the three taxonomy items below, which want the
-      same editor for category and tags, and have it call `revalidateClubs` the
-      way the create form does. ([BUG-043](../bugs/bugs.md#bug-043))
 - [ ] **P2** **A requester cannot see their own pending club proposal.** They
       submit, get a confirmation, and then have no way to check on it —
       deliberately, for now: Arpan, 2026-09-09, it belongs in the notifications
@@ -192,16 +182,19 @@ log. The rest, in the spec's order:
       recognised as predicted rather than as evidence the decision was wrong.
 
 
-- [ ] **P2** **An event cannot be given photos from the UI.** The create form works now, but stops at the fields `POST /api/v1/events` accepts. Unlike a club, the creator *can* upload to an event they just made — `canManageEvent` resolves through the club they already manage — so `POST /api/v1/events/{id}/images` is reachable and simply unwired. Same for editing an event afterwards, which has no endpoint at all ([BUG-006](../bugs/bugs.md#bug-006)). *Renamed 2026-09-12 from banner image: by Arpan's definition these are the event's photos, and a banner is chosen from them later.* The read path it needed landed 2026-09-12 (`GET /events/{id}/images/{index}`, mapped by `adapters.ts`), so an uploaded photo now displays; only the upload control is missing.
 
-**The event banner request — queued 2026-09-12 by Arpan, after the event photo unit.** A banner is **not** a stored media kind and has no prefix of its own: it is one of an event's existing photos, which the club asks the platform owner to feature. Four items, in dependency order:
+**The homepage feature request — queued 2026-09-12 by Arpan, reshaped 2026-09-15.** An event's banner is now its first photo, chosen by the club and shown on the event page at once ([ADR-015](../docs/decisions/ADR-015-event-banner-is-the-first-photo.md)); the former fourth item, *an approved banner is the event page's hero*, is superseded by that. What still goes through the platform owner is **featuring an event on the homepage**. Three items, in dependency order:
 
-- [ ] **P2** **A club requests a banner for its event.** A club owner or club admin picks **at most one** photo from an event's images and submits it to the platform owner for approval — one live request or approved banner per event. Backend: the request record, its create and withdraw endpoints behind `canManageEvent`, and a platform-admin approve and reject. **Its data shape is a real choice and wants a Proposed ADR at its `/start`:** a request table in the ADR-005 mould versus the existing unused `events.promoted` flag (`Event.java:53`, `findByPromotedTrue`) plus a chosen image index — and how an approved banner survives the photo it points at being removed, since images are addressed by index. Nothing notifies the requester of the outcome; that joins the notifications work.
-- [ ] **P2** **The platform owner's banner queue.** Pending requests beside the club proposals in the admin dashboard: the event, the chosen photo rendered through `/media/events/**`, the requesting club, approve and reject.
-- [ ] **P2** **The homepage carousel shows approved banners.** `BannerCarouselMainPage.tsx` renders four hard-coded slides from `public/`; replace them with approved event banners, each linking to its event, with an empty state when there are none. Placement chosen by Arpan 2026-09-12.
-- [ ] **P2** **An approved banner is the event page's hero.** `events/[eventId]/page.tsx:88` takes `event.images[0]`; an event with an approved banner shows that photo instead. Also chosen by Arpan 2026-09-12.
+- [ ] **P2** **A club requests a homepage feature for its event.** A club owner or club admin submits one of an event's photos to the platform owner — one live request per event. Backend: the request record, create and withdraw behind `canManageEvent`, and a platform-admin approve and reject. **Its data shape wants a Proposed ADR at its `/start`:** a request table in the ADR-005 mould versus the unused `Event.promoted` flag and `findByPromotedTrue`. **It must not reuse position 0** — the club can change its banner at any time — and needs a pointer of its own that survives a photo being removed, since photos are addressed by index. Nothing notifies the requester of the outcome; that joins the notifications work.
+- [ ] **P2** **The platform owner's feature queue.** Pending requests beside the club proposals in the admin dashboard: the event, the chosen photo rendered through `/media/events/**`, the requesting club, approve and reject.
+- [ ] **P2** **The homepage carousel shows approved features.** `BannerCarouselMainPage.tsx` renders four hard-coded slides from `public/`; replace them with approved event photos, each linking to its event, with an empty state when there are none. Placement chosen by Arpan 2026-09-12.
 
-- [ ] **P2** **Club banner images are rendered nowhere.** `POST /clubs/{id}/images` stores them and `GET /clubs/{id}/images/{index}` serves them, and `adapters.ts` maps them, but no page draws `club.images`. Needs the club editor first to have any way to upload one ([BUG-043](../bugs/bugs.md#bug-043)). Queued 2026-09-12 alongside the banner work; kept `clubs/{id}/images/`, no rename.
+- [ ] **P2** **Club banner images are rendered nowhere.** `POST /clubs/{id}/images` stores them, `GET /clubs/{id}/images/{index}` serves them, `adapters.ts` maps them, and since 2026-09-15 the club editor uploads them — but no public page draws `club.images`, so what a club uploads shows only in its own editor. Queued 2026-09-12 alongside the banner work; kept `clubs/{id}/images/`, no rename.
+- [ ] **P2** **A club photo cannot be removed.** Event photos gained `DELETE /events/{id}/images/{index}` on 2026-09-15; club photos stayed add-only by Arpan's call that day, so a wrong upload stays for good. Same shape as the event one: row first, object after the commit, only under `clubs/{id}/`. `club_images` also has no order column, which matters the day club photo order means anything ([ADR-015](../docs/decisions/ADR-015-event-banner-is-the-first-photo.md)).
+- [ ] **P1** **A club cannot see who is coming to its own event** (CEM-12, from the [2026-09-10 review](../docs/reviews/2026-09-10-club-and-event-management.md)). `user_event_rsvps` and its `idx_user_event_rsvps_event` index exist; no endpoint reads that direction. **D-9 answered by Arpan 2026-09-15: the club team sees names only, never email addresses.** Also `Event.registered` is served as `EventDTO.registered` and never incremented, so the event page's *spots left* always shows the full capacity.
+- [ ] **P2** **The platform admin has no club directory** (CEM-25). `/admin` is the pending-requests queue and a Create a club button; there is no list of clubs, no view of the ownerless ones, and no route to a club's dashboard except its URL. Partly waits on D-11. Arpan kept it out of the 2026-09-15 demo scope.
+- [ ] **P3** **The dashboard Overview answers almost nothing** (CEM-23): three tiles, the next four events, the official-email panel. Worth building once attendance numbers exist (CEM-12).
+- [ ] **P3** **No recurring events, and no way to duplicate one** (CEM-18, CEM-20). A weekly club meeting is created by hand every week. Duplicating is the cheap substitute, and it is small now that the edit form exists.
 
 ### Taxonomy — built, and almost entirely unread
 
@@ -224,12 +217,6 @@ taxonomy is currently write-only. Ordered by how visible the gap is.
       by event tag is a real filter against a real foreign key, and it belongs on
       `/events` and `/clubs`* — the replacement was never built, so the delete
       removed a bad filter and left none.
-- [ ] **P1** **A club's category and tags cannot be changed after creation.**
-      `PUT /api/v1/clubs/{id}` accepts `category` and `interests`, and there is
-      no `updateClub` anywhere in the frontend — `/manage/[clubId]` has no
-      club-details editor at all. Creation is the only moment, permanently.
-      Compounded by the P0 above it: the creator cannot manage the club anyway,
-      so the only route to a fix is an endpoint no screen reaches.
 - [ ] **P2** **A profile never shows its own interests.** `/profile/edit/interests`
       writes them; `ProfileAboutCard` renders degree, faculty and subjects and
       stops. So `showInterests` — the toggle at `profile/edit/page.tsx:164` — is

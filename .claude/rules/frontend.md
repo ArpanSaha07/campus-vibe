@@ -74,3 +74,15 @@ paths:
   function` for a hook whose signature had changed — both while `npx tsc
   --noEmit` and `npm run build` were clean. If an error contradicts the file in
   front of you, restart `campusvibe-frontend` before debugging it. (BUG-045)
+- **A media URL changes when its image does — through the last path segment,
+  never `?v=`.** `adapters.ts` ends every `/media/...` URL in
+  `mediaVersion(key)`, because URLs name a position and the image response is
+  cached for five minutes, so a reorder or a removed photo kept showing the old
+  image. `next/image` throws during render on a local `src` with a query string
+  unless `images.localPatterns` names it, so `?v=` answered 500 on every page
+  with an uploaded image. A new media route needs its versioned rewrite in
+  `next.config.ts` as well. (BUG-056, ADR-016)
+- **Every DTO carrying a stored key goes through an adapter, not only
+  `ClubDTO`.** `ManagedClubDTO.logo` is the same S3 key, and the managed-club
+  reads returned it raw, so `ClubLogo` refused it and an uploaded logo never
+  showed in the dashboard. `toManagedClub` maps it. (BUG-055)

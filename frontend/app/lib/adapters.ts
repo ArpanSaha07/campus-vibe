@@ -23,11 +23,55 @@ function isAbsoluteUrl(value: string): boolean {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
+/**
+ * A short version tag for a stored key, the last path segment of its media URL.
+ *
+ * Media URLs name the owner and a position -- `/media/events/3/images/0` -- not
+ * the object, so they do not change when the photo behind them does, and the
+ * image response may be cached for five minutes. Choosing a new banner or
+ * removing a photo moves a *different* photo to the same URL, and the browser
+ * kept showing the old one (found 2026-09-15). Every upload gets a unique key,
+ * so a tag derived from it changes exactly when the photo does and never
+ * otherwise, which keeps the cache useful.
+ *
+ * A hash rather than the key itself, so the S3 layout still never reaches a
+ * URL. FNV-1a: deterministic on server and client alike, so `src` matches
+ * across hydration, and no crypto API is needed.
+ *
+ * A path segment, not `?v=`: next/image refuses a local src with a query string
+ * unless `images.localPatterns` names it, and throws during render -- the page
+ * answered 500 (found 2026-09-15, the same day). `next.config.ts` rewrites the
+ * versioned path to the same API endpoint and ignores the segment.
+ */
+export function mediaVersion(key: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * A managed club with its logo made renderable.
+ *
+ * `ManagedClubDTO.logo` is the stored S3 key, exactly like `ClubDTO.logo`, but
+ * the managed-club reads skipped the adapter -- so the dashboard header and the
+ * /manage cards received a key, which `ClubLogo` refuses, and a logo uploaded
+ * from the club editor never showed in the dashboard it was uploaded from
+ * (found 2026-09-15). Same versioned URL as the public club page.
+ */
+export function toManagedClub(
+  api: import("@/app/types").ManagedClub,
+): import("@/app/types").ManagedClub {
+  return { ...api, logo: clubLogoUrl(api.clubId, api.logo) };
+}
+
 /** The API URL that serves a club's logo, or "" when it has none. */
 function clubLogoUrl(clubId: string, logo: string | null): string {
   if (!logo || logo.trim() === "") return "";
   if (isAbsoluteUrl(logo)) return logo;
-  return `/media/clubs/${encodeURIComponent(clubId)}/logo`;
+  return `/media/clubs/${encodeURIComponent(clubId)}/logo/${mediaVersion(logo)}`;
 }
 
 /**
@@ -41,7 +85,7 @@ function clubImageUrls(clubId: string, images: string[]): string[] {
   return images.map((image, index) =>
     isAbsoluteUrl(image)
       ? image
-      : `/media/clubs/${encodeURIComponent(clubId)}/images/${index}`,
+      : `/media/clubs/${encodeURIComponent(clubId)}/images/${index}/${mediaVersion(image)}`,
   );
 }
 
@@ -60,7 +104,7 @@ function eventImageUrls(eventId: number, images: string[]): string[] {
   return images.map((image, index) =>
     isAbsoluteUrl(image) || image.startsWith("/")
       ? image
-      : `/media/events/${encodeURIComponent(String(eventId))}/images/${index}`,
+      : `/media/events/${encodeURIComponent(String(eventId))}/images/${index}/${mediaVersion(image)}`,
   );
 }
 

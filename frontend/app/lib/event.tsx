@@ -112,3 +112,97 @@ export async function createEvent(event: NewEvent): Promise<EventInstance> {
   });
   return toEventInstance(created);
 }
+
+/** What the edit form sends: everything but the club, which an event cannot change. */
+export type EventFields = Omit<NewEvent, "organizerId">;
+
+/**
+ * An event exactly as the API holds it, bypassing Next's data cache.
+ *
+ * For the edit form, which must not go through `toEventInstance`: that turns a
+ * null location into "Location TBA", a null price into "Free" and a null
+ * capacity into 0 — display values that would be saved back as real ones.
+ * `null` means no such event, as with `getEvent`.
+ */
+export async function getEventForEdit(eventId: string): Promise<ApiEvent | null> {
+  if (!/^\d+$/.test(eventId)) return null;
+  try {
+    return await apiFetch<ApiEvent>(`/api/v1/events/${eventId}`, { auth: true });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+/**
+ * Edits an event. `PUT /api/v1/events/{id}`, guarded by `canManageEvent`.
+ *
+ * Full replacement: an emptied description, location or price is sent as null
+ * and clears the stored value, and so does an emptied capacity.
+ */
+export async function updateEvent(eventId: string, event: EventFields): Promise<EventInstance> {
+  const updated = await apiFetch<ApiEvent>(`/api/v1/events/${eventId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      ...event,
+      description: event.description.trim() || null,
+      location: event.location.trim() || null,
+      price: event.price.trim() || null,
+    }),
+    auth: true,
+  });
+  return toEventInstance(updated);
+}
+
+/**
+ * Deletes an event. A hard delete: its RSVPs and bookmarks go with it, which
+ * the caller must say before asking (CEM-14 is not built).
+ */
+export async function deleteEvent(eventId: string): Promise<void> {
+  await apiFetch<void>(`/api/v1/events/${eventId}`, { method: "DELETE", auth: true });
+}
+
+/**
+ * Adds photos to an event. Multipart, part name `files`, matching
+ * `EventController.uploadImages`; `apiFetch` leaves `Content-Type` to the
+ * browser, which is the only thing that knows the boundary.
+ *
+ * Add-only: there is no endpoint that removes one. The first photo an event has
+ * is the banner on its page.
+ */
+/** The most photos one event may hold, enforced by the backend too. */
+export const MAX_EVENT_PHOTOS = 10;
+
+/**
+ * Removes one of an event's photos by its position, and returns the event as it
+ * now stands. Positions shift afterwards, so the caller redraws from the result.
+ */
+export async function deleteEventImage(eventId: string, index: number): Promise<ApiEvent> {
+  return apiFetch<ApiEvent>(`/api/v1/events/${eventId}/images/${index}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+/**
+ * Makes one photo the event's banner by moving it to the first position — every
+ * surface already draws the first photo as the banner, so the order *is* the
+ * choice. Returns the event as it now stands.
+ */
+export async function setEventBanner(eventId: string, index: number): Promise<ApiEvent> {
+  return apiFetch<ApiEvent>(`/api/v1/events/${eventId}/images/${index}/banner`, {
+    method: "PUT",
+    auth: true,
+  });
+}
+
+export async function uploadEventImages(eventId: string, files: File[]): Promise<void> {
+  if (files.length === 0) return;
+  const body = new FormData();
+  files.forEach((file) => body.append("files", file));
+  await apiFetch<void>(`/api/v1/events/${eventId}/images`, {
+    method: "POST",
+    body,
+    auth: true,
+  });
+}

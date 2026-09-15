@@ -1,4 +1,5 @@
 import { apiFetch } from "@/app/lib/api";
+import { toManagedClub } from "@/app/lib/adapters";
 import type {
   ClubAdmin,
   ClubAdminRequest,
@@ -46,7 +47,9 @@ export async function rejectClubAdminRequest(id: number): Promise<ClubAdminReque
  * normal answer, not an error.
  */
 export async function getManagedClubs(): Promise<ManagedClub[]> {
-  return apiFetch<ManagedClub[]>(`/api/v1/users/me/managed-clubs`, { auth: true });
+  const clubs = await apiFetch<ManagedClub[]>(`/api/v1/users/me/managed-clubs`, { auth: true });
+  // Through the adapter: `logo` arrives as an S3 key (BUG-040).
+  return clubs.map(toManagedClub);
 }
 
 /**
@@ -61,10 +64,12 @@ export async function getManagedClubs(): Promise<ManagedClub[]> {
  * reads to decide whether to render at all.
  */
 export async function getManagedClub(clubId: string): Promise<ManagedClub> {
-  return apiFetch<ManagedClub>(
+  const club = await apiFetch<ManagedClub>(
     `/api/v1/clubs/${encodeURIComponent(clubId)}/managed`,
     { auth: true },
   );
+  // Through the adapter: `logo` arrives as an S3 key (BUG-040).
+  return toManagedClub(club);
 }
 
 /**
@@ -85,11 +90,15 @@ export async function setClubOfficialEmail(
   clubId: string,
   officialEmail: string | null,
 ): Promise<ManagedClub> {
-  return apiFetch<ManagedClub>(`/api/v1/clubs/${encodeURIComponent(clubId)}/official-email`, {
-    method: "PATCH",
-    body: JSON.stringify({ officialEmail }),
-    auth: true,
-  });
+  const club = await apiFetch<ManagedClub>(
+    `/api/v1/clubs/${encodeURIComponent(clubId)}/official-email`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ officialEmail }),
+      auth: true,
+    },
+  );
+  return toManagedClub(club);
 }
 
 export async function listClubAdmins(clubId: string): Promise<ClubAdmin[]> {
@@ -140,10 +149,11 @@ export async function listMyClubInvitations(): Promise<ClubInvitation[]> {
  * saying so if the account has never followed its confirmation link.
  */
 export async function acceptClubInvitation(invitationId: number): Promise<ManagedClub> {
-  return apiFetch<ManagedClub>(
+  const club = await apiFetch<ManagedClub>(
     `/api/v1/users/me/club-invitations/${invitationId}/accept`,
     { method: "POST", auth: true },
   );
+  return toManagedClub(club);
 }
 
 export async function declineClubInvitation(invitationId: number): Promise<void> {
@@ -211,10 +221,11 @@ export async function listMyOwnershipTransfers(): Promise<OwnershipTransfer[]> {
 
 /** Accepts a club. Returns it as it now appears on the dashboard, owner role. */
 export async function acceptOwnership(transferId: number): Promise<ManagedClub> {
-  return apiFetch<ManagedClub>(
+  const club = await apiFetch<ManagedClub>(
     `/api/v1/users/me/ownership-transfers/${transferId}/accept`,
     { method: "POST", auth: true },
   );
+  return toManagedClub(club);
 }
 
 export async function declineOwnership(transferId: number): Promise<void> {

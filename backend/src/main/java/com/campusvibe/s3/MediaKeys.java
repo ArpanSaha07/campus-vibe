@@ -60,12 +60,25 @@ public final class MediaKeys {
      * old {@code logo-{filename}} shape, which is still this club's object.
      */
     public static boolean belongsToClub(String key, String clubId) {
+        return belongsUnder(key, "clubs/" + clubId + "/");
+    }
+
+    /**
+     * Whether a stored key is one of this event's own photos, and so safe to
+     * delete on its behalf. Same rules as {@link #belongsToClub}; covers both
+     * {@code events/{id}/images/} and the pre-2026-09-12 {@code banners/} keys.
+     */
+    public static boolean belongsToEvent(String key, Long eventId) {
+        return eventId != null && belongsUnder(key, "events/" + eventId + "/");
+    }
+
+    private static boolean belongsUnder(String key, String prefix) {
         // A backslash is a literal on S3, but it has been a separator to
         // everything that has ever stood in for S3 on a Windows machine.
         if (key == null || key.isBlank() || key.contains("://") || key.contains("\\")) {
             return false;
         }
-        if (!key.startsWith("clubs/" + clubId + "/")) {
+        if (!key.startsWith(prefix)) {
             return false;
         }
         // Checked by segment rather than through Path, which throws on a

@@ -68,7 +68,7 @@ a `CLUB_ADMIN`, then offer ownership through `ClubOwnershipService`.
 
 - **Event lifecycle.** `EventService.update`, delete, and the
   `DRAFT`/`PUBLISHED`/`ARCHIVED` column stay queued. The club dashboard's Events
-  tab is not made end-to-end here ([BUG-006](../bugs/bugs.md#bug-006)).
+  tab is not made end-to-end here ([BUG-006](../bugs/fixed_bugs.md#bug-006)).
 - **Platform-admin management from the UI.** No promote or demote control, no
   account list. `APP_BOOTSTRAP_ADMIN_EMAIL` plus a restart stays the only way to
   mint a platform admin — Arpan, 2026-09-08.

@@ -5,21 +5,19 @@ Last updated: **2026-09-15** · Branch: `develop`
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15).
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management).
 
-**Highest id issued: BUG-054.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-056.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
-| [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **root cause found and fixed 2026-09-14** (weights formatted into SQL under a `fr_CA` locale); open until a GitHub run |
 | [BUG-053](#bug-053) | Low | A URL with no handler answers 500 and logs an ERROR stack trace, instead of 404 — `/actuator/env` included |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
-| [BUG-006](#bug-006) | Low | Events are never re-indexed after an edit |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
 
@@ -291,44 +289,6 @@ matching `build.args` in compose.
 
 ---
 
-### BUG-006
-**Events are never re-indexed after an edit** · Low · OPEN
-
-**Found:** 2026-07-30, comparing `EventService` against
-[`.claude/docs/architecture/search.md`](../docs/architecture/search.md).
-
-**Symptom:** the design note (lines 150-177) specifies regenerating an event's
-embedding when its title, description or category changes. `EventService` indexes
-only on `create` (`:45`) and has **no update method at all**, so an edited event
-keeps a stale embedding indefinitely. `ClubService.update` does re-index
-(`:63`), so the two are inconsistent.
-
-Related: the duplicate-method merge damage ([BUG-009](fixed_bugs.md#bug-009)) removed a
-`ClubService.update` variant that omitted the re-index call — the surviving copy
-is the correct one.
-
-**Narrowed 2026-09-14.** One stale path did exist even without an event update
-endpoint. An event's embedded text carries its organizer's name
-(`SearchableText.forEvent`), and `ClubService.update` could rename a club without
-touching its events. **That half is fixed:**
-- `update` calls `SearchIndexService.indexEventsByOrganizer` when the name
-  actually changes;
-- `SearchIT.renamingAClubReindexesItsEvents` covers it;
-- the rule is in `rules/backend-clubs.md`.
-
-**What remains is the missing `EventService.update` itself.** This stays open
-until that exists and re-indexes.
-
-**Affected files**
-- `backend/src/main/java/com/campusvibe/event/EventService.java` (no update path)
-- `backend/src/main/java/com/campusvibe/club/ClubService.java` `update` (correct reference implementation, including the rename re-index)
-
-**Affected tests:** `SearchIT.renamingAClubReindexesItsEvents` covers the rename
-path. The event update path needs its own test asserting the embedding changes,
-once it is built.
-
----
-
 ### BUG-007
 **`application-test.yml` lives in `src/main/resources`** · Low · OPEN
 
@@ -574,23 +534,3 @@ which a 500 satisfies.
 
 ---
 
-### BUG-043
-**A club cannot be edited after creation, so late media has no route in** · Low · OPEN
-
-**Found:** 2026-09-09, wiring the club create form's uploads.
-
-`/manage/[clubId]` has no club-details editor: there is no `updateClub` anywhere
-in the frontend, and no logo or banner control outside the create form. So the
-club-governance work's own promise — *the requester adds images from
-`/manage/[clubId]` once approval makes them the owner* — has no screen behind it.
-A user who proposes a club and is approved owns it and still cannot give it a
-logo.
-
-The endpoints all exist and are reachable by the owner (`PUT /clubs/{id}`,
-`POST /clubs/{id}/logo`, `POST /clubs/{id}/images`); only the UI is missing. It
-overlaps the three taxonomy items in [`todo.md`](../TODO/todo.md) that want the
-same editor for category and tags.
-
-Note also that uploading outside the create flow does not invalidate the
-five-minute `clubs` cache — whatever builds this screen should call
-`revalidateClubs` the way the create form does.

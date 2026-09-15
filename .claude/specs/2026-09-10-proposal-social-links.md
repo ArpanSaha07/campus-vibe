@@ -45,7 +45,7 @@ this unit would otherwise open to every signed-in user.
 - **The logo, still.** A proposal has no club id and no S3 key, so it would need
   a proposal-scoped key, a copy step at approval, a read endpoint for the queue
   and orphan cleanup for every abandoned proposal. It belongs to the club editor
-  ([BUG-043](../bugs/bugs.md#bug-043)), which is the next P1 — Arpan,
+  ([BUG-043](../bugs/fixed_bugs.md#bug-043)), which is the next P1 — Arpan,
   2026-09-09. Banner images likewise.
 - **Making the contact email required on the propose path.** Required on the
   admin path only, as now.

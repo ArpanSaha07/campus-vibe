@@ -10,7 +10,7 @@ paths:
 before changing anything here.** It is mandatory, not a suggestion.
 
 - **Next number:** the highest across your tree **and** `origin/develop` and
-  `origin/main`, plus one — `V30` today. A stale branch otherwise hands you a
+  `origin/main`, plus one — `V35` today. A stale branch otherwise hands you a
   number someone else has claimed, and since the two filenames differ git
   merges both without a conflict; Flyway then refuses to start.
 - **A migration on `origin/develop` or `origin/main` is immutable.** It has
@@ -27,6 +27,11 @@ before changing anything here.** It is mandatory, not a suggestion.
   file, so the committed V12's table never exists and later migrations fail.
   Reset the volume (`docker compose down -v`). Found 2026-09-13.
 - **One responsibility per file.**
+- **A JPA `@OrderColumn` list rewrites its value column row by row.** Choosing a
+  new banner swaps two keys between positions, so a unique constraint on
+  `(event_id, url)` must be `DEFERRABLE INITIALLY DEFERRED` or every swap fails
+  halfway, and the primary key moves to `(event_id, sort_order)`. V34 backfills
+  `sort_order` from physical row order so no existing banner changes. (ADR-015)
 - **No mock data in a migration.** The `dev` seeder owns that
   (`SKILL.md:152-169`) — a migration runs in every environment, including the
   ones you did not mean.

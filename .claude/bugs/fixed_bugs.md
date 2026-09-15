@@ -6,6 +6,10 @@ Last updated: **2026-09-15**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-056](#bug-056) | Medium | 2026-09-15 | A photo change looked undone for up to five minutes: media URLs name a position, not an image, and the response is cached — and the first fix, `?v=`, answered 500 on every page with an image |
+| [BUG-055](#bug-055) | Low | 2026-09-15 | An uploaded club logo never showed in the club's own dashboard: the managed-club reads handed `ClubLogo` the raw S3 key |
+| [BUG-043](#bug-043) | Low | 2026-09-15 | A club could not be edited after creation, from anywhere — every endpoint existed and no screen called them |
+| [BUG-006](#bug-006) | Low | 2026-09-15 | Events were never re-indexed after an edit, because no event update path existed at all |
 | [BUG-054](#bug-054) | Blocker | 2026-09-15 | The first production deploy was healthy and every request was a 503: the replacement instance landed in `ca-central-1d`, a zone the load balancer did not serve |
 | [BUG-051](#bug-051) | High | 2026-09-15 | Production was configured for S3 buckets that did not exist; closed by the first upload landing in `campusvibe-prod-media` through the deployed backend |
 | [BUG-052](#bug-052) | Blocker | 2026-09-14 | `Database / Apply migrations to a clean database` failed on PR #51: the jar refused to boot because the job never set `AWS_S3_BUCKET`, which lost its default in `806a1d0` — not a stale build, and every migration applied |
@@ -44,6 +48,114 @@ Last updated: **2026-09-15**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-056
+**A photo change looked undone for five minutes: media URLs name a position, not an image** · Medium · FIXED 2026-09-15
+
+**Found:** 2026-09-15, in the browser, verifying the event banner. After *Make
+banner* moved the red test photo first, the server held red then blue — read back
+by colour from `GET /api/v1/events/3/images/0` — and `/events/3` still showed
+blue.
+
+**Cause.** A media URL names an owner and a position —
+`/media/events/3/images/0`, `/media/clubs/{id}/logo` — and
+`StoredImageResponses` serves it with `max-age=300, public`
+(`StoredImageResponses.java:64`). Its own comment foresaw a long cache pinning a
+replaced image; five minutes was still long enough once this unit made
+reordering and removing photos routine, since both move a different image to the
+same URL at once. A replaced club logo has had the same exposure since
+2026-09-09 by the same mechanism — read from the code, not observed.
+
+**The first fix broke render.** A `?v=<hash>` query string made `/events/3`
+answer HTTP 500: `Image with src "/media/events/3/images/0?v=1jfp5m2" is using a
+query string which is not configured in images.localPatterns.` Next 16 applies
+`[{ pathname: '**', search: '' }]` when `localPatterns` is unset and throws
+during render on a local `src` with a query
+(`next/dist/shared/lib/image-loader.js:55`). The optimizer-side
+`hasLocalMatch`, which allows everything when the option is unset, was read
+first and wrongly taken as the whole answer. Local only, never committed.
+
+**Fix.** `mediaVersion(key)` in `adapters.ts`, an FNV-1a hash of the stored key,
+as the last path segment: `/media/events/3/images/0/1jfp5m2`. Every upload writes
+a unique key, so the URL changes exactly when the image does. `next.config.ts`
+gained a versioned form of each rewrite that ignores the segment
+([ADR-016](../docs/decisions/ADR-016-media-urls-versioned-by-key-hash.md)).
+
+**Verified:** `/events/3` answers 200 with the versioned path in its HTML, and
+that path answers 200 `image/png` through the rewrite; the page shows the red
+banner the server holds; `adapters.test.ts` asserts that a reorder changes the
+URL and an unchanged list keeps it; `verify.mjs --all --full` green.
+
+**Trap, now in `rules/frontend.md`:** version a media URL by path segment, never
+by query string, and give a new media route its versioned rewrite.
+
+### BUG-055
+**An uploaded club logo never showed in the club's own dashboard** · Low · FIXED 2026-09-15
+
+**Found:** 2026-09-15, checking the dashboard header after the club editor
+landed.
+
+**Cause.** `ManagedClubDTO.logo` is `club.getLogo()` passed straight through
+(`ClubAdminService.toManagedClubDto`, and the same in `ClubOwnershipService`) —
+the stored S3 key, as in `ClubDTO`. `ClubDTO` goes through `toClub`, which maps a
+key to `/media/clubs/{id}/logo`; the managed-club calls in
+`club-admin-requests.ts` returned the DTO raw. `ClubLogo`'s `isRenderableSrc`
+refused the key and drew the club's initial, so there was no crash —
+[BUG-040](#bug-040)'s guard held — and no logo either, in the dashboard header
+and on the `/manage` cards.
+
+**Fix.** `toManagedClub` in `adapters.ts`, applied in `getManagedClubs`,
+`getManagedClub`, `setClubOfficialEmail`, `acceptClubInvitation` and
+`acceptOwnership`.
+
+**Verified:** a test logo uploaded through the club editor for McGill Atheletics
+rendered in the dashboard header and on `/clubs/mcgill-atheletics`, decoded with
+`naturalWidth` 128, and the backend served it as `image/png`, 6870 bytes.
+`adapters.test.ts` covers `toManagedClub`.
+
+**Trap, now in `rules/frontend.md`:** every DTO carrying a stored key goes
+through an adapter.
+
+### BUG-043
+**A club could not be edited after creation, from anywhere** · Low · FIXED 2026-09-15
+
+**Found:** 2026-09-09, wiring the club create form's uploads. `/manage/[clubId]`
+had no club-details editor and there was no `updateClub` in the frontend, so a
+user approved as a club's owner could not give it a logo — the promise ADR-004
+made to that user. Every endpoint existed: `PUT /clubs/{id}`,
+`POST /clubs/{id}/logo`, `POST /clubs/{id}/images`.
+
+**Fix.** The Club page section of the dashboard (`manage/[clubId]/club/page.tsx`,
+`components/manage/ClubEditForm.tsx`), for everyone `canManageClub` admits —
+Arpan, 2026-09-15. It edits name, description, category, tags, logo, photos and
+contact links; not the slug, and not the official email, which stays
+admin-only. It calls `revalidateClubs`, and `revalidateEvents` on a rename, as
+the original entry asked.
+
+**Verified:** a logo uploaded through it for McGill Atheletics rendered in the
+dashboard and on the public club page, with *Saved. Your club page shows the
+changes now.* and no field errors. No automated test drives the form.
+
+### BUG-006
+**Events were never re-indexed after an edit** · Low · FIXED 2026-09-15
+
+**Found:** 2026-07-30, comparing `EventService` against `search.md`, which
+specifies regenerating an event's embedding when its title, description or tags
+change. `EventService` indexed only on create and had no update method at all.
+The organizer-rename half — an event's embedded text carries its club's name —
+was fixed 2026-09-14 and is covered by `SearchIT.renamingAClubReindexesItsEvents`.
+
+**Fix.** `EventService.update` behind `PUT /api/v1/events/{id}`: full
+replacement, tags cleared and refilled rather than reassigned, and
+`saveAndFlush` before `indexEvent`, because the embedding is written through
+`JdbcTemplate`, which cannot see unflushed work ([BUG-034](#bug-034)).
+
+**Verified:** `EventUpdateIT`, 7 tests — owner, club admin and platform admin may
+edit; an outsider gets 403; an unknown tag, a blank title or a missing date is
+400; an unknown event is 404 for staff. **Not covered:** that the embedding
+actually changes. The original entry asked for that test and it was not written.
 
 ---
 

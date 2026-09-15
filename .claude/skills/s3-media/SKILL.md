@@ -24,7 +24,9 @@ plus the honest gap between the two.
 - **The backend generates every object key.** `clubs/{id}/logos/{uuid}.webp`,
   `events/{id}/images/{uuid}.webp`, `users/{id}/profiles/{uuid}.webp`. **There is
   no banner prefix** — Arpan, 2026-09-12: a banner is one of an event's photos
-  that a club asks the platform owner to feature, not a stored kind. Where
+  — since 2026-09-15 the first one, chosen by the club and live on the event
+  page ([ADR-015](../../docs/decisions/ADR-015-event-banner-is-the-first-photo.md))
+  — not a stored kind. Where
   `reference.md` says `banners/`, read `images/`. A client
   never supplies a key, and a user-supplied filename is never the canonical
   object name (§7, §13).
@@ -70,7 +72,10 @@ implemented, and the reference does not say so.
   from the caller would fetch any object in the bucket it was pointed at. The
   index is resolved against that club's or event's own list. A stored value that
   is not a key — an absolute URL or a root-relative path — is a 404 before the
-  store is asked.
+  store is asked. **Because a position is not an object, every media URL the
+  frontend emits ends in a hash of the stored key** — reordering or removing a
+  photo moves a different image to the same index, and the response is cached
+  for five minutes ([ADR-016](../../docs/decisions/ADR-016-media-urls-versioned-by-key-hash.md)).
 - **An uploaded SVG is never served as `image/svg+xml`.** `imageTypeOf`
   (`StoredImageResponses.java`) names raster types only and falls back to
   `application/octet-stream`, with `nosniff`. Uploads refuse SVG since
@@ -133,9 +138,12 @@ implemented, and the reference does not say so.
   `ClubService.updateLogo` has committed. A failed delete is logged and does not
   fail the request, and only a key `MediaKeys.belongsToClub` recognises as that
   club's own is ever deleted — never a seeded Unsplash URL. An upload whose
-  database write fails orphans its new object (§21, accepted). Banner images
-  have no delete endpoint, so nothing deletes them, and nothing deletes a
-  club's or event's objects when the row goes (§20).
+  database write fails orphans its new object (§21, accepted). **An event photo
+  can be removed since 2026-09-15** — `DELETE /events/{id}/images/{index}` takes
+  it off the row, and the controller deletes the object only after that commits
+  and only if `MediaKeys.belongsToEvent` recognises it, the logo's order exactly.
+  Club photos still have no delete endpoint, and nothing deletes a club's or
+  event's objects when the row goes (§20).
 
 ## Before you change any of this
 

@@ -168,6 +168,53 @@ export async function updateClubSocialLinks(
   return toClub(updated);
 }
 
+/**
+ * A club exactly as the API holds it, bypassing Next's data cache.
+ *
+ * For the club editor. `getClubById` reads through the five-minute public cache,
+ * so an editor seeded from it could show — and then save back — a copy older
+ * than the last save. Raw rather than adapted, because the form needs the
+ * stored category, interests and social-links string, not display values.
+ */
+export async function getClubForEdit(clubId: string): Promise<ApiClub> {
+  return apiFetch<ApiClub>(`/api/v1/clubs/${encodeURIComponent(clubId)}`, { auth: true });
+}
+
+/** What the club editor sends. Every field is set, so nothing is left stale. */
+export interface ClubUpdate {
+  name: string;
+  description: string;
+  category: string | null;
+  interests: string[];
+  socialLinks: ClubSocialLinks;
+}
+
+/**
+ * Saves the club editor. `PUT /api/v1/clubs/{id}`, guarded by `canManageClub`,
+ * so the owner, a club admin and a platform admin may all call it.
+ *
+ * The slug is not sent: it is the club's URL and does not change on rename.
+ * Nor is the official email, which only a platform admin writes, through its
+ * own endpoint (§6).
+ *
+ * A null category is sent as-is, which the backend reads as untouched — it
+ * offers no way to clear one, by design (`ClubUpdateRequest`).
+ */
+export async function updateClub(clubId: string, club: ClubUpdate): Promise<Club> {
+  const updated = await apiFetch<ApiClub>(`/api/v1/clubs/${encodeURIComponent(clubId)}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      name: club.name.trim(),
+      description: club.description.trim(),
+      category: club.category,
+      interests: club.interests,
+      socialLinks: JSON.stringify(club.socialLinks),
+    }),
+    auth: true,
+  });
+  return toClub(updated);
+}
+
 export interface ClubMedia {
   logo: File | null;
   socialLinks: ClubSocialLinks;
