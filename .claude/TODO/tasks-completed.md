@@ -347,6 +347,30 @@ clubs into every environment it touched.
 - **Verified:** health `UP` over TLS 1.3; clubs and events 200; an unauthenticated `users/me` 403; CORS echoing both frontend origins and refusing a third; Flyway 33/33 on RDS; a 1.7 MB upload in `campusvibe-prod-media`, which closed [BUG-051](../bugs/fixed_bugs.md#bug-051) and proved nginx's raised limit; the first admin bootstrapped and switched off; club creation, event creation and photo upload by Arpan in the browser.
 - **Not done, and queued:** HTTP→HTTPS redirect, detaching two unused instance-role policies, an SSM path to the database and a dedicated application user, PostgreSQL 18 test pins, SES. Found and filed: [BUG-053](../bugs/bugs.md#bug-053), an unmapped URL answers 500.
 
+**2026-09-14 — search: relevance, a results page that shows clubs, and BUG-001's actual cause.**
+
+- **The unit** is [`specs/2026-09-14-search-relevance-and-results.md`](../specs/2026-09-14-search-relevance-and-results.md).
+  - `search.min-score` was measured before it was raised to 0.25. Real meaning-only matches scored cosine 0.38 and up, noise 0.33 and below.
+  - Past events are excluded from search.
+  - `/events?q=` shows the clubs the dropdown had already listed.
+  - The dropdown drops a stale response and names a rate limit rather than claiming *No matches*.
+  - A club rename re-indexes that club's events, the part of BUG-006 that exists.
+- **BUG-001 was the JVM's number locale, found only because this unit's verify run failed.**
+  - The weights went into the SQL through `%f`. This machine's JBR formats as `fr_CA`, so `0.7` printed as `0,700000`, and Postgres read the score as three select-list columns.
+  - That is valid SQL, so there was no error. The 2026-08-08 note had ruled this cause *down* on the belief that it would produce a 500.
+  - The months of unexplained flips tracked which JVM ran the suite.
+  - Temporary in-test diagnostics settled it: embedding present, cosine 0.7746, hybrid result empty.
+- **Docker had never been the gap.** The running container was always en_US, but only through the Temurin base image's `LANG`, and tests run in the host JVM, with Postgres alone in a container.
+  - Both are now pinned: `argLine` in the pom for surefire and failsafe, `JAVA_TOOL_OPTIONS` in the Dockerfile.
+  - The pom pin includes the `user.*.format` pair, because Windows takes number formatting from the region setting separately from the display language.
+- **The search box paid OpenAI twice per new query.** The event and club requests fire together and both missed the cache before either stored anything, and nearly every dropdown query is new. `QueryEmbeddingCache` became an `AsyncCache` joining the in-flight call ([ADR-014](../docs/decisions/ADR-014-one-embedding-call-per-search-via-the-cache.md), Proposed), with the provider call on virtual threads rather than the common pool.
+- **`ClubGrid` collapsed to one narrow column on the results page.** It uses the `/clubs` page's explicit grid instead.
+- **Verified:**
+  - `verify.mjs --full`: 120 unit and 290 integration tests, frontend lint, type-check, tests and build.
+  - Both containers rebuilt; the backend reports en/US/UTC.
+  - curl and the browser show clubs for `machine learning` and nothing for `art expo`.
+  - Not verified: a GitHub run, which is what BUG-001 still waits on.
+
 **2026-09-14 — PR #51's clean-database check: a missing property, not a stale build.**
 
 - **Asked whether the red `Database / Apply migrations to a clean database` came from a stale build.** It did not: the jar was packaged in the job, and `boot-1.log` shows all 33 migrations applied before the context failed on `AWS_S3_BUCKET` ([BUG-052](../bugs/fixed_bugs.md#bug-052)).

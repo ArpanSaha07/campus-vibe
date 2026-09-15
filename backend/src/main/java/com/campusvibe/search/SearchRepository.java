@@ -10,6 +10,14 @@ import java.util.List;
  * Hybrid search queries. Final score = semanticWeight * cosine similarity
  * + keywordWeight * normalized ts_rank (see .claude/docs/architecture/search.md).
  * When no query embedding is available, falls back to keyword-only matching.
+ *
+ * <p><b>Numbers are bound, never formatted into the SQL</b> (BUG-001). The
+ * weights used to go in through {@code %f}, which follows the JVM's default
+ * FORMAT locale: under a French one {@code 0.7} printed as {@code 0,700000}, and
+ * Postgres read {@code 0,700000 * cosine + 0,300000 * rank AS score} as three
+ * select-list columns. Still valid SQL, so no error -- score silently became
+ * {@code 300000 * rank}, and every meaning-only match scored 0 and was dropped.
+ * Only constant SQL fragments go through {@code formatted}.
  */
 @Repository
 public class SearchRepository {
@@ -64,7 +72,7 @@ public class SearchRepository {
     public SearchRepository(JdbcTemplate jdbcTemplate,
                             @Value("${search.semantic-weight:0.7}") double semanticWeight,
                             @Value("${search.keyword-weight:0.3}") double keywordWeight,
-                            @Value("${search.min-score:0.2}") double minScore) {
+                            @Value("${search.min-score:0.25}") double minScore) {
         this.jdbcTemplate = jdbcTemplate;
         this.semanticWeight = semanticWeight;
         this.keywordWeight = keywordWeight;
@@ -77,8 +85,8 @@ public class SearchRepository {
                 SELECT id FROM (
                     SELECT e.id,
                            kw.rank AS kw,
-                           %f * COALESCE(1 - (e.embedding <=> CAST(? AS vector)), 0)
-                         + %f * (kw.rank / (kw.rank + 0.05)) AS score
+                           CAST(? AS double precision) * COALESCE(1 - (e.embedding <=> CAST(? AS vector)), 0)
+                         + CAST(? AS double precision) * (kw.rank / (kw.rank + 0.05)) AS score
                     FROM events e
                     JOIN clubs c ON c.id = e.organizer_id
                     %s
@@ -91,12 +99,15 @@ public class SearchRepository {
                         SELECT CASE WHEN fts.doc @@ fts.query
                                     THEN ts_rank(fts.doc, fts.query) ELSE 0 END AS rank
                     ) kw
+                    -- Search is for what a student can still go to.
+                    WHERE e.date_time >= now()
                 ) ranked
                 WHERE score >= ? OR kw > 0
                 ORDER BY score DESC
                 LIMIT ?
-                """.formatted(semanticWeight, keywordWeight, EVENT_TAGS_JOIN, EVENT_TEXT);
-        return jdbcTemplate.queryForList(sql, Long.class, vectorLiteral, query, minScore, limit);
+                """.formatted(EVENT_TAGS_JOIN, EVENT_TEXT);
+        return jdbcTemplate.queryForList(sql, Long.class,
+                semanticWeight, vectorLiteral, keywordWeight, query, minScore, limit);
     }
 
     public List<Long> keywordSearchEventIds(String query, int limit) {
@@ -105,8 +116,9 @@ public class SearchRepository {
                 FROM events e
                 JOIN clubs c ON c.id = e.organizer_id
                 %s
-                WHERE to_tsvector('english', %s) @@ websearch_to_tsquery('english', ?)
-                   OR e.title ILIKE '%%' || ? || '%%'
+                WHERE e.date_time >= now()
+                  AND (to_tsvector('english', %s) @@ websearch_to_tsquery('english', ?)
+                       OR e.title ILIKE '%%' || ? || '%%')
                 ORDER BY ts_rank(to_tsvector('english', %s), websearch_to_tsquery('english', ?)) DESC
                 LIMIT ?
                 """.formatted(EVENT_TAGS_JOIN, EVENT_TEXT, EVENT_TEXT);
@@ -118,8 +130,8 @@ public class SearchRepository {
                 SELECT id FROM (
                     SELECT c.id,
                            kw.rank AS kw,
-                           %f * COALESCE(1 - (c.embedding <=> CAST(? AS vector)), 0)
-                         + %f * (kw.rank / (kw.rank + 0.05)) AS score
+                           CAST(? AS double precision) * COALESCE(1 - (c.embedding <=> CAST(? AS vector)), 0)
+                         + CAST(? AS double precision) * (kw.rank / (kw.rank + 0.05)) AS score
                     FROM clubs c
                     %s
                     CROSS JOIN LATERAL (
@@ -135,8 +147,9 @@ public class SearchRepository {
                 WHERE score >= ? OR kw > 0
                 ORDER BY score DESC
                 LIMIT ?
-                """.formatted(semanticWeight, keywordWeight, CLUB_TAGS_JOIN, CLUB_TEXT);
-        return jdbcTemplate.queryForList(sql, String.class, vectorLiteral, query, minScore, limit);
+                """.formatted(CLUB_TAGS_JOIN, CLUB_TEXT);
+        return jdbcTemplate.queryForList(sql, String.class,
+                semanticWeight, vectorLiteral, keywordWeight, query, minScore, limit);
     }
 
     public List<String> keywordSearchClubIds(String query, int limit) {

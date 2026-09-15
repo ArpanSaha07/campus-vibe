@@ -25,6 +25,13 @@ Kept deliberately short: this loads on every backend Java read.
   before it runs. (BUG-034)
 - **Scrub caller-supplied text through `common/Logs` before logging it.**
   (BUG-033)
+- **Bind numbers into SQL as `?` parameters; never format them in with `%f`
+  or `formatted`.** Those follow the JVM's FORMAT locale, and this dev
+  machine's is `fr_CA`: `0.7` printed as `0,700000`, and Postgres read the
+  hybrid score as three select-list columns. It stayed valid SQL, so there was
+  no error, just empty search results on some machines and never on a Linux
+  runner. `SearchIT.semanticSearchSurvivesACommaDecimalLocale` forces the
+  locale. (BUG-001)
 - **Never build an S3 key from `getOriginalFilename()`, or from anything else
   the caller wrote — go through `s3/MediaKeys`.** A filename of `../../x` used
   to be a file write anywhere the backend could reach, because the local stand-in

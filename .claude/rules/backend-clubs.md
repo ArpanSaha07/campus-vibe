@@ -24,6 +24,11 @@ reads.
 - **`saveAndFlush`, never `save`.** `indexClub` writes the embedding through
   `JdbcTemplate`, which is not a JPA query: it triggers no flush and checks no
   update count, so it silently matches zero rows. (BUG-034)
+- **Renaming a club re-indexes its events, not only the club.** An event's
+  embedded text carries its organizer's name (`SearchableText.forEvent`), so
+  `ClubService.update` calls `SearchIndexService.indexEventsByOrganizer` when the
+  name actually changes. Any new write path that can change a club's name must
+  do the same, or its events stay described under the old one. (BUG-006)
 - **`Event.id` is `IDENTITY`** (`Event.java:21-23`), so `EventService` takes the
   `persist()` branch. It reads almost identically and behaves oppositely — it is
   not evidence that this pattern is safe. (BUG-034)

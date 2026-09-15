@@ -92,6 +92,21 @@ public class SearchIndexService {
         }
     }
 
+    /**
+     * Re-embeds every event a club runs.
+     *
+     * <p>An event's searchable text carries its organizer's name, so renaming a
+     * club leaves each of its events described under the old name until this
+     * runs (BUG-006). Only the embedding column is written, on rows that already
+     * exist, so there is no unflushed insert for the JDBC update to miss.
+     */
+    public void indexEventsByOrganizer(String organizerId) {
+        if (!embeddingService.isEnabled()) {
+            return;
+        }
+        eventRepository.findByOrganizerId(organizerId).forEach(this::indexEvent);
+    }
+
     /** Backfills embeddings for every event and club. Returns counts indexed. */
     @Transactional
     public ReindexResult reindexAll() {

@@ -5,6 +5,11 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -92,6 +97,40 @@ class QueryEmbeddingCacheTest {
 
         assertEquals(0, failing.size(), "an empty answer must not occupy a cache entry");
         assertEquals("2", alwaysEmpty.toString(), "the second call must retry, not serve a cached miss");
+    }
+
+    @Test
+    void concurrentIdenticalQueriesShareOneProviderCall() throws Exception {
+        // The search box fires the event and club searches together, so both
+        // arrive before either has an answer. The second must join the first.
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountingEmbeddingService slow = new CountingEmbeddingService() {
+            @Override
+            public Optional<float[]> embed(String text) {
+                entered.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return super.embed(text);
+            }
+        };
+        QueryEmbeddingCache shared = new QueryEmbeddingCache(slow, 100, Duration.ofHours(1));
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            Future<Optional<float[]>> first = pool.submit(() -> shared.embed("chess club"));
+            assertTrue(entered.await(5, TimeUnit.SECONDS), "the first call never reached the provider");
+            Future<Optional<float[]>> second = pool.submit(() -> shared.embed("Chess Club"));
+            // Give the second caller time to arrive while the first is in flight.
+            Thread.sleep(100);
+            release.countDown();
+
+            assertTrue(first.get(5, TimeUnit.SECONDS).isPresent());
+            assertTrue(second.get(5, TimeUnit.SECONDS).isPresent());
+        }
+        assertEquals(1, slow.calls(), "an in-flight query must be joined, not embedded again");
     }
 
     @Test

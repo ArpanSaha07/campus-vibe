@@ -17,10 +17,17 @@ code. See the banner above; do not read a distance into this.
 >
 > The shipped implementation lives in
 > `backend/src/main/java/com/campusvibe/search/` — `SearchRepository.java`
-> carries the actual hybrid ranking formula. Note that
-> [BUG-001](../../bugs/bugs.md#bug-001) means meaning-only matches currently
-> return nothing, so the behaviour described below is **not** what the system
-> does today. Rewriting this as a real implementation doc is tracked in
+> carries the actual hybrid ranking formula. **As of 2026-09-14 meaning-only
+> matches work.** [BUG-001](../../bugs/bugs.md#bug-001) was the weights being
+> formatted into the SQL under a comma-decimal locale, now bound as parameters.
+> Also true of the shipped code, and absent from the note below:
+> - past events are never returned;
+> - a meaning-only match needs `search.min-score` 0.25, measured in
+>   [the spec](../../specs/2026-09-14-search-relevance-and-results.md);
+> - a query is embedded once per search, even when events and clubs are searched
+>   together ([ADR-014](../decisions/ADR-014-one-embedding-call-per-search-via-the-cache.md)).
+>
+> Rewriting this as a real implementation doc is tracked in
 > [`todo.md`](../../TODO/todo.md).
 >
 > **`V8__search_embeddings.sql:1` still cites the old path

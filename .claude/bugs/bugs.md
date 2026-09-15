@@ -14,8 +14,8 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
 | [BUG-043](#bug-043) | Low | The frontend cannot edit a club after creation, so an image uploaded later has no route to `/manage` |
+| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **root cause found and fixed 2026-09-14** (weights formatted into SQL under a `fr_CA` locale); open until a GitHub run |
 | [BUG-053](#bug-053) | Low | A URL with no handler answers 500 and logs an ERROR stack trace, instead of 404 — `/actuator/env` included |
-| [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — reproduced 2026-09-11, **passed in two full local runs 2026-09-12**; open until a GitHub run |
 | [BUG-002](#bug-002) | High | Backend CI runs JDK 17 but the project requires Java 25 |
 | [BUG-003](#bug-003) | High | Frontend route protection never executes |
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
@@ -130,6 +130,35 @@ against a fresh `pgvector/pgvector:pg15` container. It had been re-confirmed
 reproducing on 2026-09-11 on a clean worktree at `77baaab`. Nothing in the S3
 work touches search, so this is the same unexplained flip as 2026-08-08, not a
 fix, and the rule above stands: close it on a green GitHub run.
+
+**Root cause found and fixed, 2026-09-14. It was cause 3 after all.** The
+2026-08-08 ruling-down above was wrong. `0,700000 * COALESCE(...) + 0,300000 *
+(...) AS score` is *valid* SQL: Postgres reads three select-list items, `0`,
+`700000 * COALESCE(...) + 0` and `300000 * (...) AS score`. So there is no
+missing column and no 500. `score` silently becomes `300000 × keyword rank`,
+every meaning-only match scores 0, and the response is a 200 with zero rows,
+exactly the recorded symptom. The flips followed which JVM ran the suite, not
+the code: this machine's JBR runs a `fr_CA` FORMAT locale, and the Linux
+container and a GitHub runner never do.
+
+Proven in the test itself with temporary diagnostics, since removed. The event's
+embedding was present, the cosine was 0.7746 as computed, the date was in the
+future, and `hybridSearchEventIds` still returned `[]`. Under this JBR, `%f`
+applied to `0.7` prints `0,700000`.
+
+**Fix:**
+- The weights are bound as `?` parameters in both hybrid queries of
+  `SearchRepository`.
+- `SearchIT.semanticSearchSurvivesACommaDecimalLocale` forces `fr_CA`, so an
+  en_US runner still catches a regression.
+- The test JVMs are pinned to en_US and UTC in `backend/pom.xml`, and the runtime
+  JVM in `backend/Dockerfile`.
+- The traps are recorded in `rules/backend-java.md` and `rules/ci-and-build.md`.
+
+`SearchIT` ran 10 of 10 in `verify.mjs --full`, 290 integration tests green.
+
+**Still OPEN, by this entry's own rule.** Close it on a green GitHub full-tier
+run and move it to `fixed_bugs.md` then.
 
 ---
 
@@ -278,11 +307,25 @@ Related: the duplicate-method merge damage ([BUG-009](fixed_bugs.md#bug-009)) re
 `ClubService.update` variant that omitted the re-index call — the surviving copy
 is the correct one.
 
+**Narrowed 2026-09-14.** One stale path did exist even without an event update
+endpoint. An event's embedded text carries its organizer's name
+(`SearchableText.forEvent`), and `ClubService.update` could rename a club without
+touching its events. **That half is fixed:**
+- `update` calls `SearchIndexService.indexEventsByOrganizer` when the name
+  actually changes;
+- `SearchIT.renamingAClubReindexesItsEvents` covers it;
+- the rule is in `rules/backend-clubs.md`.
+
+**What remains is the missing `EventService.update` itself.** This stays open
+until that exists and re-indexes.
+
 **Affected files**
 - `backend/src/main/java/com/campusvibe/event/EventService.java` (no update path)
-- `backend/src/main/java/com/campusvibe/club/ClubService.java:51-65` (correct reference implementation)
+- `backend/src/main/java/com/campusvibe/club/ClubService.java` `update` (correct reference implementation, including the rename re-index)
 
-**Affected tests:** none. Add one asserting the embedding changes after an update.
+**Affected tests:** `SearchIT.renamingAClubReindexesItsEvents` covers the rename
+path. The event update path needs its own test asserting the embedding changes,
+once it is built.
 
 ---
 
