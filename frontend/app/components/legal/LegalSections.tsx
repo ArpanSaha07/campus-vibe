@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { Mail } from "lucide-react";
 
 // Shared building blocks for the static legal pages (/privacy-policy,
 // /terms-of-service), so both read as one document style.
@@ -71,19 +72,40 @@ export function BulletList({ items }: { items: string[] }) {
   );
 }
 
+// Titles are passed in order; entry i links to <Section number={i + 1}>.
+export function TableOfContents({ titles }: { titles: string[] }) {
+  return (
+    <nav aria-labelledby="legal-contents" className="mt-8 rounded-2xl bg-mist-100 p-5 sm:p-6">
+      <h2 id="legal-contents" className="ticket-label text-ink-600">
+        Contents
+      </h2>
+      <ol className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+        {titles.map((sectionTitle, index) => (
+          <li key={sectionTitle}>
+            <a
+              href={`#${sectionId(index + 1)}`}
+              className="flex items-baseline gap-2 text-sm text-ink-900 hover:text-lavender-600 transition-colors"
+            >
+              <span className="font-mono text-xs text-lavender-600">{String(index + 1).padStart(2, "0")}</span>
+              {sectionTitle}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 export function ContactCard({ email }: { email: string }) {
   return (
     <div className="rounded-2xl border border-mist-200 p-5">
-      <p className="font-display text-lg font-bold text-ink-900">CampusVibe</p>
-      <p className="mt-1">
-        <span className="ticket-label text-ink-600">Email</span>{" "}
-        <Link
-          href={`mailto:${email}`}
-          className="font-mono text-sm text-lavender-600 hover:text-lavender-800 underline underline-offset-4"
-        >
-          {email}
-        </Link>
-      </p>
+      <Link
+        href={`mailto:${email}`}
+        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-lavender-500 bg-transparent text-ink-900 hover:border-lavender-600 hover:bg-lavender-50 hover:text-lavender-800 transition-colors"
+      >
+        <Mail className="h-4 w-4" aria-hidden="true" />
+        Email
+      </Link>
     </div>
   );
 }

@@ -43,8 +43,8 @@ export default function Footer() {
           <div>
             <h4 className="ticket-label text-lavender-300 mb-3">CampusVibe</h4>
             <ul className="space-y-2">
-              <li><a href="#" className={linkClasses}>About</a></li>
-              <li><a href="#" className={linkClasses}>Help</a></li>
+              <li><Link href="/about" className={linkClasses}>About</Link></li>
+              {/* <li><Link href="/help" className={linkClasses}>Help</Link></li> */}
             </ul>
           </div>
         </div>

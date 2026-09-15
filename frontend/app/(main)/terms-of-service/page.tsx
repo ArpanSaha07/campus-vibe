@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BulletList, ContactCard, LegalPage, Section, sectionId } from "@/app/components/legal/LegalSections";
+import {
+  BulletList,
+  ContactCard,
+  LegalPage,
+  Section,
+  TableOfContents,
+} from "@/app/components/legal/LegalSections";
 
 // Static content, no data fetching, so this route prerenders at build time
 // without needing a backend. Bump LAST_UPDATED when the wording changes.
@@ -47,24 +53,7 @@ export default function TermsOfServicePage() {
         </p>
       </div>
 
-      <nav aria-labelledby="terms-contents" className="mt-8 rounded-2xl bg-mist-100 p-5 sm:p-6">
-        <h2 id="terms-contents" className="ticket-label text-ink-600">
-          Contents
-        </h2>
-        <ol className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
-          {SECTION_TITLES.map((sectionTitle, index) => (
-            <li key={sectionTitle}>
-              <a
-                href={`#${sectionId(index + 1)}`}
-                className="flex items-baseline gap-2 text-sm text-ink-900 hover:text-lavender-600 transition-colors"
-              >
-                <span className="font-mono text-xs text-lavender-600">{String(index + 1).padStart(2, "0")}</span>
-                {sectionTitle}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <TableOfContents titles={SECTION_TITLES} />
 
       <div className="mt-10">
         <Section number={1} title={title(1)}>
@@ -268,7 +257,7 @@ export default function TermsOfServicePage() {
         </Section>
 
         <Section number={15} title={title(15)}>
-          <p>If you have questions about these Terms, you can contact CampusVibe at:</p>
+          <p>If you have questions about these Terms, you can contact CampusVibe through email:</p>
           <ContactCard email={CONTACT_EMAIL} />
         </Section>
       </div>
