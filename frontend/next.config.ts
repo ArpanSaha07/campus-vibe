@@ -107,6 +107,25 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const apiInternal = process.env.API_INTERNAL_URL || apiOrigin;
     return [
+      // Versioned forms first. `adapters.ts` appends a hash of the stored key as
+      // a last path segment, so a URL changes exactly when the image behind it
+      // does -- a new banner or a removed photo moves a different image to the
+      // same position, and a cached copy used to keep showing the old one. A
+      // path segment rather than `?v=`, which next/image refuses on a local src
+      // without `localPatterns` (found 2026-09-15). The segment is not used in
+      // the destination, so every version reaches the same endpoint.
+      {
+        source: "/media/clubs/:clubId/logo/:version",
+        destination: `${apiInternal}/api/v1/clubs/:clubId/logo`,
+      },
+      {
+        source: "/media/clubs/:clubId/images/:index/:version",
+        destination: `${apiInternal}/api/v1/clubs/:clubId/images/:index`,
+      },
+      {
+        source: "/media/events/:eventId/images/:index/:version",
+        destination: `${apiInternal}/api/v1/events/:eventId/images/:index`,
+      },
       {
         source: "/media/clubs/:clubId/logo",
         destination: `${apiInternal}/api/v1/clubs/:clubId/logo`,

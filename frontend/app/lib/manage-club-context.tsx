@@ -24,20 +24,27 @@ interface ManageClubContextType {
   role: ManagedClub["role"];
   /** True when you can open this dashboard only because you are platform staff. */
   viaPlatformAdmin: boolean;
+  /**
+   * Re-reads the club behind the layout's header, without the loading screen.
+   * Called by the club editor after a save, so a new name or logo shows at once.
+   */
+  reload: () => Promise<void>;
 }
 
 const ManageClubContext = createContext<ManageClubContextType | undefined>(undefined);
 
 export function ManageClubProvider({
   club,
+  reload,
   children,
 }: {
   club: ManagedClub;
+  reload: () => Promise<void>;
   children: ReactNode;
 }) {
   return (
     <ManageClubContext.Provider
-      value={{ club, role: club.role, viaPlatformAdmin: club.role === null }}
+      value={{ club, role: club.role, viaPlatformAdmin: club.role === null, reload }}
     >
       {children}
     </ManageClubContext.Provider>

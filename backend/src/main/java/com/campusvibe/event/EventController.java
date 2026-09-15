@@ -1,6 +1,10 @@
 package com.campusvibe.event;
 
+import com.campusvibe.common.Logs;
+import com.campusvibe.exception.RequestValidationException;
 import com.campusvibe.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.campusvibe.s3.MediaKeys;
 import com.campusvibe.s3.MediaBucket;
 import com.campusvibe.s3.S3Service;
@@ -24,6 +28,8 @@ import java.util.List;
 @Validated // needed for constraints on @RequestParam, unlike @Valid on a body
 @RequestMapping("/api/v1/events")
 public class EventController {
+
+    private static final Logger log = LoggerFactory.getLogger(EventController.class);
 
     /**
      * Per axis, not combined. An event may carry eight topics and eight
@@ -100,6 +106,22 @@ public class EventController {
         return eventService.create(e, request.organizerId());
     }
 
+    /**
+     * Edits an event (CEM-10). Until this existed the only way to change one was
+     * to delete and recreate it, which silently discarded every RSVP.
+     *
+     * <p>Guarded by {@code canManageEvent}, which resolves through the organizing
+     * club: its owner, its admins and platform admins. Tags are checked against
+     * both vocabularies before anything is written, exactly as on create.
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
+    public EventDTO update(@PathVariable Long id, @RequestBody EventUpdateRequest request) {
+        return eventService.update(id, request,
+                taxonomyService.requireKnownInterests(request.topics(), MAX_EVENT_TAGS, "topic"),
+                taxonomyService.requireKnownEventFormats(request.formats(), MAX_EVENT_TAGS, "format"));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
     public void delete(@PathVariable Long id) {
@@ -109,6 +131,12 @@ public class EventController {
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
     public void uploadImages(@PathVariable Long id, @RequestPart("files") List<MultipartFile> files) throws IOException {
+        // The cap is checked before anything is stored, so an upload that would
+        // take the event past ten photos leaves no orphaned objects behind.
+        if (eventService.imageCount(id) + files.size() > EventService.MAX_EVENT_IMAGES) {
+            throw new RequestValidationException(
+                    "An event can have up to %d photos".formatted(EventService.MAX_EVENT_IMAGES));
+        }
         // Keys come from MediaKeys, never from the upload's filename (BUG-039).
         // Every file is checked before any is stored, so one refused file does
         // not leave the ones ahead of it uploaded and the request answering 400.
@@ -123,6 +151,40 @@ public class EventController {
             s3Service.putObject(mediaBucket.name(), keys.get(i), contents.get(i));
         }
         eventService.addImages(id, keys);
+    }
+
+    /**
+     * Removes one of an event's photos, by position, and returns the event.
+     *
+     * <p>By index, like the read, so a caller can only ever reach this event's
+     * own photos. The row is updated first and the object deleted after that
+     * commits (s3-media §19), and only a key under this event's own prefix is
+     * ever deleted -- never an absolute URL a seeded row holds. A failed delete
+     * is logged, not thrown: the photo is already gone from the page.
+     */
+    @DeleteMapping("/{id}/images/{index}")
+    @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
+    public EventDTO deleteImage(@PathVariable Long id, @PathVariable int index) {
+        String removed = eventService.removeImage(id, index);
+        if (MediaKeys.belongsToEvent(removed, id)) {
+            try {
+                s3Service.deleteObject(mediaBucket.name(), removed);
+            } catch (RuntimeException e) {
+                log.warn("Could not delete removed photo {} of event {}; the object is orphaned",
+                        Logs.safe(removed), id, e);
+            }
+        }
+        return eventService.get(id);
+    }
+
+    /**
+     * Makes one photo the event's banner by moving it to the first position.
+     * The club's own choice, live on the event page at once (Arpan, 2026-09-15).
+     */
+    @PutMapping("/{id}/images/{index}/banner")
+    @PreAuthorize("@clubPermissionService.canManageEvent(authentication, #id)")
+    public EventDTO makeBanner(@PathVariable Long id, @PathVariable int index) {
+        return eventService.makeBanner(id, index);
     }
 
     /**

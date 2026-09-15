@@ -5,7 +5,14 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `680da0e` plus the event photo unit — re-read on 2026-09-12:
+**Code as of:** `12afebf` plus the uncommitted club and event management unit —
+re-read on 2026-09-15: `event.tsx` gained `getEventForEdit` (raw and uncached),
+`updateEvent`, `deleteEvent`, `uploadEventImages`, `deleteEventImage` and
+`setEventBanner`; `adapters.ts` versions every media URL by a hash of its stored
+key and gained `toManagedClub`; the `events` cache tag got its first caller; and
+`EventController` gained `PUT /events/{id}`, `DELETE /events/{id}/images/{index}`
+and `PUT /events/{id}/images/{index}/banner`. No DTO field moved. Before that,
+`680da0e` plus the event photo unit — re-read on 2026-09-12:
 `EventController` gained `GET /events/{id}/images/{index}`, `ClubController`'s
 image response moved into `s3/StoredImageResponses` unchanged, and
 `toEventInstance` now maps event image keys to `/media/events/...` (BUG-042). No
@@ -252,8 +259,13 @@ created and after a proposal is approved. It uses **`updateTag`, not
 created the club is the one about to look at the list, and `revalidateTag`'s
 stale-while-revalidate semantics would hand them back the list without their
 club in it. `updateTag` is Server-Action-only, which is the other reason that
-file exists: both callers are client components. The `events` tag still has no
-caller.
+file exists: both callers are client components.
+
+**The `events` tag got its caller on 2026-09-15**, `revalidateEvents`, beside
+`revalidateClubs` and for the same reason. It runs after an event is edited or
+deleted, after its photos are added, removed or reordered, and after a club is
+renamed, since every event carries its organizer's name. One coarse tag covers
+the list, each club's list and each event; nothing finer exists to evict.
 
 Search is deliberately absent (`cache.ts:30`): its query space is unbounded, so
 caching it fills the store with entries nobody asks for twice, and results are
@@ -268,6 +280,14 @@ adapter. Two behaviours are worth knowing.
 404 and rethrow everything else. `getEvent` also short-circuits a non-numeric id
 before making any request, because event ids are database bigints and a slug
 cannot name one.
+
+**An edit form never reads through these.** `getEventForEdit` (`event.tsx`) and
+`getClubForEdit` (`services/clubService.ts`) fetch with `auth: true` and no cache
+policy, and return the raw `ApiEvent` / `ApiClub`. Two reasons: the public read
+is cached for five minutes, so a form seeded from it could save back a copy older
+than the last save; and `toEventInstance` turns a null location, price and
+capacity into `Location TBA`, `Free` and `0`, which a form would then submit as
+real values.
 
 `getTotalEventsForClub` (`club.tsx:75`) counts the club's own events. It
 previously returned `Math.floor(Math.random() * 100)`, so the club page printed a
@@ -329,6 +349,26 @@ through**, because event pictures in the demo data live in the frontend's own
 `public/` folder and `next/image` accepts such a path as it is. Keys are
 addressed by position, so one written under the retired `events/{id}/banners/`
 prefix maps the same way.
+
+**Every media URL ends in a version segment since 2026-09-15**, a short FNV-1a
+hash of the stored key: `/media/events/3/images/0/1jfp5m2`,
+`/media/clubs/{id}/logo/{hash}` ([BUG-056](../../bugs/fixed_bugs.md#bug-056),
+[ADR-016](../decisions/ADR-016-media-urls-versioned-by-key-hash.md)). A position
+is not a photo: choosing a new banner or removing a photo moves a different image
+to the same position, and the image response is cached for five minutes
+(`StoredImageResponses.java:64`), so the browser kept showing the old one. Every
+upload gets a unique key, so the tag changes exactly when the image does and the
+cache stays useful. **A path segment, never `?v=`:** `next/image` throws during
+render on a local `src` with a query string unless `images.localPatterns` names
+it (`next/dist/shared/lib/image-loader.js:55`), and the first attempt answered
+500 on every page with an uploaded image. `next.config.ts` rewrites the
+versioned path to the same endpoint and ignores the segment.
+
+**`toManagedClub` applies the same logo mapping to `ManagedClubDTO`**, whose
+`logo` is the stored key exactly as `ClubDTO.logo` is. The managed-club reads in
+`club-admin-requests.ts` used to skip the adapter, so `ClubLogo` received a key,
+refused it, and an uploaded logo never showed in the dashboard
+([BUG-055](../../bugs/fixed_bugs.md#bug-055)).
 
 The path is same-origin, and deliberately not an absolute API URL, because the
 two sides reach the backend at different hosts — emitting the internal one
@@ -569,10 +609,12 @@ own data request starts. It is also an XSS token-theft path. Tracked as
 auth endpoint, `apiFetch`, `AuthProvider` and `ProtectedRoute`, and logs out every
 existing session.
 
-**No cache invalidation exists.** `CACHE_TAGS` is defined and passed on every
-public read, but nothing calls `revalidateTag`. Creating an event does not evict
-the events list — it goes stale for up to five minutes. Acceptable at current
-scale, wrong as soon as club admins expect to see their own edits.
+**Invalidation happens only where a form does it.** Both tags have callers now —
+`revalidateClubs` after a club is created, edited or approved, `revalidateEvents`
+after an event is created, edited, deleted or has its photos changed. The writes
+themselves go straight to Spring Boot, so Next never sees them: the eviction is
+the form's job, not the write's, and a write made any other way — a script, or
+`curl` — leaves the public reads stale for up to five minutes.
 
 **`images` and `categories` are still N+1**, at two statements per event from the
 `@ElementCollection` copies in `EventMapper` — 2 of the 13 statements measured
@@ -585,9 +627,13 @@ data; it agreed with the real name only by coincidence, and never for a club lik
 *Making Waves Montréal*. Fixed by carrying `organizerName` on `EventDTO`, but
 nothing structural prevents the next divergence.
 
-**No HTTP caching on API responses.** No `Cache-Control`, no `ETag` — verified by
-grep. Every cache hit today is Next's in-process data cache, which means a second
-frontend instance shares nothing with the first.
+**No HTTP caching on API data responses.** No `Cache-Control` and no `ETag` on
+JSON. **The one exception is stored images**, which `StoredImageResponses`
+serves with `max-age=300, public` since 2026-09-09 — the reason a media URL has to
+change when its image does ([BUG-056](../../bugs/fixed_bugs.md#bug-056)). The
+2026-08-15 grep that said no response carries `Cache-Control` predates it. Every
+other cache hit is Next's in-process data cache, which means a second frontend
+instance shares nothing with the first.
 
 **No global ceiling on search spend.** The per-IP budget added for
 [BUG-005](../../bugs/fixed_bugs.md#bug-005) bounds one caller, not the sum of
@@ -647,6 +693,19 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- **2026-09-15** — Club and event management. New endpoints `PUT /events/{id}`
+  (full replacement, `canManageEvent`), `DELETE /events/{id}/images/{index}` and
+  `PUT /events/{id}/images/{index}/banner`; an event holds at most ten photos
+  and the first is its banner
+  ([ADR-015](../decisions/ADR-015-event-banner-is-the-first-photo.md)).
+  `event.tsx` and `clubService.ts` gained the write calls and an uncached raw
+  read for each edit form. The `events` tag got its caller. `adapters.ts`
+  versions media URLs by key hash as a path segment, after a `?v=` attempt
+  crashed every page with an image ([BUG-056](../../bugs/fixed_bugs.md#bug-056),
+  [ADR-016](../decisions/ADR-016-media-urls-versioned-by-key-hash.md)), and
+  gained `toManagedClub` ([BUG-055](../../bugs/fixed_bugs.md#bug-055)).
+  Corrected the stale claim that no API response carries `Cache-Control`. No DTO
+  field or cache policy moved. Implementing agent.
 - **2026-09-12** — Event photos can be displayed
   ([BUG-042](../../bugs/bugs.md#bug-042), events half). New endpoint
   `GET /events/{id}/images/{index}`, public under the existing

@@ -7,6 +7,7 @@ import {
   ExternalLink,
   History,
   LayoutDashboard,
+  Pencil,
   Users,
 } from "lucide-react";
 
@@ -25,7 +26,10 @@ import {
 
 const sections = [
   { segment: "", label: "Overview", icon: LayoutDashboard },
-  { segment: "events", label: "Events", icon: CalendarDays },
+  // Second, as §29 of the governance spec orders the sections. Open to owners
+  // and admins alike: everyone who can reach this dashboard edits the club.
+  { segment: "club", label: "Edit Club page", icon: Pencil },
+  { segment: "events", label: "Edit Events", icon: CalendarDays },
   { segment: "admins", label: "Administrators", icon: Users },
   // Last on purpose: it is a record of what already happened, so it is where
   // you go after noticing something, not where you start.

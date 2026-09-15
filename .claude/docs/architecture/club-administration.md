@@ -5,7 +5,10 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `3fec570` — the club ownership spine (two creation paths, the
+**Code as of:** `12afebf` plus the uncommitted club and event management unit,
+2026-09-15 — the Club page editor, Edit and Delete on the Events tab, the event
+edit route, and managed-club logos mapped through the adapter. Before that,
+`3fec570` — the club ownership spine (two creation paths, the
 club-proposal queue, the platform-admin write for `official_email`), plus the
 contact links a proposal now carries and the official email both paths seed.
 
@@ -313,8 +316,29 @@ promise in Next 16.
 **`app/(protected)/manage/[clubId]/page.tsx`** — Overview: three stat tiles, the
 next four events, and the official-email panel.
 
-**`.../events/page.tsx`** — upcoming/past tabs. Date-based, because `events` has
-no status column.
+**`.../club/page.tsx`** and **`app/components/manage/ClubEditForm.tsx`** — the
+Club page editor (CEM-01, since 2026-09-15). Everyone who can open the dashboard
+edits every property — name, description, category, tags, logo, photos, contact
+links — because `PUT /clubs/{id}` and both uploads are guarded by `canManageClub`
+and Arpan chose not to narrow it. Two things are deliberately absent: the slug,
+which is the club's URL, and the official email, which stays in its admin-only
+panel on the Overview (§6). Photos are add-only; no endpoint removes a club
+photo. Seeded from `getClubForEdit`, an uncached read of the raw `ClubDTO`,
+because `ManagedClub` carries only the name and logo. Saves in order — details,
+then logo, then photos — so a failure names the step that failed; the success
+work runs after the write's `try` and is awaited in its own `catch` (BUG-045,
+BUG-047).
+
+**`.../events/page.tsx`** — upcoming/past tabs, date-based because `events` has
+no status column, and under each card **Edit** and **Delete** since 2026-09-15.
+Delete is a hard delete that takes every RSVP and bookmark with it, so it asks
+inline first and says so (CEM-14, cancel versus delete, is not built).
+
+**`.../events/[eventId]/edit/page.tsx`** — loads the raw event through
+`getEventForEdit` and renders `CreateEventForm` in edit mode. An event belonging
+to another club answers *No such event*, so a hand-edited URL cannot open it
+under this club's dashboard. `components/event/ManageEventLink.tsx` puts an Edit
+event link on the public event page for the same people `ManageClubPill` serves.
 
 **`.../admins/page.tsx`** — the team list, plus the owner's invite form and a
 remove control on every row but the owner's. A pending invitation is a row in
@@ -325,7 +349,10 @@ that answer.
 **`app/lib/manage-club-context.tsx`** — the club the current `/manage/[clubId]`
 screen is about, resolved once by the layout and read by the pages inside it.
 Replaces each page doing its own `clubs.find(...)`, which only ever worked for
-someone holding an assignment.
+someone holding an assignment. It also exposes `reload`, a silent refresh the
+club editor calls after a save so the header shows a new name or logo — silent
+because the layout's own loader flips to the loading screen, which would unmount
+the editor and its message.
 
 **`app/components/club/ManageClubPill.tsx`** — a Manage shortcut revealed on
 hover of a club card, for platform admins and for anyone who manages that club.
@@ -347,7 +374,8 @@ Outside `/manage` deliberately: the person opening the link may manage nothing
 at all, and `/manage` is not in their navbar.
 
 **`app/components/manage/ManageSidebar.tsx`**, **`ClubRoleBadge.tsx`** — the
-rail and the owner/admin chip.
+rail and the owner/admin chip. The rail reads Overview, Edit Club page, Edit
+Events, Administrators, Activity — the Club page second, as §29 orders it.
 
 **`app/(protected)/club-dashboard/page.tsx`** — now a redirect to `/manage`.
 
@@ -495,8 +523,10 @@ list must not make the app believe the user manages nothing.
   `GET /clubs/{id}/managed`, which answers the second question.
 - **The audit log records administration and ownership only.** Club-page edits
   and event changes are not logged, so a club whose team has been stable has an
-  empty Activity tab — §21's own example shows both, and they arrive with
-  `EventService.update` (BUG-006), which that work has to touch anyway.
+  empty Activity tab — §21's own example shows both. The write paths all exist
+  since 2026-09-15 — `ClubService.update`, the uploads, `EventService.update`,
+  `removeImage`, `makeBanner` and event delete — and none records anything;
+  audit call sites were outside that unit's scope by Arpan's call (CEM-06).
 - **There is still no way out of an ownerless club.** Transfer needs a sitting
   owner to start it, so a club whose owner's account is deleted, or which never
   had one, cannot acquire one except through the club-admin-request queue — and
@@ -565,6 +595,16 @@ list must not make the app believe the user manages nothing.
 
 ## Change log
 
+- 2026-09-15 — **a club and its events can be managed from the dashboard.** The
+  Club page editor (CEM-01, closing
+  [BUG-043](../../bugs/fixed_bugs.md#bug-043)), Edit and Delete on the Events tab
+  and the edit route behind them, photo management on the event form with a
+  ten-photo cap and a chosen banner
+  ([ADR-015](../decisions/ADR-015-event-banner-is-the-first-photo.md)), and an
+  Edit event link on the public event page. Managed-club logos go through the
+  adapter now ([BUG-055](../../bugs/fixed_bugs.md#bug-055)). No spec: the plan
+  was approved in session and served as one. Nothing is audited — see Known
+  deviations. Implementing agent.
 - 2026-09-10 — **a club's official email is seeded at creation, on both paths.**
   It had no way of being set until the club already existed: `ClubCreateRequest`
   carried no field for it and `PATCH /clubs/{clubId}/official-email` is the only

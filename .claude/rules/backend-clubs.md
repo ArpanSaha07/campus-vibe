@@ -1,8 +1,8 @@
 ---
-description: Club, club-governance, seed and taxonomy code — the assigned-id merge trap, the taxonomy contract, and the ADR triggers that fire here
+description: Club, club-governance, event-media, seed and taxonomy code — the assigned-id merge trap, the taxonomy contract, event photo order, and the ADR triggers that fire here
 paths:
-  - "backend/src/main/java/com/campusvibe/{club,clubadmin,seed,taxonomy}/**"
-  - "backend/src/test/java/com/campusvibe/{club,clubadmin,taxonomy}/**"
+  - "backend/src/main/java/com/campusvibe/{club,clubadmin,event,seed,taxonomy}/**"
+  - "backend/src/test/java/com/campusvibe/{club,clubadmin,event,taxonomy}/**"
 ---
 
 # Clubs, seeding and taxonomy
@@ -66,6 +66,14 @@ reads.
   `MediaKeys.belongsToClub` says it is this club's; deleting inside the
   transaction leaves the row pointing at nothing when the commit fails.
   (BUG-039)
+- **An event's photos are ordered, and the order is data: the first is the
+  banner.** `Event.images` carries `@OrderColumn(name = "sort_order")` (V34), and
+  `EventService.makeBanner` reorders the list in place — never a reassigned copy
+  (BUG-044). Removing a photo updates the row first and deletes the object after
+  the commit, and only if `MediaKeys.belongsToEvent` says it is this event's.
+  Ten photos per event: `EventController` checks before storing anything so an
+  overflow orphans nothing, and `addImages` re-checks inside the write.
+  `event/` was added to the paths above for this on 2026-09-15. (ADR-015)
 - **`DevDataSeeder` is idempotent per club, not wholesale.** It skipped for
   months because V6 had already inserted eight clubs, so it had never run and
   every seeded club had a null embedding. V32 retires those rows; do not restore

@@ -1,5 +1,13 @@
 import { ApiError } from "@/app/lib/api";
-import { getEvent } from "@/app/lib/event";
+import {
+  deleteEvent,
+  deleteEventImage,
+  setEventBanner,
+  getEvent,
+  getEventForEdit,
+  updateEvent,
+  uploadEventImages,
+} from "@/app/lib/event";
 import { PUBLIC_READ_CACHE } from "@/app/lib/cache";
 import type { ApiEvent } from "@/app/types";
 
@@ -33,6 +41,101 @@ const apiEvent: ApiEvent = {
   topics: ["Games"],
   formats: [],
 };
+
+describe("editing an event", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("reads the raw event without the public cache, so null fields stay null", async () => {
+    mockApiFetch.mockResolvedValue(apiEvent);
+
+    const raw = await getEventForEdit("12");
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/events/12", { auth: true });
+    // Not "Free", "Location TBA" or 0 -- those would be saved back as real values.
+    expect(raw?.price).toBeNull();
+    expect(raw?.capacity).toBeNull();
+  });
+
+  it("answers null for an event that does not exist", async () => {
+    mockApiFetch.mockRejectedValue(new ApiError(404, "{}"));
+    await expect(getEventForEdit("99")).resolves.toBeNull();
+  });
+
+  it("sends a full replacement, emptied fields as null", async () => {
+    mockApiFetch.mockResolvedValue(apiEvent);
+
+    await updateEvent("12", {
+      title: "Chess Night",
+      description: "  ",
+      dateTime: "2026-10-01T18:00:00.000Z",
+      location: "",
+      price: "",
+      capacity: null,
+      topics: ["games"],
+      formats: [],
+    });
+
+    const [path, init] = mockApiFetch.mock.calls[0];
+    expect(path).toBe("/api/v1/events/12");
+    expect(init.method).toBe("PUT");
+    expect(init.auth).toBe(true);
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({ description: null, location: null, price: null, capacity: null });
+    expect(body).not.toHaveProperty("organizerId");
+  });
+
+  it("deletes with auth", async () => {
+    mockApiFetch.mockResolvedValue(undefined);
+    await deleteEvent("12");
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/events/12", {
+      method: "DELETE",
+      auth: true,
+    });
+  });
+
+  it("uploads photos as multipart under the part name files, and skips an empty pick", async () => {
+    mockApiFetch.mockResolvedValue(undefined);
+
+    await uploadEventImages("12", []);
+    expect(mockApiFetch).not.toHaveBeenCalled();
+
+    const file = new File(["x"], "a.png", { type: "image/png" });
+    await uploadEventImages("12", [file]);
+    const [path, init] = mockApiFetch.mock.calls[0];
+    expect(path).toBe("/api/v1/events/12/images");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).getAll("files")).toHaveLength(1);
+  });
+});
+
+describe("managing an event's photos", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  // By position, never by key: the server resolves the index against this
+  // event's own list, so no caller can name another object.
+  it("removes a photo by position and returns the event as it now stands", async () => {
+    mockApiFetch.mockResolvedValue({ ...apiEvent, images: [] });
+
+    const next = await deleteEventImage("12", 3);
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/events/12/images/3", {
+      method: "DELETE",
+      auth: true,
+    });
+    expect(next.images).toEqual([]);
+  });
+
+  it("chooses the banner by position", async () => {
+    mockApiFetch.mockResolvedValue(apiEvent);
+
+    await setEventBanner("12", 2);
+
+    expect(mockApiFetch).toHaveBeenCalledWith("/api/v1/events/12/images/2/banner", {
+      method: "PUT",
+      auth: true,
+    });
+  });
+});
 
 describe("getEvent", () => {
   beforeEach(() => jest.clearAllMocks());

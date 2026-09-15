@@ -60,7 +60,7 @@ append-only audit log and an Activity tab, and the club create form —
 
 **Planned.** `EventService.update` — there is no update path at all, so events
 cannot be edited and their embeddings go stale
-([BUG-006](../bugs/bugs.md#bug-006)); event delete; banner and logo upload
+([BUG-006](../bugs/fixed_bugs.md#bug-006)); event delete; banner and logo upload
 reachable from the dashboard; event lifecycle status (`DRAFT` / `PUBLISHED` /
 `ARCHIVED`), whose trap is that *every* public read path must filter to
 `PUBLISHED`. Items 6 and 11–15 of the governance spec
