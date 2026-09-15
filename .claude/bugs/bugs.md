@@ -1,10 +1,6 @@
 # CampusVibe — Bug Log
 
-<<<<<<< HEAD
-Last updated: **2026-09-14** · Branch: `feature/search`
-=======
 Last updated: **2026-09-15** · Branch: `develop`
->>>>>>> 89c52bfe94bda0c99064def1590955e32b4d9cf5
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
