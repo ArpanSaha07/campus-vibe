@@ -12,7 +12,7 @@ and production resolves two buckets that do not exist in a region the bucket is
 not in. After this ships, `FakeS3` is gone, `S3Config` always builds a genuine
 `S3Client`, local development and CI point it at MinIO, production points it at
 `campusvibe-prod-media` in `ca-central-1`, and an upload-then-read round trip is
-verified against both. This also closes [BUG-051](../bugs/bugs.md#bug-051) and
+verified against both. This also closes [BUG-051](../bugs/fixed_bugs.md#bug-051) and
 settles the presigned-upload question that has been the first item in
 [`STATUS.md`](../STATUS.md).
 

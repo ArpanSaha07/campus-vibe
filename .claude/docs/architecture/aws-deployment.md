@@ -34,6 +34,38 @@ have **not been started**. Nothing of CampusVibe runs on AWS yet.
 > `CampusVibe-Backend-Prod` gained `AWS_S3_BUCKET` and lost `S3_BUCKET_NAME`.
 > The reasoning and verification are in [`connecting-s3.md`](connecting-s3.md).
 
+> **2026-09-15 — the backend is deployed and serving the Vercel site.** The
+> state paragraph above and the body below describe the 2026-08-18 plan; these
+> dated notes are the current record.
+>
+> **What runs:**
+> - `CampusVibe-Backend-Prod`, version `campusvibe-backend-20260915-010151-67ce188`: a t3.small capped at one instance, behind an ALB spanning `ca-central-1a`, `1b` and `1d`.
+> - HTTPS at `api.campusvibe-mcgill.com`: an ACM certificate on a 443 listener, TLS 1.2/1.3 policy.
+> - RDS PostgreSQL 18.3 over `sslmode=require`, as the master user.
+> - Secrets in environment properties.
+>
+> **The decisions taken that day, and why:**
+> - **HTTPS went first, not last.** The frontend calls the API from the browser (`frontend/app/lib/api.tsx:1`), so an HTTP API behind an HTTPS page is blocked as mixed content. It also had the only wait: DNS validation.
+> - **The load balancer was kept for HTTPS.** Arpan asked what HTTPS without it would take; three alternatives were laid out: Let's Encrypt on the instance, Cloudflare in front, CloudFront in front. Each saves roughly $25–30 a month and costs deploy downtime and self-healing, and Cloudflare also moves DNS off Namecheap. Kept for the demo; revisiting it wants a Proposed ADR.
+> - **A zone mismatch was fixed by widening the load balancer, not moving the instance** ([BUG-054](../../bugs/fixed_bugs.md#bug-054)): about $3.60 a month against replacing a running instance.
+> - **The bundle was packaged from the jar `verify.mjs` had just tested.** `package-eb.mjs` could not spawn Maven from Git Bash. The jar predated no code commit, so the version label carries the sha honestly.
+>
+> **Verified from outside:**
+> - Health `UP`; clubs and events 200.
+> - `users/me` 403 without a token.
+> - CORS echoing `https://www.campusvibe-mcgill.com` and `https://campusvibe-mcgill.com`, and 403 for any other origin.
+> - The first admin granted by `AdminBootstrapRunner` and the switch turned off.
+> - A photo upload in the bucket, and club and event creation by Arpan in the browser.
+>
+> **Open:**
+> - An HTTP→HTTPS redirect.
+> - An unmapped URL answers 500 ([BUG-053](../../bugs/bugs.md#bug-053)).
+> - Flyway's untested-on-PostgreSQL-18 warning.
+> - The dedicated database user and its SSM path.
+> - The `pg18` test pins.
+> - SES.
+> - CI/CD.
+
 Plan of record: [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md).
 This document records what was actually built and where it departs from that plan.
 

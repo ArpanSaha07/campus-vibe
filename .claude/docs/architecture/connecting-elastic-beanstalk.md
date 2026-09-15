@@ -1,6 +1,6 @@
 # Connecting Elastic Beanstalk
 
-**Code as of:** 680da0e plus the event photo unit (`deploy/eb/.platform/`, `package-eb.mjs`) · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — `AWS_S3_BUCKET` set, `S3_BUCKET_NAME` removed
+**Code as of:** `11c9993` · **Account read:** 2026-09-15 · **Changed:** 2026-09-14/15 — §0 (partly), §1, §2, §4, §5 and §6 done; see the note below
 **Order:** 2 of 4 — after [`connecting-rds.md`](connecting-rds.md) §1–§5. The S3 and SES properties from [`connecting-s3.md`](connecting-s3.md) and [`connecting-ses.md`](connecting-ses.md) go in the same property pass.
 **Related:** guide §12–§19 in [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md) · packaging in [`aws-deployment.md`](aws-deployment.md) · property reference in [`docker/EB-DEPLOYMENT.md`](../../../docker/EB-DEPLOYMENT.md)
 
@@ -11,6 +11,19 @@ change, started with `/start` · **Check** — read-only.
 Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central-1`.
 
 ---
+
+> **2026-09-15 — deployed. The table below is the 2026-09-12 reading, kept as history.**
+> What changed, every write run by Arpan:
+> - **§0:** capped at one instance and the database `/32` revoked. The two *idle Elastic IPs* are the load balancer's own addresses — **do not release them**. The two unused role policies are still attached.
+> - **§1:** health check on `/actuator/health`.
+> - **§2:** certificate issued, 443 listener on `ELBSecurityPolicy-TLS13-1-2-2021-06`, `api` CNAME at Namecheap.
+> - **§3:** still open. Port 80 answers plain HTTP.
+> - **§4:** every required property set, the five unread ones removed.
+> - **§5:** version `campusvibe-backend-20260915-010151-67ce188`, packaged with `--skip-build` because the script could not spawn Maven from Git Bash.
+> - **§6:** passed — health `UP`, clubs and events 200, `users/me` 403 without a token (not the 401 this runbook predicted), CORS for both origins, the admin bootstrapped and switched off, a photo upload.
+> - **§7:** Vercel set and redeployed.
+>
+> **Found on the way:** the first deploy was healthy and 503'd, because the instance-cap change recreated the Auto Scaling group and the instance landed in `ca-central-1d`, outside the load balancer's zones. `ELBSubnets` now spans all three default subnets — [BUG-054](../../bugs/fixed_bugs.md#bug-054).
 
 ## Where it stands
 

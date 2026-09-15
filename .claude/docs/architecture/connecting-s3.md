@@ -1,8 +1,8 @@
 # Connecting S3
 
-**Code as of:** 680da0e plus the event photo unit (`s3/StoredImageResponses`, `MediaKeys.eventImage`) · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan
+**Code as of:** `11c9993` · **Account read:** 2026-09-15 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan · **Verified:** 2026-09-15 — §5's upload, in production
 **Order:** 3 of 4 — the property goes in the same pass as [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) §4; verification needs its §5 deploy.
-**Related:** [ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md) · [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) · [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) · [`s3-media/SKILL.md`](../../skills/s3-media/SKILL.md) · [BUG-051](../../bugs/bugs.md#bug-051)
+**Related:** [ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md) · [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) · [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) · [`s3-media/SKILL.md`](../../skills/s3-media/SKILL.md) · [BUG-051](../../bugs/fixed_bugs.md#bug-051)
 
 **Legend.** **Arpan · console** — an AWS change, *ask first* under
 [`rules/aws-handling.md`](../../rules/aws-handling.md) · **Check** — read-only.
@@ -12,6 +12,13 @@ Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central
 ---
 
 ## Where it stands
+
+> **2026-09-15 — connected.** Arpan created a club and uploaded a photo through
+> the deployed backend; the bucket holds one object of 1,763,667 bytes. That
+> proves the property, the region, the instance role through the default
+> credential chain and nginx's raised limit, and closed
+> [BUG-051](../../bugs/fixed_bugs.md#bug-051). Still unproved: the `ListBucket`
+> 404 path, and a 3 MB upload. §3's duplicate policy is still there.
 
 S3 is the service closest to connected: the code side shipped on 2026-09-12 and
 the bucket and grant already match it.
@@ -95,8 +102,8 @@ of storing the old bytes that long. Nothing needs it to connect.
 After [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) §5
 and the first administrator:
 
-- [ ] Log in as the administrator in the deployed frontend, create a test club,
-  and upload a logo from its page. Or with `curl`, using a token from the login
+- [x] Log in as the administrator in the deployed frontend, create a test club,
+  and upload a logo from its page. **Done 2026-09-15 by Arpan** — club, event and a photo, one 1.7 MB object in the bucket. Or with `curl`, using a token from the login
   response's `Authorization` header — never paste a real password into a file:
   ```bash
   API=https://api.campusvibe-mcgill.com
@@ -119,7 +126,7 @@ and the first administrator:
   through `POST /api/v1/events/<event-id>/images`, then open the event page
   through Vercel; the object lists under `events/<event-id>/images/`
 - [ ] **A missing object is a 404, not a 500** — the `ListBucket` grant working
-- [ ] **This closes [BUG-051](../../bugs/bugs.md#bug-051)** — move it at the next wrap-up.
+- [x] **This closes [BUG-051](../../bugs/fixed_bugs.md#bug-051)** — moved 2026-09-15. The 3 MB, event-photo-by-API and missing-object checks above are still unticked.
 
 Deleting the test club afterwards leaves its object behind (see below);
 deleting an object is Arpan's.
