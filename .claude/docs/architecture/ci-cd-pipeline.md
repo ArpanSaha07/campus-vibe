@@ -5,6 +5,8 @@
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
 **Code as of:** `081d7b3` for the paragraph on BOM pins under the Trivy gate —
+`bfc3c02` plus the uncommitted `AWS_S3_BUCKET` line for the `migrate` paragraph
+on required properties, 2026-09-14 ([BUG-052](../../bugs/fixed_bugs.md#bug-052));
 `backend/pom.xml` gained `<netty.version>` on 2026-09-11
 ([BUG-050](../../bugs/fixed_bugs.md#bug-050)); no workflow changed. `4d11778` for the `next.config.ts` sections (images, the
 `/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
@@ -495,6 +497,16 @@ On timeout the step prints the last HTTP status, because a connection refusal
 (`000`) and a served-but-absent endpoint (`404` or `500`) mean entirely
 different things and previously produced the same message.
 
+**The job's `env:` must satisfy every property that has no default**, because it
+boots the jar with no profile — unlike the IT suites, which get `application-test.yml`
+or name properties inline. Today that is the datasource, `JWT_SECRET` and, since
+2026-09-14, `AWS_S3_BUCKET` (`campusvibe-ci`, a name nothing calls: the job
+never touches S3, so it has no MinIO service). `806a1d0` removed that bucket's
+default and missed this block, and nothing caught it for three days: the push
+loop passes `run-migrate: false`, and `verify.mjs` never boots the jar, so the
+omission could only fail on a pull request — PR #51
+([BUG-052](../../bugs/fixed_bugs.md#bug-052)).
+
 ### `.github/workflows/_docker.yml`
 
 The most expensive job, and the only place that exercises the Dockerfiles, the
@@ -955,7 +967,8 @@ every `NEXT_PUBLIC_*` value live only in the Vercel dashboard
   from this origin through the rewrite below, so they are local as far as
   `next/image` is concerned. Anything not listed is a *thrown error during
   render*, not a broken image.
-- `async rewrites()` maps `/media/clubs/:clubId/logo` and `/images/:index` onto
+- `async rewrites()` maps `/media/clubs/:clubId/logo`, `/media/clubs/:clubId/images/:index`
+  and, since 2026-09-12, `/media/events/:eventId/images/:index` onto
   `API_INTERNAL_URL`. Three separate problems collapse into this one rule: the
   optimizer runs server-side where `localhost:8080` is the frontend container
   rather than the backend; emitting a different absolute URL per side would be a

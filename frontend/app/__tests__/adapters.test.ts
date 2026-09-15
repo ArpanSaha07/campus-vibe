@@ -83,6 +83,28 @@ describe("toEventInstance", () => {
     const event = toEventInstance({ ...apiEvent, images: ["/a.jpg"] });
     expect(event.images).toEqual(["/a.jpg"]);
   });
+
+  // An uploaded photo is stored as an S3 object key, which next/image throws on
+  // during render -- the club logo crash, for events (BUG-042). Addressed by
+  // position, so a key written under the old banners/ prefix maps the same way.
+  it("turns stored S3 keys into the media paths that serve them, by index", () => {
+    const event = toEventInstance({
+      ...apiEvent,
+      images: [
+        "events/7/images/one.png",
+        "https://images.unsplash.com/two.jpg",
+        "/banners/fta.jpg",
+        "events/7/banners/old.png",
+      ],
+    });
+
+    expect(event.images).toEqual([
+      "/media/events/7/images/0",
+      "https://images.unsplash.com/two.jpg",
+      "/banners/fta.jpg",
+      "/media/events/7/images/3",
+    ]);
+  });
 });
 
 describe("toClub", () => {

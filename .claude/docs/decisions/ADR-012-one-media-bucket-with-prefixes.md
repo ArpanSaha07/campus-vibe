@@ -2,7 +2,7 @@
 
 **Status:** ✅ Accepted 2026-09-12
 **Date:** 2026-09-12
-**Raised by:** [BUG-051](../../bugs/bugs.md#bug-051) — production resolves
+**Raised by:** [BUG-051](../../bugs/fixed_bugs.md#bug-051) — production resolves
 `AWS_S3_BUCKET_CLUBS` and `AWS_S3_BUCKET_EVENTS`, the environment sets neither,
 and both defaults name buckets that do not exist. The bug says in its own text
 that fixing it is a choice rather than a rename.

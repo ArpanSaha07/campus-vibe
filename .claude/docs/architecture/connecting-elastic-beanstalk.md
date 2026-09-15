@@ -1,6 +1,6 @@
 # Connecting Elastic Beanstalk
 
-**Code as of:** f8d32ba · **Account read:** 2026-09-12 · **Changed:** 2026-09-12 — `AWS_S3_BUCKET` set, `S3_BUCKET_NAME` removed
+**Code as of:** `11c9993` · **Account read:** 2026-09-15 · **Changed:** 2026-09-14/15 — §0 (partly), §1, §2, §4, §5 and §6 done; see the note below
 **Order:** 2 of 4 — after [`connecting-rds.md`](connecting-rds.md) §1–§5. The S3 and SES properties from [`connecting-s3.md`](connecting-s3.md) and [`connecting-ses.md`](connecting-ses.md) go in the same property pass.
 **Related:** guide §12–§19 in [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md) · packaging in [`aws-deployment.md`](aws-deployment.md) · property reference in [`docker/EB-DEPLOYMENT.md`](../../../docker/EB-DEPLOYMENT.md)
 
@@ -11,6 +11,19 @@ change, started with `/start` · **Check** — read-only.
 Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central-1`.
 
 ---
+
+> **2026-09-15 — deployed. The table below is the 2026-09-12 reading, kept as history.**
+> What changed, every write run by Arpan:
+> - **§0:** capped at one instance and the database `/32` revoked. The two *idle Elastic IPs* are the load balancer's own addresses — **do not release them**. The two unused role policies are still attached.
+> - **§1:** health check on `/actuator/health`.
+> - **§2:** certificate issued, 443 listener on `ELBSecurityPolicy-TLS13-1-2-2021-06`, `api` CNAME at Namecheap.
+> - **§3:** still open. Port 80 answers plain HTTP.
+> - **§4:** every required property set, the five unread ones removed.
+> - **§5:** version `campusvibe-backend-20260915-010151-67ce188`, packaged with `--skip-build` because the script could not spawn Maven from Git Bash.
+> - **§6:** passed — health `UP`, clubs and events 200, `users/me` 403 without a token (not the 401 this runbook predicted), CORS for both origins, the admin bootstrapped and switched off, a photo upload.
+> - **§7:** Vercel set and redeployed.
+>
+> **Found on the way:** the first deploy was healthy and 503'd, because the instance-cap change recreated the Auto Scaling group and the instance landed in `ca-central-1d`, outside the load balancer's zones. `ELBSubnets` now spans all three default subnets — [BUG-054](../../bugs/fixed_bugs.md#bug-054).
 
 ## Where it stands
 
@@ -23,7 +36,7 @@ Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central
 | Health check | Target group checks **`/`** for a 200 | ⚠ §1 — CampusVibe answers 401 there |
 | Instance role | `CampusVibe-ElasticBeanstalk-EC2Role`: WebTier, **WorkerTier**, **MulticontainerDocker**, and the inline S3 grant | ⚠ §0 |
 | Properties set | `AWS_REGION AWS_S3_BUCKET DB_HOST DB_NAME DB_PORT DB_USERNAME FRONTEND_URL SPRING_PROFILES_ACTIVE` — `AWS_S3_BUCKET` replaced `S3_BUCKET_NAME` 2026-09-12 | ⚠ §4 — five are read by nothing, and the database and JWT ones are missing |
-| Proxy | **nginx**, default request body limit **1 MB** — under the 5 MB upload cap | ⚠ §3 |
+| Proxy | **nginx**, default request body limit **1 MB** — under the 5 MB upload cap | ✅ in the bundle from 2026-09-12 (§3); takes effect on the first deploy |
 | Logs | Streamed to CloudWatch, 7-day retention | ✅ |
 | Loose ends | **Two Elastic IP addresses associated with nothing**, still billed | ⚠ §0 |
 | Domain | `api.campusvibe-mcgill.com` does not resolve; DNS is at Namecheap | §2 |
@@ -146,14 +159,17 @@ redirect has to ship inside the bundle.
               Query: '#{query}'
               StatusCode: HTTP_301
   ```
-- [ ] Teach `scripts/package-eb.mjs` to stage `.ebextensions/` beside
-  `Dockerfile` and `app.jar` — today it copies exactly those two.
-- [ ] **Raise nginx's request body limit** — the platform's nginx refuses
-  bodies over 1 MB by default, under the 5 MB upload cap, and no local test has
-  an nginx to catch it. `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf`
-  at `10M`, staged the same way; part of the approved
-  [event photo unit](../../specs/2026-09-12-event-images-served-and-eb-upload-limit.md),
-  which also teaches the script to stage hidden directories generally.
+- [x] Teach `scripts/package-eb.mjs` to stage `.ebextensions/` beside
+  `Dockerfile` and `app.jar` — **done 2026-09-12**: it copies every hidden
+  directory under `deploy/eb/`, so this file needs only to exist.
+- [x] **Raise nginx's request body limit** — **done 2026-09-12**:
+  `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf` at `10M`
+  ([event photo unit](../../specs/2026-09-12-event-images-served-and-eb-upload-limit.md)).
+  Proved only by the 3 MB upload in [`connecting-s3.md`](connecting-s3.md) §5.
+  **Zip entries must use forward slashes** — the script writes them itself,
+  because Windows PowerShell's `CreateFromDirectory` wrote
+  `.platform\nginx\...`, which the instance reads as one misnamed file. After
+  changing packaging, `unzip -l` the bundle.
 - [ ] **Verify:** `curl -sI http://api.campusvibe-mcgill.com/actuator/health` → `301` with an `https://` location.
 
 Until this lands, every client uses the `https://` address explicitly.

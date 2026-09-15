@@ -4,6 +4,7 @@ import com.campusvibe.common.Logs;
 import com.campusvibe.s3.MediaKeys;
 import com.campusvibe.s3.MediaBucket;
 import com.campusvibe.s3.S3Service;
+import com.campusvibe.s3.StoredImageResponses;
 import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
 import com.campusvibe.user.User;
@@ -11,8 +12,6 @@ import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,10 +23,8 @@ import org.springframework.web.multipart.MultipartFile;
 import com.campusvibe.exception.ResourceNotFoundException;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 @RestController
 @Validated // needed for constraints on @RequestParam, unlike @Valid on a body
@@ -40,13 +37,16 @@ public class ClubController {
     private final SearchService searchService;
     private final S3Service s3Service;
     private final MediaBucket mediaBucket;
+    private final StoredImageResponses storedImages;
 
     public ClubController(ClubService clubService, SearchService searchService,
-                          S3Service s3Service, MediaBucket mediaBucket) {
+                          S3Service s3Service, MediaBucket mediaBucket,
+                          StoredImageResponses storedImages) {
         this.clubService = clubService;
         this.searchService = searchService;
         this.s3Service = s3Service;
         this.mediaBucket = mediaBucket;
+        this.storedImages = storedImages;
     }
 
     @GetMapping
@@ -139,7 +139,7 @@ public class ClubController {
      */
     @GetMapping("/{id}/logo")
     public ResponseEntity<byte[]> logo(@PathVariable String id) {
-        return media(clubService.get(id).logo(), id);
+        return storedImages.serve(clubService.get(id).logo(), "Club [%s]".formatted(id));
     }
 
     /**
@@ -161,56 +161,9 @@ public class ClubController {
             throw new ResourceNotFoundException(
                     "Club [%s] has no image at position %d".formatted(id, index));
         }
-        return media(images.get(index), id);
-    }
-
-    private ResponseEntity<byte[]> media(String key, String clubId) {
-        if (key == null || key.isBlank()) {
-            throw new ResourceNotFoundException("Club [%s] has no such image".formatted(clubId));
-        }
-        // Seeded rows hold absolute URLs rather than keys (the demo photos come
-        // from Unsplash). Those are fetched by the browser directly and never
-        // reach this endpoint; answering 404 says so rather than asking S3 for
-        // an object named `https://...`.
-        if (key.startsWith("http://") || key.startsWith("https://")) {
-            throw new ResourceNotFoundException(
-                    "Club [%s] image is an external URL, not a stored object".formatted(clubId));
-        }
-
-        byte[] bytes = s3Service.getObject(mediaBucket.name(), key);
-        return ResponseEntity.ok()
-                .contentType(imageTypeOf(key))
-                // Every upload gets a new key, but the URL is the club's --
-                // /clubs/{id}/logo -- and does not change when the logo does,
-                // so a long cache would pin a replaced logo. Five minutes is
-                // enough to carry a page's worth of requests without that.
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5)).cachePublic())
-                // Belt and braces with the content type below: nothing here is
-                // ever to be sniffed into something executable.
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                .header("X-Content-Type-Options", "nosniff")
-                .body(bytes);
-    }
-
-    /**
-     * The content type to serve a stored object as, from its extension.
-     *
-     * <p>Only raster image types are named. Everything else — an SVG included —
-     * is served as {@code application/octet-stream}, so the browser saves it
-     * rather than rendering it. Uploads have refused anything but PNG, JPEG and
-     * WebP since 2026-09-11 ({@link MediaKeys}), but objects stored before then
-     * were never checked (BUG-039): an SVG is a document that can carry
-     * script, and serving one as {@code image/svg+xml} would execute it on the
-     * API's origin. This stays as the second line of defence -- do not add svg
-     * to this map.
-     */
-    private static MediaType imageTypeOf(String key) {
-        String lower = key.toLowerCase(Locale.ROOT);
-        if (lower.endsWith(".png")) return MediaType.IMAGE_PNG;
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
-        if (lower.endsWith(".gif")) return MediaType.IMAGE_GIF;
-        if (lower.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
-        return MediaType.APPLICATION_OCTET_STREAM;
+        // The response, its content-type allowlist and nosniff are shared with
+        // events in StoredImageResponses, so the SVG guard exists once.
+        return storedImages.serve(images.get(index), "Club [%s]".formatted(id));
     }
 
     /**

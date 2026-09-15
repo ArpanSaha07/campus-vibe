@@ -53,8 +53,14 @@ reads.
   address by index precisely so no caller can name an arbitrary object. A key
   that reaches `next/image` throws during render and takes the page down.
   (BUG-040)
+- **Serving any stored image goes through `s3/StoredImageResponses`** — clubs and
+  events both, since 2026-09-12. Do not build an image response in a controller
+  again: the raster-only content types and `nosniff` are the SVG guard, and a
+  second copy is the one that drifts. (BUG-039, BUG-042)
 - **Keys are `clubs/{id}/logos/{uuid}.{ext}` and `clubs/{id}/images/{uuid}.{ext}`,
-  built only by `MediaKeys`** — rows from before 2026-09-11 still hold
+  and `events/{id}/images/{uuid}.{ext}` for event photos (no `banners/` prefix
+  since 2026-09-12 — a banner is a chosen photo, not a stored kind), built only
+  by `MediaKeys`** — rows from before 2026-09-11 still hold
   `clubs/{id}/logo-{filename}`, so never parse a key's shape. Replacing a logo
   deletes the old object *after* `updateLogo` commits and only if
   `MediaKeys.belongsToClub` says it is this club's; deleting inside the

@@ -855,66 +855,68 @@ Claude Code should follow this order.
 
 ## Phase 1 — Backend production readiness
 
-- [ ] Review current Spring Boot configuration.
-- [ ] Create/verify `application-prod.yml`.
-- [ ] Replace hard-coded production configuration with environment variables.
-- [ ] Verify Flyway production configuration.
-- [ ] Ensure mock-data initialization cannot run in production.
-- [ ] Add/verify Spring Boot Actuator health endpoint.
-- [ ] Review the backend Dockerfile.
-- [ ] Build the Docker image locally.
-- [ ] Run the backend container successfully locally.
+*Status read 2026-09-14 from the code and the account: all done, verified locally 2026-08-18 ([`aws-deployment.md`](aws-deployment.md)).*
+
+- [x] ~~Review current Spring Boot configuration.~~
+- [x] ~~Create/verify `application-prod.yml`.~~
+- [x] ~~Replace hard-coded production configuration with environment variables.~~
+- [x] ~~Verify Flyway production configuration.~~ `ddl-auto: validate`, `application.yml:16`
+- [x] ~~Ensure mock-data initialization cannot run in production.~~ `DevDataSeeder` is `dev` only
+- [x] ~~Add/verify Spring Boot Actuator health endpoint.~~ `health,info` only, `application.yml:41`
+- [x] ~~Review the backend Dockerfile.~~ Production image is `deploy/eb/Dockerfile`, not `backend/Dockerfile`
+- [x] ~~Build the Docker image locally.~~ `node scripts/package-eb.mjs`
+- [x] ~~Run the backend container successfully locally.~~
 
 ## Phase 2 — RDS
 
 AWS Console/manual infrastructure work:
 
-- [ ] Create private PostgreSQL RDS instance.
-- [ ] Enable encryption.
-- [ ] Enable automated backups.
-- [ ] Use Single-AZ initially.
-- [ ] Disable public access.
-- [ ] Create/verify database security group.
-- [ ] Allow port 5432 only from the backend security group.
-- [ ] Record the RDS endpoint.
-- [ ] Configure production DB environment variables.
+- [x] ~~Create private PostgreSQL RDS instance.~~ `campusvibe-prod-db`, PostgreSQL 18.3, db.t4g.micro
+- [x] ~~Enable encryption.~~
+- [x] ~~Enable automated backups.~~ 7 days, deletion protection on
+- [x] ~~Use Single-AZ initially.~~
+- [x] ~~Disable public access.~~
+- [x] ~~Create/verify database security group.~~ `campusvibe-database-sg`
+- [ ] Allow port 5432 only from the backend security group. The EB instance group is allowed, **but a personal `/32` rule is still there**
+- [x] ~~Record the RDS endpoint.~~
+- [ ] Configure production DB environment variables. `SPRING_DATASOURCE_*`; the unread `DB_*` names are set instead
 - [ ] Verify Flyway against production RDS.
 
 ## Phase 3 — S3
 
-- [ ] Create private production S3 bucket.
-- [ ] Keep Block Public Access enabled.
-- [ ] Create least-privilege IAM policy.
-- [ ] Attach policy through the Elastic Beanstalk EC2 IAM role.
-- [ ] Update backend S3 integration to use the default AWS credential provider chain.
-- [ ] Remove any dependence on static AWS access keys.
-- [ ] Implement/verify presigned uploads.
-- [ ] Validate upload authorization and file constraints.
+- [x] ~~Create private production S3 bucket.~~ `campusvibe-prod-media`
+- [x] ~~Keep Block Public Access enabled.~~
+- [x] ~~Create least-privilege IAM policy.~~ `CampusVibe-S3-Media-Access`, including `ListBucket`
+- [x] ~~Attach policy through the Elastic Beanstalk EC2 IAM role.~~
+- [x] ~~Update backend S3 integration to use the default AWS credential provider chain.~~ ADR-011
+- [x] ~~Remove any dependence on static AWS access keys.~~
+- [x] ~~Implement/verify presigned uploads.~~ **Superseded:** uploads and reads stream through the API (ADR-010)
+- [ ] Validate upload authorization and file constraints. Done in code; not yet proved on a deployed backend (BUG-051)
 
 ## Phase 4 — Elastic Beanstalk
 
-- [ ] Create `campusvibe-backend` application.
-- [ ] Create `campusvibe-production` environment.
-- [ ] Choose Docker on Amazon Linux 2023.
-- [ ] Use Single Instance initially.
-- [ ] Configure the correct VPC.
-- [ ] Configure backend security group.
-- [ ] Add non-secret production environment variables.
-- [ ] Configure secret references.
-- [ ] Deploy backend manually.
-- [ ] Verify `/actuator/health`.
-- [ ] Verify DB connectivity.
-- [ ] Verify S3 connectivity.
-- [ ] Review CloudWatch logs.
+- [x] ~~Create `campusvibe-backend` application.~~ Named `CampusVibe`
+- [x] ~~Create `campusvibe-production` environment.~~ Named `CampusVibe-Backend-Prod`
+- [x] ~~Choose Docker on Amazon Linux 2023.~~
+- [x] ~~Use Single Instance initially.~~ **Departed:** load balanced with an ALB, kept 2026-09-12 for HTTPS through ACM
+- [x] ~~Configure the correct VPC.~~ Same VPC as RDS
+- [x] ~~Configure backend security group.~~
+- [x] ~~Add non-secret production environment variables.~~ 2026-09-14: `SPRING_DATASOURCE_URL/USERNAME`, `CORS_ALLOWED_ORIGINS`, `APP_BASE_URL`, `AUTH_RATE_LIMIT_TRUST_XFF`, `GOOGLE_CLIENT_ID`; the unread `DB_*` and `FRONTEND_URL` removed
+- [x] ~~Configure secret references.~~ **Departed:** `SPRING_DATASOURCE_PASSWORD`, `JWT_SECRET`, `OPENAI_API_KEY` are environment properties, set by Arpan in the console (decided 2026-09-12)
+- [x] ~~Deploy backend manually.~~ 2026-09-15, version `campusvibe-backend-20260915-010151-67ce188`
+- [x] ~~Verify `/actuator/health`.~~ `{"status":"UP"}`; target group health check moved from `/` to `/actuator/health`
+- [x] ~~Verify DB connectivity.~~ TLS to PostgreSQL 18.3; Flyway applied 33 migrations to the empty schema, V8 pgvector included
+- [x] ~~Verify S3 connectivity.~~ A 1.7 MB club photo landed in `campusvibe-prod-media` through the instance role (BUG-051)
+- [x] ~~Review CloudWatch logs.~~ Read with `logs get-log-events`; the guard hook refuses `logs tail`
 
 ## Phase 5 — Frontend integration
 
-- [ ] Configure production API URL in Vercel.
-- [ ] Configure Spring CORS for production frontend origins.
-- [ ] Verify authentication from Vercel to AWS backend.
-- [ ] Verify all critical frontend/backend flows.
-- [ ] Configure custom API domain.
-- [ ] Enforce HTTPS.
+- [x] ~~Configure production API URL in Vercel.~~ `NEXT_PUBLIC_API_URL`, `API_INTERNAL_URL`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, then a redeploy — the values are baked at build (BUG-004)
+- [x] ~~Configure Spring CORS for production frontend origins.~~ `https://www.campusvibe-mcgill.com` and `https://campusvibe-mcgill.com`; any other origin gets 403
+- [x] ~~Verify authentication from Vercel to AWS backend.~~ Sign-up, login, and the first admin through `AdminBootstrapRunner`, switched off again
+- [x] ~~Verify all critical frontend/backend flows.~~ Club creation, event creation and photo upload, by Arpan on 2026-09-15
+- [x] ~~Configure custom API domain.~~ `api.campusvibe-mcgill.com` CNAME at Namecheap to the environment
+- [ ] Enforce HTTPS. A 443 listener with an ACM certificate serves TLS 1.3, **but port 80 still answers plain HTTP** — the redirect is queued in `todo.md`
 
 ## Phase 6 — CI/CD
 

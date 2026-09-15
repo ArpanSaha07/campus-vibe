@@ -1,6 +1,6 @@
 ---
 name: s3-media
-description: CampusVibe media on S3 — club logos, event banners and profile images. Use when touching the s3 package, an image upload or delete endpoint, an object key, bucket config, or AWS credentials for media. Covers the private-bucket presigned model and where the code departs from it.
+description: CampusVibe media on S3 — club logos and images, event photos and profile images. Use when touching the s3 package, an image upload or delete endpoint, an object key, bucket config, or AWS credentials for media. Covers the private-bucket presigned model and where the code departs from it.
 paths:
   - "backend/src/main/java/com/campusvibe/s3/**"
   - "backend/src/main/resources/application*.yml"
@@ -22,7 +22,10 @@ plus the honest gap between the two.
   only*, read ADR-007 and ADR-010 instead: they reach it through the API, and
   the bucket stays exactly as private.
 - **The backend generates every object key.** `clubs/{id}/logos/{uuid}.webp`,
-  `events/{id}/banners/{uuid}.webp`, `users/{id}/profiles/{uuid}.webp`. A client
+  `events/{id}/images/{uuid}.webp`, `users/{id}/profiles/{uuid}.webp`. **There is
+  no banner prefix** — Arpan, 2026-09-12: a banner is one of an event's photos
+  that a club asks the platform owner to feature, not a stored kind. Where
+  `reference.md` says `banners/`, read `images/`. A client
   never supplies a key, and a user-supplied filename is never the canonical
   object name (§7, §13).
 - **Authorise before you presign.** A presigned URL is a capability — once it
@@ -58,17 +61,18 @@ implemented, and the reference does not say so.
   **`reference.md` §9 describes the rejected option** — presigning would hand S3
   whatever the browser sends, so the content sniffing that is the whole BUG-039
   fix could not run before the object lands. Do not open work to close it.
-- **Reading is done by streaming through the API, and only for clubs.**
-  `GET /api/v1/clubs/{id}/logo` and `/images/{index}`
-  (`ClubController.java:141`, `:158`). **Event banners and profile avatars still
-  have none**, so an uploaded event image cannot be displayed
-  ([BUG-042](../../bugs/bugs.md#bug-042)) — it now reaches the right bucket under
-  the right key and still has nothing to serve it.
+- **Reading is done by streaming through the API, for clubs and events.**
+  `GET /api/v1/clubs/{id}/logo`, `/clubs/{id}/images/{index}` and, since
+  2026-09-12, `/events/{id}/images/{index}`. All three hand the key to
+  **`s3/StoredImageResponses`**, the one place the response is built. **Profile
+  avatars still have no read path** ([BUG-042](../../bugs/bugs.md#bug-042)).
 - **Images are addressed by index, never by key.** An endpoint that took a key
   from the caller would fetch any object in the bucket it was pointed at. The
-  index is resolved against that club's own list.
+  index is resolved against that club's or event's own list. A stored value that
+  is not a key — an absolute URL or a root-relative path — is a 404 before the
+  store is asked.
 - **An uploaded SVG is never served as `image/svg+xml`.** `imageTypeOf`
-  (`ClubController.java:207`) names raster types only and falls back to
+  (`StoredImageResponses.java`) names raster types only and falls back to
   `application/octet-stream`, with `nosniff`. Uploads refuse SVG since
   2026-09-11, but objects stored before then were never checked, and an SVG is
   a document that can carry script — serving one as an image would execute it on
@@ -103,9 +107,10 @@ implemented, and the reference does not say so.
 - **The backend generates every key — `s3/MediaKeys` and nothing else.** Since
   2026-09-11 ([BUG-039](../../bugs/fixed_bugs.md#bug-039)), in the §7 layout:
   `clubs/{id}/logos/{uuid}.{ext}`, `clubs/{id}/images/{uuid}.{ext}`,
-  `events/{id}/banners/{uuid}.{ext}`. Nothing reads `getOriginalFilename()`.
-  Keys written before then keep the old `clubs/{id}/logo-{filename}` shape and
-  still read; nothing migrated them.
+  `events/{id}/images/{uuid}.{ext}`. Nothing reads `getOriginalFilename()`.
+  Keys written before then keep the old `clubs/{id}/logo-{filename}` shape, and
+  event photos uploaded before 2026-09-12 keep `events/{id}/banners/`; both still
+  read, and nothing migrated them.
 - **Validated by content, not by label.** `MediaKeys` reads the leading bytes
   and accepts PNG, JPEG and WebP only (§12); the filename and the part's
   `Content-Type` are ignored, since the caller writes both. Anything else, and
@@ -114,10 +119,15 @@ implemented, and the reference does not say so.
 - **5MB per file, 10MB per request** (`application.yml:34-35`), per §12. Over
   either is a 413 with a sentence (`DefaultExceptionHandler`). MockMvc never
   applies these caps; only `MediaUploadLimitIT`, on a real port, sees them.
+  **In production nginx sits in front and refuses 1 MB by default**, which
+  `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf` raises to `10M`.
+  Change it together with `max-request-size`.
 - **A missing object is a 404, not a 500.** `S3Service.getObject` translates
   `NoSuchKeyException` into `ResourceNotFoundException`. A row pointing at an
   object that is not there is a real state — §21's accepted orphan — rather than
-  a server fault.
+  a server fault. **In production that depends on the instance role holding
+  `s3:ListBucket`**: without it S3 answers a missing key with 403, not
+  NoSuchKey, and the read is a 500. MinIO always lists, so no test shows it.
 - **A replaced logo's old object is deleted, in §19's order**: store the new
   object, point the row at it, and delete the old one only after
   `ClubService.updateLogo` has committed. A failed delete is logged and does not
@@ -139,8 +149,9 @@ traffic that is a measurable share of backend memory.
 the local store could not presign. MinIO can. If the subject comes back, argue it
 on the content-validation ground, which still holds, and not on that one.
 
-**Building the missing event and avatar read paths** should follow the club one
-above rather than inventing a second shape — same index addressing, same
-content-type restriction, same `/media/**` rewrite. If that ever stops scaling,
+**Building the missing avatar read path** should follow the club and event ones
+above rather than inventing a second shape — same index addressing, the same
+`StoredImageResponses`, same `/media/**` rewrite. Events followed it on
+2026-09-12. If that ever stops scaling,
 the replacement is presigned or CDN URLs for *all* media at once, which is an
 ADR, not a per-feature choice.

@@ -55,25 +55,43 @@ Everything below binds to both.
   credentials always list, so no test shows it. Added 2026-09-12. An unattached
   duplicate, `CampusVibeProdMediaS3Access`, still exists; deleting it is
   Arpan's. The environment proxies through **nginx**, whose 1 MB default body
-  limit sits under the 5 MB upload cap until `deploy/eb/.platform/` raises it.
+  limit sits under the 5 MB upload cap. `deploy/eb/.platform/nginx/conf.d/`
+  raises it to `10M` from 2026-09-12 — **proved in production 2026-09-15** by a
+  1.7 MB upload, never provable by a local test.
 - **The backend reads one variable, `AWS_S3_BUCKET`**, and it has no default —
   an environment that does not set it fails to start (ADR-012, BUG-051).
   `AWS_REGION` defaults to `ca-central-1`, where the bucket actually is. The
   `CampusVibe-Backend-Prod` environment **sets both, since 2026-09-12**, and the
-  never-read `S3_BUCKET_NAME` is gone. Nothing has run there yet — it still
-  holds the sample application — so BUG-051 closes on the first deployed
-  upload, not on the property.
+  never-read `S3_BUCKET_NAME` is gone. The first deployed upload landed
+  2026-09-15, which closed BUG-051.
 - **Outside production nothing talks to AWS at all.** `AWS_S3_ENDPOINT` points
   the same real `S3Client` at MinIO locally and in CI (ADR-011); production
   leaves it unset and resolves the instance role. There is no mock flag any
   more.
 - **`campusvibe-prod-db`** — PostgreSQL **18.3**, private, TLS forced,
-  deletion protection on. Its master password is RDS-managed and **rotates every
-  7 days** until switched to self-managed, and the database security group still
-  admits one personal address.
-- **The Elastic Beanstalk environment is load balanced** — an ALB on HTTP only,
-  health check on `/` — not the single instance the guide describes. Kept on
-  2026-09-12; HTTPS comes from ACM on that ALB.
+  deletion protection on. Its master password is **self-managed since
+  2026-09-14** — the RDS-managed one rotated weekly and would have killed the
+  copy in the Elastic Beanstalk property — and `campusvibe-database-sg` admits
+  only the environment's instance group; the personal `/32` was revoked the same
+  day.
+- **The Elastic Beanstalk environment is load balanced**, not the single instance
+  the guide describes — kept 2026-09-12. **CampusVibe runs on it since
+  2026-09-15**: `https://api.campusvibe-mcgill.com`, a 443 listener with an ACM
+  certificate, health check `/actuator/health`, capped at one instance. Port 80
+  still answers plain HTTP. Secrets are environment properties Arpan types in
+  the console; the bootstrap admin switch is off.
+- **A 503 with a clean container log is the load balancer, not the app** (BUG-054).
+  Read `elbv2 describe-target-health` first: `Target.NotInUse` means the
+  instance sits in a zone the load balancer does not serve. Any change that
+  recreates the Auto Scaling group — `MaxSize` did — may move the instance to
+  any subnet the group lists. The load balancer now spans all three default
+  subnets, so the group's list and its own match; keep them matched.
+- **`3.96.239.88` and `15.175.46.76` are the load balancer's addresses**, not idle
+  Elastic IPs. Never release them.
+- **Read the container log with `logs get-log-events`**, the stream named by
+  instance id, under
+  `/aws/elasticbeanstalk/CampusVibe-Backend-Prod/var/log/eb-docker/containers/eb-current-app/stdouterr.log`.
+  The guard hook refuses `logs tail`; set `MSYS_NO_PATHCONV=1` in Git Bash.
 - **SES is in the sandbox** with no verified identity.
 - **What is left to connect, service by service:**
   [`connecting-rds.md`](../docs/architecture/connecting-rds.md),

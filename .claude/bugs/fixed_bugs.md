@@ -2,10 +2,13 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-11**
+Last updated: **2026-09-15**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-054](#bug-054) | Blocker | 2026-09-15 | The first production deploy was healthy and every request was a 503: the replacement instance landed in `ca-central-1d`, a zone the load balancer did not serve |
+| [BUG-051](#bug-051) | High | 2026-09-15 | Production was configured for S3 buckets that did not exist; closed by the first upload landing in `campusvibe-prod-media` through the deployed backend |
+| [BUG-052](#bug-052) | Blocker | 2026-09-14 | `Database / Apply migrations to a clean database` failed on PR #51: the jar refused to boot because the job never set `AWS_S3_BUCKET`, which lost its default in `806a1d0` — not a stale build, and every migration applied |
 | [BUG-050](#bug-050) | Blocker | 2026-09-11 | The Trivy gate blocked PR #45 on two newly published CRITICALs — `next` 16.3.0 and `netty-handler` 4.1.135 — with nothing in the repo having changed |
 | [BUG-039](#bug-039) | High | 2026-09-11 | Uploads named their own S3 object from the browser filename, and against `FakeS3` a `..` in it was a file write anywhere on disk — which our own entry had ruled out |
 | [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
@@ -43,6 +46,113 @@ Last updated: **2026-09-11**
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
 
 ---
+
+### BUG-054
+**The first production deploy was healthy and unreachable: the instance was in a zone the load balancer did not serve** · Blocker · FIXED 2026-09-15
+
+**Found:** 2026-09-15, minutes after the first CampusVibe version deployed to
+`CampusVibe-Backend-Prod`. The container log was clean — `prod` profile, 33
+migrations, `Started Main` — and every request, `/actuator/health` included,
+answered `503 Service Temporarily Unavailable` from the load balancer.
+
+**The misleading part.** Elastic Beanstalk reported the deploy as successful and
+the environment Warning on 5xx. Nothing in the application was wrong, so reading
+the application's log could never find it.
+
+**Cause.** `aws elbv2 describe-target-health` answered `Target.NotInUse` for the
+only instance, `i-005f652168477efa0`, in `ca-central-1d`. The load balancer was
+enabled in `ca-central-1a` and `1b` only; the Auto Scaling group's subnets span
+`1a`, `1b` and `1d`. The instance had been placed there an hour earlier, by the
+`update-environment` that set `aws:autoscaling:asg MaxSize=1`: *Requested update
+requires the creation of a new physical resource*, so Elastic Beanstalk created
+a new Auto Scaling group and a new instance, and the zone was free to change.
+The sample application sat on that instance briefly too, and nobody requested it.
+
+**Fix.** `aws:ec2:vpc ELBSubnets` extended to all three default subnets, run by
+Arpan with `!` in the same update that added the 443 listener. All three are
+public subnets routed to `igw-0e34ba3d48dddfb17`. Rejected: restricting the
+instance to `1a`/`1b`, which replaces the running instance. Arpan chose on cost:
+the load balancer's third public IPv4 is about $3.60 a month.
+
+**Verified:** target `healthy`, environment Green,
+`https://api.campusvibe-mcgill.com/actuator/health` → `{"status":"UP"}`.
+
+**Trap, now in `rules/aws-handling.md`:** when a load-balanced environment
+answers 503 with a clean container log, read target health before the
+application — and an ASG-recreating change can move the instance to any subnet
+the group lists.
+
+### BUG-051
+**Production was configured for S3 buckets that did not exist** · High · FIXED 2026-09-15
+
+**Renumbered 2026-09-12 — first filed as BUG-040**, an id the club-logo crash
+([BUG-040](#bug-040)) also carries.
+
+**Found:** 2026-09-08, reading the live account while writing
+[`rules/aws-handling.md`](../rules/aws-handling.md). The backend resolved two
+buckets from `AWS_S3_BUCKET_CLUBS` and `AWS_S3_BUCKET_EVENTS`, defaulting to
+`campusvibe-clubs` and `campusvibe-events`. The environment set neither — only
+`S3_BUCKET_NAME=campusvibe-prod-media`, which no code read — and neither default
+bucket existed. The IAM grant named `campusvibe-prod-media/*` alone. Every
+production upload would have failed `NoSuchBucket`. **A second fault sat under
+it:** `aws.region` defaulted to `us-east-1`, and the bucket is in `ca-central-1`.
+Neither had ever run, because the `aws.s3.mock` flag defaulted to true
+everywhere but `prod`.
+
+**Fix, in three steps.**
+- **Code, 2026-09-12** ([ADR-011](../docs/decisions/ADR-011-minio-replaces-fakes3.md), [ADR-012](../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md)): one `MediaBucket` reading `AWS_S3_BUCKET` with no default and a blank check; `aws.region` defaulting to `ca-central-1`; the mock flag deleted, the client always real and pointed at MinIO locally.
+- **Account, 2026-09-12, by Arpan:** `AWS_S3_BUCKET` set, `S3_BUCKET_NAME` removed, and `s3:ListBucket` granted so a missing key is NoSuchKey rather than a 403 that `S3Service` would turn into a 500.
+- **Deploy, 2026-09-15:** the first CampusVibe version ran on the environment.
+
+**Verified in production, 2026-09-15:** Arpan created a club and uploaded a
+photo; `aws s3 ls s3://campusvibe-prod-media --recursive` shows one object of
+1,763,667 bytes. That one upload proves the bucket property, the region, the
+instance-role credentials through the default chain, and — being over 1 MB —
+nginx's raised body limit in `deploy/eb/.platform/`.
+
+**Not proved by it:** the `ListBucket` 404 path, which needs a read of a
+missing key; and a 3 MB upload, the size the runbook named.
+
+---
+
+### BUG-052
+**The clean-database CI job could not boot the jar once `AWS_S3_BUCKET` lost its default** · Blocker · FIXED 2026-09-14
+
+**Found:** 2026-09-14, on [PR #51](https://github.com/ArpanSaha07/campus-vibe/pull/51)
+(`develop` → `main`), run 34921822202. `Database / Apply migrations to a clean
+database` failed at *Apply migrations to an empty schema* with `Application
+exited before becoming healthy.`, so `CI` failed and `Protect main` blocked the
+merge. Everything else passed.
+
+**Not a stale build, and not a migration.** The jar was packaged in the job from
+`bfc3c02` (`BUILD SUCCESS`). The uploaded `boot-1.log` shows Flyway applying all
+33 migrations to the empty schema and Hibernate starting. The context then
+failed creating `ClubController` → `MediaBucket`:
+`PlaceholderResolutionException: Could not resolve placeholder 'AWS_S3_BUCKET' in value "${AWS_S3_BUCKET}" <-- "${aws.s3.bucket}"`.
+
+**Cause.** `806a1d0` (2026-09-12) gave `aws.s3.bucket` no default on purpose
+(ADR-012, BUG-051), so every context that starts the app must name a bucket. It
+updated `application-test.yml`, `SearchIT`, `SearchRateLimitIT`, compose and
+`_docker.yml`, and missed the `migrate` job in `_database.yml`, which runs
+`java -jar` with no profile.
+
+**Why it waited three days.** `branch-checks.yml` calls `_database.yml` with
+`run-migrate: false`, so every push skipped the job. `verify.mjs` runs only the
+migration lint and never boots the jar. The last `ci.yml` run on `develop` was
+2026-09-11, before the change — PR #51 was the first full tier since.
+
+**Fix.** `AWS_S3_BUCKET: campusvibe-ci` in the `migrate` job's `env:`, covering
+both boots. Nothing in the job calls S3: with no endpoint, `S3Config` builds a
+real client whose credentials resolve lazily, and `AWS_REGION` defaults — so no
+MinIO service is needed. Putting a default back in `application.yml` was
+rejected; it would reopen the silence BUG-051 was.
+
+**Verified:** `node scripts/verify.mjs` green. **Not yet:** the re-run of PR #51,
+which is the only place this job runs. The jar was not booted locally — the
+compose stack held port 8080.
+
+**Trap, now in `rules/ci-and-build.md`:** a property with no default must also
+reach `_database.yml`'s `migrate` env.
 
 ### BUG-050
 **The Trivy gate blocked PR #45 on two CRITICALs nobody wrote** · Blocker · FIXED 2026-09-11

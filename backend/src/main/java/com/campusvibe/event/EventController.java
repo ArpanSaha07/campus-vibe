@@ -1,13 +1,16 @@
 package com.campusvibe.event;
 
+import com.campusvibe.exception.ResourceNotFoundException;
 import com.campusvibe.s3.MediaKeys;
 import com.campusvibe.s3.MediaBucket;
 import com.campusvibe.s3.S3Service;
+import com.campusvibe.s3.StoredImageResponses;
 import com.campusvibe.taxonomy.TaxonomyService;
 import com.campusvibe.search.SearchLimits;
 import com.campusvibe.search.SearchService;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -35,15 +38,17 @@ public class EventController {
     private final S3Service s3Service;
     private final MediaBucket mediaBucket;
     private final TaxonomyService taxonomyService;
+    private final StoredImageResponses storedImages;
 
     public EventController(EventService eventService, SearchService searchService,
                            S3Service s3Service, MediaBucket mediaBucket,
-                           TaxonomyService taxonomyService) {
+                           TaxonomyService taxonomyService, StoredImageResponses storedImages) {
         this.eventService = eventService;
         this.searchService = searchService;
         this.s3Service = s3Service;
         this.mediaBucket = mediaBucket;
         this.taxonomyService = taxonomyService;
+        this.storedImages = storedImages;
     }
 
     /**
@@ -112,11 +117,38 @@ public class EventController {
         for (MultipartFile file : files) {
             byte[] bytes = file.getBytes();
             contents.add(bytes);
-            keys.add(MediaKeys.eventBanner(id, bytes));
+            keys.add(MediaKeys.eventImage(id, bytes));
         }
         for (int i = 0; i < keys.size(); i++) {
             s3Service.putObject(mediaBucket.name(), keys.get(i), contents.get(i));
         }
         eventService.addImages(id, keys);
+    }
+
+    /**
+     * One of an event's photos, as bytes, by position in {@code EventDTO.images}.
+     *
+     * <p>The read half of {@code uploadImages}, missing until 2026-09-12: an
+     * uploaded photo was stored as an object key that nothing served, and the
+     * frontend handed that key to next/image, which threw during render and
+     * took down every page showing the event (BUG-042). The shape is the club
+     * one, deliberately: by index, so a caller can only reach this event's own
+     * images and never names a key (ADR-007), streamed through the API so the
+     * bucket stays private (ADR-010).
+     *
+     * <p>Unauthenticated, like the event page. It falls under the
+     * {@code GET /api/v1/events/**} permitAll matcher.
+     *
+     * <p>A banner is not a separate kind of stored object: it will be one of
+     * these photos, chosen later and approved by the platform owner.
+     */
+    @GetMapping("/{id}/images/{index}")
+    public ResponseEntity<byte[]> image(@PathVariable Long id, @PathVariable int index) {
+        List<String> images = eventService.get(id).images();
+        if (index < 0 || index >= images.size()) {
+            throw new ResourceNotFoundException(
+                    "Event [%d] has no image at position %d".formatted(id, index));
+        }
+        return storedImages.serve(images.get(index), "Event [%d]".formatted(id));
     }
 }

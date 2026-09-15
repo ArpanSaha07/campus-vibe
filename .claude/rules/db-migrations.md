@@ -18,6 +18,14 @@ before changing anything here.** It is mandatory, not a suggestion.
   edit it in place — two files claiming V12 is what the V6 saga cost.
 - **`scripts/hooks/guard-migrations.mjs` refuses both**, so neither depends on
   remembering. One you have written and not yet pushed stays editable.
+- **A local database can hold a migration you edited before pushing.** Editable
+  until pushed means a developer's own database may already have run the
+  earlier draft. Arpan's compose database had run a `V12` named *remove mock club
+  seed data* that was renamed before commit: Flyway refused to start on a
+  checksum mismatch, and the schema had silently stopped at V12. **Do not
+  `flyway repair` that** — it records the new checksum without running the new
+  file, so the committed V12's table never exists and later migrations fail.
+  Reset the volume (`docker compose down -v`). Found 2026-09-13.
 - **One responsibility per file.**
 - **No mock data in a migration.** The `dev` seeder owns that
   (`SKILL.md:152-169`) — a migration runs in every environment, including the

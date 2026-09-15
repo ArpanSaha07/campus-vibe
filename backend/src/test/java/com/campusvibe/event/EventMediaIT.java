@@ -5,6 +5,7 @@ import com.campusvibe.club.Club;
 import com.campusvibe.user.RoleName;
 import com.campusvibe.user.User;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
@@ -17,22 +18,28 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Uploading an event's banner images.
+ * Uploading an event's photos and reading them back.
  *
  * <p>{@code POST /events/{id}/images} had no test at all until 2026-09-11, and
  * built its key from the browser's filename exactly as the club uploads did
- * (BUG-039). Nothing reads event images back yet (BUG-042), so these assert
- * the stored key rather than the served bytes.
+ * (BUG-039). The read half, {@code GET /events/{id}/images/{index}}, arrived on
+ * 2026-09-12 (BUG-042): until then an uploaded photo was stored and never
+ * served, and the key crashed the page that tried to show it.
  */
 class EventMediaIT extends AbstractIntegrationTest {
 
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+    /** A second, different PNG, to tell two uploads apart when reading back. */
+    private static final byte[] OTHER_PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 42};
 
     private static final String UUID_PATTERN =
             "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -52,7 +59,7 @@ class EventMediaIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void aFilenameCannotChooseWhereABannerIsWritten() throws Exception {
+    void aFilenameCannotChooseWhereAPhotoIsWritten() throws Exception {
         Managed managed = eventWithOwner();
         Long id = managed.event().getId();
         String probe = "campusvibe-bug039-" + UUID.randomUUID() + ".png";
@@ -66,12 +73,12 @@ class EventMediaIT extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/events/" + id))
                 .andExpect(jsonPath("$.images", hasSize(1)))
                 .andExpect(jsonPath("$.images[0]",
-                        matchesPattern("events/" + id + "/banners/" + UUID_PATTERN + "\\.png")));
+                        matchesPattern("events/" + id + "/images/" + UUID_PATTERN + "\\.png")));
         assertThat(Path.of("/tmp", probe)).doesNotExist();
     }
 
     @Test
-    void anSvgBannerIsRefusedAndNothingIsStored() throws Exception {
+    void anSvgPhotoIsRefusedAndNothingIsStored() throws Exception {
         Managed managed = eventWithOwner();
         Long id = managed.event().getId();
 
@@ -103,5 +110,62 @@ class EventMediaIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/events/" + id))
                 .andExpect(jsonPath("$.images", empty()));
+    }
+
+    // --- The read path, BUG-042 --------------------------------------------------
+
+    @Test
+    void uploadedPhotosAreServedBackByIndexWithoutAToken() throws Exception {
+        Managed managed = eventWithOwner();
+        Long id = managed.event().getId();
+
+        mockMvc.perform(multipart("/api/v1/events/" + id + "/images")
+                        .file(new MockMultipartFile("files", "one.png", "image/png", PNG))
+                        .file(new MockMultipartFile("files", "two.png", "image/png", OTHER_PNG))
+                        .header("Authorization", bearer(managed.owner())))
+                .andExpect(status().isOk());
+
+        // No token: the event page is public, so its photos have to be too.
+        byte[] first = mockMvc.perform(get("/api/v1/events/" + id + "/images/0"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andReturn().getResponse().getContentAsByteArray();
+        byte[] second = mockMvc.perform(get("/api/v1/events/" + id + "/images/1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertArrayEquals(PNG, first);
+        assertArrayEquals(OTHER_PNG, second);
+    }
+
+    @Test
+    void aPositionTheEventDoesNotHaveIsNotFound() throws Exception {
+        // Resolved against this event's own list, so an out-of-range index is a
+        // 404 and there is no way to name another object.
+        Long id = eventWithOwner().event().getId();
+
+        mockMvc.perform(get("/api/v1/events/" + id + "/images/0"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/events/" + id + "/images/-1"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/events/999999/images/0"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aStoredValueThatIsNotAnObjectKeyIsNotFetched() throws Exception {
+        // An absolute URL or a path into the frontend's public folder is fetched
+        // by the browser directly. Asking the store for one must be a 404, not
+        // a request for an object called https://... and not a 500.
+        Managed managed = eventWithOwner();
+        Event event = managed.event();
+        event.getImages().add("https://images.unsplash.com/photo-123.jpg");
+        event.getImages().add("/banners/fta.jpg");
+        Long id = eventRepository.save(event).getId();
+
+        mockMvc.perform(get("/api/v1/events/" + id + "/images/0"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/events/" + id + "/images/1"))
+                .andExpect(status().isNotFound());
     }
 }
