@@ -13,23 +13,23 @@ export default function Footer() {
         {/* Top CTA */}
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-white/10 pb-8 mb-8">
           <h3 className="font-display text-xl font-bold text-white text-center sm:text-left">
-            Your club belongs on CampusVibe.
+            Never miss a McGill campus event again.
           </h3>
-          <Button href="/create-club" variant="secondary">
-            Start a club page
+          <Button href="/events" variant="secondary">
+            Find your vibe
           </Button>
         </div>
 
         {/* Links Section */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
-          <div>
+          {/* <div>
             <h4 className="ticket-label text-lavender-300 mb-3">Your account</h4>
             <ul className="space-y-2">
               <li><AuthTrigger view="signup" className={linkClasses}>Sign up</AuthTrigger></li>
               <li><AuthTrigger view="login" className={linkClasses}>Log in</AuthTrigger></li>
               <li><Link href="/profile" className={linkClasses}>Profile</Link></li>
             </ul>
-          </div>
+          </div> */}
 
           <div>
             <h4 className="ticket-label text-lavender-300 mb-3">Discover</h4>
