@@ -4,14 +4,10 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-<<<<<<< HEAD
-**Code as of:** `7e7c4b5` — trigger rework of 2026-08-16, plus the migration-lint
-=======
 **Code as of:** `081d7b3` for the paragraph on BOM pins under the Trivy gate —
 `backend/pom.xml` gained `<netty.version>` on 2026-09-11
 ([BUG-050](../../bugs/fixed_bugs.md#bug-050)); no workflow changed. `4d11778` for the `next.config.ts` sections (images, the
 `/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
->>>>>>> 63b87c2989c3e8d849833ebb4d8b78afbb2d324a
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 `verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test
 assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)),

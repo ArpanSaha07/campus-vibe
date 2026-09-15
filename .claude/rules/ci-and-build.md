@@ -25,6 +25,14 @@ paths:
 - **Actions are pinned to commit shas, not tags.** Keep the `# vX.Y.Z` comment
   beside the sha when bumping one, or the next reader cannot tell what moved.
 - **Never add `-DskipTests`.** (BUG-002)
+- **The backend JVM's locale and time zone are pinned in two places: the
+  surefire and failsafe `argLine` in `backend/pom.xml`, and `JAVA_TOOL_OPTIONS`
+  in `backend/Dockerfile`.** Docker shields only the running app; tests run in
+  the host JVM, and this dev machine's is `fr_CA`. Keep the two `argLine`s
+  identical, and do not drop `user.language.format`/`user.country.format` as
+  redundant: Windows takes FORMAT from the region setting. A plugin that later
+  sets `argLine` itself (JaCoCo, a Mockito agent) must be prepended with
+  `@{argLine}`, or it silently replaces the pin. (BUG-001)
 - **`scripts/verify.mjs` mirrors `_frontend.yml` and `_backend.yml`.** Change a
   workflow and the script together — the moment they drift, local green stops
   meaning CI green, which is the only thing the script is for.

@@ -157,7 +157,11 @@ campusvibe:
 search:
   semantic-weight: 0.7
   keyword-weight: 0.3
-  min-score: 0.2
+  # Gates meaning-only matches; a keyword hit always qualifies. 0.25 needs a
+  # cosine of about 0.357 at the 0.7 weight. Measured 2026-09-14 against
+  # text-embedding-3-small: real matches scored 0.38 and up, noise 0.33 and
+  # below (spec 2026-09-14-search-relevance-and-results).
+  min-score: 0.25
   # Caches embeddings of search *queries* only, never results (BUG-005).
   # Document embeddings live in pgvector; these were recomputed per request,
   # including for the identical repeats a search box produces constantly.

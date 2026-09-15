@@ -43,6 +43,7 @@ reads a folder, they read an index.
 | [ADR-011](ADR-011-minio-replaces-fakes3.md) | 2026-09-12 | ✅ Accepted 2026-09-12 | MinIO is the object store for local, CI and the media ITs · `FakeS3` **deleted**, and the commented `adobe/s3mock` block with it · `aws.s3.mock` deleted rather than set false, so the client is never chosen by a boolean · BUG-039's traversal guard moves to `MediaKeys.assertSafeKey` · `commons-io` falls out with the stub | `s3/S3Config.java`, `docker/docker-compose.yml`, `MinioTestContainer` — 2026-09-12 |
 | [ADR-012](ADR-012-one-media-bucket-with-prefixes.md) | 2026-09-12 | ✅ Accepted 2026-09-12 | One media bucket, `campusvibe-prod-media`, separated by key prefix rather than one bucket per media kind · no key changes and nothing migrates, since `MediaKeys` already writes the §7 prefixes · no IAM change and no new spend, since the EC2 role's inline grant already names exactly this bucket · rejected two buckets and rejected two properties pointing at one | `s3/MediaBucket.java`, `application.yml` — 2026-09-12 ([BUG-051](../../bugs/bugs.md#bug-051)) |
 | [ADR-013](ADR-013-ses-mail-over-smtp-credentials.md) | 2026-09-12 | 📝 Proposed — awaiting Arpan | Production mail is sent through SES's SMTP interface with SMTP credentials · the key is fenced: created by Arpan in the console, `ses:SendRawEmail` on the domain identity only, stored in two EB properties · rejected the SES v2 API through the instance role for the first deployment, and deferring mail | — not yet built; [`connecting-ses.md`](../architecture/connecting-ses.md) §7–§8 |
+| [ADR-014](ADR-014-one-embedding-call-per-search-via-the-cache.md) | 2026-09-14 | 📝 Proposed — awaiting Arpan | A search costs one OpenAI embedding call because `QueryEmbeddingCache` is a Caffeine `AsyncCache` whose concurrent callers join the in-flight query, on virtual threads · rejected a combined `GET /api/v1/search` returning both lists, which would also halve rate-limit use but adds a DTO to the contract | `search/QueryEmbeddingCache.java` — 2026-09-14 |
 
 **ADR-004 carries two in-place amendments, both dated 2026-09-10 and both
 against the frozen-record rule above.** Arpan decided each knowingly:
@@ -98,6 +99,15 @@ later session does not read the silence as *nobody decided*.
   reordering was chosen over re-tagging because `Club.id` is assigned, so `save`
   goes through `em.merge()` and returns a *different* managed instance; the
   argument stays detached. The underlying id strategy is [ADR-002](ADR-002-club-id-is-an-assigned-slug.md).
+- **The backend JVM's locale and time zone are pinned: surefire and failsafe
+  `argLine` in `backend/pom.xml`, `JAVA_TOOL_OPTIONS` in `backend/Dockerfile`** —
+  [BUG-001](../../bugs/bugs.md#bug-001). Search weights formatted into SQL under
+  a `fr_CA` locale silently dropped the semantic leg. Tests run in the host JVM,
+  where Testcontainers containerises only Postgres, and the running container was
+  en_US only through its base image. The rejected alternative, the forbiddenapis
+  plugin, would have flagged about 90 message-formatting calls with no other risky
+  one among them. Recorded in [the spec](../../specs/2026-09-14-search-relevance-and-results.md)
+  and `rules/ci-and-build.md`.
 - **`ROLE_CLUB_ADMIN` deleted outright in `V14`** —
   [`user-roles.md`](../architecture/user-roles.md), which records the rejected
   option and its cost: a role claim in a JWT outlives the access it names, so a
