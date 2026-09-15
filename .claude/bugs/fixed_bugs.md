@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-11**
+Last updated: **2026-09-14**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-052](#bug-052) | Blocker | 2026-09-14 | `Database / Apply migrations to a clean database` failed on PR #51: the jar refused to boot because the job never set `AWS_S3_BUCKET`, which lost its default in `806a1d0` — not a stale build, and every migration applied |
 | [BUG-050](#bug-050) | Blocker | 2026-09-11 | The Trivy gate blocked PR #45 on two newly published CRITICALs — `next` 16.3.0 and `netty-handler` 4.1.135 — with nothing in the repo having changed |
 | [BUG-039](#bug-039) | High | 2026-09-11 | Uploads named their own S3 object from the browser filename, and against `FakeS3` a `..` in it was a file write anywhere on disk — which our own entry had ruled out |
 | [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
@@ -43,6 +44,45 @@ Last updated: **2026-09-11**
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
 
 ---
+
+### BUG-052
+**The clean-database CI job could not boot the jar once `AWS_S3_BUCKET` lost its default** · Blocker · FIXED 2026-09-14
+
+**Found:** 2026-09-14, on [PR #51](https://github.com/ArpanSaha07/campus-vibe/pull/51)
+(`develop` → `main`), run 34921822202. `Database / Apply migrations to a clean
+database` failed at *Apply migrations to an empty schema* with `Application
+exited before becoming healthy.`, so `CI` failed and `Protect main` blocked the
+merge. Everything else passed.
+
+**Not a stale build, and not a migration.** The jar was packaged in the job from
+`bfc3c02` (`BUILD SUCCESS`). The uploaded `boot-1.log` shows Flyway applying all
+33 migrations to the empty schema and Hibernate starting. The context then
+failed creating `ClubController` → `MediaBucket`:
+`PlaceholderResolutionException: Could not resolve placeholder 'AWS_S3_BUCKET' in value "${AWS_S3_BUCKET}" <-- "${aws.s3.bucket}"`.
+
+**Cause.** `806a1d0` (2026-09-12) gave `aws.s3.bucket` no default on purpose
+(ADR-012, BUG-051), so every context that starts the app must name a bucket. It
+updated `application-test.yml`, `SearchIT`, `SearchRateLimitIT`, compose and
+`_docker.yml`, and missed the `migrate` job in `_database.yml`, which runs
+`java -jar` with no profile.
+
+**Why it waited three days.** `branch-checks.yml` calls `_database.yml` with
+`run-migrate: false`, so every push skipped the job. `verify.mjs` runs only the
+migration lint and never boots the jar. The last `ci.yml` run on `develop` was
+2026-09-11, before the change — PR #51 was the first full tier since.
+
+**Fix.** `AWS_S3_BUCKET: campusvibe-ci` in the `migrate` job's `env:`, covering
+both boots. Nothing in the job calls S3: with no endpoint, `S3Config` builds a
+real client whose credentials resolve lazily, and `AWS_REGION` defaults — so no
+MinIO service is needed. Putting a default back in `application.yml` was
+rejected; it would reopen the silence BUG-051 was.
+
+**Verified:** `node scripts/verify.mjs` green. **Not yet:** the re-run of PR #51,
+which is the only place this job runs. The jar was not booted locally — the
+compose stack held port 8080.
+
+**Trap, now in `rules/ci-and-build.md`:** a property with no default must also
+reach `_database.yml`'s `migrate` env.
 
 ### BUG-050
 **The Trivy gate blocked PR #45 on two CRITICALs nobody wrote** · Blocker · FIXED 2026-09-11

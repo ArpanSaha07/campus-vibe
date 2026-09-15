@@ -220,6 +220,8 @@ clubs into every environment it touched.
 
 ### Infrastructure & CI/CD
 
+- [x] **P0** ~~**Unblock PR #51's `Database / Apply migrations to a clean database`**~~ — **fixed 2026-09-14; confirmed only when PR #51 re-runs on GitHub** ([BUG-052](../bugs/fixed_bugs.md#bug-052)). Never queued: found on the PR. Asked whether a stale build caused it — it did not. The jar was built fresh at `bfc3c02` and Flyway applied all 33 migrations; the context then failed on `Could not resolve placeholder 'AWS_S3_BUCKET'`, because `806a1d0` removed the bucket default (ADR-012) and updated every context that boots the app except this job's `env:`. `_database.yml` now sets `AWS_S3_BUCKET: campusvibe-ci`; nothing in the job calls S3, so no MinIO service. Restoring a default was rejected as undoing ADR-012. The trap is in `rules/ci-and-build.md`.
+
 - [x] **P1** ~~**Let uploads over 1 MB past Elastic Beanstalk's nginx**~~ — **done in code 2026-09-12; unproved until a deploy.** `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf` sets `10M`, matching `max-request-size`, and `scripts/package-eb.mjs` now copies every hidden directory under `deploy/eb/` into the bundle root. **Packaging it found a second defect:** Windows PowerShell 5.1's `ZipFile.CreateFromDirectory` wrote the nested file as `.platform\nginx\conf.d\...`, which Linux unzip reads as one file with backslashes in its name — the deploy would have succeeded and silently kept the 1 MB limit. Invisible while the bundle held two root-level files. The script now writes each entry with forward slashes; `unzip -l` confirms it, and `rules/ci-and-build.md` holds the trap. Proof in production is the 3 MB upload in `connecting-s3.md` §5.
 
 - [x] **P1** ~~**Decide the S3 bucket topology, then make code, environment and IAM agree**~~ ([BUG-051](../bugs/bugs.md#bug-051)). Production resolves `AWS_S3_BUCKET_CLUBS` and `AWS_S3_BUCKET_EVENTS`; the environment sets neither and both defaults name buckets that do not exist. One bucket with `clubs/` and `events/` prefixes, or the two the Phase 3 plan assumed — it is a choice, not a rename, and the IAM policy has to follow it. Blocks the two upload items at the top of [`STATUS.md`](../STATUS.md).
@@ -326,6 +328,12 @@ clubs into every environment it touched.
 ---
 
 ## Completed work log
+
+**2026-09-14 — PR #51's clean-database check: a missing property, not a stale build.**
+
+- **Asked whether the red `Database / Apply migrations to a clean database` came from a stale build.** It did not: the jar was packaged in the job, and `boot-1.log` shows all 33 migrations applied before the context failed on `AWS_S3_BUCKET` ([BUG-052](../bugs/fixed_bugs.md#bug-052)).
+- **The miss was structural, not careless.** `806a1d0` updated every context it could see boot the app. The one it missed boots only on a PR: the push loop passes `run-migrate: false`, and `verify.mjs` never starts the jar. So a required property's omission there can surface only on a pull request — here, three days late.
+- **Fixed with one `env` line** in `_database.yml`; recorded as a rule in `rules/ci-and-build.md` and a paragraph in `ci-cd-pipeline.md`. `verify.mjs` green; the PR #51 re-run is the real proof. Making `verify.mjs --full` mirror the boot is queued, not done.
 
 **2026-09-12 — S3 connected end to end: MinIO locally, one bucket in production, and the presigned question closed.**
 

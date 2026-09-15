@@ -107,6 +107,12 @@ jobs:
       # Required by JWTUtil (>=32 bytes) or the context refuses to start.
       # CI-only throwaway value; never used to sign anything real.
       JWT_SECRET: ci-only-secret-0123456789-0123456789-0123456789
+      # Required by MediaBucket: application.yml gives aws.s3.bucket no default
+      # and rejects blank, so the context refuses to start without it (ADR-012,
+      # BUG-051). Nothing in this job touches S3 — the S3Client is built but
+      # never called, and AWS_REGION already defaults — so a throwaway name is
+      # enough; no MinIO service is needed.
+      AWS_S3_BUCKET: campusvibe-ci
       OPENAI_API_KEY: ''
       PGPASSWORD: ci-only-password
       PSQL: psql -h localhost -U campusvibe_ci -d campusvibe -tA
