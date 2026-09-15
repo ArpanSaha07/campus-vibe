@@ -855,53 +855,55 @@ Claude Code should follow this order.
 
 ## Phase 1 — Backend production readiness
 
-- [ ] Review current Spring Boot configuration.
-- [ ] Create/verify `application-prod.yml`.
-- [ ] Replace hard-coded production configuration with environment variables.
-- [ ] Verify Flyway production configuration.
-- [ ] Ensure mock-data initialization cannot run in production.
-- [ ] Add/verify Spring Boot Actuator health endpoint.
-- [ ] Review the backend Dockerfile.
-- [ ] Build the Docker image locally.
-- [ ] Run the backend container successfully locally.
+*Status read 2026-09-14 from the code and the account: all done, verified locally 2026-08-18 ([`aws-deployment.md`](aws-deployment.md)).*
+
+- [x] ~~Review current Spring Boot configuration.~~
+- [x] ~~Create/verify `application-prod.yml`.~~
+- [x] ~~Replace hard-coded production configuration with environment variables.~~
+- [x] ~~Verify Flyway production configuration.~~ `ddl-auto: validate`, `application.yml:16`
+- [x] ~~Ensure mock-data initialization cannot run in production.~~ `DevDataSeeder` is `dev` only
+- [x] ~~Add/verify Spring Boot Actuator health endpoint.~~ `health,info` only, `application.yml:41`
+- [x] ~~Review the backend Dockerfile.~~ Production image is `deploy/eb/Dockerfile`, not `backend/Dockerfile`
+- [x] ~~Build the Docker image locally.~~ `node scripts/package-eb.mjs`
+- [x] ~~Run the backend container successfully locally.~~
 
 ## Phase 2 — RDS
 
 AWS Console/manual infrastructure work:
 
-- [ ] Create private PostgreSQL RDS instance.
-- [ ] Enable encryption.
-- [ ] Enable automated backups.
-- [ ] Use Single-AZ initially.
-- [ ] Disable public access.
-- [ ] Create/verify database security group.
-- [ ] Allow port 5432 only from the backend security group.
-- [ ] Record the RDS endpoint.
-- [ ] Configure production DB environment variables.
+- [x] ~~Create private PostgreSQL RDS instance.~~ `campusvibe-prod-db`, PostgreSQL 18.3, db.t4g.micro
+- [x] ~~Enable encryption.~~
+- [x] ~~Enable automated backups.~~ 7 days, deletion protection on
+- [x] ~~Use Single-AZ initially.~~
+- [x] ~~Disable public access.~~
+- [x] ~~Create/verify database security group.~~ `campusvibe-database-sg`
+- [ ] Allow port 5432 only from the backend security group. The EB instance group is allowed, **but a personal `/32` rule is still there**
+- [x] ~~Record the RDS endpoint.~~
+- [ ] Configure production DB environment variables. `SPRING_DATASOURCE_*`; the unread `DB_*` names are set instead
 - [ ] Verify Flyway against production RDS.
 
 ## Phase 3 — S3
 
-- [ ] Create private production S3 bucket.
-- [ ] Keep Block Public Access enabled.
-- [ ] Create least-privilege IAM policy.
-- [ ] Attach policy through the Elastic Beanstalk EC2 IAM role.
-- [ ] Update backend S3 integration to use the default AWS credential provider chain.
-- [ ] Remove any dependence on static AWS access keys.
-- [ ] Implement/verify presigned uploads.
-- [ ] Validate upload authorization and file constraints.
+- [x] ~~Create private production S3 bucket.~~ `campusvibe-prod-media`
+- [x] ~~Keep Block Public Access enabled.~~
+- [x] ~~Create least-privilege IAM policy.~~ `CampusVibe-S3-Media-Access`, including `ListBucket`
+- [x] ~~Attach policy through the Elastic Beanstalk EC2 IAM role.~~
+- [x] ~~Update backend S3 integration to use the default AWS credential provider chain.~~ ADR-011
+- [x] ~~Remove any dependence on static AWS access keys.~~
+- [x] ~~Implement/verify presigned uploads.~~ **Superseded:** uploads and reads stream through the API (ADR-010)
+- [ ] Validate upload authorization and file constraints. Done in code; not yet proved on a deployed backend (BUG-051)
 
 ## Phase 4 — Elastic Beanstalk
 
-- [ ] Create `campusvibe-backend` application.
-- [ ] Create `campusvibe-production` environment.
-- [ ] Choose Docker on Amazon Linux 2023.
-- [ ] Use Single Instance initially.
-- [ ] Configure the correct VPC.
-- [ ] Configure backend security group.
-- [ ] Add non-secret production environment variables.
-- [ ] Configure secret references.
-- [ ] Deploy backend manually.
+- [x] ~~Create `campusvibe-backend` application.~~ Named `CampusVibe`
+- [x] ~~Create `campusvibe-production` environment.~~ Named `CampusVibe-Backend-Prod`
+- [x] ~~Choose Docker on Amazon Linux 2023.~~
+- [x] ~~Use Single Instance initially.~~ **Departed:** load balanced with an ALB, kept 2026-09-12 for HTTPS through ACM
+- [x] ~~Configure the correct VPC.~~ Same VPC as RDS
+- [x] ~~Configure backend security group.~~
+- [ ] Add non-secret production environment variables. Partial: `AWS_REGION`, `AWS_S3_BUCKET`, `SPRING_PROFILES_ACTIVE`
+- [ ] Configure secret references. Decided 2026-09-12: environment properties, not Secrets Manager
+- [ ] Deploy backend manually. The environment still runs the sample application
 - [ ] Verify `/actuator/health`.
 - [ ] Verify DB connectivity.
 - [ ] Verify S3 connectivity.
