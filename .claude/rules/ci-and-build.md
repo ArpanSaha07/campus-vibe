@@ -22,12 +22,28 @@ paths:
   unless a second netty advisory fires or you are removing the async client on
   purpose — and verify the fixed version exists on Maven Central before pinning
   it. Drop both overrides once a parent catches up. (BUG-050, ADR-008)
+- **The Elastic Beanstalk zip must use forward slashes in every entry name.**
+  Windows PowerShell 5.1's `ZipFile.CreateFromDirectory` writes backslashes for
+  anything below the root, and Linux unzip on the instance reads
+  `.platform\nginx\conf.d\x.conf` as one oddly named file — the deploy succeeds
+  and the config silently does nothing. `scripts/package-eb.mjs` builds entries
+  one by one for this; check with `unzip -l` after changing it. Found
+  2026-09-12, when the bundle first had a nested file.
 - **Actions are pinned to commit shas, not tags.** Keep the `# vX.Y.Z` comment
   beside the sha when bumping one, or the next reader cannot tell what moved.
 - **Never add `-DskipTests`.** (BUG-002)
 - **`scripts/verify.mjs` mirrors `_frontend.yml` and `_backend.yml`.** Change a
   workflow and the script together — the moment they drift, local green stops
   meaning CI green, which is the only thing the script is for.
+- **A property with no default must also reach `_database.yml`'s `migrate`
+  `env:`.** That job boots the jar with no profile, so `application-test.yml`
+  does not cover it; the push loop skips it (`run-migrate: false`) and
+  `verify.mjs` never boots, so a miss fails only on a pull request. `806a1d0`
+  dropped the `AWS_S3_BUCKET` default and blocked PR #51 this way. (BUG-052)
+- **The `hooks` component is the one deliberate exception to that mirror.**
+  `guard-aws.test.mjs` asserts a `PreToolUse` hook, which only ever runs in a
+  session on a developer's machine; a runner has none, so there is nothing for
+  a CI job to assert. It is not drift and it does not want a workflow.
 - **`ci.yml` gates pull requests, `branch-checks.yml` is the fast push loop, and
   `_*.yml` are reusable workflows that are never triggered directly.**
 - **`--no-verify` is not a workflow.** `0357b78` went around the pre-push hook

@@ -37,6 +37,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "jwt.secret=test-only-secret-0123456789-0123456789-0123456789",
         // Guarantees no live OpenAI call even with OPENAI_API_KEY exported.
         "campusvibe.ai.openai.api-key=",
+        // Not the "test" profile, so application-test.yml's bucket name does
+        // not arrive either. Nothing here touches S3 -- the name only has to
+        // exist, because application.yml gives aws.s3.bucket no default on
+        // purpose and MediaBucket is a singleton every context builds.
+        "aws.s3.bucket=campusvibe-test",
         "campusvibe.search.rate-limit.enabled=true",
         "campusvibe.search.rate-limit.ip-requests-per-window=4",
         "campusvibe.search.rate-limit.window=60s",

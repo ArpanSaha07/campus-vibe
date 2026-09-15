@@ -10,15 +10,16 @@ import java.util.UUID;
  * <p>Keys used to be {@code prefix + file.getOriginalFilename()}, at all three
  * upload sites. The filename is whatever the caller put in the multipart
  * header, so the caller chose the object: a repeated name silently replaced the
- * first upload, and against {@code FakeS3} -- the client every environment but
- * {@code prod} runs -- a name of {@code ../../x} was a file write anywhere the
- * backend could reach (BUG-039).
+ * first upload, and against the filesystem stub that stood in for S3 in every
+ * environment but {@code prod}, a name of {@code ../../x} was a file write
+ * anywhere the backend could reach (BUG-039). That stub is gone (ADR-011), and
+ * {@link #assertSafeKey} is what replaces the guard it carried.
  *
  * <p>So nothing here takes a filename. The prefix is built from an id the
  * permission check has already resolved, the name is a fresh uuid, and the
  * extension is read from the file's own leading bytes. The layout is the one in
- * {@code s3-media/reference.md} §7, so the presigned-upload work does not move
- * keys a second time.
+ * {@code s3-media/reference.md} §7, and it is what lets a single bucket hold
+ * every media kind (ADR-012) -- the prefixes were already the separation.
  *
  * <p>Only PNG, JPEG and WebP are accepted (§12). The declared part
  * {@code Content-Type} is ignored along with the filename: both are written by
@@ -37,8 +38,16 @@ public final class MediaKeys {
         return key("clubs/" + segment(clubId) + "/images", bytes);
     }
 
-    public static String eventBanner(Long eventId, byte[] bytes) {
-        return key("events/" + eventId + "/banners", bytes);
+    /**
+     * An event photo, the same shape as a club's images.
+     *
+     * <p>{@code events/{id}/banners/} until 2026-09-12. Arpan ruled that a
+     * banner is not a stored kind: it is one of an event's photos, which a club
+     * asks the platform owner to feature. Rows written before the rename keep
+     * their old keys and still read, because nothing parses a key's shape.
+     */
+    public static String eventImage(Long eventId, byte[] bytes) {
+        return key("events/" + eventId + "/images", bytes);
     }
 
     /**
@@ -51,7 +60,8 @@ public final class MediaKeys {
      * old {@code logo-{filename}} shape, which is still this club's object.
      */
     public static boolean belongsToClub(String key, String clubId) {
-        // A backslash is a literal on S3 but a separator to FakeS3 on Windows.
+        // A backslash is a literal on S3, but it has been a separator to
+        // everything that has ever stood in for S3 on a Windows machine.
         if (key == null || key.isBlank() || key.contains("://") || key.contains("\\")) {
             return false;
         }
@@ -66,6 +76,34 @@ public final class MediaKeys {
             }
         }
         return true;
+    }
+
+    /**
+     * Refuses a key that is not a plain, relative, dot-free path.
+     *
+     * <p>The filesystem stub that stood in for S3 until 2026-09-12 carried this
+     * check, because it joined the key onto a directory where {@code ..} climbs
+     * — a vulnerability the stub had and S3 does not, which was BUG-039. MinIO
+     * replaced it (ADR-011), and a real store treats a key as an opaque string,
+     * so nothing downstream checks this any more. The guard moved here rather
+     * than being deleted with the stub: it is the second line of defence behind
+     * server-generated keys, and one that existed only inside the thing being
+     * deleted was not a second line of defence at all.
+     *
+     * <p>Applied by {@link S3Service} to every put, get and delete, so it covers
+     * keys read back from a database row as well as keys built above.
+     */
+    static void assertSafeKey(String key) {
+        if (key == null || key.isBlank()
+                || key.startsWith("/") || key.contains("//")
+                || key.contains("\\") || key.contains("://")) {
+            throw new IllegalArgumentException("Not a usable media object key");
+        }
+        for (String segment : key.split("/")) {
+            if (segment.equals(".") || segment.equals("..")) {
+                throw new IllegalArgumentException("Not a usable media object key");
+            }
+        }
     }
 
     private static String key(String prefix, byte[] bytes) {

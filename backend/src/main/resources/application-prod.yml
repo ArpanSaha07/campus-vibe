@@ -18,11 +18,14 @@ spring:
       hibernate:
         format_sql: false
 
-aws:
-  s3:
-    # Use real S3; credentials come from the instance IAM role via the AWS
-    # default credential provider chain (see s3/S3Config.java).
-    mock: false
+# No aws block. Production is simply the case where aws.s3.endpoint is left
+# blank: S3Config then builds a client against AWS itself and resolves
+# credentials through the default provider chain, which finds the EC2 instance
+# role on Elastic Beanstalk. The aws.s3.mock: false that used to sit here went
+# with the flag itself on 2026-09-12 (ADR-011).
+#
+# AWS_S3_BUCKET and AWS_REGION are environment properties and must be set on the
+# environment; application.yml gives the bucket no default on purpose.
 
 logging:
   level:

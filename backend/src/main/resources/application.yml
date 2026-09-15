@@ -47,12 +47,31 @@ cors:
   exposed-headers: Authorization
 
 aws:
-  region: ${AWS_REGION:us-east-1}
+  # ca-central-1, because that is where campusvibe-prod-media is. This said
+  # us-east-1 until 2026-09-12, which nothing had noticed because no real
+  # S3Client had ever been built -- the first one would have been built for the
+  # wrong region AND pointed at a bucket that did not exist (BUG-051).
+  region: ${AWS_REGION:ca-central-1}
   s3:
-    mock: ${AWS_S3_MOCK:true}
-    buckets:
-      clubs: ${AWS_S3_BUCKET_CLUBS:campusvibe-clubs}
-      events: ${AWS_S3_BUCKET_EVENTS:campusvibe-events}
+    # One bucket, every media kind, separated by key prefix (ADR-012).
+    #
+    # Deliberately no default. Two defaults naming buckets that did not exist
+    # is exactly how BUG-051 stayed invisible: every environment looked
+    # configured. An environment that does not name its bucket now fails to
+    # start instead.
+    bucket: ${AWS_S3_BUCKET}
+
+    # Blank means AWS itself, with credentials from the default provider chain
+    # (the EC2 instance role on Elastic Beanstalk). Anything else is an
+    # S3-compatible store -- MinIO, locally and in CI -- which needs the
+    # credentials below, because it has no instance role to borrow (ADR-011).
+    #
+    # There is no longer a mock flag: the client is always a real S3Client and
+    # only its endpoint varies. The flag defaulted to true, so the real branch
+    # had never executed anywhere.
+    endpoint: ${AWS_S3_ENDPOINT:}
+    access-key: ${AWS_S3_ACCESS_KEY:}
+    secret-key: ${AWS_S3_SECRET_KEY:}
 
 google:
   clientId: ${GOOGLE_CLIENT_ID:}

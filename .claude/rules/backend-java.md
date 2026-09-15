@@ -26,12 +26,19 @@ Kept deliberately short: this loads on every backend Java read.
 - **Scrub caller-supplied text through `common/Logs` before logging it.**
   (BUG-033)
 - **Never build an S3 key from `getOriginalFilename()`, or from anything else
-  the caller wrote — go through `s3/MediaKeys`.** `FakeS3`, the client in every
-  environment but `prod`, joins the key onto a directory, so `..` in a filename
-  was a file write anywhere the backend could reach — as root, in the dev
-  compose container (`backend/Dockerfile` sets no `USER`).
-  Real S3 would have shrugged; that is why the knowledge base missed it.
+  the caller wrote — go through `s3/MediaKeys`.** A filename of `../../x` used
+  to be a file write anywhere the backend could reach, because the local stand-in
+  for S3 joined the key onto a directory. **That stand-in is gone** — MinIO
+  replaced it 2026-09-12 (ADR-011) and would have shrugged at the traversal, as
+  real S3 always would. So the guard is ours alone now: `MediaKeys.assertSafeKey`,
+  enforced on every `S3Service` put, get and delete. Do not remove it on the
+  grounds that the store no longer needs it — that is precisely why it is here.
   (BUG-039)
+- **Every Spring context needs `aws.s3.bucket` set.** `MediaBucket` is a
+  singleton with no default and a blank check, so a context that does not supply
+  it fails to start. `application-test.yml` covers the profile; `SearchIT` and
+  `SearchRateLimitIT` skip that profile and name it inline, as they already do
+  for `jwt.secret`. (ADR-012)
 - **MockMvc never applies the multipart size caps.** A test asserting an upload
   limit needs a real port — see `MediaUploadLimitIT`. (BUG-039)
 - **Assigned and generated ids make `save()` behave differently** — see

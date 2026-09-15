@@ -1,6 +1,6 @@
 ---
 name: s3-media
-description: CampusVibe media on S3 — club logos, event banners and profile images. Use when touching the s3 package, an image upload or delete endpoint, an object key, bucket config, or AWS credentials for media. Covers the private-bucket presigned model and where the code departs from it.
+description: CampusVibe media on S3 — club logos and images, event photos and profile images. Use when touching the s3 package, an image upload or delete endpoint, an object key, bucket config, or AWS credentials for media. Covers the private-bucket presigned model and where the code departs from it.
 paths:
   - "backend/src/main/java/com/campusvibe/s3/**"
   - "backend/src/main/resources/application*.yml"
@@ -16,11 +16,16 @@ plus the honest gap between the two.
 ## The model
 
 - **The bucket stays private.** Public access blocked, ACLs disabled, bucket
-  owner enforced, SSE-S3. Browsers reach media through **presigned URLs only**.
-  Never make it public, never add a `public-read` ACL or a public bucket policy,
-  however much easier it makes displaying an image (§6, §17).
+  owner enforced, SSE-S3. Never make it public, never add a `public-read` ACL or
+  a public bucket policy, however much easier it makes displaying an image (§6,
+  §17). Where the reference says browsers reach media through *presigned URLs
+  only*, read ADR-007 and ADR-010 instead: they reach it through the API, and
+  the bucket stays exactly as private.
 - **The backend generates every object key.** `clubs/{id}/logos/{uuid}.webp`,
-  `events/{id}/banners/{uuid}.webp`, `users/{id}/profiles/{uuid}.webp`. A client
+  `events/{id}/images/{uuid}.webp`, `users/{id}/profiles/{uuid}.webp`. **There is
+  no banner prefix** — Arpan, 2026-09-12: a banner is one of an event's photos
+  that a club asks the platform owner to feature, not a stored kind. Where
+  `reference.md` says `banners/`, read `images/`. A client
   never supplies a key, and a user-supplied filename is never the canonical
   object name (§7, §13).
 - **Authorise before you presign.** A presigned URL is a capability — once it
@@ -48,23 +53,26 @@ plus the honest gap between the two.
 Read this before quoting `reference.md` at the code — much of it is not
 implemented, and the reference does not say so.
 
-- **There is no presigning at all.** `S3Service.java` has three methods,
-  `putObject`, `getObject` and `deleteObject`, all moving raw bytes through the
-  backend. Every presigned-URL rule above describes work that has not started;
-  deciding it is the next unit, as its own ADR.
-- **Reading is done by streaming through the API, and only for clubs.**
-  `GET /api/v1/clubs/{id}/logo` and `/images/{index}`
-  (`ClubController.java:141`, `:158`) are the only read path that exists;
-  `getObject` had no caller at all before 2026-09-09. Chosen over presigned or
-  public URLs because `FakeS3` cannot presign and no bucket or CDN is
-  provisioned to be public with — Arpan, 2026-09-09. **Event banners and
-  profile avatars still have none**, so an uploaded event image cannot be
-  displayed.
+- **There is no presigning at all, and that is now a decision rather than a
+  gap.** `S3Service.java` has three methods, `putObject`, `getObject` and
+  `deleteObject`, all moving raw bytes through the backend. Uploads stream in
+  ([ADR-010](../../docs/decisions/ADR-010-uploads-stream-through-the-api.md)) and
+  reads stream out ([ADR-007](../../docs/decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)).
+  **`reference.md` §9 describes the rejected option** — presigning would hand S3
+  whatever the browser sends, so the content sniffing that is the whole BUG-039
+  fix could not run before the object lands. Do not open work to close it.
+- **Reading is done by streaming through the API, for clubs and events.**
+  `GET /api/v1/clubs/{id}/logo`, `/clubs/{id}/images/{index}` and, since
+  2026-09-12, `/events/{id}/images/{index}`. All three hand the key to
+  **`s3/StoredImageResponses`**, the one place the response is built. **Profile
+  avatars still have no read path** ([BUG-042](../../bugs/bugs.md#bug-042)).
 - **Images are addressed by index, never by key.** An endpoint that took a key
   from the caller would fetch any object in the bucket it was pointed at. The
-  index is resolved against that club's own list.
+  index is resolved against that club's or event's own list. A stored value that
+  is not a key — an absolute URL or a root-relative path — is a 404 before the
+  store is asked.
 - **An uploaded SVG is never served as `image/svg+xml`.** `imageTypeOf`
-  (`ClubController.java:207`) names raster types only and falls back to
+  (`StoredImageResponses.java`) names raster types only and falls back to
   `application/octet-stream`, with `nosniff`. Uploads refuse SVG since
   2026-09-11, but objects stored before then were never checked, and an SVG is
   a document that can carry script — serving one as an image would execute it on
@@ -75,27 +83,34 @@ implemented, and the reference does not say so.
   `next/image`, which throws at render time rather than failing to load, so the
   page came down. `adapters.ts` maps keys onto `/media/...` and
   `next.config.ts` rewrites that to the API.
-- **`aws.s3.mock` swaps the client, and it is on everywhere but `prod`.** True
-  by default (`application.yml:52`, `docker-compose.yml:116`, the CI Docker
-  job), so `S3Config.java:18-26` hands back `FakeS3`, which writes to
-  `~/.arpan/s3` on the local disk — `/root/.arpan/s3` in the dev compose
-  container, which runs as root (`backend/Dockerfile` sets no `USER`; the EB
-  image runs as `campusvibe`). `application-prod.yml` sets it false.
-- **`FakeS3` is not S3 in the one way that matters.** S3 treats a key as an
-  opaque string, so `..` in one is two characters. `FakeS3` joins the key onto
-  a directory, where `..` climbs. `buildObjectFullPath` therefore refuses any
-  key that resolves outside its bucket's directory, on put, get and delete
-  ([BUG-039](../../bugs/fixed_bugs.md#bug-039)). Never reason about a key's
-  safety from real S3's semantics alone.
-- **Two buckets, not one.** `S3Buckets.java` exposes `clubs` and `events`
-  (`application.yml:53-55`); the reference assumes a single bucket with prefixes,
-  and nothing exists for profile images.
+- **The client is always a real `S3Client`. There is no mock flag.**
+  `aws.s3.mock` and the filesystem stub behind it were deleted on 2026-09-12
+  ([ADR-011](../../docs/decisions/ADR-011-minio-replaces-fakes3.md)) — the flag
+  defaulted to true, so the branch production uses had *never executed anywhere*,
+  which is how BUG-039 and BUG-051 both arrived. What varies now is only where
+  the client points: `aws.s3.endpoint` set means **MinIO** (local, CI and the
+  media ITs, through `MinioTestContainer`); unset means AWS, with credentials
+  from the default provider chain. MinIO comes from **quay.io, not Docker Hub** —
+  `docker pull minio/minio` is refused outright.
+- **One bucket, not two** ([ADR-012](../../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md)).
+  `MediaBucket` reads `aws.s3.bucket` from `AWS_S3_BUCKET`, which has **no
+  default and rejects a blank value**, so an environment that does not name its
+  bucket fails to start. Media kinds are separated by key prefix, which is what
+  `MediaKeys` was already writing. `S3Buckets`, with its `clubs` and `events`
+  properties, is gone.
+- **Key safety is ours, not the store's.** `MediaKeys.assertSafeKey` refuses a
+  key that is absolute, or has a `.` or `..` segment, a backslash, a `//` or a
+  scheme, and `S3Service` applies it to every put, get and delete. The deleted
+  stub used to carry this because it joined the key onto a directory; MinIO and
+  S3 both treat a key as an opaque string and would accept all of it. **That is
+  the reason to keep the check, not to drop it** (BUG-039).
 - **The backend generates every key — `s3/MediaKeys` and nothing else.** Since
   2026-09-11 ([BUG-039](../../bugs/fixed_bugs.md#bug-039)), in the §7 layout:
   `clubs/{id}/logos/{uuid}.{ext}`, `clubs/{id}/images/{uuid}.{ext}`,
-  `events/{id}/banners/{uuid}.{ext}`. Nothing reads `getOriginalFilename()`.
-  Keys written before then keep the old `clubs/{id}/logo-{filename}` shape and
-  still read; nothing migrated them.
+  `events/{id}/images/{uuid}.{ext}`. Nothing reads `getOriginalFilename()`.
+  Keys written before then keep the old `clubs/{id}/logo-{filename}` shape, and
+  event photos uploaded before 2026-09-12 keep `events/{id}/banners/`; both still
+  read, and nothing migrated them.
 - **Validated by content, not by label.** `MediaKeys` reads the leading bytes
   and accepts PNG, JPEG and WebP only (§12); the filename and the part's
   `Content-Type` are ignored, since the caller writes both. Anything else, and
@@ -104,6 +119,15 @@ implemented, and the reference does not say so.
 - **5MB per file, 10MB per request** (`application.yml:34-35`), per §12. Over
   either is a 413 with a sentence (`DefaultExceptionHandler`). MockMvc never
   applies these caps; only `MediaUploadLimitIT`, on a real port, sees them.
+  **In production nginx sits in front and refuses 1 MB by default**, which
+  `deploy/eb/.platform/nginx/conf.d/client_max_body_size.conf` raises to `10M`.
+  Change it together with `max-request-size`.
+- **A missing object is a 404, not a 500.** `S3Service.getObject` translates
+  `NoSuchKeyException` into `ResourceNotFoundException`. A row pointing at an
+  object that is not there is a real state — §21's accepted orphan — rather than
+  a server fault. **In production that depends on the instance role holding
+  `s3:ListBucket`**: without it S3 answers a missing key with 403, not
+  NoSuchKey, and the read is a 500. MinIO always lists, so no test shows it.
 - **A replaced logo's old object is deleted, in §19's order**: store the new
   object, point the row at it, and delete the old one only after
   `ClubService.updateLogo` has committed. A failed delete is logged and does not
@@ -115,15 +139,19 @@ implemented, and the reference does not say so.
 
 ## Before you change any of this
 
-Moving to presigned uploads is a decision, not an oversight to fix in passing:
-it changes the frontend, the endpoints and possibly the stored keys at once, and
-ADR-007 rejected presigning for *reads* because `FakeS3` cannot presign. It is
-queued as its own ADR in [`todo.md`](../../TODO/todo.md) and
-[`decisions/README.md`](../../docs/decisions/README.md). Ask Arpan rather than
-riding it on another feature.
+**Presigned uploads are decided against, not pending** —
+[ADR-010](../../docs/decisions/ADR-010-uploads-stream-through-the-api.md),
+accepted 2026-09-12. Reopening it means an ADR that supersedes that one, not a
+refactor, and its revisit triggers are listed there: media past 5MB, or upload
+traffic that is a measurable share of backend memory.
 
-**Building the missing event and avatar read paths** should follow the club one
-above rather than inventing a second shape — same index addressing, same
-content-type restriction, same `/media/**` rewrite. If that ever stops scaling,
+**The old argument for it is spent.** ADR-007 rejected presigning partly because
+the local store could not presign. MinIO can. If the subject comes back, argue it
+on the content-validation ground, which still holds, and not on that one.
+
+**Building the missing avatar read path** should follow the club and event ones
+above rather than inventing a second shape — same index addressing, the same
+`StoredImageResponses`, same `/media/**` rewrite. Events followed it on
+2026-09-12. If that ever stops scaling,
 the replacement is presigned or CDN URLs for *all* media at once, which is an
 ADR, not a per-feature choice.
