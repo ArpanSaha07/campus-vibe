@@ -6,6 +6,7 @@ Last updated: **2026-09-15**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
 | [BUG-056](#bug-056) | Medium | 2026-09-15 | A photo change looked undone for up to five minutes: media URLs name a position, not an image, and the response is cached — and the first fix, `?v=`, answered 500 on every page with an image |
 | [BUG-055](#bug-055) | Low | 2026-09-15 | An uploaded club logo never showed in the club's own dashboard: the managed-club reads handed `ClubLogo` the raw S3 key |
 | [BUG-043](#bug-043) | Low | 2026-09-15 | A club could not be edited after creation, from anywhere — every endpoint existed and no screen called them |
@@ -48,6 +49,61 @@ Last updated: **2026-09-15**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-057
+**Google sign-in answered *not ready yet* on every click, while the script, the
+client id and the origin were all fine** · High · FIXED 2026-09-15
+
+**Found:** 2026-09-15, reported by Arpan. Google sign-in worked on localhost,
+worked for other people against the same production URL, and failed on every one
+of his devices — incognito included, and after a cache clear. Clicking *Continue
+with Google* answered *Google sign-in is not ready yet. Try again in a moment.*
+
+**The message was a lie, and the code proved it before the browser did.** The
+visible button was disabled until `ready`, and `ready` was set immediately after
+`renderButton` returned. A disabled button fires no click, so the message could
+only ever appear once GIS had loaded, initialised and been asked to render. The
+script was never the problem, which ruled out the whole family of causes that
+were being chased — a blocked script, a missing client id, a CSP entry, an
+unregistered origin.
+
+**Cause.** Reproduced in the browser on `https://www.campusvibe-mcgill.com`:
+`gsi/client` answered 200, `window.google.accounts.id` was present, the console
+was clean — no CSP violation, no `GSI_LOGGER` origin error — and both the apex
+and `www` were registered as authorized origins. What the hidden box held was
+`div > div > div > iframe`, the iframe served from
+`accounts.google.com/gsi/button`, and the page carried no `div[role=button]`
+anywhere. GIS had begun serving the button as a **cross-origin iframe**, while
+`handleClick` looked for Google’s markup in our DOM in order to call `.click()`
+on it. Nothing in a page can click into a cross-origin iframe, so the selector
+was not too narrow — the assumption under it was wrong.
+
+**Why it looked device-specific.** The shape varies by context, not only by
+browser: in the same Chrome within the same minute, `http://localhost:3000`
+painted the light-DOM markup and production painted the iframe. That is why
+development never saw it and why it shipped intact. What kept other people’s
+browsers on the old shape was not established, and the fix does not depend on
+knowing — as their browsers move, they land where Arpan did.
+
+**Fix.**
+[ADR-018](../docs/decisions/ADR-018-google-renders-and-styles-its-own-button.md):
+Google renders and styles its own button, and nothing of ours inspects, wraps or
+clicks anything inside its container. The proxy, the hidden box and the click
+forwarding are deleted. An empty container after 8 seconds now reports that
+sign-in could not load and names the email alternative, instead of blaming
+timing for a structural failure.
+
+**Live in production until the frontend is deployed.** The fix is verified
+locally, in the suite and in the browser; production keeps serving the broken
+build until Vercel takes the new one.
+
+**The test could not have caught it.** The fake GIS in
+`GoogleAuthButton.test.tsx` appended a `div[role=button]` **synchronously**,
+modelling Google’s private DOM as a stable contract — so the suite stayed green
+through a production outage. It now paints an iframe, asynchronously, and covers
+the case where GIS paints nothing at all.
 
 ---
 

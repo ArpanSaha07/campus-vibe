@@ -26,7 +26,7 @@ export default function SignupChoiceView({
         {title ?? "Sign up to CampusVibe"}
       </h2>
 
-      <GoogleAuthButton label="Continue with Google" onSuccess={onSuccess} />
+      <GoogleAuthButton text="continue_with" onSuccess={onSuccess} />
 
       <AuthDivider />
 
