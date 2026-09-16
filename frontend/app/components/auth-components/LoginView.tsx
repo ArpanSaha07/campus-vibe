@@ -52,7 +52,7 @@ export default function LoginView({
         Log in to CampusVibe
       </h2>
 
-      <GoogleAuthButton label="Log in with Google" onSuccess={onSuccess} disabled={loading} />
+      <GoogleAuthButton text="signin_with" onSuccess={onSuccess} disabled={loading} />
 
       <AuthDivider />
 

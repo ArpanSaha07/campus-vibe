@@ -18,6 +18,7 @@ import { parseApiError } from "@/app/lib/auth-errors";
 import { revalidateEvents } from "@/app/lib/actions/revalidate";
 import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import { ACCEPTED_IMAGE_TYPES, validateImageFile } from "@/app/lib/validators/clubValidator";
+import { readPreview } from "@/app/lib/image-preview";
 import type { ApiEvent } from "@/app/types";
 import InterestPicker from "@/app/components/profile/edit/InterestPicker";
 import EventFormatPicker from "@/app/components/event/EventFormatPicker";
@@ -169,14 +170,6 @@ export default function CreateEventForm({
   const storedPhotos =
     editing && stored && stored.images.length > 0 ? toEventInstance(stored).images : [];
   const room = MAX_EVENT_PHOTOS - storedPhotos.length - photos.length;
-
-  function readPreview(file: File): Promise<string> {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-  }
 
   async function pickPhotos(event: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(event.target.files ?? []);

@@ -89,3 +89,15 @@ paths:
   `ClubDTO`.** `ManagedClubDTO.logo` is the same S3 key, and the managed-club
   reads returned it raw, so `ClubLogo` refused it and an uploaded logo never
   showed in the dashboard. `toManagedClub` maps it. (BUG-055)
+- **Never reach into a third-party widget’s DOM.** `GoogleAuthButton` rendered
+  Google’s real button into a hidden box and forwarded clicks to it by finding
+  `div[role=button]` and calling `.click()`. GIS changed the shape to a
+  cross-origin iframe, which nothing in a page can click into, and every click
+  answered *not ready yet* while the script, the client id, the origin and the
+  CSP were all fine. **That shape is not a contract and varies by context**, not
+  just by browser: the same Chrome painted light-DOM markup on `localhost` and
+  an iframe in production within the same minute, which is why development never
+  saw it. Whatever the widget paints **is** the control — style it through the
+  options its API exposes and touch nothing inside it. GIS also reports nothing
+  when it paints nothing, so an empty container is watched and reported rather
+  than left blank. (BUG-057, ADR-018)

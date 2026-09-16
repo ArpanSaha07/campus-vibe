@@ -1,7 +1,10 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import GoogleAuthButton from "@/app/components/auth-components/GoogleAuthButton";
-import type { GoogleCredentialResponse, GoogleIdConfiguration } from "@/app/types/google-identity";
+import type {
+  GoogleButtonOptions,
+  GoogleCredentialResponse,
+  GoogleIdConfiguration,
+} from "@/app/types/google-identity";
 
 const mockGoogleSignIn = jest.fn();
 
@@ -9,12 +12,24 @@ jest.mock("@/app/lib/auth-context", () => ({
   useAuth: () => ({ googleSignIn: mockGoogleSignIn }),
 }));
 
-// Stands in for the Google Identity Services script. The real one is never
-// loaded here — these tests are about our side of the seam: that we forward a
-// click to Google's button, and that we hand its ID token to the backend.
-function installGis() {
-  const googleButtonClick = jest.fn();
+const GIS_SRC = "https://accounts.google.com/gsi/client";
+
+/**
+ * Stands in for the Google Identity Services script.
+ *
+ * It paints an **iframe**, **asynchronously** — which is what the real script
+ * does, and what the fake before BUG-057 did not. The old one appended a
+ * `div[role="button"]` synchronously, so it modelled Google's private DOM as
+ * a stable contract and the suite stayed green through the outage that took
+ * production down. Anything this component does must survive an opaque,
+ * cross-origin child arriving on Google's schedule, not ours.
+ *
+ * `paints: false` is the failure BUG-057 actually produced: GIS loads, accepts
+ * the call, and puts nothing in the box.
+ */
+function installGis({ paints = true }: { paints?: boolean } = {}) {
   let capturedConfig: GoogleIdConfiguration | undefined;
+  let capturedOptions: GoogleButtonOptions | undefined;
 
   window.google = {
     accounts: {
@@ -22,12 +37,15 @@ function installGis() {
         initialize: (config) => {
           capturedConfig = config;
         },
-        renderButton: (parent) => {
-          const rendered = document.createElement("div");
-          rendered.setAttribute("role", "button");
-          rendered.textContent = "Continue with Google";
-          rendered.addEventListener("click", googleButtonClick);
-          parent.appendChild(rendered);
+        renderButton: (parent, options) => {
+          capturedOptions = options;
+          if (!paints) return;
+          setTimeout(() => {
+            const frame = document.createElement("iframe");
+            frame.title = "Sign in with Google Button";
+            frame.src = "https://accounts.google.com/gsi/button";
+            parent.appendChild(frame);
+          }, 0);
         },
         prompt: jest.fn(),
         disableAutoSelect: jest.fn(),
@@ -36,7 +54,8 @@ function installGis() {
   };
 
   return {
-    googleButtonClick,
+    options: () => capturedOptions,
+    config: () => capturedConfig,
     /**
      * Fires the callback GIS would fire after an account pick. Wrapped in act
      * because it drives state updates from outside React's event system, the
@@ -50,47 +69,85 @@ function installGis() {
   };
 }
 
+const container = () => screen.getByTestId("google-button-container");
+
 const ORIGINAL_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 afterEach(() => {
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = ORIGINAL_CLIENT_ID;
   delete window.google;
+  document.querySelectorAll(`script[src="${GIS_SRC}"]`).forEach((s) => s.remove());
   jest.clearAllMocks();
 });
 
 describe("GoogleAuthButton", () => {
   it("says so plainly when no client id is configured", () => {
     delete process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    render(<GoogleAuthButton label="Continue with Google" />);
+    render(<GoogleAuthButton text="continue_with" />);
 
     expect(screen.getByText("Google sign-in is not configured.")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("google-button-container")).not.toBeInTheDocument();
   });
 
-  it("renders our own button, styled with a border-only hover", async () => {
+  it("hands the container to Google and adds no control of its own", async () => {
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "test-client-id";
     installGis();
-    render(<GoogleAuthButton label="Continue with Google" />);
+    render(<GoogleAuthButton text="continue_with" />);
 
-    const button = screen.getByRole("button", { name: /Continue with Google/ });
-    await waitFor(() => expect(button).toBeEnabled());
+    await waitFor(() => expect(container().querySelector("iframe")).toBeInTheDocument());
 
-    // The whole reason this component exists: Google's rendered button cannot
-    // carry these, so the design's hover would be impossible without it.
-    expect(button.className).toContain("hover:border-lavender-600");
-    expect(button.className).not.toContain("hover:bg-");
+    // The whole point of ADR-018: whatever GIS paints is the real control, so
+    // there is nothing of ours to click and nothing of ours to go stale.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(container().querySelector('div[role="button"]')).toBeNull();
   });
 
-  it("forwards a click to Google's own hidden button", async () => {
+  it("asks Google for the button the design calls for", async () => {
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "test-client-id";
     const gis = installGis();
-    render(<GoogleAuthButton label="Continue with Google" />);
+    render(<GoogleAuthButton text="signin_with" />);
 
-    const button = screen.getByRole("button", { name: /Continue with Google/ });
-    await waitFor(() => expect(button).toBeEnabled());
-    await userEvent.click(button);
+    await waitFor(() => expect(gis.options()).toBeDefined());
+    expect(gis.options()).toMatchObject({ theme: "outline", shape: "pill", text: "signin_with" });
+    expect(gis.config()?.client_id).toBe("test-client-id");
 
-    expect(gis.googleButtonClick).toHaveBeenCalledTimes(1);
+    // jsdom measures every element at 0, so this is the documented fallback
+    // rather than a real measurement — the clamp is what is under test.
+    expect(gis.options()?.width).toBe(400);
+  });
+
+  it("says sign-in is unavailable when Google paints nothing", async () => {
+    jest.useFakeTimers();
+    try {
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "test-client-id";
+      installGis({ paints: false });
+      render(<GoogleAuthButton text="continue_with" />);
+
+      // This is BUG-057: the script loaded, renderButton was called, and the
+      // box stayed empty. The old component called that "not ready yet" and
+      // invited the user to try again forever.
+      expect(screen.queryByText(/could not load/)).not.toBeInTheDocument();
+      act(() => {
+        jest.advanceTimersByTime(8000);
+      });
+
+      expect(screen.getByText(/Google sign-in could not load/)).toBeInTheDocument();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("says sign-in is unavailable when the GIS script itself fails to load", async () => {
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "test-client-id";
+    render(<GoogleAuthButton text="continue_with" />);
+
+    const script = document.querySelector<HTMLScriptElement>(`script[src="${GIS_SRC}"]`);
+    expect(script).not.toBeNull();
+    act(() => {
+      script?.dispatchEvent(new Event("error"));
+    });
+
+    expect(await screen.findByText(/Google sign-in could not load/)).toBeInTheDocument();
   });
 
   it("exchanges the ID token and reports success", async () => {
@@ -98,11 +155,9 @@ describe("GoogleAuthButton", () => {
     const gis = installGis();
     const onSuccess = jest.fn();
     mockGoogleSignIn.mockResolvedValueOnce(undefined);
-    render(<GoogleAuthButton label="Continue with Google" onSuccess={onSuccess} />);
+    render(<GoogleAuthButton text="continue_with" onSuccess={onSuccess} />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Continue with Google/ })).toBeEnabled()
-    );
+    await waitFor(() => expect(gis.config()).toBeDefined());
     await gis.signIn({ credential: "an-id-token" });
 
     expect(mockGoogleSignIn).toHaveBeenCalledWith("an-id-token");
@@ -116,11 +171,9 @@ describe("GoogleAuthButton", () => {
     mockGoogleSignIn.mockRejectedValueOnce(
       new Error(JSON.stringify({ message: "Google account not recognised" }))
     );
-    render(<GoogleAuthButton label="Continue with Google" onSuccess={onSuccess} />);
+    render(<GoogleAuthButton text="continue_with" onSuccess={onSuccess} />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Continue with Google/ })).toBeEnabled()
-    );
+    await waitFor(() => expect(gis.config()).toBeDefined());
     await gis.signIn({ credential: "an-id-token" });
 
     expect(await screen.findByText("Google account not recognised")).toBeInTheDocument();
@@ -130,11 +183,9 @@ describe("GoogleAuthButton", () => {
   it("reports a cancelled pick rather than failing silently", async () => {
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "test-client-id";
     const gis = installGis();
-    render(<GoogleAuthButton label="Continue with Google" />);
+    render(<GoogleAuthButton text="continue_with" />);
 
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Continue with Google/ })).toBeEnabled()
-    );
+    await waitFor(() => expect(gis.config()).toBeDefined());
     await gis.signIn({});
 
     expect(await screen.findByText("Google did not return a sign-in token.")).toBeInTheDocument();
