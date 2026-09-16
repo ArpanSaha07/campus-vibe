@@ -8,7 +8,7 @@ Search returns only what a student can still go to and only what is actually rel
 
 ## Out of scope
 
-- An event update endpoint. There is none, so the rest of [BUG-006](../bugs/bugs.md#bug-006) stays open until one exists.
+- An event update endpoint. There is none, so the rest of [BUG-006](../bugs/fixed_bugs.md#bug-006) stays open until one exists.
 - Closing [BUG-001](../bugs/bugs.md#bug-001). **Its root cause was found and fixed inside this unit** (see *Decisions taken*), but the entry says close it on a green GitHub full-tier run, and that is Arpan's call.
 - The home page's mock events (`(main)/page.tsx:7-8` reads `data/data.ts`). Search can never find them, and wiring the home page to the API is a separate unit.
 - Rewriting [`search.md`](../docs/architecture/search.md). Still queued in `todo.md` (P2); only its banner was corrected.

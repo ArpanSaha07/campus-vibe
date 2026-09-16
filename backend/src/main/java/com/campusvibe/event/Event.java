@@ -44,8 +44,15 @@ public class Event {
     @Column(nullable = false)
     private Integer followers = 0;
 
+    /*
+     * Ordered, and the order is data: the first photo is the event's banner
+     * (Arpan, 2026-09-15). Without an order column Postgres returns these rows
+     * in whatever physical order they happen to sit in, so a chosen banner could
+     * silently change once freed space was reused. V34 adds sort_order.
+     */
     @ElementCollection
     @CollectionTable(name = "event_images", joinColumns = @JoinColumn(name = "event_id"))
+    @OrderColumn(name = "sort_order")
     @Column(name = "url")
     private List<String> images = new ArrayList<>();
 

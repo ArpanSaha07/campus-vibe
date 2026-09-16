@@ -5,6 +5,13 @@
 behaviours were measured against a running stack the same day. Re-stamp with the
 real sha once that work is committed.
 
+**Except the Google button**, whose section was re-read against `b0c5e63` plus
+the uncommitted BUG-057 fix on 2026-09-15 and rewritten
+([ADR-018](../decisions/ADR-018-google-renders-and-styles-its-own-button.md)).
+The whole-doc stamp above is deliberately **not** raised to that sha: the other
+114 commits it sits behind were not re-read, and a stamp claiming they were is
+worth less than one that is honest about its age.
+
 **Authors:** written by the agent that switched on Google sign-in and removed
 the old `/login` page. **No `security` agent has reviewed it.** The findings in
 *Known gaps* are one engineer's reading, not a security review — treat them as a
@@ -275,16 +282,31 @@ them as unverified would retroactively penalise people who did nothing wrong.
 ### Frontend
 
 #### `app/components/auth-components/GoogleAuthButton.tsx`
-The Google button used by the modal. Its header comment (`:8-20`) carries the
-key reasoning: the backend verifies a Google **ID token**, and Google Identity
-Services only issues one through `accounts.id`, whose rendered button cannot be
-restyled. So Google's real button is rendered into a visually hidden box
-(`:174`) and clicks are forwarded to it from the button the design calls for
-(`:136-148`). `.click()` inside a real click handler preserves the user
-activation Google needs to open its popup.
+The Google button used by the modal — and it **is** Google's button, not ours.
+GIS paints into a plain container (`:197-204`) and whatever it paints is the
+real, clickable control; nothing here inspects, wraps or clicks anything inside
+it. The only styling we own is the option set GIS exposes, `theme: outline` with
+`shape: pill` being the closest the API comes to the design (`:139-146`).
 
-Gated on `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (`:60`): unset, it renders *Google
-sign-in is not configured* (`:150`) instead of a dead button.
+**It was the other way round until 2026-09-15**, and the header comment (`:7-24`)
+carries why it changed. Google's real button was rendered into a hidden box and
+clicks were forwarded to it with `.click()`, so the design could own the visible
+button. GIS then began serving that button as a cross-origin iframe, which
+nothing in a page can click into, and Google sign-in answered *not ready yet* for
+some people while working normally for others
+([BUG-057](../../bugs/fixed_bugs.md#bug-057),
+[ADR-018](../decisions/ADR-018-google-renders-and-styles-its-own-button.md)). The
+shape of that markup was never a contract and varies by context — localhost and
+production rendered differently in the same browser at the same moment.
+
+The width is measured from the container rather than hardcoded, clamped to the
+200-400 GIS accepts (`:132-133`). **GIS reports nothing when it paints nothing**,
+so a `MutationObserver` and an 8-second timeout (`:82-89`) turn an empty
+container into *Google sign-in could not load* (`:205`) rather than a blank space,
+or a message blaming timing for a structural failure.
+
+Gated on `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (`:56`): unset, it renders *Google
+sign-in is not configured* (`:187`) instead of a dead button.
 
 #### `app/components/auth-components/AuthModal.tsx` and its views
 `LoginView`, `SignupChoiceView`, `EmailSignupView`, `RecoverPasswordView`, over
@@ -297,7 +319,7 @@ confirmation text it shows is a lie to the user today.
 
 #### `app/components/auth-components/GoogleProvider.tsx`
 Loads `https://accounts.google.com/gsi/client` once from the root layout. Note
-`GoogleAuthButton` also loads the same script defensively (`:115-129`), guarding
+`GoogleAuthButton` also loads the same script defensively (`:160-174`), guarding
 on the existing tag — so the provider is not strictly required.
 
 #### `app/components/auth-components/AuthModalUrlTrigger.tsx` · `AuthTrigger.tsx`

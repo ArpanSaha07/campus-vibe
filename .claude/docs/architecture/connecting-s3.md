@@ -1,6 +1,6 @@
 # Connecting S3
 
-**Code as of:** `11c9993` · **Account read:** 2026-09-15 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan · **Verified:** 2026-09-15 — §5's upload, in production
+**Code as of:** `12afebf` plus the uncommitted event photo delete (`MediaKeys.belongsToEvent`, 2026-09-15; no bucket, grant or property change) · **Account read:** 2026-09-15 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan · **Verified:** 2026-09-15 — §5's upload, in production
 **Order:** 3 of 4 — the property goes in the same pass as [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) §4; verification needs its §5 deploy.
 **Related:** [ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md) · [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) · [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) · [`s3-media/SKILL.md`](../../skills/s3-media/SKILL.md) · [BUG-051](../../bugs/fixed_bugs.md#bug-051)
 
@@ -135,8 +135,8 @@ deleting an object is Arpan's.
 
 ## Known gaps — not needed to connect
 
-- **Profile avatars** have no upload or read path — what is left of [BUG-042](../../bugs/bugs.md#bug-042); event photos got theirs 2026-09-12. **There is no banner prefix:** a banner is one event photo a club asks the platform owner to feature, queued in [`todo.md`](../../TODO/todo.md) as its own unit
-- **Objects outlive their rows**: deleting a club or event deletes none of its objects — queued in [`todo.md`](../../TODO/todo.md)
+- **Profile avatars** have no upload or read path — what is left of [BUG-042](../../bugs/bugs.md#bug-042); event photos got theirs 2026-09-12. **There is no banner prefix:** an event's banner is its first photo, chosen by the club since 2026-09-15 ([ADR-015](../decisions/ADR-015-event-banner-is-the-first-photo.md))
+- **Objects outlive their rows**: deleting a club or event deletes none of its objects — queued in [`todo.md`](../../TODO/todo.md). Removing one event photo does delete its object since 2026-09-15, after the row commits and only under `events/{id}/`, within the existing `DeleteObject` grant
 
 ## Appendix — how this was read
 

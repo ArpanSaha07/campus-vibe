@@ -27,3 +27,15 @@ import { CACHE_TAGS } from "@/app/lib/cache";
 export async function revalidateClubs(): Promise<void> {
   updateTag(CACHE_TAGS.clubs);
 }
+
+/**
+ * Drops the cached event reads — the list, each club's list and each event.
+ *
+ * One tag covers all three, so this is coarse, and that is fine: it runs after
+ * an event is edited, deleted or given photos, and after a club is renamed,
+ * since every event carries its organizer's name. Same `updateTag` reasoning as
+ * above: the editor is about to look at the page it just changed.
+ */
+export async function revalidateEvents(): Promise<void> {
+  updateTag(CACHE_TAGS.events);
+}

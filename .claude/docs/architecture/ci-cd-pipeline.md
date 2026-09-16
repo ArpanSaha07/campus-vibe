@@ -8,8 +8,9 @@ gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 `bfc3c02` plus the uncommitted `AWS_S3_BUCKET` line for the `migrate` paragraph
 on required properties, 2026-09-14 ([BUG-052](../../bugs/fixed_bugs.md#bug-052));
 `backend/pom.xml` gained `<netty.version>` on 2026-09-11
-([BUG-050](../../bugs/fixed_bugs.md#bug-050)); no workflow changed. `4d11778` for the `next.config.ts` sections (images, the
-`/media` rewrite, CSP); `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
+([BUG-050](../../bugs/fixed_bugs.md#bug-050)); no workflow changed. `12afebf` plus the uncommitted versioned `/media`
+rewrites of 2026-09-15 for the `next.config.ts` sections (images, the `/media`
+rewrite, CSP), before that `4d11778`; `1ba1b07` — trigger rework of 2026-08-16, plus the migration-lint
 extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 `verify.mjs`) reconciled 2026-08-18, plus the `_docker.yml` smoke-test
 assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)),
@@ -969,7 +970,14 @@ every `NEXT_PUBLIC_*` value live only in the Vercel dashboard
   render*, not a broken image.
 - `async rewrites()` maps `/media/clubs/:clubId/logo`, `/media/clubs/:clubId/images/:index`
   and, since 2026-09-12, `/media/events/:eventId/images/:index` onto
-  `API_INTERNAL_URL`. Three separate problems collapse into this one rule: the
+  `API_INTERNAL_URL`. **Since 2026-09-15 each also has a versioned form with one
+  more path segment**, listed first and dropped from the destination, because
+  `adapters.ts` ends every media URL in a hash of its stored key
+  ([ADR-016](../decisions/ADR-016-media-urls-versioned-by-key-hash.md)). A
+  segment, not `?v=`: with `images.localPatterns` unset Next applies
+  `[{ pathname: '**', search: '' }]`, and `next/image` throws during render on a
+  local `src` carrying a query string
+  ([BUG-056](../../bugs/fixed_bugs.md#bug-056)). Three separate problems collapse into this one rule: the
   optimizer runs server-side where `localhost:8080` is the frontend container
   rather than the backend; emitting a different absolute URL per side would be a
   hydration mismatch on `src`; and Next 16 refuses outright to optimize an
@@ -1034,6 +1042,12 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 ## Change log
 
+- **2026-09-15** — `next.config.ts` gained a versioned form of each `/media`
+  rewrite, `/:version` on the end and ignored by the destination, for media URLs
+  that change when their image does
+  ([BUG-056](../../bugs/fixed_bugs.md#bug-056)). No `images.localPatterns`
+  entry: a query-string version was tried first and crashed render. No workflow,
+  hook or Dockerfile changed. Implementing agent.
 - **2026-09-11** — The Trivy gate blocked PR #45 on two newly published
   CRITICALs, `netty-handler` 4.1.135 and `next` 16.3.0
   ([BUG-050](../../bugs/fixed_bugs.md#bug-050)). `backend/pom.xml` gained

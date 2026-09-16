@@ -28,7 +28,7 @@ export default function Navbar() {
   const invitationCount = pendingAnswers;
 
   const linkClasses =
-    "px-3 py-2 rounded-full text-ink-900 hover:bg-lavender-50 hover:text-lavender-800 transition-colors";
+    "px-2.5 py-2 rounded-full text-ink-900 hover:bg-lavender-50 hover:text-lavender-800 transition-colors";
 
   return (
     <nav className="w-full border-b border-mist-200 bg-white top-0 z-50">

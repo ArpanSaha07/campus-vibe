@@ -9,6 +9,7 @@ import { getEventFormats, getInterests, labelFor } from "@/app/lib/taxonomy";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import EventShareButton from "@/app/components/event/EventShareButton";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
+import ManageEventLink from "@/app/components/event/ManageEventLink";
 import ClubFollowButton from "@/app/components/club/ClubFollowButton";
 import ClubLogo from "@/app/components/club/ClubLogo";
 import Chip from "@/app/components/ui/Chip";
@@ -157,6 +158,7 @@ export default async function EventPage({ params }: EventPageProps) {
             <div className="flex items-center justify-between gap-4 mb-3">
               <h2 className="font-display text-2xl font-bold text-ink-900">Details</h2>
               <div className="flex items-center gap-2">
+                <ManageEventLink eventId={event.eventId} clubId={event.organizer} />
                 <EventLikeButton event={{ eventId: event.eventId }} />
                 <EventShareButton eventId={event.eventId} />
               </div>

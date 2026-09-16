@@ -74,3 +74,27 @@ paths:
   function` for a hook whose signature had changed — both while `npx tsc
   --noEmit` and `npm run build` were clean. If an error contradicts the file in
   front of you, restart `campusvibe-frontend` before debugging it. (BUG-045)
+- **A media URL changes when its image does — through the last path segment,
+  never `?v=`.** `adapters.ts` ends every `/media/...` URL in
+  `mediaVersion(key)`, because URLs name a position and the image response is
+  cached for five minutes, so a reorder or a removed photo kept showing the old
+  image. `next/image` throws during render on a local `src` with a query string
+  unless `images.localPatterns` names it, so `?v=` answered 500 on every page
+  with an uploaded image. A new media route needs its versioned rewrite in
+  `next.config.ts` as well. (BUG-056, ADR-016)
+- **Every DTO carrying a stored key goes through an adapter, not only
+  `ClubDTO`.** `ManagedClubDTO.logo` is the same S3 key, and the managed-club
+  reads returned it raw, so `ClubLogo` refused it and an uploaded logo never
+  showed in the dashboard. `toManagedClub` maps it. (BUG-055)
+- **Never reach into a third-party widget’s DOM.** `GoogleAuthButton` rendered
+  Google’s real button into a hidden box and forwarded clicks to it by finding
+  `div[role=button]` and calling `.click()`. GIS changed the shape to a
+  cross-origin iframe, which nothing in a page can click into, and every click
+  answered *not ready yet* while the script, the client id, the origin and the
+  CSP were all fine. **That shape is not a contract and varies by context**, not
+  just by browser: the same Chrome painted light-DOM markup on `localhost` and
+  an iframe in production within the same minute, which is why development never
+  saw it. Whatever the widget paints **is** the control — style it through the
+  options its API exposes and touch nothing inside it. GIS also reports nothing
+  when it paints nothing, so an empty container is watched and reported rather
+  than left blank. (BUG-057, ADR-018)

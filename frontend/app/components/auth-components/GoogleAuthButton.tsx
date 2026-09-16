@@ -1,59 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/lib/auth-context";
 import { parseApiError } from "@/app/lib/auth-errors";
-import Button from "@/app/components/ui/Button";
 
-// A "Continue with Google" button whose styling we own.
+// Google's own Sign in with Google button, rendered by Google Identity
+// Services and styled only through the options GIS exposes.
 //
-// The backend's GoogleTokenVerifier checks a Google *ID token*, and Google
-// Identity Services only hands one out through `accounts.id`. Its rendered
-// button cannot be restyled — it is Google-controlled markup — so the design's
-// border-only hover is impossible on it. The workaround is the standard one:
-// render Google's button into a visually hidden box and forward clicks to it
-// from the button the design actually calls for. `.click()` inside a real click
-// handler keeps the user-activation Google needs to open its popup.
+// It used to be a button of ours with Google's real one hidden behind it and
+// clicks forwarded by `.click()`. That broke on 2026-09-15: GIS began serving
+// the button to newer Chrome as a cross-origin iframe
+// (`accounts.google.com/gsi/button`), and nothing in our page can click into
+// one. The selector found no `div[role="button"]`, so every click answered
+// "not ready yet" while the script, the client id and the origin were all
+// fine (BUG-057). The proxy depended on Google's private DOM, which was never
+// ours to depend on — the shape changed under us with no warning and no error.
+// ADR-018 records the choice to stop.
 //
-// The alternative was the OAuth code flow (`accounts.oauth2`), which allows a
-// fully custom button but returns an auth code, not an ID token — that would
-// mean rewriting GoogleTokenVerifier and AuthenticationService too.
+// The cost is visible and deliberate: `theme`, `size`, `shape` and `text` are
+// the whole of our control, so the border-only hover of the `outline` Button
+// variant is impossible here. `theme: "outline"` with `shape: "pill"` is the
+// closest the API comes to the design's white, full-radius, mist-bordered
+// button (design-guidelines.md:64,75).
 
-function GoogleGlyph() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
-      />
-      <path
-        fill="#34A853"
-        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z"
-      />
-      <path
-        fill="#EA4335"
-        d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.42 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"
-      />
-    </svg>
-  );
-}
+const GIS_SRC = "https://accounts.google.com/gsi/client";
+
+// GIS accepts 200-400; outside that it falls back to its own default width.
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 400;
+
+// How long GIS gets to paint before we call it a failure. Generous, because
+// the alternative — telling a user on a slow connection that sign-in is broken
+// — is worse than a few seconds of reserved space.
+const RENDER_TIMEOUT_MS = 8000;
+
+/** `loading` reserves space; `unavailable` is the honest version of BUG-057. */
+type Status = "loading" | "ready" | "unavailable";
 
 export default function GoogleAuthButton({
-  label,
+  text,
   onSuccess,
   disabled,
 }: {
-  label: string;
+  /** Maps to the GIS `text` option — Google owns the wording, we pick which. */
+  text: "signin_with" | "continue_with";
   /** Called after the token exchange succeeds — used to close the modal. */
   onSuccess?: () => void;
   disabled?: boolean;
 }) {
-  const hiddenRef = useRef<HTMLDivElement | null>(null);
-  const [ready, setReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [status, setStatus] = useState<Status>("loading");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const { googleSignIn } = useAuth();
@@ -72,80 +68,118 @@ export default function GoogleAuthButton({
     // component-scope `string | undefined`; GIS silently renders nothing when
     // client_id is undefined.
     const resolvedClientId = clientId;
+    const container = containerRef.current;
+    if (!container) return;
+
     let cancelled = false;
+    let initialised = false;
+    let renderedWidth = 0;
 
-    function init() {
+    // GIS paints asynchronously and reports nothing when it paints nothing —
+    // no exception, no console error, no callback. Watching the container is
+    // the only way to tell a slow render from a failed one, and BUG-057 was
+    // exactly the failed one.
+    const observer = new MutationObserver(() => {
+      if (!cancelled && container.childElementCount > 0) setStatus("ready");
+    });
+    observer.observe(container, { childList: true });
+
+    const timeout = setTimeout(() => {
+      if (!cancelled && container.childElementCount === 0) setStatus("unavailable");
+    }, RENDER_TIMEOUT_MS);
+
+    function fail() {
+      if (!cancelled) setStatus("unavailable");
+    }
+
+    function paint() {
       const google = window.google;
-      if (!google?.accounts?.id || !hiddenRef.current || cancelled) return;
+      // Re-read through the ref rather than closing over the narrowed
+      // `container`: `paint` is hoisted, so TypeScript cannot know the guard
+      // above already ran by the time GIS calls it back.
+      const node = containerRef.current;
+      if (!google?.accounts?.id || !node || cancelled) return;
 
-      google.accounts.id.initialize({
-        client_id: resolvedClientId,
-        callback: async (response) => {
-          const idToken = response?.credential;
-          if (!idToken) {
-            setError("Google did not return a sign-in token.");
-            return;
-          }
-          setPending(true);
-          setError("");
-          try {
-            await googleSignIn(idToken);
-            onSuccessRef.current?.();
-          } catch (err) {
-            setError(parseApiError(err, "Google sign-in failed."));
-          } finally {
-            setPending(false);
-          }
-        },
-        error_callback: () => setError("Google sign-in could not start."),
-      });
+      if (!initialised) {
+        google.accounts.id.initialize({
+          client_id: resolvedClientId,
+          callback: async (response) => {
+            const idToken = response?.credential;
+            if (!idToken) {
+              setError("Google did not return a sign-in token.");
+              return;
+            }
+            setPending(true);
+            setError("");
+            try {
+              await googleSignIn(idToken);
+              onSuccessRef.current?.();
+            } catch (err) {
+              setError(parseApiError(err, "Google sign-in failed."));
+            } finally {
+              setPending(false);
+            }
+          },
+          error_callback: () => setError("Google sign-in could not start."),
+        });
+        initialised = true;
+      }
 
-      // Cleared first so a re-run cannot stack two Google buttons in the box.
-      hiddenRef.current.innerHTML = "";
-      google.accounts.id.renderButton(hiddenRef.current, {
+      // Google's button is a fixed pixel width, not a fluid one, so it is
+      // measured from the container rather than hardcoded — the old 320 was
+      // narrower than the modal it sat in. Falls back to the maximum where
+      // there is nothing to measure (jsdom, or a container not yet laid out).
+      const measured = Math.round(node.getBoundingClientRect().width);
+      const width = Math.min(Math.max(measured || MAX_WIDTH, MIN_WIDTH), MAX_WIDTH);
+      if (width === renderedWidth) return;
+      renderedWidth = width;
+
+      // Cleared first so a re-render cannot stack two Google buttons in the box.
+      node.innerHTML = "";
+      google.accounts.id.renderButton(node, {
         theme: "outline",
         size: "large",
         type: "standard",
-        text: "continue_with",
-        width: 320,
+        shape: "pill",
+        text,
+        width,
       });
-      setReady(true);
     }
 
-    const src = "https://accounts.google.com/gsi/client";
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+    paint();
 
-    if (window.google?.accounts?.id) {
-      init();
-    } else if (existing) {
-      existing.addEventListener("load", init, { once: true });
-    } else {
-      const script = document.createElement("script");
-      script.src = src;
-      script.async = true;
-      script.defer = true;
-      script.onload = init;
-      document.head.appendChild(script);
+    // Re-measure when the viewport changes under the modal. Guarded because a
+    // missing ResizeObserver must degrade to a button at its first width, not
+    // to no button at all.
+    let resize: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== "undefined") {
+      resize = new ResizeObserver(() => paint());
+      resize.observe(container);
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${GIS_SRC}"]`);
+    if (!window.google?.accounts?.id) {
+      if (existing) {
+        existing.addEventListener("load", paint, { once: true });
+        existing.addEventListener("error", fail, { once: true });
+      } else {
+        const script = document.createElement("script");
+        script.src = GIS_SRC;
+        script.async = true;
+        script.defer = true;
+        script.onload = paint;
+        script.onerror = fail;
+        document.head.appendChild(script);
+      }
     }
 
     return () => {
       cancelled = true;
+      observer.disconnect();
+      resize?.disconnect();
+      clearTimeout(timeout);
     };
-  }, [clientId, googleSignIn]);
-
-  const handleClick = useCallback(() => {
-    // Google renders its clickable surface as div[role=button]; the fallback
-    // covers a markup change on their side without breaking the flow silently.
-    const target =
-      hiddenRef.current?.querySelector<HTMLElement>('div[role="button"]') ??
-      hiddenRef.current?.querySelector<HTMLElement>("button");
-    if (!target) {
-      setError("Google sign-in is not ready yet. Try again in a moment.");
-      return;
-    }
-    setError("");
-    target.click();
-  }, []);
+  }, [clientId, googleSignIn, text]);
 
   if (!clientId) {
     return (
@@ -157,24 +191,23 @@ export default function GoogleAuthButton({
 
   return (
     <div>
-      <Button
-        variant="outline"
-        size="lg"
-        className="w-full"
-        onClick={handleClick}
-        disabled={disabled || pending || !ready}
-      >
-        <GoogleGlyph />
-        {pending ? "Signing you in..." : label}
-      </Button>
+      {/* Google's button, painted here by GIS. `min-h` reserves its height so
+          the modal does not jump when it arrives. Nothing of ours goes inside:
+          whatever GIS puts here is the real, clickable control. */}
+      <div
+        ref={containerRef}
+        data-testid="google-button-container"
+        className={`flex min-h-[44px] items-center justify-center ${
+          disabled || pending ? "pointer-events-none opacity-50" : ""
+        }`}
+      />
 
-      {/* Google's own button. Kept in the DOM because it is the only thing that
-          can start the ID-token flow, clipped to nothing because it cannot be
-          styled to match. */}
-      <div className="relative h-0 overflow-hidden" aria-hidden="true">
-        <div ref={hiddenRef} className="pointer-events-none absolute top-0 left-0 opacity-0" />
-      </div>
-
+      {status === "unavailable" && (
+        <p className="mt-2 text-sm text-alert-600">
+          Google sign-in could not load. Check your connection, or use the email option instead.
+        </p>
+      )}
+      {pending && <p className="mt-2 text-center text-sm text-ink-600">Signing you in...</p>}
       {error && <p className="mt-2 text-sm text-alert-600">{error}</p>}
     </div>
   );

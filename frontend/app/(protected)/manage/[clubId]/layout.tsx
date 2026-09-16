@@ -63,6 +63,17 @@ export default function ManageClubLayout({
     void load();
   }, [load]);
 
+  // A silent refresh for after an edit. Not `load`: that flips to the loading
+  // screen, which unmounts the page that asked — the editor and its message.
+  // A failure keeps the club already on screen rather than denying access.
+  const reload = useCallback(async () => {
+    try {
+      setClub(await getManagedClub(clubId));
+    } catch {
+      // The save itself succeeded; a stale header is the whole cost.
+    }
+  }, [clubId]);
+
   if (state === "loading") {
     return (
       <main className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -131,7 +142,7 @@ export default function ManageClubLayout({
       <div className="mt-6 flex flex-col gap-8 lg:flex-row lg:gap-10">
         <ManageSidebar clubId={clubId} />
         <div className="min-w-0 flex-1">
-          <ManageClubProvider club={club}>{children}</ManageClubProvider>
+          <ManageClubProvider club={club} reload={reload}>{children}</ManageClubProvider>
         </div>
       </div>
     </main>

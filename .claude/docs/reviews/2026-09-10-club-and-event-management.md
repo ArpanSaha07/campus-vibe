@@ -49,7 +49,7 @@ lets them act on it.
 ### CEM-01 · P1 · A club cannot be edited after creation, from anywhere
 
 *Queued — [`todo.md` › Frontend / Features](../../TODO/todo.md#frontend--features),
-[BUG-043](../../bugs/bugs.md#bug-043). Listed here because several items below
+[BUG-043](../../bugs/fixed_bugs.md#bug-043). Listed here because several items below
 fold into it.*
 
 **Exists.** `PUT /api/v1/clubs/{id}` (`ClubController.java:106-108`), guarded by
@@ -202,7 +202,7 @@ the way password reset already is, with the link in `docker compose logs backend
 ### CEM-10 · P1 · There is no event update path at all
 
 *Queued — [`todo.md` › Backend / Features](../../TODO/todo.md#backend--features),
-[BUG-006](../../bugs/bugs.md#bug-006).*
+[BUG-006](../../bugs/fixed_bugs.md#bug-006).*
 
 **Exists.** `EventService` has list, listByOrganizer, get, create, delete and
 addImages (`EventService.java:30-70`). `EventController` mirrors it —
@@ -310,7 +310,7 @@ exactly why) — the gap is that everything else on the same record is not.
 ### CEM-16 · P2 · An event cannot be given a banner from the UI, and could not display one
 
 *Queued — [`todo.md` › Frontend / Features](../../TODO/todo.md#frontend--features),
-[BUG-006](../../bugs/bugs.md#bug-006) and [BUG-042](../../bugs/bugs.md#bug-042).*
+[BUG-006](../../bugs/fixed_bugs.md#bug-006) and [BUG-042](../../bugs/bugs.md#bug-042).*
 
 **Exists.** `POST /api/v1/events/{id}/images` (`EventController.java:103-105`),
 reachable by the creator, and simply unwired.
