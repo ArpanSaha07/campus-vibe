@@ -78,6 +78,29 @@ type FetchOptions = RequestInit & {
   tags?: readonly string[];
 };
 
+function requestHeaders(init: RequestInit, auth: boolean | undefined): Record<string, string> {
+  // FormData sets its own Content-Type, and it has to: the header carries the
+  // multipart boundary, which only the browser knows. Sending
+  // `application/json` alongside a FormData body makes the server read the
+  // parts as one opaque string and every @RequestPart comes back missing.
+  const isMultipart = typeof FormData !== "undefined" && init.body instanceof FormData;
+  const headers: Record<string, string> = {
+    ...(isMultipart ? {} : { "Content-Type": "application/json" }),
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (auth) {
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function throwIfNotOk(res: Response): Promise<void> {
+  if (res.ok) return;
+  const text = await res.text().catch(() => "");
+  throw new ApiError(res.status, text);
+}
+
 export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {}): Promise<T> {
   const { auth, revalidate, tags, ...init } = opts;
 
@@ -91,23 +114,9 @@ export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {
     );
   }
 
-  // FormData sets its own Content-Type, and it has to: the header carries the
-  // multipart boundary, which only the browser knows. Sending
-  // `application/json` alongside a FormData body makes the server read the
-  // parts as one opaque string and every @RequestPart comes back missing.
-  const isMultipart = typeof FormData !== "undefined" && init.body instanceof FormData;
-  const headers: Record<string, string> = {
-    ...(isMultipart ? {} : { "Content-Type": "application/json" }),
-    ...(opts.headers as Record<string, string> | undefined),
-  };
-  if (auth) {
-    const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-  }
-
   const res = await fetch(`${baseUrl()}${path}`, {
     ...init,
-    headers,
+    headers: requestHeaders(init, auth),
     ...(revalidate !== undefined || tags !== undefined
       ? {
           next: {
@@ -120,10 +129,7 @@ export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {
       : {}),
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new ApiError(res.status, text);
-  }
+  await throwIfNotOk(res);
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) {
     return res.json();
@@ -133,4 +139,24 @@ export async function apiFetch<T = unknown>(path: string, opts: FetchOptions = {
   // has no value to satisfy it. Callers of endpoints that can return no body
   // should type T accordingly (e.g. `apiFetch<void>`).
   return undefined as T;
+}
+
+/**
+ * The same request as `apiFetch`, handing back the unread `Response`.
+ *
+ * For a body that must be read as it arrives: the planner reply is a
+ * `text/event-stream`, and `apiFetch` waits for all of it. `EventSource` is no
+ * alternative, because it cannot send the Authorization header.
+ *
+ * No cache options, on purpose: a streamed reply is per-user, and per-user
+ * data never enters the data cache.
+ */
+export async function apiFetchResponse(
+  path: string,
+  opts: RequestInit & { auth?: boolean } = {},
+): Promise<Response> {
+  const { auth, ...init } = opts;
+  const res = await fetch(`${baseUrl()}${path}`, { ...init, headers: requestHeaders(init, auth) });
+  await throwIfNotOk(res);
+  return res;
 }

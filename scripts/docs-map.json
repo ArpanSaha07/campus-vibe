@@ -151,11 +151,12 @@
     },
 
     "ai-planner.md": {
-      "covers": "The AI planner feature",
+      "covers": "The /planner chat page: provider state, the streamed reply, the answer rendered from typed picks",
       "paths": [
         "frontend/app/lib/planner.ts",
+        "frontend/app/lib/planner-api.ts",
         "frontend/app/components/planner/",
-        "frontend/app/(main)/planner/"
+        "frontend/app/(planner)/"
       ]
     },
 

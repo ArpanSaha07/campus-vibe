@@ -18,7 +18,10 @@ paths:
 - **Every backend call goes through `apiFetch`** (`app/lib/api.tsx`). The three
   data paths, the cache tags and the error-status mapping are in
   [`api-and-caching.md`](../docs/architecture/api-and-caching.md). **Per-user
-  data must never enter Next's data cache.**
+  data must never enter Next's data cache.** A body read as it streams goes
+  through `apiFetchResponse`, its sibling, never a bare `fetch` or
+  `EventSource`, which cannot send the token
+  ([`ai-planner.md`](../docs/architecture/ai-planner.md)).
 - **`npm run verify` before claiming green, and the production build must pass
   with the backend down.** A page that fetches at build time turns a dev machine
   that happens to have the backend running into a green build that fails in CI.

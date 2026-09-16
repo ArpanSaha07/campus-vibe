@@ -21,8 +21,8 @@ sections and a club promotion section; the event page (Server Component, real
 `not-found`/`error` boundaries) and the club page; responsive throughout, under
 the *ticket stock* direction in [`design-guidelines.md`](../design-guidelines.md).
 
-**Planned.** The AI planner card is the homepage entry point the planner feature
-still needs ([todo.md › AI & Search](../TODO/todo.md#ai--search)). Event
+**Planned.** The AI planner card on the homepage opens the planner with its
+prompt; the planner itself still needs its backend (below). Event
 *categories* on the public site were dropped deliberately — events carry formats
 and topics, not a category ([ADR-001](decisions/ADR-001-three-taxonomy-vocabularies.md)).
 
@@ -92,10 +92,18 @@ not indexed into its embedding at all
 
 ## AI planner
 
-**Not built.** Only the foundation exists — the `com.campusvibe.ai` package and
-`OpenAiProperties` for key handling
-([`llm-api-key-management.md`](architecture/llm-api-key-management.md)).
-`LlmClient` / `PromptTemplateService` / `AIController` are deliberately *not*
-scaffolded until the first generative feature lands; embeddings are not
-generative. The intended experience is written up in
-[`ai-planner.md`](architecture/ai-planner.md), which predates any code.
+**Frontend built, backend not — so it does not work yet.** `/planner` is a chat
+page: saved chats in a sidebar (at most 15 per person, the least recently
+active deleted to make room, with a warning first), 15 messages a day across
+all chats, and answers made of a short intro, one row of real event or club
+cards, a line per card and follow-up prompts. It calls planner endpoints that do
+not exist, so a signed-in visitor sees *The planner is unavailable*
+([`ai-planner.md`](architecture/ai-planner.md),
+[spec](../specs/2026-09-16-planner-chat-ui.md)).
+
+**Planned.** The backend: stored chats and the daily count, retrieval of events
+that have not ended, and a streamed `gpt-4.1-mini` reply grounded in real ids.
+It needs event end times first ([spec](../specs/2026-09-15-event-end-time.md),
+draft). `LlmClient` is still unscaffolded until that unit; the key handling
+foundation is in
+[`llm-api-key-management.md`](architecture/llm-api-key-management.md).

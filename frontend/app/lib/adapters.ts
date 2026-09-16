@@ -1,4 +1,19 @@
-import type { ApiClub, ApiEvent, ApiMyEvent, Club, EventInstance, MyEvent } from "@/app/types";
+import type {
+  ApiClub,
+  ApiEvent,
+  ApiMyEvent,
+  ApiPlannerConversationSummary,
+  ApiPlannerMessage,
+  ApiPlannerPick,
+  ApiPlannerUsage,
+  Club,
+  EventInstance,
+  MyEvent,
+  PlannerConversationSummary,
+  PlannerMessage,
+  PlannerPick,
+  PlannerUsage,
+} from "@/app/types";
 
 export const FALLBACK_EVENT_IMAGE = "/campus-vibe-logo.png";
 export const FALLBACK_CLUB_LOGO = "/campus-vibe-logo.png";
@@ -177,4 +192,54 @@ export function parseSocialLinks(raw: string | null): Club["socialLinks"] {
   } catch {
     return { email: "" };
   }
+}
+
+/**
+ * A planner answer's picks, joined to the cards the server hydrated for them.
+ *
+ * A pick with no card is dropped: the event was deleted or has ended since the
+ * answer was written, and the server leaves it out rather than send a stale
+ * card. Only picks of the first pick's kind are kept, so an answer can never
+ * render more than one card row even if a reply mixes the two.
+ */
+export function toPlannerPicks(
+  picks: ApiPlannerPick[],
+  events: ApiEvent[],
+  clubs: ApiClub[],
+): PlannerPick[] {
+  const kind = picks[0]?.kind;
+  const eventsById = new Map(events.map((e) => [String(e.id), e]));
+  const clubsById = new Map(clubs.map((c) => [c.id, c]));
+  const hydrated: PlannerPick[] = [];
+  for (const pick of picks) {
+    if (pick.kind !== kind) continue;
+    if (pick.kind === "event") {
+      const event = eventsById.get(pick.id);
+      if (event) hydrated.push({ kind: "event", reason: pick.reason, event: toEventInstance(event) });
+    } else {
+      const club = clubsById.get(pick.id);
+      if (club) hydrated.push({ kind: "club", reason: pick.reason, club: toClub(club) });
+    }
+  }
+  return hydrated;
+}
+
+export function toPlannerMessage(api: ApiPlannerMessage): PlannerMessage {
+  return {
+    id: api.id,
+    role: api.role,
+    content: api.content,
+    status: api.status,
+    picks: api.role === "assistant" ? toPlannerPicks(api.picks, api.events, api.clubs) : [],
+  };
+}
+
+export function toPlannerConversationSummary(
+  api: ApiPlannerConversationSummary,
+): PlannerConversationSummary {
+  return { id: api.id, title: api.title, lastActiveAt: new Date(api.lastActiveAt) };
+}
+
+export function toPlannerUsage(api: ApiPlannerUsage): PlannerUsage {
+  return { used: api.used, limit: api.limit, resetsAt: new Date(api.resetsAt) };
 }

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/lib/auth-context";
 import { useAuthModal } from "@/app/lib/auth-modal-context";
 import { isAdmin } from "@/app/lib/user";
@@ -15,6 +16,9 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
   const { openAuth } = useAuthModal();
+  // The planner is a full-height chat; on a phone the second-row search would
+  // take a fifth of the screen from the conversation.
+  const onPlanner = (usePathname() ?? "").startsWith("/planner");
 
   // Asked of the server rather than read off the user's roles. Managing a club
   // is a relationship with that club, and it can be revoked while the user's
@@ -122,7 +126,7 @@ export default function Navbar() {
         </div>
 
         {/* Search (second row, below lg) */}
-        <div className="w-full pt-2 pb-4 lg:hidden">
+        <div className={`w-full pt-2 pb-4 lg:hidden ${onPlanner ? "hidden sm:block" : ""}`}>
           <SearchBar />
         </div>
 

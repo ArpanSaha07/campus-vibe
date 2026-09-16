@@ -5,7 +5,13 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `12afebf` plus the uncommitted club and event management unit —
+**Code as of:** `b0c5e63` plus the uncommitted planner chat UI unit — re-read on
+2026-09-16: `api.tsx` gained `apiFetchResponse` for streamed bodies, sharing two
+new helpers, `requestHeaders` and `throwIfNotOk`, with `apiFetch`, which moved
+its line numbers; `adapters.ts` gained the planner adapters; `types/index.ts`
+gained the planner shapes, deliberately not yet in the contract. No existing
+data path, cache policy or DTO field moved. Before that, `12afebf` plus the
+uncommitted club and event management unit —
 re-read on 2026-09-15: `event.tsx` gained `getEventForEdit` (raw and uncached),
 `updateEvent`, `deleteEvent`, `uploadEventImages`, `deleteEventImage` and
 `setEventBanner`; `adapters.ts` versions every media URL by a hash of its stored
@@ -74,7 +80,7 @@ piece of work and it is already written up as [BUG-003](../../bugs/bugs.md#bug-0
   other module goes through `apiFetch`. Adding a bare `fetch` elsewhere bypasses
   the base-URL switch, the error typing and the caching guard all at once.
 - **The invariant that is easy to break:** `auth: true` and caching must never be
-  combined. `apiFetch` throws if they are (`api.tsx:88`). Next keys its data
+  combined. `apiFetch` throws if they are (`api.tsx:110`). Next keys its data
   cache on the URL, and the bearer token is not part of that key, so a cached
   authenticated response is one user's data served to the next caller. If that
   throw is ever in your way, the answer is not to remove it.
@@ -108,7 +114,7 @@ public and whether the page needs to know who is asking.**
 | Path | Used for | Cached | Rendered |
 |---|---|---|---|
 | Server Component → `apiFetch` with a policy | `/clubs`, `/events`, club and event detail | 5 min, shared | Server |
-| Client Component → `apiFetch` with `auth: true` | `/my-clubs`, `/my-events`, dashboards | Never | Browser |
+| Client Component → `apiFetch` with `auth: true` | `/my-clubs`, `/my-events`, dashboards, `/planner` (its reply read through `apiFetchResponse`) | Never | Browser |
 | Client Component → `apiFetch` plain | search | Never | Browser |
 
 The middle row is not a preference. The JWT lives in `localStorage`, which a
@@ -226,7 +232,7 @@ makes the server read every part as one opaque string and each `@RequestPart`
 arrives missing. This is the first code in the app that ever sent a file.
 
 
-Every request in the application passes through `apiFetch` (`api.tsx:81`). It
+Every request in the application passes through `apiFetch` (`api.tsx:104`). It
 carries four responsibilities that would otherwise be scattered:
 
 **Base URL by side (`api.tsx:15`).** In the browser the public URL is right; on
@@ -240,11 +246,21 @@ callers can distinguish *no such thing* from *the server is broken*. The message
 stays the raw response body, so pre-existing callers and `parseApiError` behave
 as before.
 
-**The caching guard (`api.tsx:88`).** Combining `auth: true` with `revalidate` or
+**The caching guard (`api.tsx:110`).** Combining `auth: true` with `revalidate` or
 `tags` throws immediately, before the request is issued. See *Design decisions*.
 
-**Empty bodies (`api.tsx:130`).** A 204 has nothing to parse, so `undefined` is
+**Empty bodies (`api.tsx:141`).** A 204 has nothing to parse, so `undefined` is
 returned and cast to `T`; callers of no-body endpoints type them `apiFetch<void>`.
+
+**Streamed bodies (`api.tsx:154`).** `apiFetchResponse` makes the same request
+and hands back the unread `Response`, for the planner reply, a
+`text/event-stream` that `apiFetch` would wait out in full. `EventSource` is no
+alternative: it cannot send the Authorization header. Headers and error typing
+live in `requestHeaders` and `throwIfNotOk` (`api.tsx:81`, `:98`), shared by
+both, so a refused stream (429, 503) is an `ApiError` before any body is read.
+It takes **no cache options at all**, rather than guarding them, because a
+streamed reply is per-user by construction. The reader is
+`lib/planner-api.ts`; see [`ai-planner.md`](ai-planner.md).
 
 ### `frontend/app/lib/cache.ts` — the cache policy, in one place
 
@@ -325,6 +341,13 @@ JSON string and the admin review queue reads it before any club exists, so the
 translation is no longer only `toClub`'s business. What it parses is now always
 the server's own JSON: `ClubSocialLinks.normalise` validates and re-serialises
 on every write path, so the column holds four known keys or NULL.
+
+**Planner answers are joined here too** (`adapters.ts:205`). `toPlannerPicks`
+matches each pick to the `EventDTO` or `ClubDTO` hydrated beside it, drops a
+pick with no row, and keeps one kind, so a planner answer never has two card
+rows ([ADR-017](../decisions/ADR-017-planner-answer-is-intro-plus-typed-picks.md)).
+The planner `Api*` types have no row in `api-dto-fields.json` yet, because no
+Java DTO exists to assert against.
 
 **It is also where an S3 object key becomes a URL.** `clubs.logo` and
 `club_images.url` hold two different kinds of thing: absolute Unsplash URLs in
@@ -479,7 +502,7 @@ of the same API surface but were not read for this document. Auth is covered by
 
 ### Task-specific
 
-**Refusing to cache authenticated responses (`api.tsx:88`).** Next keys the data
+**Refusing to cache authenticated responses (`api.tsx:110`).** Next keys the data
 cache on the URL; the bearer token is not part of that key. A cached
 authenticated response is therefore not stale data, it is *the wrong user's*
 data. The alternative considered was a comment warning against it. Rejected
@@ -581,7 +604,7 @@ data is allowed to live.
   invalidation, cross-tab divergence and a second serialisation format. Nothing
   in the app does this today; keep it that way.
 - **Do not combine `auth: true` with `revalidate` or `tags`.** `apiFetch` throws
-  (`api.tsx:88`). The throw is the feature.
+  (`api.tsx:110`). The throw is the feature.
 - **Do not put application data in cookies.** They ride along on matching
   requests, so a cached list there is paid for on every call.
 - **Do not treat `localStorage` as a second database**, and do not add a second
@@ -693,6 +716,10 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- **2026-09-16** — Planner chat UI. `apiFetchResponse` added for streamed
+  bodies, sharing header and error handling with `apiFetch`; `/planner` joins
+  the authenticated client path; planner adapters and types added, uncontracted
+  until the planner backend exists. *(main session)*
 - **2026-09-15** — Club and event management. New endpoints `PUT /events/{id}`
   (full replacement, `canManageEvent`), `DELETE /events/{id}/images/{index}` and
   `PUT /events/{id}/images/{index}/banner`; an event holds at most ten photos

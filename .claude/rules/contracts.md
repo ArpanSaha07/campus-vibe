@@ -33,6 +33,13 @@ paths:
   TypeScript interface plus its `MIRRORS` entry in `api-contract.test.ts`. Miss
   either test registration and the contract silently does not cover the DTO at
   all — both suites still pass.
+- **The planner DTOs are uncontracted until their Java records exist.** The
+  `ApiPlanner*` interfaces in `frontend/app/types/index.ts` describe endpoints
+  that are not built, so neither test covers them and a rename passes both
+  suites. **The unit that builds the planner backend makes all eight the four
+  edits above**, the `done` frame included
+  ([spec](../specs/2026-09-16-planner-chat-ui.md),
+  [ADR-017](../docs/decisions/ADR-017-planner-answer-is-intro-plus-typed-picks.md)).
 - **`ClubCreateRequest` and `ClubCreationRequestCreateRequest` mirror each
   other, and nothing enforces it.** A club can be created two ways, so a field
   added to one and not the other means it silently cannot be proposed — no test
