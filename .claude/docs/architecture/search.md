@@ -21,11 +21,19 @@ code. See the banner above; do not read a distance into this.
 > matches work.** [BUG-001](../../bugs/bugs.md#bug-001) was the weights being
 > formatted into the SQL under a comma-decimal locale, now bound as parameters.
 > Also true of the shipped code, and absent from the note below:
-> - past events are never returned;
+> - an event is returned until it **ends**, not until it starts: both event
+>   queries filter `end_time > now()` since V35 (2026-09-16,
+>   [ADR-020](../decisions/ADR-020-event-attendable-until-its-end-time.md));
 > - a meaning-only match needs `search.min-score` 0.25, measured in
 >   [the spec](../../specs/2026-09-14-search-relevance-and-results.md);
 > - a query is embedded once per search, even when events and clubs are searched
->   together ([ADR-014](../decisions/ADR-014-one-embedding-call-per-search-via-the-cache.md)).
+>   together ([ADR-014](../decisions/ADR-014-one-embedding-call-per-search-via-the-cache.md));
+> - the AI planner has its own two queries, `plannerEventCandidates` and
+>   `plannerClubCandidates` (2026-09-16): the same weights and gate, but they
+>   match **any** word of a chat prompt rather than all of them, take a nullable
+>   vector for keyword-only ranking, return scores, and window events to a start
+>   within 30 days. `SearchIndexService.toVectorLiteral` became public for them.
+>   See [`ai-planner.md`](ai-planner.md).
 >
 > Rewriting this as a real implementation doc is tracked in
 > [`todo.md`](../../TODO/todo.md).

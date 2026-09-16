@@ -12,6 +12,7 @@ import StatTile from "@/app/components/ui/StatTile";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
 import EventCard from "@/app/components/event/EventCard";
+import { hasEnded } from "@/app/lib/event-time";
 
 /**
  * Club overview: the three numbers that answer "how is the club doing", and
@@ -59,7 +60,8 @@ export default function ClubOverviewPage({
   }, [clubId]);
 
   const now = new Date();
-  const upcoming = events?.filter((event) => event.dateTime >= now) ?? [];
+  // Still attendable means not yet ended, so a running event counts (V35).
+  const upcoming = events?.filter((event) => !hasEnded(event, now)) ?? [];
   const nextUp = [...upcoming].sort(
     (a, b) => a.dateTime.getTime() - b.dateTime.getTime(),
   );

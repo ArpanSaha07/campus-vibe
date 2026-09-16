@@ -10,7 +10,7 @@ paths:
 before changing anything here.** It is mandatory, not a suggestion.
 
 - **Next number:** the highest across your tree **and** `origin/develop` and
-  `origin/main`, plus one — `V35` today. A stale branch otherwise hands you a
+  `origin/main`, plus one — `V37` today. A stale branch otherwise hands you a
   number someone else has claimed, and since the two filenames differ git
   merges both without a conflict; Flyway then refuses to start.
 - **A migration on `origin/develop` or `origin/main` is immutable.** It has

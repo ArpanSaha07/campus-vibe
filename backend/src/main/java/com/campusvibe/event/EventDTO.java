@@ -8,6 +8,7 @@ public record EventDTO(
         String title,
         String description,
         Instant dateTime,
+        Instant endTime,
         Instant createdAt,
         String location,
         String price,

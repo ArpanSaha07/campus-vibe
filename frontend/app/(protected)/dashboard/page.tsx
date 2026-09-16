@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/app/lib/auth-context";
 import { listEvents } from "@/app/lib/event";
+import { hasEnded } from "@/app/lib/event-time";
 import type { EventInstance } from "@/app/types";
 import EventCard from "@/app/components/event/EventCard";
 import SectionHeading from "@/app/components/ui/SectionHeading";
@@ -22,7 +23,7 @@ export default function DashboardPage() {
         const now = new Date();
         setUpcoming(
           events
-            .filter((e) => e.dateTime >= now)
+            .filter((e) => !hasEnded(e, now))
             .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime())
             .slice(0, 8)
         );

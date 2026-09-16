@@ -111,6 +111,25 @@ body {
   box-shadow: var(--shadow-lift);
 }
 
+/* A row of cards that scrolls sideways when it does not fit — planner answers.
+   Thin and lavender rather than the platform default, which on Windows is a
+   16px grey bar that outweighs the cards. Tailwind has no utility for either
+   property, so it lives here. */
+.card-row {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-lavender-300) transparent;
+}
+.card-row::-webkit-scrollbar {
+  height: 6px;
+}
+.card-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-row::-webkit-scrollbar-thumb {
+  background: var(--color-lavender-300);
+  border-radius: 9999px;
+}
+
 /* Card drift toward the top-right — My clubs cards.
    Kept as its own utility rather than folded into .lift because every other
    card in the app lifts straight up (design-guidelines.md, "Radius & elevation").

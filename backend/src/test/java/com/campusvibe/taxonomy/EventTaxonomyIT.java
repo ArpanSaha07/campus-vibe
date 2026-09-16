@@ -37,6 +37,7 @@ class EventTaxonomyIT extends AbstractIntegrationTest {
 		request.put("title", "Intro to Robotics");
 		request.put("description", "Bring a laptop.");
 		request.put("dateTime", Instant.parse("2026-09-01T18:00:00Z").toString());
+		request.put("endTime", Instant.parse("2026-09-01T20:00:00Z").toString());
 		request.put("location", "Trottier 1080");
 		request.put("price", null);
 		request.put("organizerId", clubId);

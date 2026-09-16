@@ -4,7 +4,7 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `081d7b3` for the paragraph on BOM pins under the Trivy gate —
+**Code as of:** `95418a1` plus the uncommitted planner backend unit for `docker/` — re-read 2026-09-16: compose and `.env.example` gained three `OPENAI_*` planner variables, which nothing here enumerates or tests; no workflow, build step or image changed. `081d7b3` for the paragraph on BOM pins under the Trivy gate —
 `bfc3c02` plus the uncommitted `AWS_S3_BUCKET` line for the `migrate` paragraph
 on required properties, 2026-09-14 ([BUG-052](../../bugs/fixed_bugs.md#bug-052));
 `backend/pom.xml` gained `<netty.version>` on 2026-09-11

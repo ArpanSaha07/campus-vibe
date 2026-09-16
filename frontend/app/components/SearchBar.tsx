@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { ApiError } from "@/app/lib/api";
 import { searchClubs, searchEvents } from "@/app/lib/search";
+import { formatEventMonthDay } from "@/app/lib/event-zone";
 import type { Club, EventInstance } from "@/app/types";
 
 const DEBOUNCE_MS = 300;
@@ -147,10 +148,7 @@ export default function SearchBar({ className = "" }: { className?: string }) {
                   >
                     <p className="text-sm font-medium line-clamp-1">{event.title}</p>
                     <p className="text-xs text-gray-500">
-                      {event.dateTime.toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {formatEventMonthDay(event.dateTime)}
                       {event.location.name && ` · ${event.location.name}`}
                     </p>
                   </Link>

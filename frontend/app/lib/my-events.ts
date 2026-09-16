@@ -1,4 +1,6 @@
-import type { MyEvent, MyEventStatus, MyEventsTab } from "@/app/types";
+import { hasEnded } from "@/app/lib/event-time";
+import { formatEventDateShort, formatEventTime } from "@/app/lib/event-zone";
+import type { EventInstance, MyEvent, MyEventStatus, MyEventsTab } from "@/app/types";
 
 // Pure helpers behind the My events page: tab selection, day grouping and the
 // month grid for the date filter. Kept out of the components so the date maths
@@ -31,39 +33,46 @@ export function addDays(date: Date, days: number): Date {
 }
 
 /**
- * An event is past once its whole day is over — it moves to the Past tab the
- * next day, not the moment it starts.
+ * An event is past once it has ended — the moment its end time passes, not
+ * when it starts and not at midnight (V35, Arpan 2026-09-15).
  *
- * So an event stays under Going or Saved for the entire day it happens on,
- * including while it is running, and Past holds yesterday and earlier.
+ * So a running event stays under Going or Saved until it is over, a
+ * three-day festival stays there all three days, and an event that ended at
+ * noon is in Past the same afternoon. Until end times existed this was
+ * whole-day based, which filed nothing past before midnight and every
+ * multi-day event past on its second day.
  */
-export function isPastEvent(date: Date, now: Date = new Date()): boolean {
-  return startOfDay(date).getTime() < startOfDay(now).getTime();
+export function isPastEvent(
+  event: Pick<EventInstance, "dateTime" | "endTime">,
+  now: Date = new Date(),
+): boolean {
+  return hasEnded(event, now);
 }
 
 /**
  * The days the date filter may anchor at, per tab. `null` means unbounded.
  *
- * The two ranges meet but never overlap, mirroring isPastEvent exactly: Going
- * and Saved start at today and look forwards, Past ends at yesterday and looks
- * back. Today is deliberately absent from Past — nothing there can be past yet.
+ * Both ranges include today, because since events have end times today can
+ * hold both kinds: the talk that ended at noon is past, the party tonight is
+ * not. Going and Saved start at today and look forwards; Past ends at today
+ * and looks back.
  */
 export function anchorRangeForTab(
   tab: MyEventsTab,
   today: Date = new Date(),
 ): { min: Date | null; max: Date | null } {
   return tab === "past"
-    ? { min: null, max: addDays(today, -1) }
+    ? { min: null, max: startOfDay(today) }
     : { min: startOfDay(today), max: null };
 }
 
 /**
- * Where a tab points before the user picks anything: today looking forwards,
- * or yesterday looking back. Each is the edge of its tab's range, so the whole
- * tab is visible until the user narrows it.
+ * Where a tab points before the user picks anything: today, looking forwards
+ * or back. It is the edge of each tab's range, so the whole tab is visible
+ * until the user narrows it.
  */
 export function defaultAnchorForTab(tab: MyEventsTab, today: Date = new Date()): Date {
-  return tab === "past" ? addDays(today, -1) : startOfDay(today);
+  return startOfDay(today);
 }
 
 /** Whether a day may be picked while `tab` is open. */
@@ -91,8 +100,10 @@ export function myEventStatus(myEvent: MyEvent): MyEventStatus {
  * The events a single tab should show, sorted for display.
  *
  * `anchor` is the day picked in the date filter (today by default). Going and
- * Saved read it as "on or after"; Past reads it as "on or before" — so in both
- * directions the control means "anchor the list at this date".
+ * Saved read it as still happening on or after it, by the event's end day, so
+ * a festival that began before the anchor still shows while it runs. Past reads
+ * it as started on or before it. In both directions the control means anchor
+ * the list at this date.
  *
  * Past deliberately ignores the going/saved split: once an event is over, both
  * kinds belong in the same history, and each card still shows its own badge.
@@ -110,11 +121,12 @@ export function selectMyEvents(
 
   const selected = myEvents.filter((myEvent) => {
     const { event } = myEvent;
-    const day = startOfDay(event.dateTime).getTime();
-    const isPast = isPastEvent(event.dateTime, now);
+    const startDay = startOfDay(event.dateTime).getTime();
+    const endDay = startOfDay(event.endTime).getTime();
+    const isPast = isPastEvent(event, now);
 
-    if (tab === "past") return isPast && day <= anchorDay;
-    if (isPast || day < anchorDay) return false;
+    if (tab === "past") return isPast && startDay <= anchorDay;
+    if (isPast || endDay < anchorDay) return false;
     return tab === "going" ? myEvent.going : myEvent.saved;
   });
 
@@ -178,19 +190,12 @@ export function formatDayLabel(date: Date, today: Date = new Date()): string {
   });
 }
 
-/** Ticket-style stamp for a card: "Sun, Aug 9 · 1:00 PM EDT". */
+/**
+ * Ticket-style stamp for a card: "Sun, Aug 9 · 1:00 PM". Montreal time with no
+ * zone label, since every event is in that one zone (lib/event-zone.ts).
+ */
 export function formatEventDateTime(date: Date): string {
-  const day = date.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  const time = date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-  return `${day} · ${time}`;
+  return `${formatEventDateShort(date)} · ${formatEventTime(date)}`;
 }
 
 /**

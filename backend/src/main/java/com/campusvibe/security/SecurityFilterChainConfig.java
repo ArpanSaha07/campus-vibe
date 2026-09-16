@@ -3,6 +3,7 @@ package com.campusvibe.security;
 import com.campusvibe.jwt.JWTAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -48,6 +49,15 @@ public class SecurityFilterChainConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        // The second, async dispatch of a streamed response --
+                        // the planner reply, an SseEmitter -- runs after the
+                        // original request was authorised, on a request the JWT
+                        // filter does not see again (OncePerRequestFilter skips
+                        // async dispatches). Without this it is judged anonymous
+                        // and refused mid-stream. It grants nothing a caller can
+                        // reach: an async dispatch only exists for a request that
+                        // already passed the rules below.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",

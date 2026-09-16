@@ -11,23 +11,26 @@ import {
 } from "@/app/lib/my-events";
 import type { EventInstance, MyEvent, MyEventsTab } from "@/app/types";
 
-// "Now" is fixed mid-afternoon so the tests can pin the tricky case: an event
-// that has already started today is still upcoming, not past.
+// "Now" is fixed mid-afternoon so the tests can pin the cases end times decide:
+// a running event is still upcoming, and one that ended this morning is past.
 const NOW = new Date(2026, 7, 9, 15, 0); // Sun 9 Aug 2026, 3:00 PM local
+const HOUR = 60 * 60 * 1000;
 
 function myEvent(
   eventId: string,
   dateTime: Date,
   relation: { going?: boolean; saved?: boolean },
+  endTime: Date = new Date(dateTime.getTime() + 2 * HOUR),
 ): MyEvent {
   return {
     going: relation.going ?? false,
     saved: relation.saved ?? false,
-    event: { eventId, dateTime } as EventInstance,
+    event: { eventId, dateTime, endTime } as EventInstance,
   };
 }
 
-const startedEarlierToday = myEvent("started-today", new Date(2026, 7, 9, 9, 0), { going: true });
+const runningNow = myEvent("running-now", new Date(2026, 7, 9, 14, 0), { going: true });
+const endedThisMorning = myEvent("ended-this-morning", new Date(2026, 7, 9, 9, 0), { going: true });
 const laterToday = myEvent("later-today", new Date(2026, 7, 9, 20, 0), { saved: true });
 const nextWeek = myEvent("next-week", new Date(2026, 7, 16, 18, 0), { going: true });
 const savedNextWeek = myEvent("saved-next-week", new Date(2026, 7, 17, 18, 0), { saved: true });
@@ -37,39 +40,55 @@ const bothNextWeek = myEvent("both-next-week", new Date(2026, 7, 18, 18, 0), {
 });
 const yesterday = myEvent("yesterday", new Date(2026, 7, 8, 18, 0), { going: true });
 const lastMonth = myEvent("last-month", new Date(2026, 6, 14, 18, 0), { saved: true });
+// Began Friday, ends Tuesday: running today, three days after it started.
+const festival = myEvent(
+  "festival",
+  new Date(2026, 7, 7, 10, 0),
+  { going: true },
+  new Date(2026, 7, 11, 22, 0),
+);
 
 const all = [
-  startedEarlierToday,
+  runningNow,
+  endedThisMorning,
   laterToday,
   nextWeek,
   savedNextWeek,
   bothNextWeek,
   yesterday,
   lastMonth,
+  festival,
 ];
 
 const ids = (events: MyEvent[]) => events.map((item) => item.event.eventId);
 
 describe("isPastEvent", () => {
-  it("keeps an event upcoming for its whole day, even after it has started", () => {
-    // Began at 09:00 with NOW at 15:00 — still today, so still upcoming.
-    expect(isPastEvent(new Date(2026, 7, 9, 9, 0), NOW)).toBe(false);
-    expect(isPastEvent(new Date(2026, 7, 9, 23, 59), NOW)).toBe(false);
+  it("keeps a running event upcoming until it ends", () => {
+    expect(isPastEvent(runningNow.event, NOW)).toBe(false);
+    expect(isPastEvent(festival.event, NOW)).toBe(false);
   });
 
-  it("moves an event to past once its day is over", () => {
-    expect(isPastEvent(new Date(2026, 7, 8, 23, 59), NOW)).toBe(true);
+  it("makes an event past the moment it ends, not at midnight", () => {
+    expect(isPastEvent(endedThisMorning.event, NOW)).toBe(true);
+    const endsNow = myEvent("ends-now", new Date(2026, 7, 9, 13, 0), {}, NOW);
+    expect(isPastEvent(endsNow.event, NOW)).toBe(true);
   });
 });
 
 describe("selectMyEvents", () => {
-  it("keeps today's events under going all day, whatever the time", () => {
+  it("keeps running and later events under going, soonest start first", () => {
     expect(ids(selectMyEvents(all, "going", NOW, NOW))).toEqual([
-      "started-today",
+      "festival",
+      "running-now",
       "next-week",
       "both-next-week",
     ]);
-    expect(ids(selectMyEvents(all, "past", NOW, NOW))).not.toContain("started-today");
+  });
+
+  it("moves an event that ended this morning to past the same afternoon", () => {
+    expect(ids(selectMyEvents(all, "going", NOW, NOW))).not.toContain("ended-this-morning");
+    expect(ids(selectMyEvents(all, "past", NOW, NOW))).toContain("ended-this-morning");
+    expect(ids(selectMyEvents(all, "past", NOW, NOW))).not.toContain("running-now");
   });
 
   it("shows saved events on the saved tab", () => {
@@ -86,12 +105,18 @@ describe("selectMyEvents", () => {
   });
 
   it("mixes going and saved on the past tab, most recent first", () => {
-    expect(ids(selectMyEvents(all, "past", NOW, NOW))).toEqual(["yesterday", "last-month"]);
+    expect(ids(selectMyEvents(all, "past", NOW, NOW))).toEqual([
+      "ended-this-morning",
+      "yesterday",
+      "last-month",
+    ]);
   });
 
-  it("anchors upcoming tabs at the chosen date", () => {
-    const anchor = new Date(2026, 7, 12);
+  it("anchors upcoming tabs at the chosen date, by the day an event ends", () => {
+    // The festival started before the anchor but still runs on it.
+    const anchor = new Date(2026, 7, 11);
     expect(ids(selectMyEvents(all, "going", anchor, NOW))).toEqual([
+      "festival",
       "next-week",
       "both-next-week",
     ]);
@@ -119,26 +144,19 @@ describe("anchorRangeForTab / isAnchorAllowed / defaultAnchorForTab", () => {
     }
   });
 
-  it("stops the past tab at yesterday", () => {
+  it("stops the past tab at today, which can already hold ended events", () => {
     expect(anchorRangeForTab("past", NOW).min).toBeNull();
-    expect(anchorRangeForTab("past", NOW).max).toEqual(yesterday);
+    expect(anchorRangeForTab("past", NOW).max).toEqual(today);
 
     expect(isAnchorAllowed(yesterday, "past", NOW)).toBe(true);
-    expect(isAnchorAllowed(today, "past", NOW)).toBe(false);
+    expect(isAnchorAllowed(today, "past", NOW)).toBe(true);
     expect(isAnchorAllowed(tomorrow, "past", NOW)).toBe(false);
   });
 
-  it("meets without overlapping, so no day is reachable from both sides", () => {
-    for (const tab of ["going", "saved"] as const) {
-      expect(isAnchorAllowed(today, tab, NOW)).toBe(true);
-      expect(isAnchorAllowed(today, "past", NOW)).toBe(false);
-    }
-  });
-
-  it("defaults each tab to the near edge of its own range", () => {
+  it("defaults every tab to today", () => {
     expect(defaultAnchorForTab("going", NOW)).toEqual(today);
     expect(defaultAnchorForTab("saved", NOW)).toEqual(today);
-    expect(defaultAnchorForTab("past", NOW)).toEqual(yesterday);
+    expect(defaultAnchorForTab("past", NOW)).toEqual(today);
   });
 
   it("gives every tab a default its own range allows", () => {
@@ -152,9 +170,14 @@ describe("anchorRangeForTab / isAnchorAllowed / defaultAnchorForTab", () => {
   const clamp = (anchor: Date, next: MyEventsTab) =>
     isAnchorAllowed(anchor, next, NOW) ? anchor : defaultAnchorForTab(next, NOW);
 
-  it("resets a future anchor when switching to past, and back again", () => {
-    expect(clamp(tomorrow, "past")).toEqual(yesterday);
+  it("resets a future anchor when switching to past, and a past one when switching back", () => {
+    expect(clamp(tomorrow, "past")).toEqual(today);
     expect(clamp(yesterday, "going")).toEqual(today);
+  });
+
+  it("keeps today when switching in either direction", () => {
+    expect(clamp(today, "past")).toEqual(today);
+    expect(clamp(today, "going")).toEqual(today);
   });
 
   it("keeps an anchor both upcoming tabs can reach", () => {
@@ -180,9 +203,9 @@ describe("myEventStatus", () => {
 
 describe("groupMyEventsByDay", () => {
   it("buckets consecutive events that share a day", () => {
-    const groups = groupMyEventsByDay([startedEarlierToday, laterToday, nextWeek]);
+    const groups = groupMyEventsByDay([runningNow, laterToday, nextWeek]);
     expect(groups).toHaveLength(2);
-    expect(ids(groups[0].events)).toEqual(["started-today", "later-today"]);
+    expect(ids(groups[0].events)).toEqual(["running-now", "later-today"]);
     expect(ids(groups[1].events)).toEqual(["next-week"]);
   });
 });

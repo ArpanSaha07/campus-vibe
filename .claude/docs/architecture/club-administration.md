@@ -5,7 +5,10 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `12afebf` plus the uncommitted club and event management unit,
+**Code as of:** `95418a1`, re-stamped 2026-09-16: that commit is the event end time unit this document was already updated for, and the planner backend touches nothing it covers. Before that, `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
+the overview and Events tab split upcoming from past on each event's end, and
+the event form requires an end. Before that, `12afebf` plus the uncommitted
+club and event management unit,
 2026-09-15 — the Club page editor, Edit and Delete on the Events tab, the event
 edit route, and managed-club logos mapped through the adapter. Before that,
 `3fec570` — the club ownership spine (two creation paths, the
@@ -329,8 +332,10 @@ then logo, then photos — so a failure names the step that failed; the success
 work runs after the write's `try` and is awaited in its own `catch` (BUG-045,
 BUG-047).
 
-**`.../events/page.tsx`** — upcoming/past tabs, date-based because `events` has
-no status column, and under each card **Edit** and **Delete** since 2026-09-15.
+**`.../events/page.tsx`** — upcoming/past tabs, split on each event's **end**
+since 2026-09-16, so a running event stays under Upcoming until it is over
+(`hasEnded`, `lib/event-time.ts`; [ADR-020](../decisions/ADR-020-event-attendable-until-its-end-time.md)). Time-based
+because `events` has no status column, and under each card **Edit** and **Delete** since 2026-09-15.
 Delete is a hard delete that takes every RSVP and bookmark with it, so it asks
 inline first and says so (CEM-14, cancel versus delete, is not built).
 
@@ -595,6 +600,9 @@ list must not make the app believe the user manages nothing.
 
 ## Change log
 
+- 2026-09-16 — **events have an end time.** The overview's upcoming count and
+  the Events tab split on it, and the create and edit form requires it, in
+  Montreal time.
 - 2026-09-15 — **a club and its events can be managed from the dashboard.** The
   Club page editor (CEM-01, closing
   [BUG-043](../../bugs/fixed_bugs.md#bug-043)), Edit and Delete on the Events tab

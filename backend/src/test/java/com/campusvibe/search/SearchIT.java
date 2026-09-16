@@ -177,10 +177,16 @@ class SearchIT {
     }
 
     private Event createIndexedEvent(String title, String description, String organizerId, Instant dateTime) {
+        return createIndexedEvent(title, description, organizerId, dateTime, dateTime.plusSeconds(7200));
+    }
+
+    private Event createIndexedEvent(String title, String description, String organizerId,
+                                     Instant dateTime, Instant endTime) {
         Event event = new Event();
         event.setTitle(title);
         event.setDescription(description);
         event.setDateTime(dateTime);
+        event.setEndTime(endTime);
         event.setOrganizer(clubRepository.findById(organizerId).orElseThrow());
         Event saved = eventRepository.save(event);
         searchIndexService.indexEvent(saved);
@@ -227,6 +233,31 @@ class SearchIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id", is(upcoming.getId().intValue())));
+    }
+
+    /**
+     * Still attendable means not yet ended (V35). Search used to compare the
+     * start, so an event dropped out of results the moment it began -- exactly
+     * when a student looking for something to do right now wants it.
+     */
+    @Test
+    void aRunningEventIsReturnedAndOneThatEndedIsNot() throws Exception {
+        Instant now = Instant.now();
+        Event running = createIndexedEvent("Chess Blitz", "Games in progress", "chess-club",
+                now.minusSeconds(3600), now.plusSeconds(3600));
+        createIndexedEvent("Chess Blitz Morning", "Games this morning", "chess-club",
+                now.minusSeconds(7200), now.minusSeconds(60));
+
+        mockMvc.perform(get("/api/v1/events/search").param("q", "blitz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(running.getId().intValue())));
+
+        EMBEDDINGS_ENABLED.set(false);
+        mockMvc.perform(get("/api/v1/events/search").param("q", "blitz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id", is(running.getId().intValue())));
     }
 
     @Test

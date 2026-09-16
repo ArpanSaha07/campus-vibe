@@ -153,6 +153,12 @@ campusvibe:
       connect-timeout: ${OPENAI_CONNECT_TIMEOUT:2s}
       read-timeout: ${OPENAI_READ_TIMEOUT:10s}
       max-retries: ${OPENAI_MAX_RETRIES:2}
+      # The planner (spec 2026-09-16-planner-backend). Unlike search, the planner
+      # does not degrade without a key: it answers 503.
+      chat-model: ${OPENAI_CHAT_MODEL:gpt-4.1-mini}
+      max-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:1200}
+      # One whole streamed reply, first byte to last.
+      chat-timeout: ${OPENAI_CHAT_TIMEOUT:60s}
 
 search:
   semantic-weight: 0.7

@@ -20,6 +20,7 @@ const chessEvent = toEventInstance({
   title: "Chess Night",
   description: "Blitz games",
   dateTime: "2026-08-01T18:00:00Z",
+  endTime: "2026-08-01T20:00:00Z",
   createdAt: "2026-07-01T00:00:00Z",
   location: "Student Hall",
   price: "Free",

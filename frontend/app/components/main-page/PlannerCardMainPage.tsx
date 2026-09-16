@@ -7,18 +7,7 @@ import Button from "@/app/components/ui/Button";
 import Chip from "@/app/components/ui/Chip";
 import { useAuth } from "@/app/lib/auth-context";
 import { useAuthModal } from "@/app/lib/auth-modal-context";
-import { PLANNER_PROMPT_KEY } from "@/app/lib/planner";
-
-/** Chip label → the starting query it drops into the input. */
-const SUGGESTIONS: { label: string; prompt: string }[] = [
-  { label: "Plan my weekend", prompt: "Plan my weekend around campus events I'd enjoy" },
-  { label: "Find free events", prompt: "Find free events happening this week" },
-  { label: "Beginner-friendly clubs", prompt: "Show me beginner-friendly clubs with social events" },
-  {
-    label: "Meet people with similar interests",
-    prompt: "Help me meet people who share my interests",
-  },
-];
+import { PLANNER_PROMPT_KEY, PLANNER_SUGGESTIONS } from "@/app/lib/planner";
 
 /**
  * Homepage entry point for the AI planner: a natural-language prompt box plus
@@ -104,7 +93,7 @@ export default function PlannerCard() {
           </form>
 
           <ul className="mt-4 flex flex-wrap justify-center gap-2">
-            {SUGGESTIONS.map((suggestion) => (
+            {PLANNER_SUGGESTIONS.map((suggestion) => (
               <li key={suggestion.label}>
                 <Chip surface="onLavender" onClick={() => pickSuggestion(suggestion.prompt)}>
                   {suggestion.label}

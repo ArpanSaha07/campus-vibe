@@ -8,11 +8,16 @@ import com.campusvibe.search.SearchIndexService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
 @Service
 public class EventService {
+    /** The longest an event may run (Arpan, 2026-09-15); V35 checks the same. */
+    public static final Duration MAX_EVENT_LENGTH = Duration.ofDays(14);
+
     private final EventRepository eventRepository;
     private final ClubRepository clubRepository;
     private final EventMapper eventMapper;
@@ -31,6 +36,13 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<EventDTO> list() {
         return eventRepository.findAll().stream().map(eventMapper).toList();
+    }
+
+    /** Events that have not ended, running or still to come, soonest start first. */
+    @Transactional(readOnly = true)
+    public List<EventDTO> listUpcoming() {
+        return eventRepository.findByEndTimeAfterOrderByDateTimeAsc(Instant.now())
+                .stream().map(eventMapper).toList();
     }
 
     /**
@@ -52,6 +64,7 @@ public class EventService {
 
     @Transactional
     public EventDTO create(Event event, String organizerId) {
+        requireValidTimes(event.getDateTime(), event.getEndTime());
         Club club = clubRepository.findById(organizerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Club with id [%s] not found".formatted(organizerId)));
         event.setOrganizer(club);
@@ -64,8 +77,8 @@ public class EventService {
      * Replaces an event's editable fields and tags, then re-indexes it.
      *
      * <p>Full replacement: a null description, location, price or capacity
-     * clears it. Title and date cannot be cleared -- both columns are NOT NULL,
-     * and letting the constraint refuse them would surface as a 500.
+     * clears it. Title, start and end cannot be cleared -- all are NOT NULL, and
+     * letting the constraint refuse them would surface as a 500.
      *
      * <p>The tag sets are cleared and refilled, never reassigned: swapping the
      * PersistentSet out makes Hibernate delete and reinsert every row.
@@ -76,13 +89,12 @@ public class EventService {
         if (request.title() == null || request.title().isBlank()) {
             throw new RequestValidationException("An event needs a title");
         }
-        if (request.dateTime() == null) {
-            throw new RequestValidationException("An event needs a date and time");
-        }
+        requireValidTimes(request.dateTime(), request.endTime());
         Event event = findEvent(id);
         event.setTitle(request.title().trim());
         event.setDescription(request.description());
         event.setDateTime(request.dateTime());
+        event.setEndTime(request.endTime());
         event.setLocation(request.location());
         event.setPrice(request.price());
         event.setCapacity(request.capacity());
@@ -162,6 +174,26 @@ public class EventService {
         if (index < 0 || index >= images.size()) {
             throw new ResourceNotFoundException(
                     "Event [%d] has no image at position %d".formatted(id, index));
+        }
+    }
+
+    /**
+     * Start and end present, end after start, at most 14 days apart. Checked
+     * here so each is a 400 with a sentence; V35's CHECK constraints would
+     * otherwise refuse them as a 500.
+     */
+    private static void requireValidTimes(Instant start, Instant end) {
+        if (start == null) {
+            throw new RequestValidationException("An event needs a start date and time");
+        }
+        if (end == null) {
+            throw new RequestValidationException("An event needs an end date and time");
+        }
+        if (!end.isAfter(start)) {
+            throw new RequestValidationException("An event must end after it starts");
+        }
+        if (end.isAfter(start.plus(MAX_EVENT_LENGTH))) {
+            throw new RequestValidationException("An event must end within 14 days of its start");
         }
     }
 

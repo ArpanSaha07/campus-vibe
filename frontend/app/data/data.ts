@@ -9,6 +9,7 @@ export const popularEvents: EventInstance[] = [
     title: "ReMode, Circular Fashion Festival | Festival de Mode...",
     details: "A festival celebrating circular fashion and sustainability.",
     dateTime: new Date("2025-09-28T12:00:00"),
+    endTime: new Date(new Date("2025-09-28T12:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-01T09:00:00"),
     location: { 
       name: "Society for Arts and Technology [SAT]",
@@ -31,6 +32,7 @@ export const popularEvents: EventInstance[] = [
     title: "Persian New Year Celebration",
     details: "Celebrate the Persian New Year with traditional music, dance, and food.",
     dateTime: new Date("2025-10-06T09:00:00"),
+    endTime: new Date(new Date("2025-10-06T09:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-10T09:00:00"),
     location: { 
       name: "Palais des congrès de Montréal",
@@ -53,6 +55,7 @@ export const popularEvents: EventInstance[] = [
     title: "Art Expo Montreal",
     details: "Showcase of local and international artists.",
     dateTime: new Date("2025-10-18T11:00:00"),
+    endTime: new Date(new Date("2025-10-18T11:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-15T09:00:00"),
     location: { 
       name: "Montreal Art Centre",
@@ -75,6 +78,7 @@ export const popularEvents: EventInstance[] = [
     title: "Startup Pitch Night",
     details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
+    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-20T09:00:00"),
     location: { 
       name: "Notman House",
@@ -97,6 +101,7 @@ export const popularEvents: EventInstance[] = [
     title: "Montreal Tech Summit 2025",
     details: "Annual summit for tech enthusiasts and professionals.",
     dateTime: new Date("2025-11-03T18:00:00"),
+    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-20T09:00:00"),
     location: { 
       name: "Notman House",
@@ -119,6 +124,7 @@ export const popularEvents: EventInstance[] = [
     title: "Ski Trip to Mont Tremblant",
     details: "A club for skiing enthusiasts at McGill University.",
     dateTime: new Date("2025-11-03T18:00:00"),
+    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-20T09:00:00"),
     location: { 
       name: "Notman House",
@@ -141,6 +147,7 @@ export const popularEvents: EventInstance[] = [
     title: "Startup Pitch Night",
     details: "Pitch your startup ideas to investors.",
     dateTime: new Date("2025-11-03T18:00:00"),
+    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-20T09:00:00"),
     location: { 
       name: "Notman House",
@@ -163,6 +170,7 @@ export const popularEvents: EventInstance[] = [
     title: "Tech Fair 2025",
     details: "Explore the latest in technology and innovation.",
     dateTime: new Date("2025-11-03T18:00:00"),
+    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
     createdAt: new Date("2025-09-20T09:00:00"),
     location: { 
       name: "Notman House",

@@ -80,6 +80,8 @@ export interface NewEvent {
   description: string;
   /** ISO-8601. The form collects `datetime-local`, which has no zone. */
   dateTime: string;
+  /** ISO-8601, after dateTime and at most 14 days later. Required. */
+  endTime: string;
   location: string;
   price: string;
   /** The club putting it on — you must be able to manage it. */

@@ -22,7 +22,7 @@
   ],
 
   "EventDTO": [
-    "id", "title", "description", "dateTime", "createdAt", "location", "price",
+    "id", "title", "description", "dateTime", "endTime", "createdAt", "location", "price",
     "organizerId", "organizerName", "followers", "images", "promoted",
     "capacity", "registered", "topics", "formats"
   ],
@@ -93,5 +93,25 @@
   "ManagedClubDTO": [
     "clubId", "clubName", "logo", "followers", "role", "officialEmail",
     "officialEmailVerified"
+  ],
+
+  "PlannerPickDTO": ["kind", "id", "reason"],
+
+  "PlannerUsageDTO": ["used", "limit", "resetsAt"],
+
+  "PlannerConversationSummaryDTO": ["id", "title", "lastActiveAt"],
+
+  "PlannerConversationListDTO": ["conversations", "usage"],
+
+  "PlannerCreatedConversationDTO": ["conversation", "evictedId"],
+
+  "PlannerMessageDTO": [
+    "id", "role", "content", "status", "picks", "events", "clubs", "createdAt"
+  ],
+
+  "PlannerConversationDTO": ["id", "title", "lastActiveAt", "messages"],
+
+  "PlannerReplyDoneDTO": [
+    "messageId", "picks", "events", "clubs", "usage", "conversation"
   ]
 }

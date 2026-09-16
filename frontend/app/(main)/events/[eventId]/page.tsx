@@ -7,6 +7,8 @@ import { getEvent } from "@/app/lib/event";
 import { getClubById } from "@/app/lib/club";
 import { getEventFormats, getInterests, labelFor } from "@/app/lib/taxonomy";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
+import { isOngoing } from "@/app/lib/event-time";
+import { formatEventDateLong, formatEventTime } from "@/app/lib/event-zone";
 import EventShareButton from "@/app/components/event/EventShareButton";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import ManageEventLink from "@/app/components/event/ManageEventLink";
@@ -25,25 +27,6 @@ import Button from "@/app/components/ui/Button";
 // link went nowhere and the Follow button reverted a moment after being
 // clicked. The organizer now comes from the event's real organizerId.
 
-/** "Sunday, September 28, 2026" */
-function formatDate(date: Date): string {
-  return date.toLocaleDateString(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-/** "6:00 PM EDT" */
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-}
-
 export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   const { eventId } = await params;
   const event = await getEvent(eventId).catch(() => null);
@@ -51,7 +34,7 @@ export async function generateMetadata({ params }: EventPageProps): Promise<Meta
 
   return {
     title: `${event.title} · CampusVibe`,
-    description: event.details || `${event.title} — ${formatDate(event.dateTime)}.`,
+    description: event.details || `${event.title} — ${formatEventDateLong(event.dateTime)}.`,
   };
 }
 
@@ -87,6 +70,9 @@ export default async function EventPage({ params }: EventPageProps) {
   ];
 
   const banner = event.images[0] ?? FALLBACK_EVENT_IMAGE;
+  // At render time. The event data may be up to five minutes old, but the
+  // clock is not, so the badge is right whenever the page is rendered.
+  const ongoing = isOngoing(event);
 
   // Rendered twice — inline on small screens, in the side column on md+.
   // Extracted so the markup stays identical in both spots.
@@ -95,8 +81,16 @@ export default async function EventPage({ params }: EventPageProps) {
       <div className="px-5 pt-5 pb-4 space-y-4">
         <div>
           <p className="ticket-label text-ink-600">Date</p>
-          <p className="font-mono text-sm text-ink-900 mt-1">{formatDate(event.dateTime)}</p>
-          <p className="font-mono text-sm text-ink-900">{formatTime(event.dateTime)}</p>
+          <p className="font-mono text-sm text-ink-900 mt-1">{formatEventDateLong(event.dateTime)}</p>
+          <p className="font-mono text-sm text-ink-900">{formatEventTime(event.dateTime)}</p>
+          {/* The end, which every event has since V35. The date is repeated
+              only when the event runs past the day it starts on. */}
+          <p className="font-mono text-sm text-ink-600">
+            Until{" "}
+            {formatEventDateLong(event.endTime) === formatEventDateLong(event.dateTime)
+              ? formatEventTime(event.endTime)
+              : `${formatEventDateLong(event.endTime)}, ${formatEventTime(event.endTime)}`}
+          </p>
         </div>
         <div>
           <p className="ticket-label text-ink-600">Location</p>
@@ -145,7 +139,14 @@ export default async function EventPage({ params }: EventPageProps) {
         />
       </div>
 
-      <h1 className="font-display text-3xl md:text-4xl font-bold text-ink-900 mt-8">
+      {ongoing && (
+        <span className="ticket-label mt-8 inline-block rounded-full bg-sun-300 px-2.5 py-1 text-ink-900">
+          Happening now
+        </span>
+      )}
+      <h1
+        className={`font-display text-3xl md:text-4xl font-bold text-ink-900 ${ongoing ? "mt-3" : "mt-8"}`}
+      >
         {event.title}
       </h1>
 

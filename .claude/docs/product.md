@@ -21,8 +21,8 @@ sections and a club promotion section; the event page (Server Component, real
 `not-found`/`error` boundaries) and the club page; responsive throughout, under
 the *ticket stock* direction in [`design-guidelines.md`](../design-guidelines.md).
 
-**Planned.** The AI planner card is the homepage entry point the planner feature
-still needs ([todo.md › AI & Search](../TODO/todo.md#ai--search)). Event
+**Planned.** The AI planner card on the homepage opens the planner with its
+prompt; the planner itself still needs its backend (below). Event
 *categories* on the public site were dropped deliberately — events carry formats
 and topics, not a category ([ADR-001](decisions/ADR-001-three-taxonomy-vocabularies.md)).
 
@@ -56,7 +56,9 @@ account closure, which has no endpoint and cannot simply delete an owner's rows.
 **Shipped.** `/manage/[clubId]` with per-request authorisation, the
 Administrators tab (invite by address, remove, cancel), ownership transfer, an
 append-only audit log and an Activity tab, and the club create form —
-[`club-administration.md`](architecture/club-administration.md).
+[`club-administration.md`](architecture/club-administration.md). Every event
+has a required end, at most 14 days after its start, entered in Montreal time;
+the dashboards file an event as past once it ends (2026-09-16).
 
 **Planned.** `EventService.update` — there is no update path at all, so events
 cannot be edited and their embeddings go stale
@@ -84,6 +86,9 @@ embeddings in pgvector — with per-IP budget, a query-length cap and a
 query-embedding cache; taxonomy tables joined into the query
 ([`search.md`](architecture/search.md), a pre-implementation note).
 
+Since 2026-09-16 an event appears in search until it **ends**, so one that is
+running is still found ([ADR-020](decisions/ADR-020-event-attendable-until-its-end-time.md)).
+
 **Planned.** The semantic half is not yet trustworthy
 ([BUG-001](../bugs/bugs.md#bug-001)), all 8 clubs still have a null embedding
 pending a `POST /api/v1/search/reindex` backfill, and a club's interest tags are
@@ -92,10 +97,18 @@ not indexed into its embedding at all
 
 ## AI planner
 
-**Not built.** Only the foundation exists — the `com.campusvibe.ai` package and
-`OpenAiProperties` for key handling
-([`llm-api-key-management.md`](architecture/llm-api-key-management.md)).
-`LlmClient` / `PromptTemplateService` / `AIController` are deliberately *not*
-scaffolded until the first generative feature lands; embeddings are not
-generative. The intended experience is written up in
-[`ai-planner.md`](architecture/ai-planner.md), which predates any code.
+**Frontend built, backend not — so it does not work yet.** `/planner` is a chat
+page: saved chats in a sidebar (at most 15 per person, the least recently
+active deleted to make room, with a warning first), 15 messages a day across
+all chats, and answers made of a short intro, one row of real event or club
+cards, a line per card and follow-up prompts. It calls planner endpoints that do
+not exist, so a signed-in visitor sees *The planner is unavailable*
+([`ai-planner.md`](architecture/ai-planner.md),
+[spec](../specs/2026-09-16-planner-chat-ui.md)).
+
+**Planned.** The backend: stored chats and the daily count, retrieval of events
+that have not ended, and a streamed `gpt-4.1-mini` reply grounded in real ids.
+It needs event end times first ([spec](../specs/2026-09-15-event-end-time.md),
+draft). `LlmClient` is still unscaffolded until that unit; the key handling
+foundation is in
+[`llm-api-key-management.md`](architecture/llm-api-key-management.md).

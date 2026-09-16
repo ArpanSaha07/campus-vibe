@@ -127,7 +127,9 @@ public class SearchIndexService {
 
     public record ReindexResult(boolean embeddingsEnabled, int eventsIndexed, int clubsIndexed) {}
 
-    static String toVectorLiteral(float[] embedding) {
+    // Public for the planner, which searches with the same embeddings.
+    // float append is locale-free, unlike String.format (BUG-001).
+    public static String toVectorLiteral(float[] embedding) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {
             if (i > 0) {

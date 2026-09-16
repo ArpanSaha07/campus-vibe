@@ -2,6 +2,17 @@
 
 > ⚠ **Unverified against the code.** This is recommended architecture, not a description of the shipped `com.campusvibe.ai` package.
 > It does not follow [`implementation-docs`](../../skills/implementation-docs/SKILL.md).
+>
+> **Shipped since, 2026-09-16:** the first generative feature, the AI planner.
+> `ai/client/LlmClient` and `OpenAiLlmClient` stream Chat Completions with a
+> strict JSON schema through the same `openAiRestClient`, so the key is still
+> read only in `AiClientConfig`. `OpenAiProperties` gained `chatModel`,
+> `maxOutputTokens` and `chatTimeout`. Unlike search, the planner **fails fast**
+> without a key (503). Prompts live in `resources/prompts/` behind
+> `ai/prompt/PromptTemplateService`. The planner's rate limit is its per-user
+> daily quota, and only counts and token totals are logged, never prompt text.
+> The implementation is described in [`ai-planner.md`](ai-planner.md); the
+> sections below remain unreconciled.
 
 **Code as of:** never — not reconciled with the code.
 

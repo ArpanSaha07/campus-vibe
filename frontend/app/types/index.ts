@@ -6,6 +6,8 @@ export type EventInstance = {
   title: string;
   details: string;
   dateTime: Date;
+  /** Always after dateTime, at most 14 days later. Still attendable until then. */
+  endTime: Date;
   createdAt: Date;
   location: { 
     name: string,
@@ -77,24 +79,99 @@ export type Club = {
     interests: string[];
 };
 
-// AI planner (see .claude/docs/architecture/ai-planner.md).
-// Built from mock data today; this is the shape the RAG endpoint should return,
-// so the page does not have to change when the backend lands.
-export type PlanSlot = {
-  time: string;        // printed label, e.g. '6:00 PM'
-  event: EventInstance;
-  rationale: string;   // why this pick answers the request
-};
+// AI planner (see .claude/specs/2026-09-16-planner-chat-ui.md and
+// 2026-09-16-planner-backend.md). The Api* shapes mirror the Planner*DTO
+// records in com.campusvibe.ai.feature.planner and are contracted in
+// contracts/api-dto-fields.json.
 
-export type Plan = {
-  prompt: string;          // the request this plan answers
-  refinements: string[];   // follow-up prompts applied, oldest first
+export type PlannerPickKind = "event" | "club";
+
+/** One recommended item. `reason` continues a sentence that starts with its name. */
+export interface ApiPlannerPick {
+  kind: PlannerPickKind;
+  /** An event id as a string, or a club slug. */
+  id: string;
+  reason: string;
+}
+
+export interface ApiPlannerUsage {
+  used: number;
+  limit: number;
+  /** ISO-8601 instant of the next midnight in America/Toronto. */
+  resetsAt: string;
+}
+
+export interface ApiPlannerConversationSummary {
+  id: string;
   title: string;
-  summary: string;
-  slots: PlanSlot[];
-  clubs: Club[];
-  nextSteps: string[];
-};
+  lastActiveAt: string;
+}
+
+export interface ApiPlannerConversationList {
+  conversations: ApiPlannerConversationSummary[];
+  usage: ApiPlannerUsage;
+}
+
+export interface ApiPlannerCreatedConversation {
+  conversation: ApiPlannerConversationSummary;
+  /** The least recently active chat, deleted to stay within the cap. */
+  evictedId: string | null;
+}
+
+export interface ApiPlannerMessage {
+  id: string;
+  role: "user" | "assistant";
+  /** The user's text, or the assistant's intro. */
+  content: string;
+  status: "complete" | "failed";
+  picks: ApiPlannerPick[];
+  /** Hydrated fresh on every read; a deleted or ended item is simply absent. */
+  events: ApiEvent[];
+  clubs: ApiClub[];
+  createdAt: string;
+}
+
+export interface ApiPlannerConversation extends ApiPlannerConversationSummary {
+  messages: ApiPlannerMessage[];
+}
+
+/** The `done` frame that closes a streamed reply. */
+export interface ApiPlannerReplyDone {
+  messageId: string;
+  picks: ApiPlannerPick[];
+  events: ApiEvent[];
+  clubs: ApiClub[];
+  usage: ApiPlannerUsage;
+  conversation: ApiPlannerConversationSummary;
+}
+
+export type PlannerPick =
+  | { kind: "event"; reason: string; event: EventInstance }
+  | { kind: "club"; reason: string; club: Club };
+
+export interface PlannerMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  /** `streaming` and `stopped` exist only in the browser; the server stores the other two. */
+  status: "complete" | "failed" | "streaming" | "stopped";
+  /** Hydrated and all of one kind, so an answer never has more than one card row. */
+  picks: PlannerPick[];
+  /** Why a failed reply failed, in words for the user. */
+  error?: string;
+}
+
+export interface PlannerConversationSummary {
+  id: string;
+  title: string;
+  lastActiveAt: Date;
+}
+
+export interface PlannerUsage {
+  used: number;
+  limit: number;
+  resetsAt: Date;
+}
 
 // Platform-wide roles, mirroring com.campusvibe.user.RoleName. These describe
 // the account and travel in the JWT.
@@ -259,6 +336,7 @@ export interface ApiEvent {
   title: string;
   description: string | null;
   dateTime: string;
+  endTime: string;
   createdAt: string;
   location: string | null;
   price: string | null;

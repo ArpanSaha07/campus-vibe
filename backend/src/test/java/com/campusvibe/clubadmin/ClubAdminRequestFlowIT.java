@@ -211,9 +211,11 @@ class ClubAdminRequestFlowIT extends AbstractIntegrationTest {
         createClub("other-club", "Other Club");
 
         Map<String, Object> eventForOwnClub = Map.of(
-                "title", "Meetup", "dateTime", Instant.now().toString(), "organizerId", "own-club");
+                "title", "Meetup", "dateTime", Instant.now().toString(),
+                "endTime", Instant.now().plusSeconds(7200).toString(), "organizerId", "own-club");
         Map<String, Object> eventForOtherClub = Map.of(
-                "title", "Hijack", "dateTime", Instant.now().toString(), "organizerId", "other-club");
+                "title", "Hijack", "dateTime", Instant.now().toString(),
+                "endTime", Instant.now().plusSeconds(7200).toString(), "organizerId", "other-club");
 
         mockMvc.perform(post("/api/v1/events")
                         .header("Authorization", bearer(clubAdmin))

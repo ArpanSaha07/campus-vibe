@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,10 +22,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class EventLookupIT extends AbstractIntegrationTest {
 
 	private Event createEvent(String title, Club club, Instant when) {
+		return createEvent(title, club, when, when.plusSeconds(7200));
+	}
+
+	private Event createEvent(String title, Club club, Instant start, Instant end) {
 		Event event = new Event();
 		event.setTitle(title);
 		event.setOrganizer(club);
-		event.setDateTime(when);
+		event.setDateTime(start);
+		event.setEndTime(end);
 		return eventRepository.save(event);
 	}
 
@@ -72,6 +78,31 @@ class EventLookupIT extends AbstractIntegrationTest {
 						contains("Chess Club")))
 				.andExpect(jsonPath("$[?(@.title == 'Demo night')].organizerName",
 						contains("Making Waves Montreal")));
+	}
+
+	/**
+	 * upcoming=true is the one definition of still attendable (V35): not yet
+	 * ended. A running event is in, an ended one is out, and the list runs
+	 * soonest start first. Without the flag the list still carries everything,
+	 * because the manage Events page shows a club's past events.
+	 */
+	@Test
+	void upcomingKeepsRunningAndFutureEventsInStartOrder() throws Exception {
+		Club club = createClub("chess-club", "Chess Club");
+		Instant now = Instant.now();
+		createEvent("Ended", club, now.minusSeconds(7200), now.minusSeconds(60));
+		Event future = createEvent("Next week", club, now.plusSeconds(7 * 86400));
+		Event running = createEvent("Running", club, now.minusSeconds(3600), now.plusSeconds(3600));
+
+		mockMvc.perform(get("/api/v1/events").param("upcoming", "true"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[*].id", contains(
+						running.getId().intValue(), future.getId().intValue())))
+				.andExpect(jsonPath("$[0].organizerName", is("Chess Club")));
+
+		mockMvc.perform(get("/api/v1/events"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", hasSize(3)));
 	}
 
 	@Test

@@ -18,7 +18,10 @@ paths:
 - **Every backend call goes through `apiFetch`** (`app/lib/api.tsx`). The three
   data paths, the cache tags and the error-status mapping are in
   [`api-and-caching.md`](../docs/architecture/api-and-caching.md). **Per-user
-  data must never enter Next's data cache.**
+  data must never enter Next's data cache.** A body read as it streams goes
+  through `apiFetchResponse`, its sibling, never a bare `fetch` or
+  `EventSource`, which cannot send the token
+  ([`ai-planner.md`](../docs/architecture/ai-planner.md)).
 - **`npm run verify` before claiming green, and the production build must pass
   with the backend down.** A page that fetches at build time turns a dev machine
   that happens to have the backend running into a green build that fails in CI.
@@ -38,6 +41,15 @@ paths:
   through `eventImageUrls` — they reached `next/image` raw until 2026-09-12. A
   new place that reads `api.images` directly instead of the adapted
   `EventInstance` reopens that crash. (BUG-042)
+- **Event dates and times go through `lib/event-zone.ts`, never a bare
+  `toLocale*String` or `new Date(value)` on a form value.** Every event is in
+  Montreal's zone and shows no zone label (Arpan, 2026-09-16). A bare call
+  formats in the process zone, which is UTC on the server: the event page read
+  `7:00 PM UTC` for an event at 3 PM. The form reads and writes
+  `datetime-local` values in that zone through `toEventInputValue` and
+  `fromEventInputValue`, whatever the browser's zone. Past, ongoing and ended
+  compare instants through `lib/event-time.ts`. The My events day grouping and
+  date filter still use the browser's local day. (BUG-058, ADR-020)
 - **`next/image` needs a `remotePatterns` entry for any absolute host**, and
   Next 16 refuses outright to optimize an upstream image on a private IP — which
   local development always is. Same-origin paths behind the `/media/**` rewrite

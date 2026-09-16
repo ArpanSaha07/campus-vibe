@@ -53,4 +53,17 @@ Kept deliberately short: this loads on every backend Java read.
 - **`@Profile("dev")` beans never run under test.** `@ActiveProfiles`
   *replaces* the active set rather than adding to it
   (`skills/database-lifecycle/SKILL.md:38-45`).
+- **An error handler a non-JSON request can reach must preset
+  `application/json`** — use `json(status, apiError)` in
+  `DefaultExceptionHandler`. A negotiated `ApiError` under
+  `Accept: text/event-stream` (the planner page's stream request) finds no
+  writer and leaves as a bodiless 500. `@ResponseStatus` on an exception only
+  hides this, without a body. (BUG-059)
+- **A streamed response (`SseEmitter`) needs `DispatcherType.ASYNC` permitted**
+  — the first rule in `SecurityFilterChainConfig`. The JWT filter does not run
+  on the second, async dispatch, so without it the stream is refused mid-reply.
+  **MockMvc does not show this**; only a real port does, as `PlannerStreamIT`
+  proves by failing when the line is removed. Set an explicit emitter timeout
+  too: Tomcat's default async timeout is 30 seconds.
+  ([`ai-planner.md`](../docs/architecture/ai-planner.md))
 - **The IT suites need Testcontainers:** `node scripts/verify.mjs --full`.

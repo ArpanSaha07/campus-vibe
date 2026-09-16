@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { EventInstance } from "@/app/types";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
+import { isOngoing } from "@/app/lib/event-time";
+import { formatEventDateShort } from "@/app/lib/event-zone";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import EventShareButton from "@/app/components/event/EventShareButton";
 
@@ -14,8 +16,10 @@ import EventShareButton from "@/app/components/event/EventShareButton";
 // click target sits above that overlay on z-10.
 
 export default function EventCard({ event }: { event: EventInstance }) {
-  const isToday =
-    event.dateTime.toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+  // Running right now, by the event's own start and end. Replaces a check that
+  // compared calendar dates as the server saw them, which badged the wrong
+  // events on a Montreal evening and a morning event all day after it ended.
+  const ongoing = isOngoing(event);
   const almostFull = event.capacity > 0 && event.registered / event.capacity >= 0.75;
 
   return (
@@ -48,14 +52,14 @@ export default function EventCard({ event }: { event: EventInstance }) {
 
         {/* Badges over the image. pointer-events-none so they read as decoration
             and clicks fall through to the card link underneath. */}
-        {(almostFull || isToday) && (
+        {(almostFull || ongoing) && (
           <div className="absolute top-2 left-2 z-10 flex space-x-1.5 pointer-events-none">
             {almostFull && (
               <span className="ticket-label rounded-full bg-berry-100 text-berry-600 px-2.5 py-1">
                 Almost full
               </span>
             )}
-            {isToday && (
+            {ongoing && (
               <span className="ticket-label rounded-full bg-sun-300 text-ink-900 px-2.5 py-1">
                 Happening now
               </span>
@@ -78,11 +82,7 @@ export default function EventCard({ event }: { event: EventInstance }) {
 
           <div className="mt-2 flex items-baseline justify-between font-mono text-xs text-ink-600">
             <span>
-              {event.dateTime.toLocaleDateString(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-              })}
+              {formatEventDateShort(event.dateTime)}
             </span>
             <span className="font-medium text-berry-600">{event.price}</span>
           </div>

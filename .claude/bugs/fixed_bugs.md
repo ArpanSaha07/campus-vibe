@@ -7,6 +7,8 @@ Last updated: **2026-09-15**
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
 | [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
+| [BUG-059](#bug-059) | Medium | 2026-09-16 | A 429, a 503 or the catch-all 500 asked for with a non-JSON `Accept` left as a bodiless 500: the `ApiError` could not be negotiated, and the planner's stream request asks for `text/event-stream` |
+| [BUG-058](#bug-058) | Medium | 2026-09-16 | Server-rendered event times were the server's UTC clock: the event page read `7:00 PM UTC` for an event at 3 PM, and a Montreal evening event's card showed the next day |
 | [BUG-056](#bug-056) | Medium | 2026-09-15 | A photo change looked undone for up to five minutes: media URLs name a position, not an image, and the response is cached — and the first fix, `?v=`, answered 500 on every page with an image |
 | [BUG-055](#bug-055) | Low | 2026-09-15 | An uploaded club logo never showed in the club's own dashboard: the managed-club reads handed `ClubLogo` the raw S3 key |
 | [BUG-043](#bug-043) | Low | 2026-09-15 | A club could not be edited after creation, from anywhere — every endpoint existed and no screen called them |
@@ -106,6 +108,75 @@ through a production outage. It now paints an iframe, asynchronously, and covers
 the case where GIS paints nothing at all.
 
 ---
+
+### BUG-059
+**Error responses failed content negotiation under a non-JSON Accept** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, in `PlannerMessageIT`, building the planner backend. A
+send refused at the daily limit, and one refused for a missing provider key,
+were both asked for as `Accept: text/event-stream`, which is what the planner
+page sends. Neither came back as 429 or 503: MockMvc surfaced the original
+exception instead.
+
+**Cause.** `DefaultExceptionHandler` returned `ResponseEntity<ApiError>` with
+no content type, so Spring negotiated one against the request's `Accept`
+header. Nothing writes an `ApiError` as `text/event-stream`, the handler
+itself failed with `HttpMediaTypeNotAcceptableException`, and the refusal fell
+through as a 500 with no body. The 400 and 404 looked fine only because
+`RequestValidationException` and `ResourceNotFoundException` carry
+`@ResponseStatus`, which a fallback resolver honours without a body.
+`TooManyAttemptsException` has no such annotation. Predates the planner: any
+client asking for HTML or a stream from an endpoint that raised these had the
+same 500; nothing in the product did until the planner.
+
+**Fix.** The handlers a streaming request can reach, 404, 400, 429, 503 and the
+catch-all 500, preset `application/json` (`DefaultExceptionHandler.java:306`).
+A preset content type skips negotiation entirely.
+
+**Verified.** `PlannerMessageIT.theSixteenthMessageOfTheDayIsRefusedAndDeletingAChatDoesNotGiveItBack`
+and `refusalsBeforeTheStreamAreStatusesAndCostNothing` through MockMvc, and
+`PlannerStreamIT.refusalsAskedForAsAStreamKeepTheirStatusAndBody` on a real
+port, which also reads the 503 body. Held by
+[`rules/backend-java.md`](../rules/backend-java.md).
+
+### BUG-058
+**Server-rendered event times were the server's UTC clock** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, in the browser, verifying the event end time unit. The
+event page ticket for an event stored at `2026-09-17T19:00:00Z` — 3:00 PM in
+Montreal — read `7:00 PM UTC` and `Until 9:00 PM UTC`.
+
+**Cause.** Every event date and time was formatted with
+`toLocaleDateString(undefined, …)` or `toLocaleTimeString(undefined, …)`, which
+format in the zone the process runs in. The event page is a Server Component, and
+the server runs in UTC (the frontend container, and Vercel), so it printed UTC
+clock times and, because `formatTime` asked for `timeZoneName: "short"`, said
+so. `EventCard` renders on the server too, through `EventGrid` and
+`EventSectionMainPage`, so an evening event's card carried the next day's date.
+Client-rendered cards printed the viewer's zone instead (`EDT`), so the same
+event could read two ways. Predates this unit: it was on the event page since the
+page stopped being hardcoded (BUG-023).
+
+**Fix.** Every event takes place in one zone (Arpan, 2026-09-16), so
+`frontend/app/lib/event-zone.ts` formats every event date and time in
+America/Toronto and `en-US`, with no zone label, and the create and edit form
+reads and writes its `datetime-local` values in that zone through
+`toEventInputValue` and `fromEventInputValue`, whatever the browser's zone. Call
+sites: the event page, `EventCard`, `MyEventCard` via `formatEventDateTime`, the
+search dropdown, and the planner's day labels and range. The backend is
+unchanged and still sends instants.
+
+**Why not drop the label only.** The label was the visible half. Without it the
+page would still have printed 7:00 PM, now with nothing saying why.
+
+**Verified.** `event-zone.test.ts` pins summer and winter offsets, a late-evening
+date, no zone name in any output, the input round-trip and both daylight-saving
+changeover days, and passes with the test process forced to UTC. On the rebuilt
+local stack the event page HTML reads `3:00 PM` and `Until 5:00 PM` and
+contains no `UTC`; the edit form loads `15:00`.
+
+**Still open.** My events groups by the browser's calendar day; queued in
+`todo.md`. Held by [`rules/frontend.md`](../rules/frontend.md).
 
 ### BUG-056
 **A photo change looked undone for five minutes: media URLs name a position, not an image** · Medium · FIXED 2026-09-15

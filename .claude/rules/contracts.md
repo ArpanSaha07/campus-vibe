@@ -33,6 +33,12 @@ paths:
   TypeScript interface plus its `MIRRORS` entry in `api-contract.test.ts`. Miss
   either test registration and the contract silently does not cover the DTO at
   all — both suites still pass.
+- **The planner's eight shapes are contracted, and one is not a response
+  body.** `PlannerReplyDoneDTO` / `ApiPlannerReplyDone` is the JSON of the
+  stream's closing `done` frame, which the page parses like any DTO; a rename
+  there breaks the planner exactly as a body rename would. The `delta` and
+  `error` frames are two-field maps built in `SseReplySink` and are not
+  contracted ([ADR-019](../docs/decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)).
 - **`ClubCreateRequest` and `ClubCreationRequestCreateRequest` mirror each
   other, and nothing enforces it.** A club can be created two ways, so a field
   added to one and not the other means it silently cannot be proposed — no test
