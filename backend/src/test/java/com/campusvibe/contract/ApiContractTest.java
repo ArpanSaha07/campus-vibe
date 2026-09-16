@@ -1,5 +1,13 @@
 package com.campusvibe.contract;
 
+import com.campusvibe.ai.feature.planner.PlannerConversationDTO;
+import com.campusvibe.ai.feature.planner.PlannerConversationListDTO;
+import com.campusvibe.ai.feature.planner.PlannerConversationSummaryDTO;
+import com.campusvibe.ai.feature.planner.PlannerCreatedConversationDTO;
+import com.campusvibe.ai.feature.planner.PlannerMessageDTO;
+import com.campusvibe.ai.feature.planner.PlannerPickDTO;
+import com.campusvibe.ai.feature.planner.PlannerReplyDoneDTO;
+import com.campusvibe.ai.feature.planner.PlannerUsageDTO;
 import com.campusvibe.auth.AuthenticationResponse;
 import com.campusvibe.club.ClubDTO;
 import com.campusvibe.clubadmin.ClubAdminDTO;
@@ -88,6 +96,16 @@ class ApiContractTest {
         CONTRACTED.put("InterestDTO", InterestDTO.class);
         CONTRACTED.put("ClubCategoryDTO", ClubCategoryDTO.class);
         CONTRACTED.put("EventFormatDTO", EventFormatDTO.class);
+        // The planner. PlannerReplyDoneDTO is not a response body but the JSON
+        // of the stream's closing done frame, which the page parses the same way.
+        CONTRACTED.put("PlannerPickDTO", PlannerPickDTO.class);
+        CONTRACTED.put("PlannerUsageDTO", PlannerUsageDTO.class);
+        CONTRACTED.put("PlannerConversationSummaryDTO", PlannerConversationSummaryDTO.class);
+        CONTRACTED.put("PlannerConversationListDTO", PlannerConversationListDTO.class);
+        CONTRACTED.put("PlannerCreatedConversationDTO", PlannerCreatedConversationDTO.class);
+        CONTRACTED.put("PlannerMessageDTO", PlannerMessageDTO.class);
+        CONTRACTED.put("PlannerConversationDTO", PlannerConversationDTO.class);
+        CONTRACTED.put("PlannerReplyDoneDTO", PlannerReplyDoneDTO.class);
     }
 
     private final ObjectMapper mapper = new ObjectMapper();

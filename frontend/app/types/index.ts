@@ -79,10 +79,10 @@ export type Club = {
     interests: string[];
 };
 
-// AI planner (see .claude/specs/2026-09-16-planner-chat-ui.md).
-// The Api* shapes are the planned /api/v1/planner responses. The backend does
-// not exist yet, so they are not in contracts/api-dto-fields.json; they join
-// it, on both sides, when it lands.
+// AI planner (see .claude/specs/2026-09-16-planner-chat-ui.md and
+// 2026-09-16-planner-backend.md). The Api* shapes mirror the Planner*DTO
+// records in com.campusvibe.ai.feature.planner and are contracted in
+// contracts/api-dto-fields.json.
 
 export type PlannerPickKind = "event" | "club";
 

@@ -52,7 +52,10 @@ The application refuses to start without these.
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | |
 | `OPENAI_CONNECT_TIMEOUT` | `2s` | |
 | `OPENAI_READ_TIMEOUT` | `10s` | |
-| `OPENAI_MAX_RETRIES` | `2` | Retries 429/5xx only |
+| `OPENAI_MAX_RETRIES` | `2` | Retries 429/5xx only; the planner retries only before its first streamed token |
+| `OPENAI_CHAT_MODEL` | `gpt-4.1-mini` | The planner's model. Without `OPENAI_API_KEY` the planner answers 503 |
+| `OPENAI_MAX_OUTPUT_TOKENS` | `1200` | Cap per planner reply |
+| `OPENAI_CHAT_TIMEOUT` | `60s` | One whole streamed planner reply |
 | `GOOGLE_CLIENT_ID` | *(blank)* | Public client id, not a secret |
 | `SPRING_MAIL_HOST` | *(unset)* | `email-smtp.ca-central-1.amazonaws.com`. Unset means mail is logged, not sent |
 | `SPRING_MAIL_PORT` | | `587` |

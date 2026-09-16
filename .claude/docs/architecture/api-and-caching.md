@@ -5,7 +5,12 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `70336d2` plus the uncommitted event end time unit — re-read on
+**Code as of:** `95418a1` plus the uncommitted planner backend unit — re-read on
+2026-09-16: the eight `Planner*DTO` records joined `api-dto-fields.json` and
+both contract tests; `DefaultExceptionHandler` gained a 503 entry for
+`AiServiceUnavailableException` and now presets `application/json` on the
+handlers a streaming request can reach. No cache policy or data path moved.
+Before that, `70336d2` plus the event end time unit — re-read on
 2026-09-16: `EventDTO` gained `endTime` and its row in `api-dto-fields.json`;
 `GET /api/v1/events` gained `upcoming=true`, served by
 `EventRepository.findByEndTimeAfterOrderByDateTimeAsc` with the organizer
@@ -351,8 +356,10 @@ on every write path, so the column holds four known keys or NULL.
 matches each pick to the `EventDTO` or `ClubDTO` hydrated beside it, drops a
 pick with no row, and keeps one kind, so a planner answer never has two card
 rows ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)).
-The planner `Api*` types have no row in `api-dto-fields.json` yet, because no
-Java DTO exists to assert against.
+The planner `Api*` types mirror the `Planner*DTO` records in
+`com.campusvibe.ai.feature.planner` and are contracted like every other DTO;
+`ApiPlannerReplyDone` is the stream's closing `done` frame rather than a
+response body.
 
 **It is also where an S3 object key becomes a URL.** `clubs.logo` and
 `club_images.url` hold two different kinds of thing: absolute Unsplash URLs in
@@ -460,6 +467,17 @@ The entries that carry reasoning worth preserving:
 - `TooManyAttemptsException` → 429 with `Retry-After`, and
   `EmailNotVerifiedException` → 403. Both from the auth work; see
   [`authentication.md`](authentication.md).
+- `AiServiceUnavailableException` → 503, added 2026-09-16 for the planner: no
+  provider key means the feature is off, not broken, and the planner page shows
+  its unavailable state for exactly this status.
+- **Handlers a streaming endpoint can reach preset `application/json`**
+  (`DefaultExceptionHandler.java:35`, `json` at `:306`): 404, 400, 429, 503 and
+  the catch-all. The planner message endpoint is asked for
+  `Accept: text/event-stream`, and an `ApiError` negotiated against that finds
+  no writer: the 429 and 503 left as bodiless 500s. The 400 and 404 had survived
+  only through `@ResponseStatus` on their exceptions, without a body.
+  `PlannerStreamIT` asserts the statuses on a real port. See
+  [`rules/backend-java.md`](../../rules/backend-java.md).
 - `MaxUploadSizeExceededException` → 413, added 2026-09-11 when the per-file
   multipart cap went from 10MB to 5MB
   ([BUG-039](../../bugs/fixed_bugs.md#bug-039)). It was answering 500 through
@@ -727,6 +745,10 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- **2026-09-16** — Planner backend. The eight planner DTOs contracted on both
+  sides; `AiServiceUnavailableException` → 503; error handlers preset their JSON
+  content type so a stream request cannot turn a refusal into a 500.
+  *(main session)*
 - **2026-09-16** — Event end time. `EventDTO.endTime` added, contracted on
   both sides; `GET /events?upcoming=true` filters on it. *(main session)*
 - **2026-09-16** — Planner chat UI. `apiFetchResponse` added for streamed

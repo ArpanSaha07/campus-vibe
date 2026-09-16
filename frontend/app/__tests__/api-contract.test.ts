@@ -5,6 +5,14 @@ import type {
   ApiClub,
   ApiEvent,
   ApiMyEvent,
+  ApiPlannerConversation,
+  ApiPlannerConversationList,
+  ApiPlannerConversationSummary,
+  ApiPlannerCreatedConversation,
+  ApiPlannerMessage,
+  ApiPlannerPick,
+  ApiPlannerReplyDone,
+  ApiPlannerUsage,
   AuthResponse,
   ClubAdmin,
   ClubAdminRequest,
@@ -246,6 +254,64 @@ const eventFormatFields: Record<keyof EventFormat, true> = {
   groupLabel: true,
 };
 
+// The planner (spec 2026-09-16-planner-backend). ApiPlannerReplyDone is the
+// stream's closing done frame rather than a response body; it crosses the wire
+// all the same.
+const plannerPickFields: Record<keyof ApiPlannerPick, true> = {
+  kind: true,
+  id: true,
+  reason: true,
+};
+
+const plannerUsageFields: Record<keyof ApiPlannerUsage, true> = {
+  used: true,
+  limit: true,
+  resetsAt: true,
+};
+
+const plannerConversationSummaryFields: Record<keyof ApiPlannerConversationSummary, true> = {
+  id: true,
+  title: true,
+  lastActiveAt: true,
+};
+
+const plannerConversationListFields: Record<keyof ApiPlannerConversationList, true> = {
+  conversations: true,
+  usage: true,
+};
+
+const plannerCreatedConversationFields: Record<keyof ApiPlannerCreatedConversation, true> = {
+  conversation: true,
+  evictedId: true,
+};
+
+const plannerMessageFields: Record<keyof ApiPlannerMessage, true> = {
+  id: true,
+  role: true,
+  content: true,
+  status: true,
+  picks: true,
+  events: true,
+  clubs: true,
+  createdAt: true,
+};
+
+const plannerConversationFields: Record<keyof ApiPlannerConversation, true> = {
+  id: true,
+  title: true,
+  lastActiveAt: true,
+  messages: true,
+};
+
+const plannerReplyDoneFields: Record<keyof ApiPlannerReplyDone, true> = {
+  messageId: true,
+  picks: true,
+  events: true,
+  clubs: true,
+  usage: true,
+  conversation: true,
+};
+
 /** Backend DTO name → the TypeScript interface mirroring it. */
 const MIRRORS: Record<string, Record<string, true>> = {
   EventDTO: eventFields,
@@ -266,6 +332,14 @@ const MIRRORS: Record<string, Record<string, true>> = {
   InterestDTO: interestFields,
   ClubCategoryDTO: clubCategoryFields,
   EventFormatDTO: eventFormatFields,
+  PlannerPickDTO: plannerPickFields,
+  PlannerUsageDTO: plannerUsageFields,
+  PlannerConversationSummaryDTO: plannerConversationSummaryFields,
+  PlannerConversationListDTO: plannerConversationListFields,
+  PlannerCreatedConversationDTO: plannerCreatedConversationFields,
+  PlannerMessageDTO: plannerMessageFields,
+  PlannerConversationDTO: plannerConversationFields,
+  PlannerReplyDoneDTO: plannerReplyDoneFields,
 };
 
 describe("API contract", () => {

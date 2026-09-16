@@ -5,7 +5,7 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
+**Code as of:** `95418a1`, re-stamped 2026-09-16: that commit is the event end time unit this document was already updated for, and the planner backend touches nothing it covers. Before that, `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
 the overview and Events tab split upcoming from past on each event's end, and
 the event form requires an end. Before that, `12afebf` plus the uncommitted
 club and event management unit,

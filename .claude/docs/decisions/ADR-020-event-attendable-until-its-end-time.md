@@ -1,6 +1,6 @@
 # ADR-020 — An event is still attendable until its required end time
 
-**Status:** Proposed
+**Status:** Accepted 2026-09-16
 **Date:** 2026-09-16
 **Decided in:** the event end time `/start` session, recorded in
 [`2026-09-15-event-end-time.md`](../../specs/2026-09-15-event-end-time.md)

@@ -1,6 +1,6 @@
 # ADR-019 — A planner answer is an intro plus typed picks, not prose with inline markers
 
-**Status:** Proposed
+**Status:** Accepted 2026-09-16
 **Date:** 2026-09-16
 **Decided in:** the planner chat UI `/start` session, recorded in
 [`2026-09-16-planner-chat-ui.md`](../../specs/2026-09-16-planner-chat-ui.md)

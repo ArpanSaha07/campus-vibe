@@ -5,7 +5,13 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `3fec570` — re-stamped on 2026-09-10 after the contact links a
+**Code as of:** `95418a1` plus the uncommitted planner backend unit — re-read on
+2026-09-16 for `SecurityFilterChainConfig`, which gained a first rule permitting
+the async dispatch of a streamed response. That grants no role and opens no
+URL: an async dispatch exists only for a request that already passed the rules
+below. The planner's routes need no line, falling through to
+`anyRequest().authenticated()`, and own their data by user id. Before that,
+`3fec570` — re-stamped on 2026-09-10 after the contact links a
 club proposal now carries. That work moved `clubadmin/`, which is mapped here,
 but touches no role, no assignment and no authorisation check: who may propose,
 approve and manage is exactly as described below. Re-read again the same day for
@@ -165,7 +171,10 @@ order. The shape that matters: a `permitAll` block makes `GET /api/v1/clubs/**`
 public, and four club sub-paths are pulled back to `authenticated()` *above* it
 — `/admins`, `/ownership-transfer`, `/audit-logs` and `/managed`. Everything not
 listed falls through to `anyRequest().authenticated()`, which is why the
-club-scoped POST and DELETE methods need no line of their own.
+club-scoped POST and DELETE methods need no line of their own. **The first rule
+permits `DispatcherType.ASYNC`** (`:60`): the planner reply is an `SseEmitter`,
+its second dispatch is not seen again by the JWT filter, and without the rule it
+was refused mid-stream. It is not a public path.
 
 **`user/UserDetailsServiceImpl.java`** — *not read during this rewrite; listed
 here so its absence is not mistaken for an oversight.*
@@ -286,3 +295,5 @@ grant would throw and take startup with it, so the runner checks first.
   ([ADR-004](../decisions/ADR-004-two-paths-create-a-club.md)). The admin
   endpoint list above was refreshed against the code at the same time.
   Implementing agent.
+- 2026-09-16 — the async dispatch rule in `SecurityFilterChainConfig`, for the
+  planner's streamed reply. No role or grant changed. Main session.

@@ -27,10 +27,10 @@ public class AiClientConfig {
     @Bean
     public RestClient openAiRestClient(OpenAiProperties properties) {
         if (properties.isConfigured()) {
-            log.info("OpenAI configured (model={}, connectTimeout={}, readTimeout={}); semantic search enabled",
-                    properties.embeddingModel(), properties.connectTimeout(), properties.readTimeout());
+            log.info("OpenAI configured (model={}, chatModel={}, connectTimeout={}, readTimeout={}); semantic search and the planner enabled",
+                    properties.embeddingModel(), properties.chatModel(), properties.connectTimeout(), properties.readTimeout());
         } else {
-            log.info("OPENAI_API_KEY is not set; search will run in keyword-only mode and no OpenAI calls will be made");
+            log.info("OPENAI_API_KEY is not set; search will run in keyword-only mode, the planner answers 503, and no OpenAI calls will be made");
         }
 
         // Explicit timeouts: an unbounded default lets a hung provider call

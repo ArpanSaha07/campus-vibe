@@ -151,9 +151,11 @@
     },
 
     "ai-planner.md": {
-      "covers": "The /planner chat page: provider state, the streamed reply, the answer rendered from typed picks",
+      "covers": "The AI planner end to end: the chat page, the streamed reply, retrieval, grounding, and the chat and message limits",
       "paths": [
-        "frontend/app/lib/planner.ts",
+        "backend/src/main/java/com/campusvibe/ai/feature/planner/",
+    "backend/src/main/resources/prompts/",
+    "frontend/app/lib/planner.ts",
         "frontend/app/lib/planner-api.ts",
         "frontend/app/components/planner/",
         "frontend/app/(planner)/"

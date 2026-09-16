@@ -2,8 +2,10 @@ package com.campusvibe.search;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Types;
 import java.util.List;
 
 /**
@@ -151,6 +153,90 @@ public class SearchRepository {
                 """.formatted(CLUB_TAGS_JOIN, CLUB_TEXT);
         return jdbcTemplate.queryForList(sql, String.class,
                 semanticWeight, vectorLiteral, keywordWeight, query, minScore, limit);
+    }
+
+    /** An id and the hybrid score it was ranked by. */
+    public record Scored<T>(T id, double score) {}
+
+    /**
+     * A tsquery matching <em>any</em> word of the text, for chat prompts.
+     *
+     * <p>The search box's {@code websearch_to_tsquery} requires every word,
+     * which suits a query someone typed to find one thing and fails a sentence:
+     * <em>anything fun to do this weekend</em> becomes fun AND weekend and
+     * matches nothing. {@code plainto_tsquery} normalises the words and drops
+     * stop words, and its {@code &} are turned into {@code |}. The text
+     * rewritten is the query Postgres produced, never the caller's, so nothing
+     * the caller wrote can become tsquery syntax.
+     */
+    private static final String ANY_WORD_QUERY =
+            "replace(plainto_tsquery('english', ?)::text, '&', '|')::tsquery";
+
+    /**
+     * The planner's search leg over events: not ended, starting within
+     * {@code windowDays}, matching any word of the prompt or close to it in
+     * meaning.
+     *
+     * @param vectorLiteral the prompt's embedding, or null to rank by keywords
+     *                      alone when no embedding could be had
+     */
+    public List<Scored<Long>> plannerEventCandidates(String vectorLiteral, String prompt, int windowDays, int limit) {
+        String sql = """
+                SELECT id, score FROM (
+                    SELECT e.id,
+                           kw.rank AS kw,
+                           CAST(? AS double precision) * COALESCE(1 - (e.embedding <=> CAST(? AS vector)), 0)
+                         + CAST(? AS double precision) * (kw.rank / (kw.rank + 0.05)) AS score
+                    FROM events e
+                    JOIN clubs c ON c.id = e.organizer_id
+                    %s
+                    CROSS JOIN LATERAL (
+                        SELECT to_tsvector('english', %s) AS doc, %s AS query
+                    ) fts
+                    CROSS JOIN LATERAL (
+                        SELECT CASE WHEN fts.doc @@ fts.query
+                                    THEN ts_rank(fts.doc, fts.query) ELSE 0 END AS rank
+                    ) kw
+                    -- Still attendable (ADR-020), and not months away.
+                    WHERE e.end_time > now()
+                      AND e.date_time < now() + make_interval(days => ?)
+                ) ranked
+                WHERE score >= ? OR kw > 0
+                ORDER BY score DESC
+                LIMIT ?
+                """.formatted(EVENT_TAGS_JOIN, EVENT_TEXT, ANY_WORD_QUERY);
+        return jdbcTemplate.query(sql,
+                (rs, n) -> new Scored<>(rs.getLong("id"), rs.getDouble("score")),
+                semanticWeight, new SqlParameterValue(Types.VARCHAR, vectorLiteral), keywordWeight, prompt,
+                windowDays, minScore, limit);
+    }
+
+    /** The planner's search leg over clubs; {@code vectorLiteral} may be null as above. */
+    public List<Scored<String>> plannerClubCandidates(String vectorLiteral, String prompt, int limit) {
+        String sql = """
+                SELECT id, score FROM (
+                    SELECT c.id,
+                           kw.rank AS kw,
+                           CAST(? AS double precision) * COALESCE(1 - (c.embedding <=> CAST(? AS vector)), 0)
+                         + CAST(? AS double precision) * (kw.rank / (kw.rank + 0.05)) AS score
+                    FROM clubs c
+                    %s
+                    CROSS JOIN LATERAL (
+                        SELECT to_tsvector('english', %s) AS doc, %s AS query
+                    ) fts
+                    CROSS JOIN LATERAL (
+                        SELECT CASE WHEN fts.doc @@ fts.query
+                                    THEN ts_rank(fts.doc, fts.query) ELSE 0 END AS rank
+                    ) kw
+                ) ranked
+                WHERE score >= ? OR kw > 0
+                ORDER BY score DESC
+                LIMIT ?
+                """.formatted(CLUB_TAGS_JOIN, CLUB_TEXT, ANY_WORD_QUERY);
+        return jdbcTemplate.query(sql,
+                (rs, n) -> new Scored<>(rs.getString("id"), rs.getDouble("score")),
+                semanticWeight, new SqlParameterValue(Types.VARCHAR, vectorLiteral), keywordWeight, prompt,
+                minScore, limit);
     }
 
     public List<String> keywordSearchClubIds(String query, int limit) {

@@ -7,6 +7,7 @@ Last updated: **2026-09-15**
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
 | [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
+| [BUG-059](#bug-059) | Medium | 2026-09-16 | A 429, a 503 or the catch-all 500 asked for with a non-JSON `Accept` left as a bodiless 500: the `ApiError` could not be negotiated, and the planner's stream request asks for `text/event-stream` |
 | [BUG-058](#bug-058) | Medium | 2026-09-16 | Server-rendered event times were the server's UTC clock: the event page read `7:00 PM UTC` for an event at 3 PM, and a Montreal evening event's card showed the next day |
 | [BUG-056](#bug-056) | Medium | 2026-09-15 | A photo change looked undone for up to five minutes: media URLs name a position, not an image, and the response is cached — and the first fix, `?v=`, answered 500 on every page with an image |
 | [BUG-055](#bug-055) | Low | 2026-09-15 | An uploaded club logo never showed in the club's own dashboard: the managed-club reads handed `ClubLogo` the raw S3 key |
@@ -107,6 +108,36 @@ through a production outage. It now paints an iframe, asynchronously, and covers
 the case where GIS paints nothing at all.
 
 ---
+
+### BUG-059
+**Error responses failed content negotiation under a non-JSON Accept** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, in `PlannerMessageIT`, building the planner backend. A
+send refused at the daily limit, and one refused for a missing provider key,
+were both asked for as `Accept: text/event-stream`, which is what the planner
+page sends. Neither came back as 429 or 503: MockMvc surfaced the original
+exception instead.
+
+**Cause.** `DefaultExceptionHandler` returned `ResponseEntity<ApiError>` with
+no content type, so Spring negotiated one against the request's `Accept`
+header. Nothing writes an `ApiError` as `text/event-stream`, the handler
+itself failed with `HttpMediaTypeNotAcceptableException`, and the refusal fell
+through as a 500 with no body. The 400 and 404 looked fine only because
+`RequestValidationException` and `ResourceNotFoundException` carry
+`@ResponseStatus`, which a fallback resolver honours without a body.
+`TooManyAttemptsException` has no such annotation. Predates the planner: any
+client asking for HTML or a stream from an endpoint that raised these had the
+same 500; nothing in the product did until the planner.
+
+**Fix.** The handlers a streaming request can reach, 404, 400, 429, 503 and the
+catch-all 500, preset `application/json` (`DefaultExceptionHandler.java:306`).
+A preset content type skips negotiation entirely.
+
+**Verified.** `PlannerMessageIT.theSixteenthMessageOfTheDayIsRefusedAndDeletingAChatDoesNotGiveItBack`
+and `refusalsBeforeTheStreamAreStatusesAndCostNothing` through MockMvc, and
+`PlannerStreamIT.refusalsAskedForAsAStreamKeepTheirStatusAndBody` on a real
+port, which also reads the 503 body. Held by
+[`rules/backend-java.md`](../rules/backend-java.md).
 
 ### BUG-058
 **Server-rendered event times were the server's UTC clock** · Medium · FIXED 2026-09-16

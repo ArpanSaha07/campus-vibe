@@ -1,5 +1,6 @@
 package com.campusvibe.exception;
 
+import com.campusvibe.ai.AiServiceUnavailableException;
 import com.campusvibe.auth.EmailNotVerifiedException;
 import com.campusvibe.common.Logs;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -29,6 +31,15 @@ import java.time.LocalDateTime;
  * annotation, never on the parameter type, so the overloading bought nothing and
  * cost two things: a reader had to match brace to signature to see which one ran,
  * and a stack trace named {@code handleException} thirteen times over.
+ *
+ * <p><b>A handler a streaming endpoint can reach must preset its content type</b>
+ * ({@link #json}). The planner's message endpoint is asked for
+ * {@code Accept: text/event-stream}, and an {@code ApiError} negotiated against
+ * that header finds no JSON writer: Spring gives up on the handler and the
+ * refusal leaves as a 500 with no body. A preset {@code Content-Type} skips
+ * negotiation. The 400 and 404 used to survive only because their exceptions
+ * carry {@code @ResponseStatus}, which a fallback resolver honours without a
+ * body.
  */
 @ControllerAdvice
 public class DefaultExceptionHandler {
@@ -51,7 +62,7 @@ public class DefaultExceptionHandler {
                 LocalDateTime.now()
         );
 
-        return new ResponseEntity<>(apiError, HttpStatus.NOT_FOUND);
+        return json(HttpStatus.NOT_FOUND, apiError);
     }
 
     @ExceptionHandler(InsufficientAuthenticationException.class)
@@ -133,7 +144,7 @@ public class DefaultExceptionHandler {
                 LocalDateTime.now()
         );
 
-        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+        return json(HttpStatus.BAD_REQUEST, apiError);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -221,7 +232,24 @@ public class DefaultExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header("Retry-After", String.valueOf(e.getRetryAfterSeconds()))
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(apiError);
+    }
+
+    // A generative feature with no provider key. 503 rather than 500: nothing
+    // is broken, the feature is switched off, and the planner page shows its
+    // unavailable state for exactly this status.
+    @ExceptionHandler(AiServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handleAiServiceUnavailable(AiServiceUnavailableException e,
+                                                               HttpServletRequest request) {
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                e.getMessage(),
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                LocalDateTime.now()
+        );
+
+        return json(HttpStatus.SERVICE_UNAVAILABLE, apiError);
     }
 
     // Constraints on @RequestParam / @PathVariable (a @Validated controller)
@@ -271,7 +299,12 @@ public class DefaultExceptionHandler {
                 LocalDateTime.now()
         );
 
-        return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
+        return json(HttpStatus.INTERNAL_SERVER_ERROR, apiError);
+    }
+
+    /** An ApiError with its content type preset, so no Accept header can refuse it (see the class comment). */
+    private static ResponseEntity<ApiError> json(HttpStatus status, ApiError apiError) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(apiError);
     }
 
 }

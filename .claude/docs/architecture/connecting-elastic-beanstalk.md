@@ -201,8 +201,15 @@ application.
 | `APP_BASE_URL` | `https://www.campusvibe-mcgill.com` | Links in mail point here |
 | `AUTH_RATE_LIMIT_TRUST_XFF` | `true` | Behind the load balancer every request arrives from its address; without this the whole internet shares one login budget |
 
-**Optional:** `OPENAI_API_KEY` (**secret**; blank runs search keyword-only),
-`GOOGLE_CLIENT_ID` (public). Mail properties: [`connecting-ses.md`](connecting-ses.md) §8.
+**Optional:** `OPENAI_API_KEY` (**secret**; blank runs search keyword-only
+**and turns the AI planner off**, which then answers 503),
+`GOOGLE_CLIENT_ID` (public). The planner also reads `OPENAI_CHAT_MODEL`,
+`OPENAI_MAX_OUTPUT_TOKENS` and `OPENAI_CHAT_TIMEOUT`, whose defaults
+(`gpt-4.1-mini`, `1200`, `60s`) need no property; see
+[`docker/EB-DEPLOYMENT.md`](../../../docker/EB-DEPLOYMENT.md). Its reply streams
+through nginx and the load balancer: the backend sends `X-Accel-Buffering: no`
+and a keep-alive every 15 seconds, so no `.platform` change is expected, but
+neither has been seen behind the real proxy ([`ai-planner.md`](ai-planner.md)). Mail properties: [`connecting-ses.md`](connecting-ses.md) §8.
 
 **One time only — the first administrator.** `AdminBootstrapRunner` grants
 `ROLE_ADMIN` at startup and never revokes it:
