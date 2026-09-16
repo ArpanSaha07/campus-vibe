@@ -1,6 +1,6 @@
 # Event end time and one definition of still attendable
 
-**Status:** draft · **Date:** 2026-09-15
+**Status:** shipped · **Date:** 2026-09-15
 
 Unit 1 of 3 of the AI planner rebuild (planner backend and the chat page follow, each with its own spec).
 
@@ -27,6 +27,8 @@ Every event has a required end time, so the platform can tell a running event fr
 - Google Calendar export uses the real end time and `DEFAULT_DURATION_MS` is deleted — the file's own comment asks for exactly that. Claude, following `google-calendar.ts:11-13`.
 - The form defaults the end to start + 2h when a start is picked and the end is still empty; it never overwrites an end the user typed. Claude, a form detail with no lasting consequence.
 - **An ADR is warranted** for the attendable definition (Proposed, written at wrap-up): it constrains every future read path, and the alternatives — a default duration, or upcoming-only — were real. Arpan flips its status.
+- `dateTime` stays the start; no separate date and start-time fields. Arpan, 2026-09-16, withdrawing a request made during the build.
+- Event times are shown and entered in **America/Toronto**, with no zone label anywhere, through `frontend/app/lib/event-zone.ts`; the create and edit form reads its values in that zone whatever the browser's zone. Frontend only: the backend keeps storing instants in UTC. Arpan, 2026-09-16.
 
 ## Open questions
 
@@ -55,7 +57,7 @@ Every event has a required end time, so the platform can tell a running event fr
 
 ## To update at wrap-up
 
-- `docs/decisions/ADR-018-event-attendable-until-its-end-time.md` (ADR-017 went to the planner answer shape on 2026-09-16) (Proposed) plus its rows in `docs/decisions/README.md` and `docs/README.md`.
+- `docs/decisions/ADR-020-event-attendable-until-its-end-time.md` (017 to 019 were taken on 2026-09-16) (Proposed) plus its rows in `docs/decisions/README.md` and `docs/README.md`.
 - `rules/backend-clubs.md` or a new line in `rules/contracts.md`: any new event read path that means still attendable filters `end_time > now()`, never `date_time`.
 - `api-and-caching.md` — the `upcoming` parameter; `search.md` banner — the filter moved to `end_time`.
 - `product.md` — Search and Club dashboard sections.

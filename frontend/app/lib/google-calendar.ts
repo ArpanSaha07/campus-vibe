@@ -8,11 +8,6 @@ import type { EventInstance } from "@/app/types";
 
 const GOOGLE_CALENDAR_TEMPLATE = "https://calendar.google.com/calendar/render";
 
-// EventInstance has no end time yet, so every event is assumed to run two
-// hours. Swap this for the real end once the backend carries one — Google
-// requires a start/end pair and silently rejects a lone start.
-const DEFAULT_DURATION_MS = 2 * 60 * 60 * 1000;
-
 /**
  * Google's basic-format UTC stamp: 20261015T140000Z.
  *
@@ -26,12 +21,14 @@ function toUtcStamp(date: Date): string {
 export function buildGoogleCalendarUrl(
   event: EventInstance,
   organizerName: string,
-  options: { durationMs?: number; timeZone?: string } = {},
+  options: { timeZone?: string } = {},
 ): string {
-  const { durationMs = DEFAULT_DURATION_MS, timeZone } = options;
+  const { timeZone } = options;
 
+  // Google requires a start/end pair and silently rejects a lone start. Every
+  // event has a real end since V35; before that this assumed two hours.
   const start = event.dateTime;
-  const end = new Date(start.getTime() + durationMs);
+  const end = event.endTime;
 
   // "Tech Conference | ACME Corp" — the pipe survives as %7C.
   const text = `${event.title} | ${organizerName}`;

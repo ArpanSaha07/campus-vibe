@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import { formatEventDateTime, isPastEvent, myEventStatus } from "@/app/lib/my-events";
+import { isOngoing } from "@/app/lib/event-time";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import AddToCalendarLink from "@/app/components/event/AddToCalendarLink";
 import type { MyEvent } from "@/app/types";
@@ -19,7 +20,8 @@ const STATUS_STYLES = {
 export default function MyEventCard({ myEvent }: { myEvent: MyEvent }) {
   const { event } = myEvent;
   const badge = STATUS_STYLES[myEventStatus(myEvent)];
-  const isPast = isPastEvent(event.dateTime);
+  const isPast = isPastEvent(event);
+  const ongoing = isOngoing(event);
 
   return (
     <div
@@ -41,6 +43,12 @@ export default function MyEventCard({ myEvent }: { myEvent: MyEvent }) {
           <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} aria-hidden="true" />
           {badge.label}
         </span>
+
+        {ongoing && (
+          <span className="absolute bottom-2 left-2 rounded-full bg-sun-300 px-2.5 py-1 text-ink-900 ticket-label">
+            Happening now
+          </span>
+        )}
 
         <div className="absolute right-2 top-2">
           <EventLikeButton event={event} initiallySaved={myEvent.saved} />

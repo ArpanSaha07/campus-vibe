@@ -10,6 +10,7 @@ import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
 import EventCard from "@/app/components/event/EventCard";
 import ClubEventTabButton, { type EventTab } from "@/app/components/club/ClubEventTabButtons";
+import { hasEnded } from "@/app/lib/event-time";
 
 /**
  * The club's events, split into upcoming and past, each with Edit and Delete.
@@ -60,11 +61,13 @@ export default function ClubEventsPage({
     return {
       // Soonest first for what is still to come; most recent first for what is
       // done — in both cases the event you are most likely to want is on top.
+      // Split on the end, not the start: a running event is still upcoming
+      // here, and moves to Past only once it is over (V35).
       upcoming: all
-        .filter((event) => event.dateTime >= now)
+        .filter((event) => !hasEnded(event, now))
         .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()),
       past: all
-        .filter((event) => event.dateTime < now)
+        .filter((event) => hasEnded(event, now))
         .sort((a, b) => b.dateTime.getTime() - a.dateTime.getTime()),
     };
   }, [events]);

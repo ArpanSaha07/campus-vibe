@@ -31,6 +31,15 @@ public class Event {
     @Column(name = "date_time", nullable = false)
     private Instant dateTime;
 
+    /*
+     * Required since V35. An event is still attendable while endTime is in the
+     * future, and ongoing while dateTime <= now < endTime -- one definition,
+     * used by search, the upcoming list and every past/upcoming split in the
+     * frontend. EventService enforces end after start and at most 14 days.
+     */
+    @Column(name = "end_time", nullable = false)
+    private Instant endTime;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 

@@ -1,13 +1,13 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-15** · Branch: `develop`
+Last updated: **2026-09-16** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in).
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058 (2026-09-16)
 
-**Highest id issued: BUG-057.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-058.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|

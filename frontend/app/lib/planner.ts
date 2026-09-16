@@ -1,3 +1,4 @@
+import { formatEventDateRange } from "@/app/lib/event-zone";
 import type { PlannerConversationSummary, PlannerPick, PlannerPickKind } from "@/app/types";
 
 /**
@@ -83,11 +84,6 @@ export function pickRowLabel(picks: PlannerPick[]): string {
   const times = picks.map((pick) => (pick.kind === "event" ? pick.event.dateTime.getTime() : 0));
   const first = new Date(Math.min(...times));
   const last = new Date(Math.max(...times));
-  const format = new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  const range = format.formatRange(first, last);
+  const range = formatEventDateRange(first, last);
   return `${count} ${count === 1 ? "event" : "events"} · ${range}`;
 }

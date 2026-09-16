@@ -56,7 +56,9 @@ account closure, which has no endpoint and cannot simply delete an owner's rows.
 **Shipped.** `/manage/[clubId]` with per-request authorisation, the
 Administrators tab (invite by address, remove, cancel), ownership transfer, an
 append-only audit log and an Activity tab, and the club create form —
-[`club-administration.md`](architecture/club-administration.md).
+[`club-administration.md`](architecture/club-administration.md). Every event
+has a required end, at most 14 days after its start, entered in Montreal time;
+the dashboards file an event as past once it ends (2026-09-16).
 
 **Planned.** `EventService.update` — there is no update path at all, so events
 cannot be edited and their embeddings go stale
@@ -83,6 +85,9 @@ events, setting a club's `official_email`
 embeddings in pgvector — with per-IP budget, a query-length cap and a
 query-embedding cache; taxonomy tables joined into the query
 ([`search.md`](architecture/search.md), a pre-implementation note).
+
+Since 2026-09-16 an event appears in search until it **ends**, so one that is
+running is still found ([ADR-020](decisions/ADR-020-event-attendable-until-its-end-time.md)).
 
 **Planned.** The semantic half is not yet trustworthy
 ([BUG-001](../bugs/bugs.md#bug-001)), all 8 clubs still have a null embedding

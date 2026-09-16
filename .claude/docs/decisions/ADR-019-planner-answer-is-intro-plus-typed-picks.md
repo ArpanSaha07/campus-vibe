@@ -1,4 +1,4 @@
-# ADR-017 — A planner answer is an intro plus typed picks, not prose with inline markers
+# ADR-019 — A planner answer is an intro plus typed picks, not prose with inline markers
 
 **Status:** Proposed
 **Date:** 2026-09-16

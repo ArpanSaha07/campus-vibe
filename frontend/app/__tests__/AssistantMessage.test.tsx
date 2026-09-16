@@ -21,6 +21,7 @@ const event = (id: number, title: string, dateTime: string) =>
     title,
     description: null,
     dateTime,
+    endTime: new Date(new Date(dateTime).getTime() + 2 * 60 * 60 * 1000).toISOString(),
     createdAt: "2026-09-01T00:00:00Z",
     location: "Lower Field",
     price: "Free",

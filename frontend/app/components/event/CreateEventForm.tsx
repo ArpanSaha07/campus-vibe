@@ -14,6 +14,12 @@ import {
   type EventFields,
 } from "@/app/lib/event";
 import { toEventInstance } from "@/app/lib/adapters";
+import {
+  DEFAULT_EVENT_LENGTH_MS,
+  eventTimesError,
+  shiftLocalDateTime,
+} from "@/app/lib/event-time";
+import { fromEventInputValue, toEventInputValue } from "@/app/lib/event-zone";
 import { parseApiError } from "@/app/lib/auth-errors";
 import { revalidateEvents } from "@/app/lib/actions/revalidate";
 import { useManagedClubs } from "@/app/lib/managed-clubs-context";
@@ -27,18 +33,6 @@ import Button from "@/app/components/ui/Button";
 import EmptyState from "@/app/components/ui/EmptyState";
 
 const MAX_TAGS = 8;
-
-/**
- * An instant as a `datetime-local` value (`2026-09-01T18:00`), in the browser's
- * own zone — the inverse of `new Date(value)` on submit, so an untouched date
- * saves back unchanged.
- */
-export function toDateTimeLocal(iso: string): string {
-  const date = new Date(iso);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 16);
-}
 
 /**
  * One photo in the picker: the image, a Banner badge on the first, and the two
@@ -133,7 +127,8 @@ export default function CreateEventForm({
   const [organizerId, setOrganizerId] = useState("");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [dateTime, setDateTime] = useState(initial ? toDateTimeLocal(initial.dateTime) : "");
+  const [dateTime, setDateTime] = useState(initial ? toEventInputValue(new Date(initial.dateTime)) : "");
+  const [endTime, setEndTime] = useState(initial ? toEventInputValue(new Date(initial.endTime)) : "");
   const [location, setLocation] = useState(initial?.location ?? "");
   const [price, setPrice] = useState(initial?.price ?? "");
   const [capacity, setCapacity] = useState(
@@ -159,8 +154,10 @@ export default function CreateEventForm({
   const club = editing
     ? initial.organizerId
     : organizerId || (clubs.length === 1 ? clubs[0].clubId : "");
+  const timesError = eventTimesError(dateTime, endTime);
   const canSubmit =
-    Boolean(club && title.trim() && dateTime) &&
+    Boolean(club && title.trim() && dateTime && endTime) &&
+    !timesError &&
     !submitting &&
     !photoBusy &&
     savedWithoutPhotos === null;
@@ -242,10 +239,12 @@ export default function CreateEventForm({
     const fields: EventFields = {
       title: title.trim(),
       description,
-      // `datetime-local` yields `2026-09-01T18:00` with no zone. Interpreted
-      // as local time, which is what somebody typing it into a form means,
-      // and sent as an instant so the backend never has to guess.
-      dateTime: new Date(dateTime).toISOString(),
+      // `datetime-local` yields `2026-09-01T18:00` with no zone. Read as
+      // Montreal time, where every event takes place, whatever zone this
+      // browser is in, and sent as an instant so the backend never guesses.
+      // canSubmit only allows values that parse.
+      dateTime: fromEventInputValue(dateTime)!.toISOString(),
+      endTime: fromEventInputValue(endTime)!.toISOString(),
       location,
       price,
       capacity: capacity.trim() ? Number(capacity) : null,
@@ -384,15 +383,44 @@ export default function CreateEventForm({
           />
         </FormField>
 
-        <FormField label="Date and time" htmlFor="dateTime">
-          <input
-            id="dateTime"
-            type="datetime-local"
-            value={dateTime}
-            onChange={(event) => setDateTime(event.target.value)}
-            className={inputClasses}
-          />
-        </FormField>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <FormField label="Starts" htmlFor="dateTime" required hint="Montreal time.">
+            <input
+              id="dateTime"
+              type="datetime-local"
+              value={dateTime}
+              aria-required="true"
+              onChange={(event) => {
+                const next = event.target.value;
+                setDateTime(next);
+                // Fill the end once, when there is none yet. Never overwrite an
+                // end somebody typed: moving the start is often a correction
+                // to the start alone.
+                if (!endTime) setEndTime(shiftLocalDateTime(next, DEFAULT_EVENT_LENGTH_MS));
+              }}
+              className={inputClasses}
+            />
+          </FormField>
+
+          <FormField
+            label="Ends"
+            htmlFor="endTime"
+            required
+            error={timesError}
+            hint="Up to 14 days after it starts."
+          >
+            <input
+              id="endTime"
+              type="datetime-local"
+              value={endTime}
+              min={dateTime || undefined}
+              aria-required="true"
+              aria-invalid={timesError ? true : undefined}
+              onChange={(event) => setEndTime(event.target.value)}
+              className={inputClasses}
+            />
+          </FormField>
+        </div>
 
         <FormField label="Location" htmlFor="location">
           <input
@@ -545,7 +573,9 @@ export default function CreateEventForm({
           <p aria-live="polite" className="text-sm">
             {error && <span className="font-semibold text-alert-600">{error}</span>}
             {!error && !canSubmit && !submitting && !photoBusy && (
-              <span className="text-ink-600">A club, a title and a date are needed.</span>
+              <span className="text-ink-600">
+                {timesError || "A club, a title, a start and an end are needed."}
+              </span>
             )}
           </p>
         </div>

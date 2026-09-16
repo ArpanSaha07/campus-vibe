@@ -14,6 +14,7 @@ public class EventMapper implements Function<Event, EventDTO> {
                 event.getTitle(),
                 event.getDescription(),
                 event.getDateTime(),
+                event.getEndTime(),
                 event.getCreatedAt(),
                 event.getLocation(),
                 event.getPrice(),

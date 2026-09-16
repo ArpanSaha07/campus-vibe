@@ -74,6 +74,14 @@ reads.
   Ten photos per event: `EventController` checks before storing anything so an
   overflow orphans nothing, and `addImages` re-checks inside the write.
   `event/` was added to the paths above for this on 2026-09-15. (ADR-015)
+- **Still attendable means `end_time > now()`, and nothing else.** An event
+  read that shows what a student can go to filters on the end, never on
+  `date_time`: comparing the start dropped running events from search the
+  moment they began. Search, `EventService.listUpcoming` and the frontend
+  `hasEnded` all use it. An end is required, after the start and at most 14
+  days later, checked in `EventService.requireValidTimes` for a 400 and by
+  V35's CHECK constraints behind it. A new event fixture must set
+  `endTime` or the insert fails. ([ADR-020](../docs/decisions/ADR-020-event-attendable-until-its-end-time.md))
 - **`DevDataSeeder` is idempotent per club, not wholesale.** It skipped for
   months because V6 had already inserted eight clubs, so it had never run and
   every seeded club had a null embedding. V32 retires those rows; do not restore

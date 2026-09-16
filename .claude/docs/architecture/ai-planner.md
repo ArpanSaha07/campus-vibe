@@ -6,8 +6,9 @@ renders *The planner is unavailable* until the planner endpoints ship (Unit 2 of
 the AI planner plan). A populated thread has been seen only in Jest and in a
 browser with `fetch` stubbed in the tab.
 **Authors:** main session.
-**Code as of:** `b0c5e63` plus the uncommitted planner chat UI unit, read
-2026-09-16.
+**Code as of:** `70336d2` plus the uncommitted event end time unit, read
+2026-09-16: `AssistantMessage` and `pickRowLabel` format dates through
+`lib/event-zone.ts`. Before that, `b0c5e63` plus the planner chat UI unit.
 **Spec:** [`2026-09-16-planner-chat-ui.md`](../../specs/2026-09-16-planner-chat-ui.md).
 Replaces the pre-code guide that lived at this path, which described a
 single-page plan layout that was never the design.
@@ -30,7 +31,7 @@ planner with that message.**
   chat moves the URL to `/planner/{id}` while the reply is still streaming; the
   page remounts on that move and the layout does not.
 - **The answer shape is intro plus typed picks**, decided by Arpan on
-  2026-09-16 ([ADR-017](../decisions/ADR-017-planner-answer-is-intro-plus-typed-picks.md),
+  2026-09-16 ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md),
   Proposed). The backend must produce exactly this; the markers in the plan are
   withdrawn.
 - **The streamed reply goes through `apiFetchResponse`** (`lib/api.tsx:154`),
@@ -177,7 +178,8 @@ and `INCOMPLETE_STREAM` when the body ends without `done` (`:200`).
 What needs no server: the prompt stash key, the 15-chat cap, the 1,000
 character limit, the starter and follow-up chip lists, day grouping, the chat
 an eviction would remove (`:63`), a provisional title, and the row label using
-`Intl.DateTimeFormat.formatRange` (`:79`).
+`formatEventDateRange` from `lib/event-zone.ts` (`:79`), so the range is in
+Montreal days whatever zone renders it.
 
 ### `frontend/app/lib/adapters.ts` (planner part)
 
@@ -208,7 +210,7 @@ only in the browser.
 
 | Decision | Forced by | Rejected | If reverted |
 |---|---|---|---|
-| Intro plus typed picks, not prose with inline `[[event:id]]` markers ([ADR-017](../decisions/ADR-017-planner-answer-is-intro-plus-typed-picks.md)) | The design puts the intro above the row and a line per pick below it | Markers: the layout would depend on the model writing paragraphs in the right order | Cards land wherever the model put a marker; the per-pick lines have nowhere to come from |
+| Intro plus typed picks, not prose with inline `[[event:id]]` markers ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)) | The design puts the intro above the row and a line per pick below it | Markers: the layout would depend on the model writing paragraphs in the right order | Cards land wherever the model put a marker; the per-pick lines have nowhere to come from |
 | Real endpoints only, no mock layer (Arpan, 2026-09-16) | A mock is code thrown away in Unit 2 | A fake client from sample events, in memory or `localStorage` | — |
 | State in a layout-level provider | The first message changes the URL mid-stream | State in `PlannerChat` | The stream is dropped, or the thread refetched half-written, on every new chat |
 | One reply streams at a time | The daily quota and retry both reason about one pending message | Per-chat streams | Two replies race the usage count |
@@ -264,5 +266,7 @@ only in the browser.
 
 ## Change log
 
+- 2026-09-16 — main session: planner dates formatted in Montreal time through
+  `lib/event-zone.ts`, with the event end time unit.
 - 2026-09-16 — main session: replaced the pre-code guide with this document
   for the frontend built in the planner chat UI unit.

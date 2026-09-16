@@ -3,6 +3,7 @@ package com.campusvibe.event;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,4 +48,11 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @EntityGraph(attributePaths = "organizer")
     List<Event> findByPromotedTrue();
+
+    /**
+     * Events that have not ended -- running now or still to come -- soonest
+     * start first. The one definition of still attendable (V35); pass now().
+     */
+    @EntityGraph(attributePaths = "organizer")
+    List<Event> findByEndTimeAfterOrderByDateTimeAsc(Instant now);
 }

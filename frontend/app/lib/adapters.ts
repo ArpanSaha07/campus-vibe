@@ -130,6 +130,7 @@ export function toEventInstance(api: ApiEvent): EventInstance {
     title: api.title,
     details: api.description ?? "",
     dateTime: new Date(api.dateTime),
+    endTime: new Date(api.endTime),
     createdAt: new Date(api.createdAt),
     location: {
       name: api.location ?? "Location TBA",

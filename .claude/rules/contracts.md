@@ -39,7 +39,7 @@ paths:
   suites. **The unit that builds the planner backend makes all eight the four
   edits above**, the `done` frame included
   ([spec](../specs/2026-09-16-planner-chat-ui.md),
-  [ADR-017](../docs/decisions/ADR-017-planner-answer-is-intro-plus-typed-picks.md)).
+  [ADR-019](../docs/decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)).
 - **`ClubCreateRequest` and `ClubCreationRequestCreateRequest` mirror each
   other, and nothing enforces it.** A club can be created two ways, so a field
   added to one and not the other means it silently cannot be proposed — no test

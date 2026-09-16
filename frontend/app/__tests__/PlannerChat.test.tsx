@@ -51,6 +51,7 @@ const hackNight = toEventInstance({
   title: "AI Hack Night",
   description: null,
   dateTime: "2026-09-18T22:00:00Z",
+  endTime: "2026-09-19T00:00:00Z",
   createdAt: "2026-09-01T00:00:00Z",
   location: "Trottier Building",
   price: "Free",

@@ -31,8 +31,8 @@ function MyEventsContent() {
   const tabParam = searchParams.get("tab");
   const tab: MyEventsTab = isMyEventsTab(tabParam) ? tabParam : "going";
 
-  // Seeded from the tab in the URL, so landing straight on ?tab=past starts at
-  // yesterday rather than a date that tab cannot reach.
+  // Seeded from the tab in the URL. Every tab starts at today, which both
+  // directions can reach now that an event is past when it ends.
   const [anchor, setAnchor] = useState(() => defaultAnchorForTab(tab));
   const [myEvents, setMyEvents] = useState<MyEvent[] | null>(null);
   const [error, setError] = useState(false);
@@ -61,9 +61,9 @@ function MyEventsContent() {
   );
 
   // Going and Saved look forwards from the anchor, Past looks back from it, and
-  // their ranges do not overlap — so a date picked on one tab is often out of
-  // bounds on the next. Snap to that tab's own default instead of leaving the
-  // list anchored somewhere it cannot reach.
+  // they share only today — so a date picked on one tab is often out of bounds
+  // on the next. Snap to that tab's own default instead of leaving the list
+  // anchored somewhere it cannot reach.
   function selectTab(next: EventTab) {
     // The pills speak a union wide enough for the manage screen too. This page
     // never draws Upcoming, so that value can only arrive from a bug — and

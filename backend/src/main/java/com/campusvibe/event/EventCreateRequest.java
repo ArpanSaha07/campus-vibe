@@ -7,6 +7,7 @@ public record EventCreateRequest(
         String title,
         String description,
         Instant dateTime,
+        Instant endTime,
         String location,
         String price,
         String organizerId,

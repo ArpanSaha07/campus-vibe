@@ -12,6 +12,7 @@ const apiEvent: ApiEvent = {
   title: "Chess Night",
   description: null,
   dateTime: "2026-08-01T18:00:00Z",
+  endTime: "2026-08-01T20:00:00Z",
   createdAt: "2026-07-01T00:00:00Z",
   location: null,
   price: null,
@@ -46,6 +47,7 @@ describe("toEventInstance", () => {
     expect(event.eventId).toBe("7");
     expect(event.organizer).toBe("chess-club");
     expect(event.dateTime).toBeInstanceOf(Date);
+    expect(event.endTime).toEqual(new Date("2026-08-01T20:00:00Z"));
     // Both axes carried through untouched -- the adapter maps shapes, and
     // resolving a slug to a label is the page's job, not this one's.
     expect(event.topics).toEqual(["Games"]);

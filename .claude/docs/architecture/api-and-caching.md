@@ -5,7 +5,12 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `b0c5e63` plus the uncommitted planner chat UI unit — re-read on
+**Code as of:** `70336d2` plus the uncommitted event end time unit — re-read on
+2026-09-16: `EventDTO` gained `endTime` and its row in `api-dto-fields.json`;
+`GET /api/v1/events` gained `upcoming=true`, served by
+`EventRepository.findByEndTimeAfterOrderByDateTimeAsc` with the organizer
+graph; `toEventInstance` maps `endTime`. No cache policy or data path moved.
+Before that, `b0c5e63` plus the uncommitted planner chat UI unit — re-read on
 2026-09-16: `api.tsx` gained `apiFetchResponse` for streamed bodies, sharing two
 new helpers, `requestHeaders` and `throwIfNotOk`, with `apiFetch`, which moved
 its line numbers; `adapters.ts` gained the planner adapters; `types/index.ts`
@@ -345,7 +350,7 @@ on every write path, so the column holds four known keys or NULL.
 **Planner answers are joined here too** (`adapters.ts:205`). `toPlannerPicks`
 matches each pick to the `EventDTO` or `ClubDTO` hydrated beside it, drops a
 pick with no row, and keeps one kind, so a planner answer never has two card
-rows ([ADR-017](../decisions/ADR-017-planner-answer-is-intro-plus-typed-picks.md)).
+rows ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)).
 The planner `Api*` types have no row in `api-dto-fields.json` yet, because no
 Java DTO exists to assert against.
 
@@ -407,9 +412,15 @@ query without making a request.
 
 ### `backend/.../EventController.java` — the collection filter
 
-`list` (`EventController.java:39`) takes an optional `organizerId` and filters
+`list` (`EventController.java:73`) takes an optional `organizerId` and filters
 server-side. Chosen over a nested `/clubs/{id}/events` route; see *Design
 decisions*.
+
+`upcoming=true` returns only events that have not ended, soonest start first
+(`EventService.java:43`). It is opt-in, not the default, because the manage
+Events page lists a club's past events too, and it does not combine with
+`organizerId`. It is the one definition of still attendable, `end_time >
+now()`, shared with search ([ADR-020](../decisions/ADR-020-event-attendable-until-its-end-time.md)).
 
 ### `backend/.../EventRepository.java` — the N+1 fix
 
@@ -716,6 +727,8 @@ Prioritised, each with the trigger for doing it.
 
 ## Change log
 
+- **2026-09-16** — Event end time. `EventDTO.endTime` added, contracted on
+  both sides; `GET /events?upcoming=true` filters on it. *(main session)*
 - **2026-09-16** — Planner chat UI. `apiFetchResponse` added for streamed
   bodies, sharing header and error handling with `apiFetch`; `/planner` joins
   the authenticated client path; planner adapters and types added, uncontracted

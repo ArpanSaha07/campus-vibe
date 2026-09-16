@@ -42,6 +42,7 @@ class EventUpdateIT extends AbstractIntegrationTest {
         e.setCapacity(30);
         e.setOrganizer(club);
         e.setDateTime(Instant.parse("2026-10-01T18:00:00Z"));
+        e.setEndTime(Instant.parse("2026-10-01T20:00:00Z"));
         e.getTopicSlugs().add("robotics");
         e.getFormatSlugs().add("workshop");
         event = eventRepository.save(e);
@@ -53,6 +54,7 @@ class EventUpdateIT extends AbstractIntegrationTest {
         request.put("title", title);
         request.put("description", "Now with pizza.");
         request.put("dateTime", "2026-10-08T19:30:00Z");
+        request.put("endTime", "2026-10-08T21:30:00Z");
         request.put("location", null);
         request.put("price", null);
         request.put("capacity", null);
@@ -84,6 +86,7 @@ class EventUpdateIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.title").value("Robotics, week two"))
                 .andExpect(jsonPath("$.description").value("Now with pizza."))
                 .andExpect(jsonPath("$.dateTime").value("2026-10-08T19:30:00Z"))
+                .andExpect(jsonPath("$.endTime").value("2026-10-08T21:30:00Z"))
                 // Full replacement: a null clears.
                 .andExpect(jsonPath("$.location").value(nullValue()))
                 .andExpect(jsonPath("$.price").value(nullValue()))
@@ -174,6 +177,56 @@ class EventUpdateIT extends AbstractIntegrationTest {
                         .content(json(noDate))
                         .header("Authorization", bearer(owner)))
                 .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * An end is required, after the start, and at most 14 days later (V35).
+     * Each is a 400 with a sentence; the CHECK constraints behind them would
+     * otherwise surface as a 500. Nothing is written on a refusal.
+     */
+    @Test
+    void aMissingInvertedOrOverlongEndIsABadRequestAndNothingChanges() throws Exception {
+        Event e = existingEvent();
+        User owner = createUser("Owner", "owner@campus.com", "password123", RoleName.ROLE_USER);
+        makeClubOwner(club, owner);
+
+        Map<String, Object> noEnd = body("Fine title", List.of(), List.of());
+        noEnd.put("endTime", null);
+        Map<String, Object> inverted = body("Fine title", List.of(), List.of());
+        inverted.put("endTime", "2026-10-08T19:00:00Z");
+        Map<String, Object> sameInstant = body("Fine title", List.of(), List.of());
+        sameInstant.put("endTime", "2026-10-08T19:30:00Z");
+        Map<String, Object> fifteenDays = body("Fine title", List.of(), List.of());
+        fifteenDays.put("endTime", "2026-10-23T19:30:01Z");
+
+        for (Map<String, Object> refused : List.of(noEnd, inverted, sameInstant, fifteenDays)) {
+            mockMvc.perform(put("/api/v1/events/" + e.getId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json(refused))
+                            .header("Authorization", bearer(owner)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message", containsString("end")));
+        }
+
+        mockMvc.perform(get("/api/v1/events/" + e.getId()))
+                .andExpect(jsonPath("$.title").value("Intro to Robotics"))
+                .andExpect(jsonPath("$.endTime").value("2026-10-01T20:00:00Z"));
+    }
+
+    @Test
+    void exactlyFourteenDaysIsAllowed() throws Exception {
+        Event e = existingEvent();
+        User owner = createUser("Owner", "owner@campus.com", "password123", RoleName.ROLE_USER);
+        makeClubOwner(club, owner);
+
+        Map<String, Object> festival = body("Two-week festival", List.of(), List.of());
+        festival.put("endTime", "2026-10-22T19:30:00Z");
+        mockMvc.perform(put("/api/v1/events/" + e.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(festival))
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.endTime").value("2026-10-22T19:30:00Z"));
     }
 
     @Test

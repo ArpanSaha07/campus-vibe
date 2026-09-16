@@ -58,14 +58,23 @@ public class EventController {
     }
 
     /**
-     * All events, or just one club's when organizerId is given.
+     * All events, one club's when organizerId is given, or only those that have
+     * not ended when upcoming=true.
      *
      * A filter on the existing collection rather than a nested
      * /clubs/{id}/events route: the club dashboard used to fetch every event in
      * the system and filter client-side, which is the only thing this replaces.
+     *
+     * upcoming is opt-in rather than the default because the manage Events page
+     * lists a club's past events too (Arpan, 2026-09-15). The two filters do not
+     * combine; the planner, the one caller of upcoming, never names a club.
      */
     @GetMapping
-    public List<EventDTO> list(@RequestParam(required = false) String organizerId) {
+    public List<EventDTO> list(@RequestParam(required = false) String organizerId,
+                               @RequestParam(defaultValue = "false") boolean upcoming) {
+        if (upcoming) {
+            return eventService.listUpcoming();
+        }
         return organizerId == null || organizerId.isBlank()
                 ? eventService.list()
                 : eventService.listByOrganizer(organizerId);
@@ -93,6 +102,7 @@ public class EventController {
         e.setTitle(request.title());
         e.setDescription(request.description());
         e.setDateTime(request.dateTime());
+        e.setEndTime(request.endTime());
         e.setLocation(request.location());
         e.setPrice(request.price());
         e.setCapacity(request.capacity());

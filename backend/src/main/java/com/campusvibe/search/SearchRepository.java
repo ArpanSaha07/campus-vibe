@@ -99,8 +99,9 @@ public class SearchRepository {
                         SELECT CASE WHEN fts.doc @@ fts.query
                                     THEN ts_rank(fts.doc, fts.query) ELSE 0 END AS rank
                     ) kw
-                    -- Search is for what a student can still go to.
-                    WHERE e.date_time >= now()
+                    -- Search is for what a student can still go to: running
+                    -- now or still to come, never ended (V35).
+                    WHERE e.end_time > now()
                 ) ranked
                 WHERE score >= ? OR kw > 0
                 ORDER BY score DESC
@@ -116,7 +117,7 @@ public class SearchRepository {
                 FROM events e
                 JOIN clubs c ON c.id = e.organizer_id
                 %s
-                WHERE e.date_time >= now()
+                WHERE e.end_time > now()
                   AND (to_tsvector('english', %s) @@ websearch_to_tsquery('english', ?)
                        OR e.title ILIKE '%%' || ? || '%%')
                 ORDER BY ts_rank(to_tsvector('english', %s), websearch_to_tsquery('english', ?)) DESC

@@ -41,6 +41,15 @@ paths:
   through `eventImageUrls` — they reached `next/image` raw until 2026-09-12. A
   new place that reads `api.images` directly instead of the adapted
   `EventInstance` reopens that crash. (BUG-042)
+- **Event dates and times go through `lib/event-zone.ts`, never a bare
+  `toLocale*String` or `new Date(value)` on a form value.** Every event is in
+  Montreal's zone and shows no zone label (Arpan, 2026-09-16). A bare call
+  formats in the process zone, which is UTC on the server: the event page read
+  `7:00 PM UTC` for an event at 3 PM. The form reads and writes
+  `datetime-local` values in that zone through `toEventInputValue` and
+  `fromEventInputValue`, whatever the browser's zone. Past, ongoing and ended
+  compare instants through `lib/event-time.ts`. The My events day grouping and
+  date filter still use the browser's local day. (BUG-058, ADR-020)
 - **`next/image` needs a `remotePatterns` entry for any absolute host**, and
   Next 16 refuses outright to optimize an upstream image on a private IP — which
   local development always is. Same-origin paths behind the `/media/**` rewrite

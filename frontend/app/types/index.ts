@@ -6,6 +6,8 @@ export type EventInstance = {
   title: string;
   details: string;
   dateTime: Date;
+  /** Always after dateTime, at most 14 days later. Still attendable until then. */
+  endTime: Date;
   createdAt: Date;
   location: { 
     name: string,
@@ -334,6 +336,7 @@ export interface ApiEvent {
   title: string;
   description: string | null;
   dateTime: string;
+  endTime: string;
   createdAt: string;
   location: string | null;
   price: string | null;

@@ -6,6 +6,7 @@ import com.campusvibe.event.Event;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ class MyEventsIT extends AbstractIntegrationTest {
 		event.setTitle(title);
 		event.setOrganizer(club);
 		event.setDateTime(when);
+		event.setEndTime(when.plus(Duration.ofHours(2)));
 		return eventRepository.save(event);
 	}
 

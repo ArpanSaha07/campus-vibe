@@ -43,6 +43,12 @@ paths:
 - **`scripts/verify.mjs` mirrors `_frontend.yml` and `_backend.yml`.** Change a
   workflow and the script together — the moment they drift, local green stops
   meaning CI green, which is the only thing the script is for.
+- **Plain `node scripts/verify.mjs` scopes itself to committed work.** It picks
+  components from `git diff origin/main...HEAD`, so uncommitted changes count
+  for nothing: on 2026-09-16 it ran the frontend alone while the working tree
+  held a new migration and nine changed ITs. Before a commit, run
+  `verify.mjs --all` (with `--full` for backend work). The pre-push hook is
+  unaffected, since by then the work is committed.
 - **A property with no default must also reach `_database.yml`'s `migrate`
   `env:`.** That job boots the jar with no profile, so `application-test.yml`
   does not cover it; the push loop skips it (`run-migrate: false`) and

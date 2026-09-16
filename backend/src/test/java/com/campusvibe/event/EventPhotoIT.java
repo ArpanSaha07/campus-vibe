@@ -39,6 +39,7 @@ class EventPhotoIT extends AbstractIntegrationTest {
         event.setTitle("Photo walk");
         event.setOrganizer(club);
         event.setDateTime(Instant.parse("2026-10-01T18:00:00Z"));
+        event.setEndTime(Instant.parse("2026-10-01T20:00:00Z"));
         return new Managed(eventRepository.save(event), owner);
     }
 

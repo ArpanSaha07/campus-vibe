@@ -84,7 +84,7 @@ export default function EventDateFilter({
     setOpen(false);
   }
 
-  // "Yesterday" earns its place because it is where the Past tab starts.
+  // "Yesterday" earns its place as the day most often looked back at on Past.
   let label = value.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   if (isSameDay(value, today)) label = "Today";
   else if (isSameDay(value, addDays(today, -1))) label = "Yesterday";

@@ -62,6 +62,7 @@ const eventFields: Record<keyof ApiEvent, true> = {
   title: true,
   description: true,
   dateTime: true,
+  endTime: true,
   createdAt: true,
   location: true,
   price: true,

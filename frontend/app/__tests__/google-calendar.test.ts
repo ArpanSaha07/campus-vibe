@@ -6,6 +6,7 @@ const event = {
   title: "Tech Conference",
   details: "Doors at 1:30 PM. Bring student ID.",
   dateTime: new Date("2026-10-15T14:00:00Z"),
+  endTime: new Date("2026-10-15T17:30:00Z"),
   location: {
     name: "Trottier Building",
     address: "3630 University St, Montreal",
@@ -21,13 +22,13 @@ describe("buildGoogleCalendarUrl", () => {
     expect(url()).toContain("text=Tech%20Conference%20%7C%20ACME%20Corp");
   });
 
-  it("stamps start and end as basic-format UTC, two hours apart by default", () => {
-    expect(url()).toContain("dates=20261015T140000Z/20261015T160000Z");
+  it("stamps the real start and end as basic-format UTC", () => {
+    expect(url()).toContain("dates=20261015T140000Z/20261015T173000Z");
   });
 
-  it("honours an explicit duration", () => {
-    expect(url({}, { durationMs: 60 * 60 * 1000 })).toContain(
-      "dates=20261015T140000Z/20261015T150000Z",
+  it("carries an end days later for a multi-day event, not a guessed length", () => {
+    expect(url({ endTime: new Date("2026-10-17T22:00:00Z") })).toContain(
+      "dates=20261015T140000Z/20261017T220000Z",
     );
   });
 

@@ -3,6 +3,7 @@ import { RotateCcw, Sparkles } from "lucide-react";
 import ClubCard from "@/app/components/club/ClubCard";
 import EventCard from "@/app/components/event/EventCard";
 import CardRow from "@/app/components/planner/CardRow";
+import { formatEventWeekday } from "@/app/lib/event-zone";
 import { FOLLOW_UPS, pickRowLabel } from "@/app/lib/planner";
 import type { PlannerMessage, PlannerPick } from "@/app/types";
 
@@ -64,7 +65,7 @@ export default function AssistantMessage({
               <li key={pickKey(pick)} className="flex gap-3 text-[15px] leading-relaxed text-ink-900">
                 {pick.kind === "event" && (
                   <span className="ticket-label w-9 flex-shrink-0 pt-[3px] text-ink-600">
-                    {pick.event.dateTime.toLocaleDateString(undefined, { weekday: "short" })}
+                    {formatEventWeekday(pick.event.dateTime)}
                   </span>
                 )}
                 <p>
