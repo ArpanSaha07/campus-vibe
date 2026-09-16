@@ -13,6 +13,7 @@ import {
 } from '@/app/lib/services/clubService';
 import { proposeClub } from '@/app/lib/club-creation-requests';
 import { parseApiError } from '@/app/lib/auth-errors';
+import { readPreview } from '@/app/lib/image-preview';
 
 export interface UseCreateClubFormReturn {
   formData: ClubFormData;
@@ -141,11 +142,9 @@ export function useCreateClubForm(
       }
 
       setFormData((prev) => ({ ...prev, logo: file }));
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Not awaited: the handler stays synchronous so the error clear below
+      // runs in the same tick it always did. The preview lands when it lands.
+      readPreview(file).then(setLogoPreview);
       if (errors.logo) {
         setErrors((prev) => ({ ...prev, logo: undefined }));
       }

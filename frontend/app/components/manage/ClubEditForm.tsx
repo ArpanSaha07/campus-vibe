@@ -19,6 +19,7 @@ import { revalidateClubs, revalidateEvents } from '@/app/lib/actions/revalidate'
 import { parseApiError } from '@/app/lib/auth-errors';
 import { parseSocialLinks, toClub } from '@/app/lib/adapters';
 import { instagramHandle } from '@/app/lib/links';
+import { readPreview } from '@/app/lib/image-preview';
 import {
   getClubForEdit,
   updateClub,
@@ -116,14 +117,6 @@ export default function ClubEditForm({ clubId }: { clubId: string }) {
       prev ? { ...prev, socialLinks: { ...prev.socialLinks, [key]: value } } : prev,
     );
     if (errors.social) setErrors((prev) => ({ ...prev, social: undefined }));
-  }
-
-  function readPreview(file: File): Promise<string> {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
   }
 
   async function pickLogo(event: React.ChangeEvent<HTMLInputElement>) {
