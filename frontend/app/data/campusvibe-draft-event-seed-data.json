@@ -1,0 +1,268 @@
+{
+  "EventDTO": [
+    {
+      "title": "Diwali Lights Night",
+      "description": "Draft showcase listing based on McGill ISA's established cultural-programming themes. Celebrate Diwali with music, dance, festive food, and a welcoming community atmosphere. Date, room, admission details, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-09-25T19:00:00-04:00",
+      "endTime": "2026-09-25T22:00:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McGill Indian Students' Association (ISA)",
+      "images": [
+        "isa-diwali-lights-night.png"
+      ],
+      "topics": [
+        "Indian culture",
+        "Diwali",
+        "music",
+        "community"
+      ],
+      "formats": [
+        "in-person",
+        "social",
+        "cultural celebration"
+      ]
+    },
+    {
+      "title": "Bollywood Dance Workshop",
+      "description": "Draft showcase listing based on McGill ISA's established cultural-programming themes. Learn an upbeat beginner-friendly Bollywood routine, meet other students, and enjoy a relaxed dance session. Date, room, instructor, and registration details must be confirmed before publication.",
+      "startTime": "2026-10-03T17:30:00-04:00",
+      "endTime": "2026-10-03T19:30:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McGill Indian Students' Association (ISA)",
+      "images": [
+        "isa-bollywood-dance-workshop.png"
+      ],
+      "topics": [
+        "dance",
+        "Bollywood",
+        "Indian culture",
+        "wellness"
+      ],
+      "formats": [
+        "in-person",
+        "workshop",
+        "beginner-friendly"
+      ]
+    },
+    {
+      "title": "Chai & Chaat Social",
+      "description": "Draft showcase listing based on McGill ISA's established cultural-programming themes. Connect with new and returning students over chai, Indian snacks, conversation, and casual games. Date, room, menu, and accessibility details must be confirmed before publication.",
+      "startTime": "2026-10-10T16:00:00-04:00",
+      "endTime": "2026-10-10T18:00:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McGill Indian Students' Association (ISA)",
+      "images": [
+        "isa-chai-chaat-social.png"
+      ],
+      "topics": [
+        "food",
+        "Indian culture",
+        "friendship",
+        "community"
+      ],
+      "formats": [
+        "in-person",
+        "social",
+        "drop-in"
+      ]
+    },
+    {
+      "title": "Kamayan Community Dinner",
+      "description": "Draft showcase listing inspired by MUFASA's Filipino cultural and community mandate. Gather for a communal Filipino-style meal, cultural sharing, and conversation with students from across McGill. Date, room, food service, pricing, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-09-26T18:30:00-04:00",
+      "endTime": "2026-09-26T21:00:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McGill University Filipino Asian Students' Association (MUFASA)",
+      "images": [
+        "mufasa-kamayan-community-dinner.png"
+      ],
+      "topics": [
+        "Filipino culture",
+        "food",
+        "community",
+        "heritage"
+      ],
+      "formats": [
+        "in-person",
+        "dinner",
+        "cultural celebration"
+      ]
+    },
+    {
+      "title": "Filipino Culture & Games Night",
+      "description": "Draft showcase listing inspired by MUFASA's Filipino cultural and community mandate. Discover Filipino traditions through team games, trivia, music, and low-pressure social activities. Date, room, capacity, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-10-08T18:00:00-04:00",
+      "endTime": "2026-10-08T20:00:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McGill University Filipino Asian Students' Association (MUFASA)",
+      "images": [
+        "mufasa-filipino-culture-games-night.png"
+      ],
+      "topics": [
+        "Filipino culture",
+        "games",
+        "trivia",
+        "community"
+      ],
+      "formats": [
+        "in-person",
+        "social",
+        "interactive"
+      ]
+    },
+    {
+      "title": "Halo-Halo Study Break",
+      "description": "Draft showcase listing inspired by MUFASA's Filipino cultural and community mandate. Take a midterm-season break, meet other students, and enjoy a Filipino dessert-themed social. Date, room, food service, allergens, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-10-22T16:00:00-04:00",
+      "endTime": "2026-10-22T18:00:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McGill University Filipino Asian Students' Association (MUFASA)",
+      "images": [
+        "mufasa-halo-halo-study-break.png"
+      ],
+      "topics": [
+        "Filipino culture",
+        "food",
+        "study break",
+        "wellness"
+      ],
+      "formats": [
+        "in-person",
+        "drop-in",
+        "social"
+      ]
+    },
+    {
+      "title": "Networking 101 Workshop",
+      "description": "Draft showcase listing based on McConnect's established professional-development programming. Practice introductions, build a concise personal pitch, and learn how to follow up after meeting recruiters and professionals. Date, speakers, room, and registration details must be confirmed before publication.",
+      "startTime": "2026-09-24T18:00:00-04:00",
+      "endTime": "2026-09-24T19:30:00-04:00",
+      "location": "McGill University Centre (room TBD)",
+      "organizerName": "McConnect McGill",
+      "images": [
+        "mcconnect-networking-101-workshop.png"
+      ],
+      "topics": [
+        "networking",
+        "careers",
+        "communication",
+        "professional development"
+      ],
+      "formats": [
+        "in-person",
+        "workshop",
+        "interactive"
+      ]
+    },
+    {
+      "title": "McConnect Fall Career Fair",
+      "description": "Draft showcase listing based on McConnect's established career-fair programming. Meet professionals from several industries, learn about internships and early-career paths, and practise purposeful networking. Date, venue, participating organizations, tickets, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-10-05T18:00:00-04:00",
+      "endTime": "2026-10-05T20:00:00-04:00",
+      "location": "Trottier Building (room TBD)",
+      "organizerName": "McConnect McGill",
+      "images": [
+        "mcconnect-fall-career-fair.png"
+      ],
+      "topics": [
+        "career fair",
+        "internships",
+        "recruiting",
+        "networking"
+      ],
+      "formats": [
+        "in-person",
+        "career fair",
+        "networking"
+      ]
+    },
+    {
+      "title": "Alumni & Recruiter Mixer",
+      "description": "Draft showcase listing based on McConnect's established professional-networking programming. Connect with McGill alumni and recruiters, ask career questions, and practise building genuine professional relationships. Date, venue, guest list, dress guidance, and registration details must be confirmed before publication.",
+      "startTime": "2026-10-20T18:30:00-04:00",
+      "endTime": "2026-10-20T20:30:00-04:00",
+      "location": "Desautels Faculty of Management (room TBD)",
+      "organizerName": "McConnect McGill",
+      "images": [
+        "mcconnect-alumni-recruiter-mixer.png"
+      ],
+      "topics": [
+        "alumni",
+        "recruiting",
+        "careers",
+        "networking"
+      ],
+      "formats": [
+        "in-person",
+        "mixer",
+        "networking"
+      ]
+    },
+    {
+      "title": "Weekly Study Night",
+      "description": "Draft showcase listing based on Diversity in Math's previously published weekly study-night format. Study with peers in a welcoming environment and take a break with snacks and conversation. The Fall 2026 recurrence, exact date, room, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-09-21T17:00:00-04:00",
+      "endTime": "2026-09-21T19:00:00-04:00",
+      "location": "Burnside Hall, Room 512 (TBD)",
+      "organizerName": "McGill Diversity in Math",
+      "images": [
+        "diversity-in-math-weekly-study-night.png"
+      ],
+      "topics": [
+        "mathematics",
+        "studying",
+        "peer support",
+        "community"
+      ],
+      "formats": [
+        "in-person",
+        "study session",
+        "drop-in"
+      ]
+    },
+    {
+      "title": "LaTeX Workshop",
+      "description": "Draft showcase listing based on workshops Diversity in Math has offered previously. Learn the basics of writing polished mathematical documents in LaTeX through guided examples and hands-on practice. Date, room, facilitator, prerequisites, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-10-07T17:30:00-04:00",
+      "endTime": "2026-10-07T19:00:00-04:00",
+      "location": "Burnside Hall (room TBD)",
+      "organizerName": "McGill Diversity in Math",
+      "images": [
+        "diversity-in-math-latex-workshop.png"
+      ],
+      "topics": [
+        "mathematics",
+        "LaTeX",
+        "academic skills",
+        "technology"
+      ],
+      "formats": [
+        "in-person",
+        "workshop",
+        "hands-on"
+      ]
+    },
+    {
+      "title": "Undergraduate Research Panel",
+      "description": "Draft showcase listing based on panels Diversity in Math has offered previously. Hear students and researchers discuss how to find opportunities, contact supervisors, and get started in undergraduate mathematics research. Date, room, panelists, and organizer approval must be confirmed before publication.",
+      "startTime": "2026-10-28T18:00:00-04:00",
+      "endTime": "2026-10-28T20:00:00-04:00",
+      "location": "Burnside Hall (room TBD)",
+      "organizerName": "McGill Diversity in Math",
+      "images": [
+        "diversity-in-math-undergraduate-research-panel.png"
+      ],
+      "topics": [
+        "mathematics",
+        "research",
+        "academia",
+        "career development"
+      ],
+      "formats": [
+        "in-person",
+        "panel",
+        "Q&A"
+      ]
+    }
+  ]
+}
