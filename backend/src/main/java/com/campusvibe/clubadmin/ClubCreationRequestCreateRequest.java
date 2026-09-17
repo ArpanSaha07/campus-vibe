@@ -32,11 +32,16 @@ public record ClubCreationRequestCreateRequest(
         List<String> interests,
         @Size(max = 2000) String message,
         /**
-         * The four contact values as a JSON string, the shape
+         * The six contact values as a JSON string, the shape
          * {@code clubs.social_links} already uses. Optional on this path, unlike
          * the admin form where the contact email is required: a student
          * proposing a club may not have an address for it yet.
          * {@code ClubSocialLinks.normalise} both validates and re-serialises it.
+         *
+         * <p>The cap matches {@code ClubSocialLinks.MAX_JSON_LENGTH} and moved
+         * with it when the two 2026-09-16 keys landed. A lower one here would
+         * refuse the payload before the validator could name the field at
+         * fault, which is the worse of the two errors.
          */
-        @Size(max = 2000) String socialLinks
+        @Size(max = 3500) String socialLinks
 ) {}

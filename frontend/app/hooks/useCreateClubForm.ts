@@ -56,6 +56,8 @@ const EMPTY_FORM: ClubFormData = {
     website: '',
     facebook: '',
     instagram: '',
+    linkedin: '',
+    linktree: '',
   },
   message: '',
 };

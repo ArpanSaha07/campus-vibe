@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-15**
+Last updated: **2026-09-16**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-060](#bug-060) | Medium | 2026-09-16 | Every club photo answered 400 the first time a page rendered `club.images`: a `remotePatterns` entry written as `new URL(...)` forbids a query string, and the error blamed the hostname |
 | [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
 | [BUG-059](#bug-059) | Medium | 2026-09-16 | A 429, a 503 or the catch-all 500 asked for with a non-JSON `Accept` left as a bodiless 500: the `ApiError` could not be negotiated, and the planner's stream request asks for `text/event-stream` |
 | [BUG-058](#bug-058) | Medium | 2026-09-16 | Server-rendered event times were the server's UTC clock: the event page read `7:00 PM UTC` for an event at 3 PM, and a Montreal evening event's card showed the next day |
@@ -108,6 +109,44 @@ through a production outage. It now paints an iframe, asynchronously, and covers
 the case where GIS paints nothing at all.
 
 ---
+
+### BUG-060
+**A `remotePatterns` URL literal forbade the query string every seeded club photo carries** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, by Arpan, opening a club page the moment it began
+rendering `club.images`. Every photo failed and the page showed a runtime error:
+
+```
+Invalid src prop (https://images.unsplash.com/photo-1512790182412-b19e6d62bc39?w=400)
+on `next/image`, hostname "images.unsplash.com" is not configured under images
+in your `next.config.js`
+```
+
+**Cause.** The hostname *was* configured — `next.config.ts:80` read
+`remotePatterns: [new URL("https://images.unsplash.com/**")]`. That URL carries
+no query string, and Next 16 reads a missing search as `search: ""`, which means
+*the src must not have one either* (`node_modules/next/dist/docs/01-app/
+03-api-reference/02-components/image.md:563`: "must start with
+`https://example.com/account123/` and **must not have a query string**"). Every
+seeded club photo is `?w=400`, so every one was refused. The message names the
+hostname for any `remotePatterns` miss, which sent the first look at the wrong
+half of the entry entirely.
+
+**Why it had never fired.** Nothing rendered `club.images` until the club page
+redesign did. The entry was added 2026-09-09 with the club media read path and
+had only ever been exercised by same-origin `/media/...` paths, which do not go
+through `remotePatterns` at all.
+
+**Fix.** The object form, with `search` omitted so any query string is allowed,
+the hostname still pinned to one public image CDN (`next.config.ts:76-101`).
+Pinning an exact `search` would not have worked: the seed holds both `?w=400`
+and `?w=400&q=80`.
+
+**Verified.** In the running stack — `/_next/image` for both seeded URLs
+answers 200 in ~0.24s, and the club page loads with zero console errors and zero
+failed requests. Held by [`rules/frontend.md`](../rules/frontend.md), beside the
+`localPatterns` rule it is the remote twin of, and described in
+[`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md).
 
 ### BUG-059
 **Error responses failed content negotiation under a non-JSON Accept** · Medium · FIXED 2026-09-16

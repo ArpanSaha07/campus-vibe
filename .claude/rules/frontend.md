@@ -50,6 +50,21 @@ paths:
   `fromEventInputValue`, whatever the browser's zone. Past, ongoing and ended
   compare instants through `lib/event-time.ts`. The My events day grouping and
   date filter still use the browser's local day. (BUG-058, ADR-020)
+- **A `remotePatterns` entry written as `new URL(...)` forbids query strings.**
+  The literal carries no search, which Next reads as `search: ''`, so a `src`
+  with one answers **400** — and the error names the *hostname*
+  (`hostname "images.unsplash.com" is not configured`), which is the only part
+  that is fine. Use the object form and omit `search` unless you mean to pin it.
+  The seeded club photos are `?w=400` and `?w=400&q=80`, so an exact `search`
+  would not have worked either. This is the remote twin of the `localPatterns`
+  rule below — same default, other side of the boundary. (BUG-060)
+- **A page in the `(main)` layout needs `w-full` as well as `max-w-* mx-auto`.**
+  That layout is a flex column, and a flex item with auto cross-axis margins is
+  **not** stretched — it shrink-to-fits, so the max width never applies and the
+  page collapses to whatever its text needs. It bit the event page once
+  (`events/[eventId]/page.tsx:134` carries the note) and the club page again on
+  2026-09-16, where a nested container had been supplying the width until it was
+  removed. A page that suddenly renders in a narrow centred column is this.
 - **`next/image` needs a `remotePatterns` entry for any absolute host**, and
   Next 16 refuses outright to optimize an upstream image on a private IP — which
   local development always is. Same-origin paths behind the `/media/**` rewrite

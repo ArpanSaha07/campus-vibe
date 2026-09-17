@@ -57,6 +57,11 @@ function fieldsFrom(api: ApiClub): Fields {
       facebook: links.facebook ?? '',
       // Stored as the full URL the server built; the field asks for the handle.
       instagram: links.instagram ? (instagramHandle(links.instagram) ?? links.instagram) : '',
+      // Whole links, so no handle round trip -- what is stored is what the
+      // field shows. Every key must appear here: one left out is read as empty
+      // and saved back as empty, quietly clearing it.
+      linkedin: links.linkedin ?? '',
+      linktree: links.linktree ?? '',
     },
   };
 }
@@ -456,6 +461,30 @@ export default function ClubEditForm({ clubId }: { clubId: string }) {
               value={fields.socialLinks.facebook}
               onChange={(e) => setLink('facebook', e.target.value)}
               placeholder="https://facebook.com/yourclub"
+              disabled={saving}
+              className={inputClasses}
+            />
+          </FormField>
+
+          <FormField label="LinkedIn" htmlFor="social_linkedin">
+            <input
+              id="social_linkedin"
+              type="url"
+              value={fields.socialLinks.linkedin}
+              onChange={(e) => setLink('linkedin', e.target.value)}
+              placeholder="https://linkedin.com/company/yourclub"
+              disabled={saving}
+              className={inputClasses}
+            />
+          </FormField>
+
+          <FormField label="Linktree" htmlFor="social_linktree">
+            <input
+              id="social_linktree"
+              type="url"
+              value={fields.socialLinks.linktree}
+              onChange={(e) => setLink('linktree', e.target.value)}
+              placeholder="https://linktr.ee/yourclub"
               disabled={saving}
               className={inputClasses}
             />

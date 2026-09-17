@@ -89,10 +89,25 @@ reads.
 - **`clubs.social_links` is never written raw — go through
   `ClubSocialLinks.normalise`.** Both writers do (`ClubService.update`,
   `ClubCreationRequestService.create`), and it validates, canonicalises and
-  re-serialises, so the column holds four known keys or NULL. It was stored as
-  sent until 2026-09-10 and two of those values reach an `href` on the public
+  re-serialises, so the column holds six known keys or NULL. It was stored as
+  sent until 2026-09-10 and four of those values reach an `href` on the public
   club page, so a `javascript:` link was a script waiting for a click
   (BUG-048). A new writer that skips it reopens exactly that.
+- **Adding a social link key is three edits in `ClubSocialLinks`, and two of
+  them fail silently.** The mapper runs with `FAIL_ON_UNKNOWN_PROPERTIES` off,
+  so a key the record does not name is **accepted and dropped** — the editor
+  reports a successful save and the value is gone. Then `isEmpty()` must name
+  it, or a club whose only contact is the new key is stored as NULL; and
+  `blankIfNull` must write it, because every key is always present by contract.
+  `linkedin` and `linktree` landed this way on 2026-09-16. The test that guards
+  the last part now reads the record's own components — it used to be a list of
+  `contains` calls, which cannot fail by omission.
+- **`MAX_JSON_LENGTH` is checked against the incoming string before any field
+  is looked at**, so it has to clear (number of keys x `MAX_VALUE_LENGTH`).
+  It went 2000 -> 3500 with the two 2026-09-16 keys; leaving it would have
+  refused a fully-filled form under *Contact links are too long*, a message
+  naming no field. `ClubCreationRequestCreateRequest.socialLinks` carries the
+  same cap and must move with it.
 - **`official_email` is seeded at creation, and only `hasRole('ADMIN')` may
   change it.** Both creation paths fill it from the form's contact email; the
   two columns are independent from then on, so nothing that edits
