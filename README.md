@@ -53,4 +53,3 @@ A campus event platform to allow students to discover, get notified, plan and ke
                         │ - User/Event Data │     │ - Images, Docs   │     │ - S3 Mock        │
                         └───────────────────┘     └──────────────────┘     └──────────────────┘
 
-###  Work in progress....

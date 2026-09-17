@@ -3,190 +3,207 @@
 import { EventInstance } from "@/app/types";
 import { Club } from "@/app/types";
 
+// The eight draft listings from campusvibe-draft-event-seed-data.json, in its
+// order. Every value not in that file — price, followers, capacity, registered,
+// promoted, createdAt, the street address and the map embed — is mock filler
+// carried over from the rows these replaced. Rooms are TBD in the seed, so they
+// stay TBD in `locationDetails`.
+//
+// The seed's topics and formats are free text; they are written here as
+// interest_catalogue and event_formats slugs (V20, V26, V29), because that is
+// the vocabulary the filters join on.
 export const popularEvents: EventInstance[] = [
   {
-    eventId: "sat-2025",
-    title: "ReMode, Circular Fashion Festival | Festival de Mode...",
-    details: "A festival celebrating circular fashion and sustainability.",
-    dateTime: new Date("2025-09-28T12:00:00"),
-    endTime: new Date(new Date("2025-09-28T12:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-01T09:00:00"),
-    location: { 
-      name: "Society for Arts and Technology [SAT]",
-      address: "1201 Boulevard Saint-Laurent, Montréal, QC H2X 2S6",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "diwali-lights-night",
+    title: "Diwali Lights Night",
+    details: "Draft showcase listing based on McGill ISA's established cultural-programming themes. Celebrate Diwali with music, dance, festive food, and a welcoming community atmosphere. Date, room, admission details, and organizer approval must be confirmed before publication.",
+    dateTime: new Date("2026-09-25T19:00:00-04:00"),
+    endTime: new Date("2026-09-25T22:00:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "fashion-takes-action",
-    organizerName: "Fashion Takes Action",
-    followers: 137,
+    organizer: "mcgill-isa",
+    organizerName: "McGill Indian Students' Association (ISA)",
+    followers: 480,
     images: ["/rave.jpg"],
     promoted: true,
     capacity: 200,
     registered: 100,
-    topics: ["research", "food-drink"],
-    formats: ["social", "networking"]
+    topics: ["faith-spirituality", "live-music", "international-students", "make-friends"],
+    formats: ["social", "performance"]
   },
   {
-    eventId: "mts-2025",
-    title: "Persian New Year Celebration",
-    details: "Celebrate the Persian New Year with traditional music, dance, and food.",
-    dateTime: new Date("2025-10-06T09:00:00"),
-    endTime: new Date(new Date("2025-10-06T09:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-10T09:00:00"),
-    location: { 
-      name: "Palais des congrès de Montréal",
-      address: "1201 Boulevard Saint-Laurent, Montréal, QC H2X 2S6",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "bollywood-dance-workshop",
+    title: "Bollywood Dance Workshop",
+    details: "Draft showcase listing based on McGill ISA's established cultural-programming themes. Learn an upbeat beginner-friendly Bollywood routine, meet other students, and enjoy a relaxed dance session. Date, room, instructor, and registration details must be confirmed before publication.",
+    dateTime: new Date("2026-10-03T17:30:00-04:00"),
+    endTime: new Date("2026-10-03T19:30:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
-    price: "Paid",
-    organizer: "tech-montreal",
-    organizerName: "PersianEvents",
-    followers: 520,
+    price: "Free",
+    organizer: "mcgill-isa",
+    organizerName: "McGill Indian Students' Association (ISA)",
+    followers: 480,
     images: ["/food.jpg"],
     promoted: false,
-    capacity: 500,
-    registered: 400,
-    topics: ["research", "food-drink"],
-    formats: ["social", "networking"]
+    capacity: 60,
+    registered: 34,
+    topics: ["live-music", "international-students", "mental-health"],
+    formats: ["workshop"]
   },
   {
-    eventId: "art-expo-montreal",
-    title: "Art Expo Montreal",
-    details: "Showcase of local and international artists.",
-    dateTime: new Date("2025-10-18T11:00:00"),
-    endTime: new Date(new Date("2025-10-18T11:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-15T09:00:00"),
-    location: { 
-      name: "Montreal Art Centre",
-      address: "1201 Boulevard Saint-Laurent, Montréal, QC H2X 2S6",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "chai-chaat-social",
+    title: "Chai & Chaat Social",
+    details: "Draft showcase listing based on McGill ISA's established cultural-programming themes. Connect with new and returning students over chai, Indian snacks, conversation, and casual games. Date, room, menu, and accessibility details must be confirmed before publication.",
+    dateTime: new Date("2026-10-10T16:00:00-04:00"),
+    endTime: new Date("2026-10-10T18:00:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "montreal-artists",
-    organizerName: "F1 club",
-    followers: 260,
+    organizer: "mcgill-isa",
+    organizerName: "McGill Indian Students' Association (ISA)",
+    followers: 480,
     images: ["/birthday-party.jpg"],
     promoted: false,
-    capacity: 300,
-    registered: 100,
-    topics: ["research", "food-drink"],
-    formats: ["social", "networking"]
+    capacity: 120,
+    registered: 45,
+    topics: ["food-drink", "international-students", "make-friends"],
+    formats: ["social"]
   },
   {
-    eventId: "startup-pitch-night",
-    title: "Startup Pitch Night",
-    details: "Pitch your startup ideas to investors.",
-    dateTime: new Date("2025-11-03T18:00:00"),
-    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-20T09:00:00"),
-    location: { 
-      name: "Notman House",
-      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "kamayan-community-dinner",
+    title: "Kamayan Community Dinner",
+    details: "Draft showcase listing inspired by MUFASA's Filipino cultural and community mandate. Gather for a communal Filipino-style meal, cultural sharing, and conversation with students from across McGill. Date, room, food service, pricing, and organizer approval must be confirmed before publication.",
+    dateTime: new Date("2026-09-26T18:30:00-04:00"),
+    endTime: new Date("2026-09-26T21:00:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "startup-montreal",
-    organizerName: "Making Waves Montreal",
-    followers: 420,
+    organizer: "mufasa",
+    organizerName: "McGill University Filipino Asian Students' Association (MUFASA)",
+    followers: 260,
     images: ["/party.jpg"],
     promoted: false,
     capacity: 150,
-    registered: 120,
-    topics: ["research", "food-drink"],
-    formats: ["social", "networking"]
+    registered: 110,
+    topics: ["food-drink", "potlucks", "international-students", "make-friends"],
+    formats: ["social"]
   },
   {
-    eventId: "startup-pitch-night-2",
-    title: "Montreal Tech Summit 2025",
-    details: "Annual summit for tech enthusiasts and professionals.",
-    dateTime: new Date("2025-11-03T18:00:00"),
-    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-20T09:00:00"),
-    location: { 
-      name: "Notman House",
-      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "filipino-culture-games-night",
+    title: "Filipino Culture & Games Night",
+    details: "Draft showcase listing inspired by MUFASA's Filipino cultural and community mandate. Discover Filipino traditions through team games, trivia, music, and low-pressure social activities. Date, room, capacity, and organizer approval must be confirmed before publication.",
+    dateTime: new Date("2026-10-08T18:00:00-04:00"),
+    endTime: new Date("2026-10-08T20:00:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "startup-montreal",
-    organizerName: "Making Waves Montreal",
-    followers: 420,
+    organizer: "mufasa",
+    organizerName: "McGill University Filipino Asian Students' Association (MUFASA)",
+    followers: 260,
     images: ["/frosh3.jpeg"],
     promoted: false,
-    capacity: 150,
-    registered: 120,
-    topics: ["research", "food-drink"],
-    formats: ["social", "networking"]
+    capacity: 80,
+    registered: 52,
+    topics: ["board-games", "trivia", "international-students", "make-friends"],
+    formats: ["game-night", "social"]
   },
   {
-    eventId: "annual-ski-trip",
-    title: "Ski Trip to Mont Tremblant",
-    details: "A club for skiing enthusiasts at McGill University.",
-    dateTime: new Date("2025-11-03T18:00:00"),
-    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-20T09:00:00"),
-    location: { 
-      name: "Notman House",
-      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "halo-halo-study-break",
+    title: "Halo-Halo Study Break",
+    details: "Draft showcase listing inspired by MUFASA's Filipino cultural and community mandate. Take a midterm-season break, meet other students, and enjoy a Filipino dessert-themed social. Date, room, food service, allergens, and organizer approval must be confirmed before publication.",
+    dateTime: new Date("2026-10-22T16:00:00-04:00"),
+    endTime: new Date("2026-10-22T18:00:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "mcgill-ski-club",
-    organizerName: "McGill Ski Club",
-    followers: 420,
+    organizer: "mufasa",
+    organizerName: "McGill University Filipino Asian Students' Association (MUFASA)",
+    followers: 260,
     images: ["/ski-mcgill.jpg"],
     promoted: false,
-    capacity: 150,
-    registered: 120,
-    topics: ["parties"],
-    formats: ["party"]
+    capacity: 100,
+    registered: 38,
+    topics: ["food-drink", "study-groups", "mental-health", "international-students"],
+    formats: ["social"]
   },
   {
-    eventId: "startup-pitch-night-4",
-    title: "Startup Pitch Night",
-    details: "Pitch your startup ideas to investors.",
-    dateTime: new Date("2025-11-03T18:00:00"),
-    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-20T09:00:00"),
-    location: { 
-      name: "Notman House",
-      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "networking-101-workshop",
+    title: "Networking 101 Workshop",
+    details: "Draft showcase listing based on McConnect's established professional-development programming. Practice introductions, build a concise personal pitch, and learn how to follow up after meeting recruiters and professionals. Date, speakers, room, and registration details must be confirmed before publication.",
+    dateTime: new Date("2026-09-24T18:00:00-04:00"),
+    endTime: new Date("2026-09-24T19:30:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "McGill University Centre",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "startup-montreal",
-    organizerName: "Making Waves Montreal",
-    followers: 420,
+    organizer: "mcconnect-mcgill",
+    organizerName: "McConnect McGill",
+    followers: 320,
     images: ["/frosh2.jpeg"],
     promoted: false,
-    capacity: 150,
-    registered: 120,
-    topics: ["research"],
-    formats: ["social"]
+    capacity: 70,
+    registered: 55,
+    topics: ["networking", "public-speaking"],
+    formats: ["workshop"]
   },
   {
-    eventId: "tech-fair-2025",
-    title: "Tech Fair 2025",
-    details: "Explore the latest in technology and innovation.",
-    dateTime: new Date("2025-11-03T18:00:00"),
-    endTime: new Date(new Date("2025-11-03T18:00:00").getTime() + 2 * 60 * 60 * 1000),
-    createdAt: new Date("2025-09-20T09:00:00"),
-    location: { 
-      name: "Notman House",
-      address: "600 Saint Jerome Street, Montreal, QC H2L 4M1",
-      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!..." // replace with real maps embed
+    eventId: "mcconnect-fall-career-fair",
+    title: "McConnect Fall Career Fair",
+    details: "Draft showcase listing based on McConnect's established career-fair programming. Meet professionals from several industries, learn about internships and early-career paths, and practise purposeful networking. Date, venue, participating organizations, tickets, and organizer approval must be confirmed before publication.",
+    dateTime: new Date("2026-10-05T18:00:00-04:00"),
+    endTime: new Date("2026-10-05T20:00:00-04:00"),
+    createdAt: new Date("2026-09-01T09:00:00-04:00"),
+    location: {
+      name: "Trottier Building",
+      address: "McGill University, 845 Rue Sherbrooke Ouest, Montréal, QC H3A 0G4",
+      mapUrl: "https://www.google.com/maps/embed?pb=!1m18!...", // replace with real maps embed
+      locationDetails: "Room TBD"
     },
     price: "Free",
-    organizer: "startup-montreal",
-    organizerName: "Making Waves Montreal",
-    followers: 420,
+    organizer: "mcconnect-mcgill",
+    organizerName: "McConnect McGill",
+    followers: 320,
     images: ["/techfair-image.png"],
     promoted: false,
-    capacity: 150,
-    registered: 120,
-    topics: ["research"],
-    formats: ["social"]
+    capacity: 400,
+    registered: 260,
+    topics: ["career-fairs", "networking"],
+    formats: ["fair", "networking"]
   },
 ];
 
