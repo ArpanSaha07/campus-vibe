@@ -5,12 +5,13 @@ Last updated: **2026-09-16** · Branch: `develop`
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16)
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16)
 
-**Highest id issued: BUG-059.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-061.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
 | [BUG-001](#bug-001) | High | Semantic-only search match returns 0 results — **root cause found and fixed 2026-09-14** (weights formatted into SQL under a `fr_CA` locale); open until a GitHub run |
@@ -22,6 +23,33 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
 
 ---
+
+### BUG-061
+**The navbar logo file does not exist** · Low · OPEN
+
+**Found:** 2026-09-16, while verifying the club page redesign in a headless
+browser. Every page load reported one failed request.
+
+**Symptom.** `GET /_next/image?url=%2Fnew-campusvibe-logo.png&w=256&q=75`
+answers **400** with the body `The requested resource isn't a valid image.`
+It reproduces at every width (128, 256, 384, 640) and on every page —
+confirmed on `/`, `/clubs` and `/clubs/coding-club`.
+
+**Cause.** `frontend/app/components/Navbar.tsx:46` sets
+`src="/new-campusvibe-logo.png"`, and `frontend/public/` contains no such file.
+The asset that is there is **`campus-vibe-logo.png`** — the name
+`adapters.ts` already uses for `FALLBACK_EVENT_IMAGE` and `FALLBACK_CLUB_LOGO`.
+So this is a filename mismatch, not an optimizer problem.
+
+**Not caused by the club page work**, which is only where it was noticed: it
+reproduces on pages that unit did not touch, and `git log` shows the reference
+predates it.
+
+**Fix (untaken).** Point `Navbar.tsx:46` at `/campus-vibe-logo.png`, or add the
+missing asset under the name the navbar expects — whichever name is meant to
+be canonical is Arpan's call, since two spellings are in use.
+`ClubLogo.tsx:34` and `ClubLogo.test.tsx:58` both cite the non-existent name in
+passing and should move with it.
 
 ### BUG-001
 **Semantic-only search match returns 0 results** · High · OPEN

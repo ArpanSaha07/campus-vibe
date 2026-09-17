@@ -11,20 +11,26 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * A club's four public contact values, and the one place they are checked.
+ * A club's six public contact values, and the one place they are checked.
  *
  * <p>They are stored as a JSON string in a single column rather than as columns
  * — {@code Club.socialLinks} — so this record exists to give that string a
  * shape long enough to validate it. Two writers need that: {@code ClubService}
  * on {@code PUT /clubs/&#123;id&#125;} and {@code ClubCreationRequestService},
- * where the same four values arrive on a proposal.
+ * where the same six values arrive on a proposal.
  *
- * <p><strong>Why this is not optional.</strong> The three links reach an
+ * <p><strong>Why this is not optional.</strong> The five links reach an
  * {@code href} on the public club page. Until this existed, whatever string a
  * client sent was stored and rendered with nothing checking the scheme, so
  * {@code javascript:alert(1)} in the website field was a script on the club's
  * page waiting for a click. The profile side has refused that since it was
  * built; clubs never did (BUG-048).
+ *
+ * <p><strong>Adding a key is a code change here, not only in the form.</strong>
+ * Jackson runs with {@code FAIL_ON_UNKNOWN_PROPERTIES} off, so a key this record
+ * does not name is not refused — it is silently dropped. {@code linkedin} and
+ * {@code linktree} were added on 2026-09-16 and would otherwise have round
+ * tripped as nothing at all, with the editor reporting a successful save.
  *
  * <p><strong>The email is not a link, and is deliberately not normalised like
  * one.</strong> {@code hello@yourclub.ca} has no scheme, so
@@ -34,10 +40,16 @@ import java.util.regex.Pattern;
  *
  * <p>What comes back out of {@link #normalise} is <em>our</em> JSON, built from
  * this record, never the client's string handed back. That is the quiet benefit
- * of validating a value we could have stored opaquely: the column holds four
+ * of validating a value we could have stored opaquely: the column holds six
  * known keys in a known order, or NULL.
  */
-public record ClubSocialLinks(String email, String website, String facebook, String instagram) {
+public record ClubSocialLinks(
+        String email,
+        String website,
+        String facebook,
+        String instagram,
+        String linkedin,
+        String linktree) {
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             // A club editor that learns a fifth link should not break every
@@ -54,8 +66,16 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
      */
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
-    /** Long enough for four real values, short enough not to be a payload. */
-    private static final int MAX_JSON_LENGTH = 2000;
+    /**
+     * Long enough for six real values, short enough not to be a payload.
+     *
+     * <p>Raised from 2000 with the two 2026-09-16 keys, because this is checked
+     * against the <em>incoming</em> string before any field is looked at: six
+     * values at {@link #MAX_VALUE_LENGTH} plus their keys exceed 2000, so the
+     * old cap would have refused a form the editor itself allows, under a
+     * message naming no field.
+     */
+    private static final int MAX_JSON_LENGTH = 3500;
 
     private static final int MAX_VALUE_LENGTH = 500;
 
@@ -63,7 +83,7 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
      * Checks a client's JSON string and returns ours, or null.
      *
      * @param rawJson the JSON object as submitted; null or blank means not set
-     * @return a JSON object carrying all four keys, or null when every value is
+     * @return a JSON object carrying all six keys, or null when every value is
      *         empty — so clearing the last link leaves NULL rather than a husk
      *         of empty strings
      * @throws RequestValidationException (→ 400) if it is not a JSON object, is
@@ -98,7 +118,14 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
                 // A handle, not a link: the form asks for `yourclub` and this
                 // builds the URL. It still accepts a pasted instagram.com URL.
                 blankIfNull(WebLinks.normaliseInstagram(
-                        bounded(parsed.instagram(), "Instagram"), "Instagram")));
+                        bounded(parsed.instagram(), "Instagram"), "Instagram")),
+                // Plain links, like website and facebook — not handles. A club's
+                // LinkedIn may be /company/, /school/ or /groups/, which a bare
+                // handle cannot express, and Linktree is only ever pasted whole
+                // (Arpan, 2026-09-16). This is also what the profile side does
+                // with its own linkedin: UserProfileService.java:86-87.
+                blankIfNull(WebLinks.normalise(bounded(parsed.linkedin(), "LinkedIn"), "LinkedIn")),
+                blankIfNull(WebLinks.normalise(bounded(parsed.linktree(), "Linktree"), "Linktree")));
 
         if (clean.isEmpty()) {
             return null;
@@ -106,7 +133,7 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
         try {
             return MAPPER.writeValueAsString(clean);
         } catch (JsonProcessingException e) {
-            // Four strings cannot fail to serialise. Not swallowed, because a
+            // Six strings cannot fail to serialise. Not swallowed, because a
             // silent null here would clear a club's links.
             throw new IllegalStateException("Could not serialise club social links", e);
         }
@@ -167,8 +194,18 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /**
+     * Every key must be named here. A field left out reads as always-empty, so
+     * a club whose only contact is the one that was forgotten would be stored as
+     * NULL — the save reporting success and the value gone.
+     */
     private boolean isEmpty() {
-        return email.isEmpty() && website.isEmpty() && facebook.isEmpty() && instagram.isEmpty();
+        return email.isEmpty()
+                && website.isEmpty()
+                && facebook.isEmpty()
+                && instagram.isEmpty()
+                && linkedin.isEmpty()
+                && linktree.isEmpty();
     }
 
     private static String normaliseEmail(String raw) {
@@ -194,7 +231,7 @@ public record ClubSocialLinks(String email, String website, String facebook, Str
     }
 
     /**
-     * All four keys are always written, empty rather than absent. The frontend
+     * All six keys are always written, empty rather than absent. The frontend
      * type says every field is a string, and a missing key would make that a
      * lie at runtime for anything reading a club from the API.
      */

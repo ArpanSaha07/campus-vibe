@@ -5,7 +5,10 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `95418a1` plus the uncommitted planner backend unit — re-read on
+**Code as of:** `f7a4399`, re-stamped 2026-09-16: the club social links unit
+touched `ClubCreationRequest*` for two extra JSON keys and a raised `@Size`, and
+changes no role, no club-scoped check and no endpoint guard — nothing this
+document covers moved. Before that, `95418a1` plus the uncommitted planner backend unit — re-read on
 2026-09-16 for `SecurityFilterChainConfig`, which gained a first rule permitting
 the async dispatch of a streamed response. That grants no role and opens no
 URL: an async dispatch exists only for a request that already passed the rules

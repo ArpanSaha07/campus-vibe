@@ -205,12 +205,15 @@ Today the only consumer of a club's category or tags is the text handed to the
 embedder, and BUG-001 means the semantic leg does not work — so in practice the
 taxonomy is currently write-only. Ordered by how visible the gap is.
 
-- [ ] **P1** **A club page shows neither its category nor its tags.** `ClubDTO`
-      carries both, `toClub` maps them onto `Club`, `types/index.ts` documents
-      them — and `(main)/clubs/[clubId]/page.tsx` renders neither. The data
-      travels the whole way and stops one line short of the screen. A club admin
-      picks a category and up to eight tags at creation and no visitor can ever
-      see them.
+- [ ] **P3** **A club page shows its tags but not its category.** The tags half
+      shipped 2026-09-16 with the club page redesign — `getInterests` + `labelFor`
+      turn the stored slugs into `Chip`s. The category is **implemented and
+      commented out**: `page.tsx` builds `categoryLabel` from `getClubCategories`
+      and the line that renders it is commented, by Arpan, at the same sitting.
+      So this is now a display decision, not missing code — uncomment it, or
+      decide the category is not worth a line and delete both. Leaving it as-is
+      keeps an unused local that lint will eventually object to.
+- [ ] **P2** **A club's social link keys are covered by no contract test.** `ClubDTO.socialLinks` is one opaque `String`, so `ApiContractTest`'s Jackson introspection never looks inside it and `api-dto-fields.json` pins only the field name. Renaming `instagram` to `insta` across `ClubSocialLinks.java` and the TS `ClubSocialLinks` would leave **both** suites green and the club page blank — exactly the failure the contract exists to prevent. `ProfileSocialLinksDTO` gets its own row precisely because it is a real nested Jackson bean; the club's blob never did. Four edits to close: a row in `api-dto-fields.json`, `CONTRACTED.put("ClubSocialLinks", ClubSocialLinks.class)` (it is already a record Jackson can introspect), a `Record<keyof ClubSocialLinks, true>` mirror and a `MIRRORS` entry. Raised 2026-09-16 when `linkedin` and `linktree` were added and deliberately left undone — it is scope Arpan has not agreed. Held meanwhile by [`rules/contracts.md`](../rules/contracts.md).
 - [ ] **P1** **Nothing browses by category or by tag.** `GET /api/v1/clubs` takes
       no category parameter, `(main)/clubs/page.tsx` is a flat grid with no
       filter, and `/events` filters only on free-text `?q=`. D6 deleted the
@@ -248,7 +251,6 @@ taxonomy is currently write-only. Ordered by how visible the gap is.
 - [ ] **P2** Wire the rest of the Admin Dashboard UI to the backend. *(The club-creation half shipped 2026-09-09: a Create a club control, and one merged Pending requests list reading both the club-admin-request and club-creation-request queues. User management and event moderation have no endpoints to wire yet.)*
 - [ ] **P2** Bookmark UI. `EventLikeButton` posts to `/saved-events` but starts from `initiallySaved={false}` unless the caller knows better, so a saved event still shows an empty heart on the events listing. Same fix as the follow button: a provider holding the saved ids, filled from `GET /api/v1/users/me/events`.
 - [ ] **P3** Show the live follower count on club cards and the club page. `Club.followers` is accurate now that follows move it, but `ClubCard` has its count commented out and the club page's number never refreshes after a follow — the provider only tracks ids.
-- [ ] **P2** **The club page's event tabs still render mock data.** `ClubEventTabs` is wired to the shared pill component but `app/(main)/clubs/[clubId]/page.tsx` passes `popularEvents` for *both* upcoming and past, so the two tabs show the same eight fixtures and the counts are the same number twice. `listEventsByClub(clubId)` already exists and is what `/manage/[clubId]/events` uses — this is a call site, not a feature. Also un-comment the `followers · events` line the page currently has commented out.
 - [ ] **P2** **Profile photo upload.** `ProfileAvatar` draws the first initial and `/profile/edit` says in words that uploads are not available, rather than showing a disabled button. There is no avatar column on `users` or on `user_profiles` to fall back from. S3 is already wired for club logos and event banners, so this is the same path with a different owner.
 - [ ] **P2** **The public profile view does not exist.** `showInterests` and `showSocialLinks` persist as of 2026-08-20 and govern how a profile looks *to other people* — but `/profile` only ever shows you your own, where you always see everything. **Both switches therefore still control nothing.** Decide the route (`/users/[id]`?), what a visitor may see, and add the public read endpoint. Note that its `permitAll` matcher has to sit *above* the broad public-GET block in `SecurityFilterChainConfig`, the way `/api/v1/interests` does — first match wins.
 - [ ] **P2** **Build the club and event taxonomies.** Fully specified as of 2026-08-20 in [ADR-001](../docs/decisions/ADR-001-three-taxonomy-vocabularies.md) — seven decisions, **no open questions**, content settled down to the word lists. **Read it before starting**; the summary below is not enough to build from.

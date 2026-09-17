@@ -31,7 +31,7 @@ import { ClubFormErrorBoundary } from './ClubFormErrorBoundary';
  * promising it later either; the requester adds it from /manage/[clubId] once
  * approval makes them the owner. See ADR-004 and its 2026-09-10 amendment.
  *
- * The four contact links are on both paths. They were once admin-only for the
+ * The six contact links are on both paths. They were once admin-only for the
  * same reason as the logo, which was wrong: they need no club id and no S3 key,
  * and leaving them out meant a club born by proposal reached its public page
  * with an empty contact block.
@@ -365,6 +365,37 @@ export default function CreateClubForm() {
                     value={formData.socialLinks.facebook}
                     onChange={handleInputChange}
                     placeholder="https://facebook.com/yourclub"
+                    disabled={isSubmitting}
+                    className={inputClasses}
+                  />
+                </FormField>
+
+                {/* Whole links, unlike Instagram above: a club's LinkedIn may be
+                    a /company/, /school/ or /groups/ path, so there is no handle
+                    to ask for -- Arpan, 2026-09-16. `handleInputChange` needs no
+                    change for either; it splits the `social_` prefix off the
+                    name and indexes ClubSocialLinks with what is left. */}
+                <FormField label="LinkedIn" htmlFor="social_linkedin">
+                  <input
+                    type="url"
+                    id="social_linkedin"
+                    name="social_linkedin"
+                    value={formData.socialLinks.linkedin}
+                    onChange={handleInputChange}
+                    placeholder="https://linkedin.com/company/yourclub"
+                    disabled={isSubmitting}
+                    className={inputClasses}
+                  />
+                </FormField>
+
+                <FormField label="Linktree" htmlFor="social_linktree">
+                  <input
+                    type="url"
+                    id="social_linktree"
+                    name="social_linktree"
+                    value={formData.socialLinks.linktree}
+                    onChange={handleInputChange}
+                    placeholder="https://linktr.ee/yourclub"
                     disabled={isSubmitting}
                     className={inputClasses}
                   />

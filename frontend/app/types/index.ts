@@ -63,6 +63,8 @@ export type Club = {
       website?: string;
       facebook?: string;
       instagram?: string;
+      linkedin?: string;
+      linktree?: string;
     },
     featured: boolean;
     images: string[];
@@ -508,7 +510,7 @@ export interface ClubCreationRequest {
   interests: string[];
   message: string | null;
   /**
-   * The club's four contact values as a JSON string, the same shape
+   * The club's six contact values as a JSON string, the same shape
    * `ApiClub.socialLinks` carries — null when the requester filled in none of
    * them. Parse it with `parseSocialLinks`; the server normalised it, so what
    * is here is always our JSON.
@@ -600,6 +602,15 @@ export interface ClubSocialLinks {
   website: string;
   facebook: string;
   instagram: string;
+  /**
+   * Whole links, not handles, unlike `instagram` above (Arpan, 2026-09-16). A
+   * club's LinkedIn may be a /company/, /school/ or /groups/ path, which a bare
+   * handle cannot express, and a Linktree is only ever pasted entire. Both go
+   * through `normaliseWebLink` on the way in and `WebLinks.normalise` on the
+   * server, exactly as `website` and `facebook` do.
+   */
+  linkedin: string;
+  linktree: string;
 }
 
 export interface ClubFormData {

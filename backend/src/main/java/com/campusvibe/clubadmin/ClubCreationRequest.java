@@ -75,7 +75,7 @@ public class ClubCreationRequest {
     private String message;
 
     /**
-     * The club's four public contact values, as a JSON string in one column
+     * The club's six public contact values, as a JSON string in one column
      * exactly as {@code Club.socialLinks} holds them — which is what lets
      * {@code approve} carry the value across without translating it.
      *

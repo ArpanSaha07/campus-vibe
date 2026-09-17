@@ -13,13 +13,21 @@ import { ClubFormData, ClubSocialLinks, FormErrors } from '@/app/types';
 export type ClubFormMode = 'create' | 'propose';
 
 /**
- * The two that are plain links. `email` is an address and `instagram` is a
+ * The four that are plain links. `email` is an address and `instagram` is a
  * handle; each has its own rule below, and running either through the link
  * normaliser is exactly the mistake this list exists to avoid.
+ *
+ * LinkedIn and Linktree joined the list rather than getting rules of their own
+ * (Arpan, 2026-09-16): a club's LinkedIn may be a /company/, /school/ or
+ * /groups/ path, so there is no handle to ask for, and a Linktree is pasted
+ * whole. The server agrees — `ClubSocialLinks.normalise` sends both through
+ * `WebLinks.normalise`, the same call website and facebook get.
  */
 const LINK_FIELDS: [keyof ClubSocialLinks, string][] = [
   ['website', 'Website'],
   ['facebook', 'Facebook'],
+  ['linkedin', 'LinkedIn'],
+  ['linktree', 'Linktree'],
 ];
 
 export async function validateClubForm(
