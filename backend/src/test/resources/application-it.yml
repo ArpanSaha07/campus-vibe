@@ -18,6 +18,19 @@ spring:
   flyway:
     enabled: true
 
+  datasource:
+    hikari:
+      # One container serves every IT class, but Spring caches a context per
+      # distinct test configuration and each context opens a pool of its own —
+      # at Hikari's default of 10, and PostgreSQL's default max_connections of
+      # 100, the eighth such context exhausted the server and whichever context
+      # loaded next died with 'FATAL: sorry, too many clients already' (BUG-063).
+      # The failure lands on an unrelated class, so cap it here rather than
+      # leave the next new IT to trip over it. MockMvc drives one request at a
+      # time; four is already generous.
+      maximum-pool-size: 4
+      minimum-idle: 0
+
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:

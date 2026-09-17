@@ -35,9 +35,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <ol>
  *   <li>A PENDING row grants nothing. Being invited is not being an
  *       administrator (§6).</li>
- *   <li>Claiming an invitation requires a <em>confirmed</em> address. Without
- *       it, registering someone else's address is enough to steal their
- *       invitation, because sign-up does not require confirming one.</li>
+ *   <li>Claiming an invitation requires a <em>confirmed</em> address whenever
+ *       {@code campusvibe.auth.require-verified-email-for-invitations} is on —
+ *       without it, registering someone else's address is enough to steal their
+ *       invitation, because sign-up does not require confirming one. It is off
+ *       here, as it is by default, so this class pins the open behaviour and
+ *       {@link InvitationRequiresVerifiedEmailIT} pins the closed one.</li>
  *   <li>Removal takes effect on the next request, not on the next login. That
  *       is the whole reason authority lives in this table rather than in a
  *       token claim (§28).</li>
@@ -296,27 +299,29 @@ class ClubAdminInvitationIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The attack this closes: sign-up does not require confirming the address,
-     * so without this rule anyone who registered the incoming treasurer's
-     * address first would inherit the invitation sent to it.
+     * With the confirmation rule switched off — its default while confirmation
+     * mail is not reliably delivered — an unconfirmed account accepts and is an
+     * administrator straight away. The refusal the switch restores is pinned in
+     * {@link InvitationRequiresVerifiedEmailIT}, along with the attack it closes.
      */
     @Test
-    void anUnconfirmedAccountCannotClaimAnInvitationToItsAddress() throws Exception {
+    void anUnconfirmedAccountCanClaimAnInvitationToItsAddress() throws Exception {
         Club club = createClub("robotics", "Robotics");
         User owner = createConfirmedUser("Sarah", "sarah@campus.com");
         makeClubOwner(club, owner);
         Long invitationId = inviteAndReturnId(club, owner, "emma@campus.com");
 
         // Registered the address but never followed the confirmation link.
-        User squatter = createUser("Squatter", "emma@campus.com", "password123", RoleName.ROLE_USER);
+        User emma = createUser("Emma", "emma@campus.com", "password123", RoleName.ROLE_USER);
 
         mockMvc.perform(post("/api/v1/users/me/club-invitations/%d/accept".formatted(invitationId))
-                        .header("Authorization", bearer(squatter)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message", containsString("Confirm your email address")));
+                        .header("Authorization", bearer(emma)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clubId", is("robotics")));
 
-        assertEquals(AssignmentStatus.PENDING,
-                clubAdminAssignmentRepository.findById(invitationId).orElseThrow().getStatus());
+        ClubAdminAssignment claimed = clubAdminAssignmentRepository.findById(invitationId).orElseThrow();
+        assertEquals(AssignmentStatus.ACTIVE, claimed.getStatus());
+        assertEquals(emma.getId(), claimed.getUser().getId());
     }
 
     /** Answered as a missing row, so ids cannot be walked to find open invitations. */
