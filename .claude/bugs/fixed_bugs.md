@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-16**
+Last updated: **2026-09-17**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-062](#bug-062) | Low | 2026-09-17 | An event card's Like and Share buttons were invisible on every phone and tablet, yet still tappable: Tailwind v4 only applies `group-hover` where the device can hover |
 | [BUG-060](#bug-060) | Medium | 2026-09-16 | Every club photo answered 400 the first time a page rendered `club.images`: a `remotePatterns` entry written as `new URL(...)` forbids a query string, and the error blamed the hostname |
 | [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
 | [BUG-059](#bug-059) | Medium | 2026-09-16 | A 429, a 503 or the catch-all 500 asked for with a non-JSON `Accept` left as a bodiless 500: the `ApiError` could not be negotiated, and the planner's stream request asks for `text/event-stream` |
@@ -52,6 +53,38 @@ Last updated: **2026-09-16**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-062
+**Event card actions invisible on touch devices, and still tappable** · Low · FIXED 2026-09-17
+
+**Found:** 2026-09-17, by Arpan: Like and Share never appeared on an event card
+in mobile view.
+
+**Cause.** `EventCard.tsx` hid the actions with `opacity-0 group-hover:opacity-100`.
+Tailwind v4 wraps every `hover:` and `group-hover:` in `@media (hover: hover)`
+(`tailwindcss` 4.1.13, `node_modules/tailwindcss/dist/lib.js`), and a phone or
+tablet never matches it, so the actions stayed at opacity 0 for good. Opacity
+does not remove a hit target: a tap near the bottom right of the image could
+like an event through a button nobody could see.
+
+**Fix.** `EventCard.tsx:49` is visible by default and hidden only where the
+device can hover: `opacity-100 [@media(hover:hover)]:opacity-0
+group-hover:opacity-100 focus-within:opacity-100`. The compiled CSS puts the
+hiding rule last, but `group-hover` and `focus-within` still win, since each adds
+a pseudo-class (0,2,0 against 0,1,0). `focus-within` also shows the actions to a
+keyboard user on desktop, who used to focus them invisibly. Rejected: user-agent
+detection (iPads send a desktop agent, and the render needs a request or a
+client), a `matchMedia` hook (client code and a flash before hydration), and an
+`md:` breakpoint (a wide tablet still cannot hover).
+
+**Still armed.** `ManageClubPill.tsx:44` and `ConversationSidebar.tsx:135` use the
+same pattern; queued in `todo.md` under *Frontend / Features*, not fixed here.
+Held by `rules/frontend.md`.
+
+**Verified:** `node scripts/verify.mjs` green (lint, type-check, Jest, build).
+Not seen on a touch device or in DevTools device emulation.
 
 ---
 

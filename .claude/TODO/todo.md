@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-09-12** · Branch: `infra/s3-pipeline`
+Last updated: **2026-09-17** · Branch: `style/event-card-and-page-ui`
 
 **This is the full queue, not the orientation file.** Do not read it to find out
 where the project is — [`../STATUS.md`](../STATUS.md) answers that in forty
@@ -143,6 +143,7 @@ log. The rest, in the spec's order:
 
 ## Frontend / Features
 
+- [ ] **P2** **Two more hover-only controls are invisible on touch devices.** `ManageClubPill.tsx:44` and `ConversationSidebar.tsx:135` use `opacity-0 group-hover:opacity-100`, which never shows on a phone or tablet because Tailwind v4 gates `group-hover` behind `@media (hover: hover)` — and the invisible control is still tappable. Same fix as `EventCard.tsx:49`: `opacity-100 [@media(hover:hover)]:opacity-0 group-hover:opacity-100` plus `focus-within:opacity-100` (keep `ManageClubPill`'s `focus-visible`). Noted out of scope on 2026-09-17 with [BUG-062](../bugs/fixed_bugs.md#bug-062); the rule is in `rules/frontend.md`.
 - [ ] **P3** **My events still groups by the browser's calendar day.** Event times are shown and entered in Montreal's zone since 2026-09-16 (`lib/event-zone.ts`), but `startOfDay`, the Today and Tomorrow labels, the date filter anchors and the `EventDateFilter` month grid in `lib/my-events.ts` use the browser's local day. They agree for anyone in Montreal; a viewer elsewhere sees an evening event under the next day. Needs zone-aware day arithmetic through the date filter. Trigger: a user outside the zone, or the planner showing My events data.
 - [ ] **P2** **A requester cannot see their own pending club proposal.** They
       submit, get a confirmation, and then have no way to check on it —
@@ -349,6 +350,7 @@ Implementation Sequence.
 
 ## Security
 
+- [ ] **P2** **Rate-limit the Google Places suggestion endpoint.** Queued 2026-09-17, deferred by Arpan from the [event location spec](../specs/2026-09-17-event-location-autocomplete.md): the endpoint ships behind `canManageClub` only, with no per-IP cap. Every debounced keystroke is a billed Autocomplete Request (10,000 free a month, then $2.83 per 1,000), so the cap is what bounds a runaway client or a compromised club account. Shape: its own properties beside `campusvibe.search.rate-limit` (`application.yml:178-184`) and a filter following `SearchRateLimitFilter`, starting from search's numbers, with a 429 the `LocationField` treats as no suggestions. Pair it with the daily quota and budget alert on the Google Cloud key. Blocked on the location feature shipping.
 - [ ] **Commit the secrets-management work.** Steps 1-5 are complete and verified; see [Completed work log](tasks-completed.md#completed-work-log). Nothing is left to build — the work simply has not been committed.
 
 **Every item below came out of the 2026-08-15 authentication review. Full

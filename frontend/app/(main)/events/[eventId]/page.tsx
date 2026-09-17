@@ -99,10 +99,12 @@ export default async function EventPage({ params }: EventPageProps) {
             <p className="text-xs text-ink-600">{event.location.address}</p>
           )}
         </div>
-        <div>
-          <p className="ticket-label text-ink-600">Price</p>
-          <p className="font-mono text-sm font-medium text-berry-600 mt-1">{event.price}</p>
-        </div>
+        {event.price != "Free" && (
+          <div>
+            <p className="ticket-label text-ink-600">Price</p>
+            <p className="font-mono text-sm font-medium text-berry-600 mt-1">{event.price}</p>
+          </div>
+        )}
         {event.capacity > 0 && (
           <div>
             <p className="ticket-label text-ink-600">Spots</p>
@@ -198,27 +200,27 @@ export default async function EventPage({ params }: EventPageProps) {
                 >
                   {event.organizerName}
                 </Link>
-                {organizer && (
+                {/* {organizer && (
                   <p className="font-mono text-xs text-ink-600 mt-1">
                     {organizer.followers} followers
                   </p>
-                )}
+                )} */}
               </div>
             </div>
             <div className="flex gap-2 font-semibold">
-              <button
+              {/* <button
                 type="button"
                 className="cursor-pointer rounded border border-gray-200 px-6 py-2 text-ink-900 transition-colors hover:bg-gray-200"
               >
                 Contact
-              </button>
+              </button> */}
               <ClubFollowButton clubId={event.organizer} />
             </div>
           </section>
 
-          <a href="#" className="inline-block text-sm text-ink-600 underline hover:text-ink-900">
+          {/* <a href="#" className="inline-block text-sm text-ink-600 underline hover:text-ink-900">
             Report this event
-          </a>
+          </a> */}
         </div>
 
         {/* Right Column — the ticket (side column on md+, hidden on small screens) */}

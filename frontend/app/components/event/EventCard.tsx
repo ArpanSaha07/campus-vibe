@@ -41,10 +41,12 @@ export default function EventCard({ event }: { event: EventInstance }) {
           </div>
         </div>
 
-        {/* Hover actions */}
+        {/* Actions: revealed on hover where the device can hover, always shown on
+            touch. Keyed on (hover: hover), the same query Tailwind v4 wraps
+            group-hover in, so the two never disagree. */}
         <div
           aria-label="event-card-actions"
-          className="absolute bottom-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2"
+          className="absolute bottom-2 right-2 z-10 opacity-100 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200 flex space-x-2"
         >
           <EventLikeButton event={event} />
           <EventShareButton eventId={event.eventId} />

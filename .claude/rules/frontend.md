@@ -125,3 +125,11 @@ paths:
   options its API exposes and touch nothing inside it. GIS also reports nothing
   when it paints nothing, so an empty container is watched and reported rather
   than left blank. (BUG-057, ADR-018)
+- **`opacity-0 group-hover:opacity-100` hides a control on every touch device
+  for good.** Tailwind v4 wraps `hover:` and `group-hover:` in
+  `@media (hover: hover)`, which a phone never matches, and the invisible
+  control is still tappable. Show by default and hide only where hovering is
+  possible: `opacity-100 [@media(hover:hover)]:opacity-0 group-hover:opacity-100
+  focus-within:opacity-100`, as `EventCard.tsx:49` does. Never key it on a width
+  breakpoint or the user agent: a wide tablet cannot hover either. Still armed
+  in `ManageClubPill.tsx:44` and `ConversationSidebar.tsx:135`. (BUG-062)
