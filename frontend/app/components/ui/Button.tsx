@@ -13,9 +13,13 @@ const variantClasses: Record<Variant, string> = {
   outline: "bg-white text-ink-900 border border-mist-200 hover:border-lavender-600",
 };
 
+// A minimum height plus vertical padding, not a fixed height. A one-line label
+// is the same 40 or 48px either way, but a label that wraps in a narrow column
+// -- the event page's calendar button in its sidebar -- grew past a fixed
+// `h-12`, and its lines sat on the button's top and bottom edges.
 const sizeClasses: Record<Size, string> = {
-  md: "h-10 px-5 text-sm",
-  lg: "h-12 px-7 text-base",
+  md: "min-h-10 px-5 py-2 text-sm",
+  lg: "min-h-12 px-7 py-2.5 text-base",
 };
 
 interface ButtonProps {
@@ -23,6 +27,8 @@ interface ButtonProps {
   variant?: Variant;
   size?: Size;
   href?: string;
+  /** With `href`: a plain anchor opening in a new tab, for links off the site. */
+  external?: boolean;
   onClick?: () => void;
   type?: "button" | "submit";
   disabled?: boolean;
@@ -34,15 +40,23 @@ export default function Button({
   variant = "primary",
   size = "md",
   href,
+  external,
   onClick,
   type = "button",
   disabled,
   className = "",
 }: ButtonProps) {
-  const classes = `inline-flex items-center justify-center gap-2 rounded-full font-semibold
+  const classes = `inline-flex items-center justify-center gap-2 rounded-full text-center font-semibold
     transition-colors duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none
     ${variantClasses[variant]} ${sizeClasses[size]} ${className}`;
 
+  if (href && external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={classes}>
+        {children}
+      </a>
+    );
+  }
   if (href) {
     return (
       <Link href={href} className={classes}>

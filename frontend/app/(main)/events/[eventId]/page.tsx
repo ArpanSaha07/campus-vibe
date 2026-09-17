@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { CalendarPlus } from "lucide-react";
 import type { EventPageProps } from "@/app/types";
 import { getEvent } from "@/app/lib/event";
 import { getClubById } from "@/app/lib/club";
@@ -9,6 +10,7 @@ import { getEventFormats, getInterests, labelFor } from "@/app/lib/taxonomy";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import { isOngoing } from "@/app/lib/event-time";
 import { formatEventDateLong, formatEventTime } from "@/app/lib/event-zone";
+import { buildGoogleCalendarUrl } from "@/app/lib/google-calendar";
 import EventShareButton from "@/app/components/event/EventShareButton";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import ManageEventLink from "@/app/components/event/ManageEventLink";
@@ -115,9 +117,18 @@ export default async function EventPage({ params }: EventPageProps) {
         )}
       </div>
 
+      {/* A prefilled Google Calendar form in a new tab, the same link My events
+          uses: no OAuth and no backend, and the student confirms in Google.
+          Shown on ended events too, by Arpan's choice (2026-09-17). */}
       <div className="px-5 py-4">
-        <Button size="lg" className="w-full">
-          Save your spot
+        <Button
+          size="lg"
+          className="w-full"
+          href={buildGoogleCalendarUrl(event, event.organizerName)}
+          external
+        >
+          <CalendarPlus className="h-5 w-5" aria-hidden="true" />
+          Save this event to your calendar
         </Button>
       </div>
     </div>
