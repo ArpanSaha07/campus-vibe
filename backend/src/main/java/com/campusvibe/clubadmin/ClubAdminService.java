@@ -9,6 +9,7 @@ import com.campusvibe.mail.AppMailProperties;
 import com.campusvibe.mail.MailSender;
 import com.campusvibe.user.User;
 import com.campusvibe.user.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +55,7 @@ public class ClubAdminService {
     private final ClubAuditService auditService;
     private final MailSender mailSender;
     private final AppMailProperties mailProperties;
+    private final boolean requireVerifiedEmailForInvitations;
 
     public ClubAdminService(ClubAdminAssignmentRepository assignmentRepository,
                             ClubRepository clubRepository,
@@ -61,7 +63,9 @@ public class ClubAdminService {
                             ClubOwnershipService ownershipService,
                             ClubAuditService auditService,
                             MailSender mailSender,
-                            AppMailProperties mailProperties) {
+                            AppMailProperties mailProperties,
+                            @Value("${campusvibe.auth.require-verified-email-for-invitations:false}")
+                            boolean requireVerifiedEmailForInvitations) {
         this.assignmentRepository = assignmentRepository;
         this.clubRepository = clubRepository;
         this.userRepository = userRepository;
@@ -69,6 +73,7 @@ public class ClubAdminService {
         this.auditService = auditService;
         this.mailSender = mailSender;
         this.mailProperties = mailProperties;
+        this.requireVerifiedEmailForInvitations = requireVerifiedEmailForInvitations;
     }
 
     // --- reads --------------------------------------------------------------
@@ -452,6 +457,12 @@ public class ClubAdminService {
      * they have already made. Declining is held to the same rule deliberately:
      * letting an unconfirmed account decline would be a quiet way to keep a
      * rival off a club's team.
+     *
+     * <p><strong>Currently switched off</strong> by
+     * {@code campusvibe.auth.require-verified-email-for-invitations}, default
+     * false: confirmation mail is not reliably delivered yet, so the rule was
+     * refusing real invitees. While it is off, the attack above is open to
+     * email/password accounts; Google accounts are confirmed by Google.
      */
     private ClubAdminAssignment claimableBy(Long invitationId, User user) {
         ClubAdminAssignment invitation = assignmentRepository.findById(invitationId)
@@ -475,7 +486,7 @@ public class ClubAdminService {
             throw new RequestValidationException("This invitation is no longer open.");
         }
 
-        if (!user.isEmailVerified()) {
+        if (requireVerifiedEmailForInvitations && !user.isEmailVerified()) {
             // Not AccessDeniedException: that handler answers with a fixed
             // "Access denied", and this is the one refusal in the flow that the
             // person on the other end can actually do something about.

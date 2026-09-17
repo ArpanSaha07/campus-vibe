@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MailOpen } from "lucide-react";
-import { useAuth } from "@/app/lib/auth-context";
 import { useManagedClubs } from "@/app/lib/managed-clubs-context";
 import {
   acceptClubInvitation,
@@ -35,7 +34,6 @@ import Button from "@/app/components/ui/Button";
  * clubs — accepting changes each of them in one act.
  */
 export default function ClubInvitationsPage() {
-  const { user } = useAuth();
   const { ready, invitations, ownershipTransfers, invitationsFailed } =
     useManagedClubs();
   const nothingWaiting = invitations.length === 0 && ownershipTransfers.length === 0;
@@ -52,18 +50,12 @@ export default function ClubInvitationsPage() {
         own account.
       </p>
 
-      {/* The one thing that stops an invitation being answerable, surfaced
-          before the button that would fail rather than after it. */}
-      {user && !user.emailVerified && (
-        <div className="mt-6 rounded-2xl border border-berry-600/30 bg-[#F7E6EE] p-5">
-          <p className="font-semibold text-ink-900">Confirm your email address first</p>
-          <p className="mt-1 text-sm text-ink-600">
-            An invitation is sent to an address, so answering one means proving that
-            address is yours. Check your inbox for the confirmation link we sent when
-            you signed up.
-          </p>
-        </div>
-      )}
+      {/* No confirm-your-address banner here. The backend rule it warned about
+          is behind `campusvibe.auth.require-verified-email-for-invitations`,
+          off while confirmation mail is not reliably delivered, so the warning
+          was stopping people in front of a button that now works. If the switch
+          goes back on, the refusal arrives as the accept call's own error, in
+          the card, with the backend's wording. */}
 
       <div className="mt-8">
         {!ready && (

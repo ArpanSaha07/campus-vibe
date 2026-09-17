@@ -110,6 +110,13 @@ campusvibe.auth:
   # addresses, at the cost of locking out anyone whose mail never arrives.
   # A product decision, so it is a switch rather than a default.
   require-verified-email: ${AUTH_REQUIRE_VERIFIED_EMAIL:false}
+  # OFF for now. Turning it on refuses accepting or declining a club admin
+  # invitation until the account has confirmed its address. That check is what
+  # stops someone who registered an invitee's address first from claiming the
+  # invitation, but confirmation mail is not reliably delivered yet, so real
+  # invitees were stuck. Turn it back on once it is. Ownership handovers are
+  # not affected by this switch and always require a confirmed address.
+  require-verified-email-for-invitations: ${AUTH_REQUIRE_VERIFIED_EMAIL_FOR_INVITATIONS:false}
 
 # The first platform administrator. Every admin path is behind hasRole('ADMIN'),
 # including approving the club-admin requests that give a club its first owner,
