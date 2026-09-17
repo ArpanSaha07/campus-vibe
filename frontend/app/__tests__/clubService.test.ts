@@ -65,6 +65,15 @@ describe("createClub", () => {
     expect(bodyOf().officialEmail).toBeNull();
   });
 
+  it("sends featured, and false when it is not set", async () => {
+    await createClub({ ...club, featured: true });
+    expect(bodyOf().featured).toBe(true);
+
+    mockApiFetch.mockClear();
+    await createClub(club);
+    expect(bodyOf().featured).toBe(false);
+  });
+
   it("derives the slug and sends it as the club id", async () => {
     await createClub(club);
     expect(bodyOf().id).toBe("rooftop-astronomy-club");

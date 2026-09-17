@@ -178,7 +178,7 @@ export default function ClubEditForm({ clubId }: { clubId: string }) {
     // conflict. `propose` because the contact email is optional here — a club
     // born by proposal may have none.
     const found = await validateClubForm(
-      { ...fields, logo: null, message: '' },
+      { ...fields, logo: null, featured: false, message: '' },
       async () => false,
       'propose',
     );

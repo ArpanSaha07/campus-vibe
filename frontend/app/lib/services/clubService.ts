@@ -76,6 +76,8 @@ export interface NewClub {
    * mailed to it can say otherwise (ADR-006).
    */
   officialEmail?: string | null;
+  /** Promotes the club to the homepage's Featured clubs row. Omitted is false. */
+  featured?: boolean;
 }
 
 /**
@@ -107,6 +109,7 @@ export async function createClub(club: NewClub): Promise<Club> {
       // independent from then on: this one is the club's recovery channel and
       // only a platform admin may change it.
       officialEmail: club.officialEmail?.trim() || null,
+      featured: club.featured === true,
     }),
     auth: true,
   });

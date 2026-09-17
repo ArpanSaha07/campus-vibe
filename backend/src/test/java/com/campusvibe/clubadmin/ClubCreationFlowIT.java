@@ -431,6 +431,29 @@ class ClubCreationFlowIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.socialLinks", nullValue()));
     }
 
+    // ----------------------------------------------------------------- featured
+
+    @Test
+    void anAdminCanPromoteAClubToFeaturedWhenCreatingIt() throws Exception {
+        User admin = createUser("Root", "root@campus.com", "password123",
+                RoleName.ROLE_USER, RoleName.ROLE_ADMIN);
+
+        mockMvc.perform(post("/api/v1/clubs")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("id", "robotics", "name", "Robotics", "featured", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.featured", is(true)));
+
+        // Omitted is not featured: the homepage row is opted into, never defaulted.
+        mockMvc.perform(post("/api/v1/clubs")
+                        .header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("id", "chess", "name", "Chess"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.featured", is(false)));
+    }
+
     // ----------------------------------------------------------- official email
 
     @Test

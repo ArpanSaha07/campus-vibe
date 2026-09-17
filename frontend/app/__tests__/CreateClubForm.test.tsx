@@ -248,6 +248,34 @@ describe("CreateClubForm — interests reach the payload", () => {
   });
 });
 
+describe("CreateClubForm — Promoted", () => {
+  // The homepage's Featured clubs row reads this. Admin path only, so a
+  // proposer cannot promote their own club (Arpan, 2026-09-17).
+  it("is absent from a proposal", () => {
+    currentUser = user(Role.USER);
+    render(<CreateClubForm />);
+    expect(screen.queryByRole("checkbox", { name: "Promoted" })).not.toBeInTheDocument();
+  });
+
+  it("is sent when an admin checks it", async () => {
+    currentUser = user(Role.USER, Role.ADMIN);
+    render(<CreateClubForm />);
+
+    await fillCommon();
+    await userEvent.type(screen.getByLabelText(/Contact email/), "hello@yourclub.ca");
+    const promoted = screen.getByRole("checkbox", { name: "Promoted" });
+    expect(promoted).not.toBeChecked();
+    await userEvent.click(promoted);
+    await userEvent.click(screen.getByRole("button", { name: "Create club" }));
+
+    await waitFor(() => expect(mockCreateClubWithMedia).toHaveBeenCalledTimes(1));
+    expect(mockCreateClubWithMedia).toHaveBeenCalledWith(
+      expect.objectContaining({ featured: true }),
+      expect.anything(),
+    );
+  });
+});
+
 describe("CreateClubForm — contact links reach the payload", () => {
   // Same reason the interests have a block of their own: a link is not
   // something the user reads back off the form after submitting, so the whole

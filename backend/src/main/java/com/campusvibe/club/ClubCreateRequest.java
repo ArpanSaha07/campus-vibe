@@ -43,5 +43,12 @@ public record ClubCreateRequest(
          * state every club was in before this field existed.
          */
         @Email(message = "The club email must be a valid email address")
-        @Size(max = 255) String officialEmail
+        @Size(max = 255) String officialEmail,
+        /**
+         * Whether the club is promoted to the homepage's Featured clubs row.
+         * Admin path only, because this endpoint is: a proposal carries no such
+         * field, so nobody can promote their own club (Arpan, 2026-09-17).
+         * Null means not featured, the column default.
+         */
+        Boolean featured
 ) {}
