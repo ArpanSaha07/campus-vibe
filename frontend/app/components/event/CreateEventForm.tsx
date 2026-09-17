@@ -407,7 +407,6 @@ export default function CreateEventForm({
             htmlFor="endTime"
             required
             error={timesError}
-            hint="Up to 14 days after it starts."
           >
             <input
               id="endTime"
@@ -445,7 +444,7 @@ export default function CreateEventForm({
             />
           </FormField>
 
-          <FormField label="Capacity" htmlFor="capacity" hint="Leave empty for no limit.">
+          <FormField label="Capacity" htmlFor="capacity" hint="">
             <input
               id="capacity"
               type="number"
