@@ -51,7 +51,11 @@ export default function ClubFollowButton({ clubId }: { clubId: string }) {
       // them the click is what opens the signup card.
       disabled={pending || (isAuthenticated && !ready)}
       aria-pressed={following}
-      className={`min-w-[110px] cursor-pointer rounded px-4 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-60 ${
+      // rounded-full and a focus ring, both per design-guidelines.md: buttons
+      // are full-radius, and "Focus: 2px lavender-300 ring, 2px offset, never
+      // removed". This button had a 4px radius and no focus state at all, so a
+      // keyboard user could not see where they were.
+      className={`min-w-[110px] cursor-pointer rounded-full px-4 py-2 text-center font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lavender-300 disabled:cursor-not-allowed disabled:opacity-60 ${
         following
           ? "bg-lavender-800 text-white"
           : "bg-lavender-600 text-white hover:bg-lavender-800"

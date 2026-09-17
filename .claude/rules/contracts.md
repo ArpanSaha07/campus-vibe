@@ -22,6 +22,16 @@ paths:
   entry in `api-dto-fields.json`, and the TypeScript type in
   `frontend/app/types/`. Changing two of the three is precisely the failure
   these tests are here to catch — and both suites will still pass.
+- **A club's social link keys are covered by nothing.** `ClubDTO.socialLinks`
+  is one opaque `String`, so Jackson introspection never sees inside it and the
+  contract pins only the field name. Renaming `instagram` to `insta` across
+  `ClubSocialLinks.java` and the TS `ClubSocialLinks` would leave both suites
+  green and the club page blank. Contrast `ProfileSocialLinksDTO`, which gets
+  its own contract row precisely because it *is* a nested Jackson bean. Closing
+  it is four edits (a row in `api-dto-fields.json`, `CONTRACTED.put`, a
+  `Record<keyof ClubSocialLinks, true>` mirror, a `MIRRORS` entry) and is
+  **proposed, not done** — raised when `linkedin` and `linktree` were added on
+  2026-09-16 and left for Arpan.
 - **Shape translation belongs in `frontend/app/lib/adapters.ts`**, not in
   components. See
   [`api-and-caching.md`](../docs/architecture/api-and-caching.md).

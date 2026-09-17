@@ -5,7 +5,9 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `95418a1`, re-stamped 2026-09-16: that commit is the event end time unit this document was already updated for, and the planner backend touches nothing it covers. Before that, `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
+**Code as of:** `f7a4399` plus the uncommitted club social links unit — re-read
+2026-09-16: the club editor and the proposal form both collect LinkedIn and
+Linktree, and the admin review queue renders them. Before that, `95418a1`, re-stamped 2026-09-16: that commit is the event end time unit this document was already updated for, and the planner backend touches nothing it covers. Before that, `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
 the overview and Events tab split upcoming from past on each event's end, and
 the event form requires an end. Before that, `12afebf` plus the uncommitted
 club and event management unit,
@@ -322,7 +324,8 @@ next four events, and the official-email panel.
 **`.../club/page.tsx`** and **`app/components/manage/ClubEditForm.tsx`** — the
 Club page editor (CEM-01, since 2026-09-15). Everyone who can open the dashboard
 edits every property — name, description, category, tags, logo, photos, contact
-links — because `PUT /clubs/{id}` and both uploads are guarded by `canManageClub`
+links (six since 2026-09-16: email, website, Instagram, Facebook, LinkedIn and
+Linktree) — because `PUT /clubs/{id}` and both uploads are guarded by `canManageClub`
 and Arpan chose not to narrow it. Two things are deliberately absent: the slug,
 which is the club's URL, and the official email, which stays in its admin-only
 panel on the Overview (§6). Photos are add-only; no endpoint removes a club
@@ -647,7 +650,7 @@ list must not make the app believe the user manages nothing.
   **The links are now validated on every write path**, which they never were:
   `ProfileLinks` moved to `common/WebLinks` and gained a third caller, and
   `ClubSocialLinks` parses the stored JSON, normalises it and re-serialises, so
-  the column holds our four keys or NULL. That closed
+  the column holds our own keys or NULL — four then, six since 2026-09-16. That closed
   [BUG-048](../../bugs/fixed_bugs.md#bug-048) on `ClubService.update`, which
   predated this work. Instagram is collected as a *handle* and the URL is built
   server-side (Arpan, 2026-09-10). Also

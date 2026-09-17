@@ -22,7 +22,7 @@ public record ClubCreationRequestDTO(
         List<String> interests,
         String message,
         /**
-         * The four contact values as the JSON string the club will hold, or null
+         * The six contact values as the JSON string the club will hold, or null
          * when the requester left every one blank. The review queue renders them
          * so a reviewer deciding whether a club is real can look at its site.
          */

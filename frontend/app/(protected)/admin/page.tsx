@@ -284,6 +284,8 @@ function ProposalContactLinks({ socialLinks }: { socialLinks: string | null }) {
     ["Website", normaliseWebLink(links.website)],
     ["Instagram", normaliseWebLink(links.instagram)],
     ["Facebook", normaliseWebLink(links.facebook)],
+    ["LinkedIn", normaliseWebLink(links.linkedin)],
+    ["Linktree", normaliseWebLink(links.linktree)],
   ];
   const shown = web.filter(([, href]) => href !== null);
 

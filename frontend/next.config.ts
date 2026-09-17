@@ -77,7 +77,27 @@ const nextConfig: NextConfig = {
     // Only Unsplash, which the demo clubs' photos come from. Uploaded images
     // are served from this origin through the /media rewrite below, so they are
     // local as far as next/image is concerned and need no entry here.
-    remotePatterns: [new URL("https://images.unsplash.com/**")],
+    //
+    // The object form, and deliberately no `search`, because this was
+    // `new URL("https://images.unsplash.com/**")` and that URL carries no query
+    // string — which Next reads as `search: ""`, meaning *the src must not have
+    // one either*. The demo photos are all `?w=400`, so every one of them was
+    // refused, under an error naming the hostname ("hostname is not configured")
+    // rather than the query string that was actually at fault. Nothing rendered
+    // `club.images` until the club page did, so this never fired before.
+    //
+    // Omitting `search` allows any query string, which the docs warn about in
+    // general — it is bounded here by the hostname still being pinned to one
+    // public image CDN, and Unsplash serves its sizes as `?w=`, so pinning an
+    // exact value would break the moment a seed row asked for a different width.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        port: "",
+        pathname: "/**",
+      },
+    ],
   },
 
   /**

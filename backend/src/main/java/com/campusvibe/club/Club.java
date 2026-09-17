@@ -31,7 +31,10 @@ public class Club {
 
     private String logo; // s3 key or url
 
-    private String socialLinks; // JSON string of { email, website, facebook, instagram }
+    // JSON string of { email, website, facebook, instagram, linkedin, linktree }.
+    // Shaped and validated by ClubSocialLinks, which is the only thing that may
+    // write it -- a key it does not name is silently dropped by Jackson.
+    private String socialLinks;
 
     // The organisation's own address, and the trust anchor for administrator
     // changes. Distinct from the contact email inside socialLinks above, which

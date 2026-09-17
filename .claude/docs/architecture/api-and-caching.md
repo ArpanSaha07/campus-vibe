@@ -5,7 +5,13 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `95418a1` plus the uncommitted planner backend unit — re-read on
+**Code as of:** `f7a4399` plus the uncommitted club page and club social links
+unit — re-read 2026-09-16: `ClubSocialLinks` gained `linkedin` and `linktree`,
+so the stored JSON now holds six keys. **No DTO moved and no contract entry
+changed**: `socialLinks` is one opaque `String` on every DTO that carries it, so
+Jackson introspection never looks inside it — which is also why nothing pins
+those six key names (see `rules/contracts.md`). Before that, `95418a1` plus the
+uncommitted planner backend unit — re-read on
 2026-09-16: the eight `Planner*DTO` records joined `api-dto-fields.json` and
 both contract tests; `DefaultExceptionHandler` gained a 503 entry for
 `AiServiceUnavailableException` and now presets `application/json` on the
@@ -350,7 +356,11 @@ It is **exported** since 2026-09-10, because a club proposal carries the same
 JSON string and the admin review queue reads it before any club exists, so the
 translation is no longer only `toClub`'s business. What it parses is now always
 the server's own JSON: `ClubSocialLinks.normalise` validates and re-serialises
-on every write path, so the column holds four known keys or NULL.
+on every write path, so the column holds six known keys or NULL — `email`,
+`website`, `facebook`, `instagram`, and `linkedin` and `linktree` since
+2026-09-16. **The key list is a code change, not configuration**: the mapper
+runs with `FAIL_ON_UNKNOWN_PROPERTIES` off, so a key the record does not name
+is accepted and silently dropped rather than refused.
 
 **Planner answers are joined here too** (`adapters.ts:205`). `toPlannerPicks`
 matches each pick to the `EventDTO` or `ClubDTO` hydrated beside it, drops a

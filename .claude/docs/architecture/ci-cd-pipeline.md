@@ -4,7 +4,10 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `95418a1` plus the uncommitted planner backend unit for `docker/` — re-read 2026-09-16: compose and `.env.example` gained three `OPENAI_*` planner variables, which nothing here enumerates or tests; no workflow, build step or image changed. `081d7b3` for the paragraph on BOM pins under the Trivy gate —
+**Code as of:** `f7a4399` plus the uncommitted club page unit for the `images`
+section — re-read 2026-09-16: `remotePatterns` moved from the `new URL()` form
+to the object form ([BUG-060](../../bugs/fixed_bugs.md#bug-060)). Before that,
+`95418a1` plus the uncommitted planner backend unit for `docker/` — re-read 2026-09-16: compose and `.env.example` gained three `OPENAI_*` planner variables, which nothing here enumerates or tests; no workflow, build step or image changed. `081d7b3` for the paragraph on BOM pins under the Trivy gate —
 `bfc3c02` plus the uncommitted `AWS_S3_BUCKET` line for the `migrate` paragraph
 on required properties, 2026-09-14 ([BUG-052](../../bugs/fixed_bugs.md#bug-052));
 `backend/pom.xml` gained `<netty.version>` on 2026-09-11
@@ -968,6 +971,16 @@ every `NEXT_PUBLIC_*` value live only in the Vercel dashboard
   from this origin through the rewrite below, so they are local as far as
   `next/image` is concerned. Anything not listed is a *thrown error during
   render*, not a broken image.
+- **It is the object form, and deliberately not `new URL()`.** A URL literal
+  carries no query string, which Next reads as `search: ''` — *the src must not
+  have one either*. The seeded club photos are all `?w=400`, so every one was
+  refused with **400** under a message naming the hostname
+  (`hostname "images.unsplash.com" is not configured`), which is the one thing
+  that was correct. Nothing rendered `club.images` until the club page did on
+  2026-09-16, so the entry had never been exercised
+  ([BUG-060](../../bugs/fixed_bugs.md#bug-060)). This is the remote twin of the
+  `localPatterns` rule two bullets down — same `search: ''` default, opposite
+  side of the boundary.
 - `async rewrites()` maps `/media/clubs/:clubId/logo`, `/media/clubs/:clubId/images/:index`
   and, since 2026-09-12, `/media/events/:eventId/images/:index` onto
   `API_INTERNAL_URL`. **Since 2026-09-15 each also has a versioned form with one
