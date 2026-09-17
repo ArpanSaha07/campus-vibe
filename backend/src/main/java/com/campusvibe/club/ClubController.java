@@ -106,6 +106,7 @@ public class ClubController {
         // official_email_verified_at at its default of NULL, which is the whole
         // of ADR-006 that applies here -- there is no stamp yet to clear.
         club.setOfficialEmail(ClubSocialLinks.normaliseOfficialEmail(request.officialEmail()));
+        club.setFeatured(Boolean.TRUE.equals(request.featured()));
         return clubService.createOwnedBy(club, request.category(), request.interests(),
                 creator, creator);
     }

@@ -31,6 +31,7 @@ export interface UseCreateClubFormReturn {
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   setCategory: (slug: string | null) => void;
   setInterests: (slugs: string[]) => void;
+  setFeatured: (featured: boolean) => void;
   /** Clears the submission-level error, for the toast's dismiss control. */
   dismissGeneralError: () => void;
 }
@@ -59,6 +60,7 @@ const EMPTY_FORM: ClubFormData = {
     linkedin: '',
     linktree: '',
   },
+  featured: false,
   message: '',
 };
 
@@ -170,6 +172,10 @@ export function useCreateClubForm(
     setFormData((prev) => ({ ...prev, interests: slugs }));
   }, []);
 
+  const setFeatured = useCallback((featured: boolean) => {
+    setFormData((prev) => ({ ...prev, featured }));
+  }, []);
+
   const dismissGeneralError = useCallback(() => {
     setErrors((prev) => ({ ...prev, general: undefined }));
   }, []);
@@ -205,6 +211,7 @@ export function useCreateClubForm(
               // recovery channel in the create call itself -- the links follow
               // in a PUT, and the two are independent from then on.
               officialEmail: formData.socialLinks.email,
+              featured: formData.featured,
             },
             {
               logo: formData.logo,
@@ -294,6 +301,7 @@ export function useCreateClubForm(
     handleSubmit,
     setCategory,
     setInterests,
+    setFeatured,
     dismissGeneralError,
   };
 }

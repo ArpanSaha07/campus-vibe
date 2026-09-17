@@ -638,6 +638,12 @@ export interface ClubFormData {
   /** Sent as a `PUT` on the club once it exists, like the uploads above. */
   socialLinks: ClubSocialLinks;
   /**
+   * Whether the club shows under Featured clubs on the homepage. Admin path
+   * only, like the logo: a proposal has no such field, so nobody promotes
+   * their own club.
+   */
+  featured: boolean;
+  /**
    * Why the requester should run this club. Proposal path only — a platform
    * admin creating a club directly is not asking anyone's permission.
    */

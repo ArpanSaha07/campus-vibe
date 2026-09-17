@@ -39,8 +39,10 @@ import { ClubFormErrorBoundary } from './ClubFormErrorBoundary';
  * <strong>Every field here maps to a column on `Club`</strong>, and nothing on
  * `Club` that a creator may set is missing:
  * `id` (derived, shown read-only) · `name` · `description` · `category_slug` ·
- * `club_interests` · `logo` · `social_links` · `official_email`. `followers`,
- * `featured` and `created_at` are the server's to set.
+ * `club_interests` · `logo` · `social_links` · `official_email` · `featured`.
+ * `followers` and `created_at` are the server's to set. `featured` is the
+ * homepage's Featured clubs row, labelled Promoted here, and like the logo it is
+ * on the admin path only, so nobody promotes their own club (Arpan, 2026-09-17).
  *
  * **`official_email` is seeded from the contact email below** and is not a
  * field of its own (Arpan, 2026-09-10). It was unsettable at creation until
@@ -72,6 +74,7 @@ export default function CreateClubForm() {
     handleSubmit,
     setCategory,
     setInterests,
+    setFeatured,
     dismissGeneralError,
   } = useCreateClubForm(admin ? 'create' : 'propose', async (createdClubId) => {
     if (createdClubId) {
@@ -283,6 +286,31 @@ export default function CreateClubForm() {
                   className="sr-only"
                 />
               </FormField>
+
+              {/* A checkbox, not FormField: the label sits beside the box and is
+                  the click target, so FormField's label-above layout does not
+                  fit. Unchecked is not featured, the column default. */}
+              <div>
+                <label
+                  htmlFor="featured"
+                  className="flex items-center gap-3 text-sm font-semibold text-ink-900"
+                >
+                  <input
+                    type="checkbox"
+                    id="featured"
+                    name="featured"
+                    checked={formData.featured}
+                    onChange={(event) => setFeatured(event.target.checked)}
+                    disabled={isSubmitting}
+                    aria-describedby="featured-hint"
+                    className="h-4 w-4 rounded accent-lavender-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender-300 focus-visible:ring-offset-2"
+                  />
+                  Promoted
+                </label>
+                <p id="featured-hint" className="mt-1.5 pl-7 text-sm text-ink-600">
+                  Show this club under Featured clubs on the homepage.
+                </p>
+              </div>
             </div>
           )}
 

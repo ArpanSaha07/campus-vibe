@@ -1,11 +1,10 @@
-import type { CSSProperties } from "react";
+import { Suspense, type CSSProperties } from "react";
 import BannerCarousel from "@/app/components/main-page/BannerCarouselMainPage";
 import EventSection from "@/app/components/main-page/EventSectionMainPage";
 import DiscoverClubs from "@/app/components/main-page/DiscoverClubsMainPage";
 import PlannerCard from "@/app/components/main-page/PlannerCardMainPage";
 
 import { popularEvents } from "@/app/data/data";
-import { clubs } from "@/app/data/data";
 
 function reveal(index: number): CSSProperties {
   return { "--reveal-index": index } as CSSProperties;
@@ -30,7 +29,11 @@ export default function Home() {
         <EventSection title="Outdoors" events={popularEvents} />
       </div>
       <div className="fade-up" style={reveal(6)}>
-        <DiscoverClubs clubs={clubs} />
+        {/* Fetches live clubs itself; no fallback, since it renders nothing
+            when there is nothing to feature. */}
+        <Suspense fallback={null}>
+          <DiscoverClubs />
+        </Suspense>
       </div>
     </main>
   );
