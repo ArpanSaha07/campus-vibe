@@ -156,6 +156,7 @@ services:
       AUTH_RATE_LIMIT_MAX_FAILED_LOGINS: ${AUTH_RATE_LIMIT_MAX_FAILED_LOGINS:-5}
       AUTH_RATE_LIMIT_LOCKOUT: ${AUTH_RATE_LIMIT_LOCKOUT:-15m}
       AUTH_RATE_LIMIT_TRUST_XFF: ${AUTH_RATE_LIMIT_TRUST_XFF:-false}
+      AUTH_RATE_LIMIT_TRUSTED_PROXY_HOPS: ${AUTH_RATE_LIMIT_TRUSTED_PROXY_HOPS:-2}
 
       # One bucket for every media kind, separated by key prefix (ADR-012).
       # Production sets this to campusvibe-prod-media; application.yml gives it
