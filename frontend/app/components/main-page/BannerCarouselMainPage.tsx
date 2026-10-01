@@ -17,7 +17,7 @@ export default function BannerCarousel() {
   const banners = [
     {
       img: "/mcgill-find-clubs.jpg",
-      link: "https://ssmu.ca/student-life/activities-night/",
+      link: "https://www.campusvibe-mcgill.com/events/3",
       alt: "Activities Night",
       eyebrow: "Find your people in",
       title: "Activities Night",
@@ -26,7 +26,7 @@ export default function BannerCarousel() {
     },
     {
       img: "/tech-fair.png",
-      link: "https://www.mcgill.ca/careers4engineers/techfair/students",
+      link: "https://www.campusvibe-mcgill.com/events/2",
       alt: "Tech Fair 2026",
       eyebrow: "Supercharge your career at",
       title: "Tech Fair 2026",

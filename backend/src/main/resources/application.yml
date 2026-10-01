@@ -142,9 +142,13 @@ campusvibe.auth.rate-limit:
   window: ${AUTH_RATE_LIMIT_WINDOW:1m}
   max-failed-logins: ${AUTH_RATE_LIMIT_MAX_FAILED_LOGINS:5}
   lockout-duration: ${AUTH_RATE_LIMIT_LOCKOUT:15m}
-  # Only true behind a proxy that sets X-Forwarded-For (an ALB). On a directly
-  # exposed app it lets a caller forge an IP per request and bypass the limit.
+  # Only true behind proxies that append to X-Forwarded-For (CloudFront or an
+  # ALB, then Elastic Beanstalk's nginx). On a directly exposed app it lets a
+  # caller forge an IP per request and bypass the limit.
   trust-forwarded-header: ${AUTH_RATE_LIMIT_TRUST_XFF:false}
+  # How many of those proxies append. The client is this many entries from the
+  # right; everything left of it was written by the caller (ADR-017).
+  trusted-proxy-hops: ${AUTH_RATE_LIMIT_TRUSTED_PROXY_HOPS:2}
 
 # AI providers. Every value is externalised so the same artifact runs unchanged
 # in local dev (docker/.env) and production (Elastic Beanstalk environment

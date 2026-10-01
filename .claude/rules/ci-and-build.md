@@ -40,6 +40,14 @@ paths:
   redundant: Windows takes FORMAT from the region setting. A plugin that later
   sets `argLine` itself (JaCoCo, a Mockito agent) must be prepended with
   `@{argLine}`, or it silently replaces the pin. (BUG-001)
+- **CI runs no ITs and never starts the compose stack — on purpose, for now.**
+  quay.io refuses anonymous pulls of `minio/minio` and `minio/mc`, and every IT
+  starts MinIO, so `_backend.yml` is pinned to `-DskipITs` and `_docker.yml`'s
+  *Start the stack* through *Smoke test the API* are commented out, each marked
+  `TEMP 2026-09-30`. A green PR proves unit tests only. Uncomment both together,
+  and only once `MinioTestContainer` and compose pull a store that exists.
+  `verify.mjs --full` still runs the ITs — the one deliberate drift from the
+  mirror below. (BUG-063)
 - **`scripts/verify.mjs` mirrors `_frontend.yml` and `_backend.yml`.** Change a
   workflow and the script together — the moment they drift, local green stops
   meaning CI green, which is the only thing the script is for.

@@ -56,7 +56,7 @@ class PlannerConversationIT extends PlannerIntegrationTest {
                 .andExpect(jsonPath("$.conversations[0].id").value(created))
                 .andExpect(jsonPath("$.conversations[1].id").value(older))
                 .andExpect(jsonPath("$.usage.used").value(0))
-                .andExpect(jsonPath("$.usage.limit").value(15))
+                .andExpect(jsonPath("$.usage.limit").value(PlannerLimits.DAILY_MESSAGES))
                 .andExpect(jsonPath("$.usage.resetsAt").exists());
 
         mockMvc.perform(get("/api/v1/planner/conversations/{id}", created).header("Authorization", bearer(user)))

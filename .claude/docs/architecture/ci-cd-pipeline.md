@@ -4,7 +4,9 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `f7a4399` plus the uncommitted club page unit for the `images`
+**Code as of:** `63d657f` plus the uncommitted BUG-063 stopgap for
+`_backend.yml` and `_docker.yml`, re-read 2026-10-01 — see the note below; no
+other section was re-read. Before that, `f7a4399` plus the uncommitted club page unit for the `images`
 section — re-read 2026-09-16: `remotePatterns` moved from the `new URL()` form
 to the object form ([BUG-060](../../bugs/fixed_bugs.md#bug-060)). Before that,
 `95418a1` plus the uncommitted planner backend unit for `docker/` — re-read 2026-09-16: compose and `.env.example` gained three `OPENAI_*` planner variables, which nothing here enumerates or tests; no workflow, build step or image changed. `081d7b3` for the paragraph on BOM pins under the Trivy gate —
@@ -19,6 +21,18 @@ extraction of 2026-08-17 (`scripts/lint-migrations.mjs`, `_database.yml`,
 assertion reconciled 2026-09-08 ([BUG-038](../../bugs/fixed_bugs.md#bug-038)),
 plus the `hooks` component of `verify.mjs` added 2026-09-08. Other sections are
 unreviewed since 2026-08-16.
+
+> **Temporary, 2026-09-30 — read before anything below.** quay.io stopped
+> serving `minio/minio` and `minio/mc` without a login, and every IT starts
+> MinIO, so the PR run lost 314 of 332 ITs and the stack job died at `compose
+> up` ([BUG-063](../../bugs/bugs.md#bug-063)). At Arpan's instruction both are
+> commented out: `_backend.yml` always runs `-DskipITs`, ignoring
+> `run-integration-tests`, and `_docker.yml` builds the images, boots the
+> production frontend and runs Trivy, but no longer starts the stack, waits on
+> it or smoke-tests it. **Where this document says the PR runs the integration
+> suites or the Docker stack, it does not today.** `verify.mjs --full` still
+> runs them locally. Both blocks are marked `TEMP 2026-09-30`; they come back
+> together once MinIO has a pullable replacement.
 
 > **Note, 2026-08-16.** The dated banner below is kept as a record of where the
 > pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:

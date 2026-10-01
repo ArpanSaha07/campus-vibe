@@ -27,6 +27,12 @@ import java.time.Duration;
  *                           (an ALB); trusting it on a directly exposed app
  *                           lets any caller forge a fresh IP per request and
  *                           bypass the limit entirely.
+ * @param trustedProxyHops   how many proxies in front of the app append to
+ *                           X-Forwarded-For. The client is that many entries
+ *                           from the right; anything further left was written
+ *                           by the caller. Default 2: one edge proxy (the ALB,
+ *                           or CloudFront per ADR-017) plus Elastic Beanstalk's
+ *                           nginx. Only read when trustForwardedHeader is true.
  */
 @ConfigurationProperties(prefix = "campusvibe.auth.rate-limit")
 public record RateLimitProperties(
@@ -35,12 +41,14 @@ public record RateLimitProperties(
         Duration window,
         int maxFailedLogins,
         Duration lockoutDuration,
-        boolean trustForwardedHeader
+        boolean trustForwardedHeader,
+        int trustedProxyHops
 ) {
     public RateLimitProperties {
         if (ipRequestsPerWindow <= 0) ipRequestsPerWindow = 20;
         if (window == null) window = Duration.ofMinutes(1);
         if (maxFailedLogins <= 0) maxFailedLogins = 5;
         if (lockoutDuration == null) lockoutDuration = Duration.ofMinutes(15);
+        if (trustedProxyHops <= 0) trustedProxyHops = 2;
     }
 }

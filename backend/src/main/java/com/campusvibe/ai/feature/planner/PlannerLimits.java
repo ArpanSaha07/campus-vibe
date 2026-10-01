@@ -13,7 +13,7 @@ public final class PlannerLimits {
     public static final int MAX_CONVERSATIONS = 15;
 
     /** Messages per user per America/Toronto day, across every chat. */
-    public static final int DAILY_MESSAGES = 15;
+    public static final int DAILY_MESSAGES = 1000; // TEMP demo 2026-09-30: revert to 15
 
     /** Longest message, in characters. The page's MAX_PROMPT_LENGTH. */
     public static final int MAX_PROMPT_LENGTH = 1000;

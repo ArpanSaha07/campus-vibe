@@ -1,16 +1,17 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-09-17** · Branch: `develop`
+Last updated: **2026-10-01** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
 **Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16) · BUG-062, opened and fixed the same day (2026-09-17, event card actions on touch)
 
-**Highest id issued: BUG-062.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-063.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — commented out until MinIO is replaced |
 | [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
@@ -21,6 +22,46 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
+
+---
+
+### BUG-063
+**MinIO's images can no longer be pulled, so CI runs no integration tests and never starts the stack** · High · OPEN
+
+**Found:** 2026-09-30, on PR #68 (`develop`), run `36810797005`.
+
+**Symptom.** `Backend / Build and test`: 164 unit tests pass, then 314 of 332
+ITs error in under a second each with `Failed to load ApplicationContext`,
+caused by `ContainerFetchException: Can't get Docker image:
+quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`. `Docker / Build images and
+run the stack` fails at `docker compose up` with `minio-init Error
+unauthorized: access to the requested resource is not authorized`.
+
+**Cause.** Not code. quay.io now answers 401 for `minio/minio` and `minio/mc`
+without credentials (`curl https://quay.io/api/v1/repository/minio/mc` →
+`invalid_token`), and Docker Hub has no public copy of either tag (404). Every
+IT starts `MinioTestContainer` through `AbstractIntegrationTest`
+(`MinioTestContainer.java:52`), and the compose backend waits on `minio-init`
+(`docker/docker-compose.yml:183`), so both jobs die on the pull.
+
+**Stopgap, 2026-09-30, at Arpan's instruction** — commented out in CI only,
+each block marked `TEMP 2026-09-30`:
+- `.github/workflows/_backend.yml`: the `run-integration-tests` branch, so
+  every run is `./mvnw -B verify -DskipITs`. **The Postgres-only ITs are off
+  too** — they share the base class.
+- `.github/workflows/_docker.yml`: *Start the stack* through *Smoke test the
+  API*. Images are still built; Trivy now names `campusvibe-backend` instead of
+  reading it from a running container.
+
+Arpan was offered a registry login in CI and a replacement store, and chose
+the stopgap. `MinioTestContainer`, compose and `verify.mjs --full` are unchanged, so
+**locally the ITs still need a MinIO image already in the Docker cache**.
+
+**Fix (untaken).** Replace MinIO with a store that can be pulled, which
+overturns [ADR-011](../docs/decisions/ADR-011-minio-replaces-fakes3.md) and so
+needs a Proposed ADR first; swap the image in `MinioTestContainer` and
+`docker-compose.yml` together; then uncomment both workflow blocks. Close on a
+green PR run with the ITs back on.
 
 ---
 

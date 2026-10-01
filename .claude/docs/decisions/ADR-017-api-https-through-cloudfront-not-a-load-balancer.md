@@ -1,6 +1,6 @@
-# ADR-014 — HTTPS for the API moves from the load balancer to CloudFront, in front of a single-instance environment
+# ADR-017 — HTTPS for the API moves from the load balancer to CloudFront, in front of a single-instance environment
 
-**Status:** Proposed — only Arpan moves this to Accepted
+**Status:** Accepted 2026-09-22
 **Date:** 2026-09-15
 **Raised by:** the first production deploy. Arpan asked what the load balancer
 costs, then what HTTPS without it would take, and asked for this record so the
@@ -8,7 +8,7 @@ move can be made after the demo. The 2026-09-12 choice to keep the load balancer
 was never an ADR; it is recorded in
 [`aws-deployment.md`](../architecture/aws-deployment.md) and
 [`connecting-elastic-beanstalk.md`](../architecture/connecting-elastic-beanstalk.md).
-**Approved by:** — (pending)
+**Approved by:** Arpan, 2026-09-22, scheduled for immediately rather than after the demo ([spec](../../specs/2026-09-22-cloudfront-single-instance.md))
 **Implemented in:** — not yet built. Nothing changes until this is accepted and
 scheduled; the load balancer stays for the demo.
 
