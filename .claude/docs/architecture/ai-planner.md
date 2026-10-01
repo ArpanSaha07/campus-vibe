@@ -6,13 +6,22 @@ uncommitted planner backend unit. Seen working on the local stack against the
 real OpenAI key: a streamed events answer, a clubs follow-up, an events
 follow-up, a reload, and a prompt-injection attempt declined. Not yet deployed.
 **Authors:** main session.
-**Code as of:** `95418a1` plus the uncommitted planner backend unit, read
+**Code as of:** `63d657f` for the daily limit only, re-read 2026-10-01:
+`PlannerLimits.java:16` and `PlannerConversationIT.java:59`; nothing else moved.
+Before that, `95418a1` plus the uncommitted planner backend unit, read
 2026-09-16: everything under `backend/src/main/java/com/campusvibe/ai/`, V36,
 the planner queries in `SearchRepository`, and the frontend files below, which
 the unit did not change. Before that, `70336d2` plus the event end time unit.
 **Specs:** [`2026-09-16-planner-chat-ui.md`](../../specs/2026-09-16-planner-chat-ui.md)
 (frontend) · [`2026-09-16-planner-backend.md`](../../specs/2026-09-16-planner-backend.md)
 (backend).
+
+> **Temporary, 2026-09-30.** `PlannerLimits.DAILY_MESSAGES` is **1000**, not
+> 15, for a demo (`63d657f`, marked `TEMP` on the line). Every *15 messages a
+> day* below describes the intended value; the page reads the limit from the
+> usage response, so only the backend changes back. `PlannerConversationIT`
+> now asserts the constant rather than a literal 15, as the other planner ITs
+> already did, so the revert needs no test change.
 
 ## In one paragraph
 
@@ -147,7 +156,8 @@ A signed-out caller gets 403, as every other signed-in route here does.
 
 The day is `America/Toronto`'s. `spend` returns the day it counted against, so a
 refund after midnight hands back the right day's message. `trySpend` is one
-`INSERT … ON CONFLICT DO UPDATE … WHERE message_count < 15`, so two sends at 14
+`INSERT … ON CONFLICT DO UPDATE … WHERE message_count < ?`, bound to
+`DAILY_MESSAGES`,, so two sends at 14
 cannot both pass. 429 carries `Retry-After` through the existing
 `TooManyAttemptsException` handler.
 
