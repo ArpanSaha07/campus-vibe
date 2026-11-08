@@ -56,7 +56,10 @@ lever those bugs used has nothing to point at.
 **Fix, half taken.**
 - **Frontend, done 2026-11-07, uncommitted.** `npm update next` moved the
   lockfile to 16.4.5 inside `^16.3.3`. `verify.mjs --all` is green and
-  `npm audit --omit=dev` reports 0 critical; Trivy was not run locally.
+  `npm audit --omit=dev` reports 0 critical. **Proved in CI** once pushed as
+  `9116608`: run `42439638257` passed the frontend image through the gate,
+  and the failure named one finding class, the backend's, where the first
+  run named two.
 - **Backend, accepted and built 2026-11-07, uncommitted.** Arpan chose option B with the 2026-12-31 expiry. [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)
   sets a `.trivyignore.yaml` entry scoped by id, `purl` and
   `expired_at` 2026-12-31, then Spring Boot 4.
