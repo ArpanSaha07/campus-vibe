@@ -27,8 +27,12 @@ paths:
   is no `<spring-framework.version>` to point at, and a scanner's 6.2.x fixed
   version may not resolve. Check what the CVE needs before treating it as
   reachable here. The route is ADR-022: a `.trivyignore.yaml` entry scoped by
-  id, `purl` and `expired_at`, never a bare id, then Spring Boot 4.
-  (BUG-064, ADR-022 — Proposed)
+  id, `purl` and `expired_at`, never a bare id, and only with an ADR; then
+  Spring Boot 4. Two entries exist, expiring **2026-12-31** — when they do the
+  gate goes red by itself. Never move the date in place. (BUG-064, ADR-022)
+- **Every `trivy image` call in `_docker.yml` passes `--ignorefile`**: the
+  report, the gate and the class list. Add a fourth call without it and it
+  disagrees with the gate. (ADR-022)
 - **The Elastic Beanstalk zip must use forward slashes in every entry name.**
   Windows PowerShell 5.1's `ZipFile.CreateFromDirectory` writes backslashes for
   anything below the root, and Linux unzip on the instance reads

@@ -66,4 +66,11 @@ Kept deliberately short: this loads on every backend Java read.
   proves by failing when the line is removed. Set an explicit emitter timeout
   too: Tomcat's default async timeout is 30 seconds.
   ([`ai-planner.md`](../docs/architecture/ai-planner.md))
+- **No view rendering in the backend while ADR-022's exception stands** —
+  no `ViewResolver`, `XsltView`, `ModelAndView`, template engine, or SSE
+  carrying view fragments. Two `spring-webmvc` 6.2.19 CRITICALs are excepted
+  in `.trivyignore.yaml` only because none of those exists; adding one voids
+  the exception, so delete both entries and fix the version first (Spring
+  Boot 4). The planner's `SseEmitter` must keep sending JSON data.
+  (BUG-064, [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md))
 - **The IT suites need Testcontainers:** `node scripts/verify.mjs --full`.

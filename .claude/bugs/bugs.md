@@ -11,7 +11,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 
 | ID | Severity | Summary |
 |---|---|---|
-| [BUG-064](#bug-064) | High | PR #71's Trivy gate fails on four fixable CRITICALs: `next` 16.3.8, live on Vercel (fixed in the lockfile, uncommitted), and `spring-webmvc` 6.2.19, which no free release fixes ([ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md), Proposed) |
+| [BUG-064](#bug-064) | High | PR #71's Trivy gate fails on four fixable CRITICALs: `next` 16.3.8, live on Vercel (fixed in the lockfile, uncommitted), and `spring-webmvc` 6.2.19, which no free release fixes, excepted until 2026-12-31 by [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md) |
 | [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — commented out until MinIO is replaced |
 | [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
@@ -57,8 +57,8 @@ lever those bugs used has nothing to point at.
 - **Frontend, done 2026-11-07, uncommitted.** `npm update next` moved the
   lockfile to 16.4.5 inside `^16.3.3`. `verify.mjs --all` is green and
   `npm audit --omit=dev` reports 0 critical; Trivy was not run locally.
-- **Backend, waiting on Arpan.** [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)
-  proposes a `.trivyignore.yaml` entry scoped by id, `purl` and
+- **Backend, accepted and built 2026-11-07, uncommitted.** Arpan chose option B with the 2026-12-31 expiry. [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)
+  sets a `.trivyignore.yaml` entry scoped by id, `purl` and
   `expired_at` 2026-12-31, then Spring Boot 4.
 
 **Closes** when PR #71's Docker job is green with `next` 16.4.5 committed

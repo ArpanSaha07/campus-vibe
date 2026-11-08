@@ -1,15 +1,14 @@
 # ADR-022 — Two Spring MVC CVEs are excepted from the Trivy gate, scoped and expiring, until Spring Boot 4
 
-**Status:** Proposed — only Arpan moves this to Accepted
+**Status:** Accepted 2026-11-07
 **Date:** 2026-11-07
 **Raised by:** PR #71 (`develop` → `main`). Its Docker job failed the Trivy gate
 on four fixable CRITICALs. Two were `next` 16.3.8 in the frontend, fixed the
 same day by moving the lockfile to 16.4.5. The other two are the subject of
 this record. Arpan accepted the recommendation in session: the exception
 first, then the migration.
-**Approved by:** — (pending)
-**Implemented in:** — not yet built. Nothing is suppressed until this is
-accepted.
+**Approved by:** Arpan, 2026-11-07 — option B with the 2026-12-31 expiry, Spring Boot 4 later
+**Implemented in:** `.trivyignore.yaml` and `--ignorefile` on all three `trivy image` calls in `.github/workflows/_docker.yml` (the class-list call too, so the error message agrees with the gate), 2026-11-07, uncommitted. Not yet proved by a CI run.
 
 ## Context
 

@@ -4,7 +4,10 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `63d657f` plus the uncommitted BUG-063 stopgap for
+**Code as of:** `9116608` plus the uncommitted ADR-022 exception for the
+Trivy sections (`_docker.yml` step 7, `.trivyignore.yaml`, the BOM-pins
+decision), re-read 2026-11-07; no other section was re-read. Before that,
+`63d657f` plus the uncommitted BUG-063 stopgap for
 `_backend.yml` and `_docker.yml`, re-read 2026-10-01 — see the note below; no
 other section was re-read. Before that, `f7a4399` plus the uncommitted club page unit for the `images`
 section — re-read 2026-09-16: `remotePatterns` moved from the `new URL()` form
@@ -601,7 +604,12 @@ In order:
    `--exit-code 1`. On failure the step now reports the Trivy finding **class**
    and how to route it. It previously said `Bump the base image`, which was the
    one cause that applied to none of the three findings in the first real
-   failure — see BUG-016.
+   failure — see BUG-016. **Since 2026-11-07 all three `trivy image` calls —
+   report, gate, and the class list on failure — pass `--ignorefile
+   "$GITHUB_WORKSPACE/.trivyignore.yaml"`**, so the three never disagree about
+   what is excepted (ADR-022, BUG-064). The class-list call needed it too:
+   without it, a failure message would name findings the gate had already
+   excepted.
 
 Container logs dump `if: failure()`; teardown is `if: always()`.
 
@@ -736,6 +744,30 @@ the rule — an entry is only ever for a value that is provably not a credential
 anything that authenticated against a real system must be **rotated**, not
 ignored, because rewriting history does not help once the commit is pushed.
 
+### `.trivyignore.yaml` (repo root)
+
+The Trivy gate's exceptions, added 2026-11-07 by
+[ADR-022](../decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md).
+Two entries, CVE-2026-47884 and CVE-2026-47890 in `spring-webmvc` 6.2.19. No
+free 6.2.x carries the fix and 3.5.16 is the last Boot 3.5, so the override
+lever below has nothing to point at; neither CVE's precondition (`XsltView`,
+SSE view fragments) exists in the backend.
+
+Each entry is scoped three ways, which is what answers ADR-003's objection
+that a suppression *silences the next one too*:
+- **`id`** — a new CVE is still gated.
+- **`purls`, versioned** — `pkg:maven/org.springframework/spring-webmvc@6.2.19`,
+  so a version change, or any other package, falls out of scope.
+- **`expired_at: 2026-12-31`** — after which Trivy stops honouring the entry
+  and the gate fails again with no one having to remember. Spring Boot 4 is
+  due first, and deletes both entries.
+
+YAML rather than a plain `.trivyignore`, because only the YAML form carries
+`purls`, `expired_at` and a `statement`. **Unproved as of this writing:** a
+local Trivy run was not possible, so PR #71's Docker job is the first to read
+the file. If Trivy 0.74.0 does not match the versioned purl, the two CVEs stay
+in the report; drop `@6.2.19`, never the `purls` line.
+
 ### `backend/pom.xml` — the unit/integration split
 
 `maven-failsafe-plugin` declared with **no `<executions>` block**. Surefire runs
@@ -839,6 +871,14 @@ so the lever is a property override in `backend/pom.xml`: `<tomcat.version>`
 does not bump a property that overrides a BOM**, so this gate is the only thing
 that notices either going stale. BUG-050 also carried `next` 16.3.0 on the
 frontend image, which was an ordinary lockfile bump.
+
+**On Spring Framework itself the lever is gone** (BUG-064, 2026-11-07).
+`spring-webmvc` 6.2.19 is the last free 6.2.x, so two CRITICALs had no version
+to pin. ADR-022 rejected the Boot 4 migration as the immediate fix (days,
+while the same red gate held a Next.js RCE fix off the live site), paid 6.2
+support, and leaving the gate red, and chose the scoped, expiring exception in
+`.trivyignore.yaml` above. The frontend half of BUG-064 was again an ordinary
+lockfile bump, `next` 16.3.8 → 16.4.5.
 
 **A limit of image scanning worth stating plainly.** Now that the frontend image
 ships `.next/standalone`, client-side dependencies have no `package.json` in it —
