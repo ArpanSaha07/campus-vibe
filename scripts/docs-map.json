@@ -80,6 +80,7 @@
       "covers": "GitHub Actions, tiering, the ci-success gate, local CI parity, and the dependency pins the Trivy gate depends on",
       "paths": [
         ".github/workflows/",
+        ".github/actions/",
         ".githooks/",
         "scripts/verify.mjs",
         "scripts/check-docs.mjs",
@@ -238,6 +239,7 @@
       "reason": "What gates what, the exhausted Tomcat lever, and the local/CI parity script",
       "paths": [
         ".github/workflows/",
+        ".github/actions/",
         ".githooks/",
         "scripts/verify.mjs",
         "backend/pom.xml",

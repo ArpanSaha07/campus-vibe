@@ -257,20 +257,10 @@ jobs:
           docker logs campusvibe-frontend-prod --tail 100
           exit 1
 
-      # Pinned to a release tarball rather than piping contrib/install.sh from
-      # the upstream `main` branch into a shell. That script is unversioned by
-      # definition — whatever was merged upstream minutes ago would run here —
-      # and a vulnerability scanner that is itself installed from a moving
-      # target is an odd thing to trust. Bump TRIVY_VERSION by hand; Dependabot
-      # does not watch raw downloads.
+      # The version pin and its reasoning live in the composite action, shared
+      # with trivy-weekly.yml, so both scans always run the same Trivy.
       - name: Install Trivy
-        env:
-          TRIVY_VERSION: 0.74.0
-        run: |
-          set -euo pipefail
-          curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
-            | sudo tar -xz -C /usr/local/bin trivy
-          trivy --version
+        uses: ./.github/actions/setup-trivy
 
       # Two passes on purpose.
       #

@@ -1,0 +1,200 @@
+name: Trivy weekly
+
+# Scans what develop would ship, once a week, with no pull request needed. The
+# only other scan is the Docker job's gate, which runs when a PR or branch push
+# triggers it — which is why BUG-019, BUG-035, BUG-050 and BUG-064 were each
+# found on a PR, days after their advisory was published.
+#
+# Same threshold as that gate: fail on fixable CRITICAL, report fixable HIGH,
+# and read .trivyignore.yaml, so ADR-022's exception and its expiry apply here
+# exactly as on a PR. A green weekly run predicts a green gate.
+#
+# Four targets, each with its own SARIF category so a clean scan of one can
+# never close another's alerts in Security → Code scanning:
+#   trivy-backend   backend/Dockerfile, the image the PR gate builds
+#   trivy-frontend  frontend/Dockerfile --target runner, likewise
+#   trivy-eb        deploy/eb/Dockerfile — the image Elastic Beanstalk RUNS.
+#                   Its JRE base is not the gate's JDK base, and nothing else
+#                   ever builds or scans it.
+#   trivy-fs        backend/pom.xml and frontend/package-lock.json, which is
+#                   what Vercel builds the live site from
+#
+# Scans develop, not main (Arpan, 2026-11-07): a finding lands where it is
+# fixed, and reaches main by PR through the gate. A schedule only ever fires
+# from the default branch, so this file lives on main and checks develop out
+# explicitly. A green run says nothing about main while a fix sits unmerged.
+#
+# Spec: .claude/specs/2026-11-07-weekly-trivy-scan.md
+
+on:
+  schedule:
+    # Mondays 08:00 UTC, an hour after CodeQL's weekly run.
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+  # A PR that touches this workflow or the shared Trivy install runs it, so a
+  # change is proved before merge. workflow_dispatch only exists once the file
+  # is on main, which is too late to find out it does not work.
+  pull_request:
+    paths:
+      - .github/workflows/trivy-weekly.yml
+      - .github/actions/setup-trivy/**
+
+concurrency:
+  group: trivy-weekly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan images and lockfiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+      # Required to upload SARIF to the code-scanning API, as in codeql.yml.
+      security-events: write
+
+    steps:
+      # A PR run scans the PR's own code; scheduled and manual runs scan
+      # develop. An empty ref is checkout's default for the event.
+      - name: Checkout ${{ github.event_name == 'pull_request' && 'the pull request' || 'develop' }}
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request' && '' || 'develop' }}
+
+      - name: Record the scanned commit
+        id: rev
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Scanning $(git log -1 --format='%h %s')"
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      # Both backend images COPY a packaged jar rather than building it.
+      - name: Build backend jar
+        working-directory: ./backend
+        run: ./mvnw -B -DskipTests -DskipITs package
+
+      # docker build directly rather than compose: compose refuses to produce a
+      # config without docker/.env's secrets, and this job runs nothing.
+      - name: Build the images
+        run: |
+          set -euo pipefail
+          docker build -f backend/Dockerfile -t campusvibe-backend .
+          docker build --target runner -f frontend/Dockerfile -t campusvibe-frontend:prod .
+
+          # The Elastic Beanstalk build context is a bundle root holding only
+          # the Dockerfile and app.jar, as scripts/package-eb.mjs stages it.
+          shopt -s nullglob
+          jars=(backend/target/campusvibe-*.jar)
+          if [ "${#jars[@]}" -ne 1 ]; then
+            echo "::error::expected one campusvibe-*.jar in backend/target, found ${#jars[@]}"
+            exit 1
+          fi
+          stage=$(mktemp -d)
+          cp deploy/eb/Dockerfile "$stage/Dockerfile"
+          cp "${jars[0]}" "$stage/app.jar"
+          docker build -t campusvibe-eb "$stage"
+
+      - name: Install Trivy
+        uses: ./.github/actions/setup-trivy
+
+      # Report, SARIF and gate for every target, before failing on any of them,
+      # so every SARIF file exists for the uploads below even when a gate trips.
+      - name: Scan
+        id: scan
+        run: |
+          set -euo pipefail
+          ignorefile="$GITHUB_WORKSPACE/.trivyignore.yaml"
+          mkdir -p sarif
+          failed=""
+
+          scan() {
+            local category=$1 kind=$2 target=$3
+            shift 3
+            local common=(--scanners vuln --ignore-unfixed --ignorefile "$ignorefile" "$@")
+
+            echo "::group::Trivy report (HIGH+CRITICAL, fixable) — $category"
+            trivy "$kind" "${common[@]}" --severity HIGH,CRITICAL --exit-code 0 "$target"
+            echo "::endgroup::"
+
+            trivy "$kind" "${common[@]}" --severity HIGH,CRITICAL --exit-code 0 \
+              --format sarif --output "sarif/$category.sarif" --quiet "$target"
+
+            echo "--- Gate: fixable CRITICAL — $category ---"
+            if ! trivy "$kind" "${common[@]}" --severity CRITICAL --exit-code 1 \
+                --quiet "$target"; then
+              failed="$failed $category"
+            fi
+          }
+
+          scan trivy-backend  image campusvibe-backend
+          scan trivy-frontend image campusvibe-frontend:prod
+          scan trivy-eb       image campusvibe-eb
+          # The repo's manifests, not the jar the job built: skip its output.
+          scan trivy-fs       fs    . --skip-dirs backend/target
+
+          echo "failed=${failed# }" >> "$GITHUB_OUTPUT"
+
+      # Scheduled and manual runs file their alerts against develop, the branch
+      # scanned, not main, the branch the workflow ran from. A PR run leaves
+      # both empty and files them against the pull request.
+      - name: Upload SARIF — backend image
+        if: always() && hashFiles('sarif/trivy-backend.sarif') != ''
+        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3.37.7
+        with:
+          sarif_file: sarif/trivy-backend.sarif
+          category: trivy-backend
+          ref: ${{ github.event_name != 'pull_request' && 'refs/heads/develop' || '' }}
+          sha: ${{ github.event_name != 'pull_request' && steps.rev.outputs.sha || '' }}
+
+      - name: Upload SARIF — frontend image
+        if: always() && hashFiles('sarif/trivy-frontend.sarif') != ''
+        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3.37.7
+        with:
+          sarif_file: sarif/trivy-frontend.sarif
+          category: trivy-frontend
+          ref: ${{ github.event_name != 'pull_request' && 'refs/heads/develop' || '' }}
+          sha: ${{ github.event_name != 'pull_request' && steps.rev.outputs.sha || '' }}
+
+      - name: Upload SARIF — Elastic Beanstalk image
+        if: always() && hashFiles('sarif/trivy-eb.sarif') != ''
+        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3.37.7
+        with:
+          sarif_file: sarif/trivy-eb.sarif
+          category: trivy-eb
+          ref: ${{ github.event_name != 'pull_request' && 'refs/heads/develop' || '' }}
+          sha: ${{ github.event_name != 'pull_request' && steps.rev.outputs.sha || '' }}
+
+      - name: Upload SARIF — lockfiles
+        if: always() && hashFiles('sarif/trivy-fs.sarif') != ''
+        uses: github/codeql-action/upload-sarif@f3712979fa5f215279b101dd0a2e3bdfb4353324 # v3.37.7
+        with:
+          sarif_file: sarif/trivy-fs.sarif
+          category: trivy-fs
+          ref: ${{ github.event_name != 'pull_request' && 'refs/heads/develop' || '' }}
+          sha: ${{ github.event_name != 'pull_request' && steps.rev.outputs.sha || '' }}
+
+      # Last, so the uploads above run whatever the gate found. A failed
+      # scheduled run is what emails Arpan.
+      - name: Gate — fixable CRITICAL
+        if: steps.scan.outputs.failed != ''
+        run: |
+          echo "::error::A fixable CRITICAL vulnerability is present in: ${{ steps.scan.outputs.failed }}."
+          echo "Route it exactly as a PR gate failure (rules/ci-and-build.md):"
+          echo "  a dependency (jar, node-pkg) is ours to bump on develop;"
+          echo "  a base-image package means a new tag, or a line in bugs.md."
+          echo "trivy-eb is the image production runs; a finding there only"
+          echo "reaches production on the next package-eb.mjs deploy."
+          echo "Full tables are in the Scan step; alerts are under Security,"
+          echo "Code scanning, with the develop branch filter."
+          exit 1

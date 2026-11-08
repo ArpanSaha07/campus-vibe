@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-09-17**
+Last updated: **2026-11-07**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-064](#bug-064) | High | 2026-11-07 | The Trivy gate failed on two `next` 16.3.8 RCEs and two `spring-webmvc` 6.2.19 CVEs that no free release fixes: `next` 16.4.5 in the lockfile, and a scoped, expiring exception for Spring ([ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)) |
 | [BUG-062](#bug-062) | Low | 2026-09-17 | An event card's Like and Share buttons were invisible on every phone and tablet, yet still tappable: Tailwind v4 only applies `group-hover` where the device can hover |
 | [BUG-060](#bug-060) | Medium | 2026-09-16 | Every club photo answered 400 the first time a page rendered `club.images`: a `remotePatterns` entry written as `new URL(...)` forbids a query string, and the error blamed the hostname |
 | [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
@@ -53,6 +54,59 @@ Last updated: **2026-09-17**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-064
+**The Trivy gate failed on four fixable CRITICALs, two of them Next.js RCEs live on Vercel** · High · FIXED 2026-11-07
+
+**Found:** 2026-11-07, on PR #71 (`develop` → `main`), run `42436024598`,
+job `Docker / Build images and run the stack`.
+
+**Symptom.** The gate's `--severity CRITICAL --exit-code 1` scan failed with
+*finding classes: lang-pkgs lang-pkgs*. Both base images were clean
+(`alpine 3.24.4`, 0 findings); every finding is an application library.
+
+| Image | Library | Installed | Fixed in | Findings |
+|---|---|---|---|---|
+| `campusvibe-frontend:prod` | `next` | 16.3.8 | 16.4.1 | GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr — unauthenticated RCE |
+| `campusvibe-backend` | `spring-webmvc` | 6.2.19 | 7.0.9 | CVE-2026-47884 (`XsltView`), CVE-2026-47890 (SSE view fragments) |
+
+**Cause.** Not code: advisories published against pinned versions, the same
+shape as BUG-019, BUG-035 and BUG-050. What is new is the backend half. No free
+6.2.x carries the fix and Boot 3.5.16 is the last 3.5, so the version-property
+lever those bugs used has nothing to point at.
+
+**Exposure.**
+- **Frontend: real.** `origin/main` locks `next` 16.3.8, and the live
+  Vercel site is not paused.
+- **Backend: none found.** There is no `XsltView`, view resolver or template
+  engine, and the planner's `SseEmitter` sends JSON only
+  (`SseReplySink.java:94`). Production is paused anyway.
+
+**Fix, half taken.**
+- **Frontend, done 2026-11-07, uncommitted.** `npm update next` moved the
+  lockfile to 16.4.5 inside `^16.3.3`. `verify.mjs --all` is green and
+  `npm audit --omit=dev` reports 0 critical. **Proved in CI** once pushed as
+  `9116608`: run `42439638257` passed the frontend image through the gate,
+  and the failure named one finding class, the backend's, where the first
+  run named two.
+- **Backend, accepted and built 2026-11-07, uncommitted.** Arpan chose option B with the 2026-12-31 expiry. [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)
+  sets a `.trivyignore.yaml` entry scoped by id, `purl` and
+  `expired_at` 2026-12-31, then Spring Boot 4.
+
+**Closed 2026-11-07, proved in CI.** Run `42442088359` on PR #71 passed the
+Docker job and `CI`. The backend report fell from 9 findings (7 HIGH,
+2 CRITICAL) to 7 (7 HIGH, 0 CRITICAL): exactly the two ADR-022 CVEs dropped
+out, and the Jackson, Guava and pgjdbc HIGHs stayed listed, so nothing else
+was hidden. Trivy 0.74.0 matches a versioned `purls` entry; the `@6.2.19`
+fallback was not needed. The frontend half was proved earlier, in run
+`42439638257`.
+
+**Still open, and not this bug:** the live Vercel site serves `next` 16.3.8
+until PR #71 merges to `main`; the exception expires 2026-12-31, by which
+Spring Boot 4 must land. Both are in `todo.md`. Rules:
+`rules/ci-and-build.md` and `rules/backend-java.md`.
 
 ---
 

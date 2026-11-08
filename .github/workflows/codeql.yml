@@ -50,8 +50,9 @@ jobs:
     timeout-minutes: 30
 
     permissions:
-      # The only elevated scope in this repo's workflows: required to upload
-      # SARIF results to the code-scanning API.
+      # One of the two elevated scopes in this repo's workflows, both for the
+      # same purpose: uploading SARIF to the code-scanning API. The other is
+      # trivy-weekly.yml.
       security-events: write
       contents: read
       actions: read

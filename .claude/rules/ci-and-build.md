@@ -30,9 +30,18 @@ paths:
   id, `purl` and `expired_at`, never a bare id, and only with an ADR; then
   Spring Boot 4. Two entries exist, expiring **2026-12-31** — when they do the
   gate goes red by itself. Never move the date in place. (BUG-064, ADR-022)
-- **Every `trivy image` call in `_docker.yml` passes `--ignorefile`**: the
-  report, the gate and the class list. Add a fourth call without it and it
+- **Every Trivy call passes `--ignorefile`**, in `_docker.yml` (report, gate,
+  class list) and in `trivy-weekly.yml`'s `scan()`. A call without it
   disagrees with the gate. (ADR-022)
+- **Trivy's version lives only in `.github/actions/setup-trivy`.** Bump it
+  there; never add a second install step or `TRIVY_VERSION` to a workflow,
+  or the gate and the weekly scan drift apart.
+- **The weekly scan (`trivy-weekly.yml`) scans `develop`, not `main`.** A
+  failure there is routed exactly like a gate failure and fixed on `develop`.
+  A green weekly run says nothing about `main` while a fix is unmerged. Its
+  uploads must name `refs/heads/develop`, or the alerts land on `main`. Each
+  target keeps its own SARIF `category` — reuse one and a clean scan closes
+  another target's alerts.
 - **The Elastic Beanstalk zip must use forward slashes in every entry name.**
   Windows PowerShell 5.1's `ZipFile.CreateFromDirectory` writes backslashes for
   anything below the root, and Linux unzip on the instance reads
