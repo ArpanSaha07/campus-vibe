@@ -1,0 +1,25 @@
+name: Set up Trivy
+description: >-
+  Installs the pinned Trivy release binary. The one place the Trivy version is
+  set, shared by _docker.yml (the PR gate) and trivy-weekly.yml, so the two
+  scans can never run different scanners against the same images.
+
+# Pinned to a release tarball rather than piping contrib/install.sh from the
+# upstream `main` branch into a shell. That script is unversioned by
+# definition — whatever was merged upstream minutes ago would run here — and a
+# vulnerability scanner that is itself installed from a moving target is an
+# odd thing to trust. Bump TRIVY_VERSION by hand, here only; Dependabot does
+# not watch raw downloads.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Trivy
+      shell: bash
+      env:
+        TRIVY_VERSION: 0.74.0
+      run: |
+        set -euo pipefail
+        curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+          | sudo tar -xz -C /usr/local/bin trivy
+        trivy --version

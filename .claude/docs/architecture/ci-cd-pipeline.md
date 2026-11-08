@@ -4,9 +4,12 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `9116608` plus the uncommitted ADR-022 exception for the
+**Code as of:** `7909cea` plus the uncommitted weekly scan for the overview,
+`_docker.yml` step 7, `trivy-weekly.yml` and `setup-trivy` sections, re-read
+2026-11-07; no other section was re-read. Before that, `9116608` plus the
+uncommitted ADR-022 exception for the
 Trivy sections (`_docker.yml` step 7, `.trivyignore.yaml`, the BOM-pins
-decision), re-read 2026-11-07; no other section was re-read. Before that,
+decision), re-read 2026-11-07. Before that,
 `63d657f` plus the uncommitted BUG-063 stopgap for
 `_backend.yml` and `_docker.yml`, re-read 2026-10-01 — see the note below; no
 other section was re-read. Before that, `f7a4399` plus the uncommitted club page unit for the `images`
@@ -134,9 +137,10 @@ visitor's browser alongside an entire build toolchain nobody meant to deploy.
 
 ## Overview
 
-Six workflow files under `.github/workflows/`, plus `.github/dependabot.yml`,
-`.dockerignore` and `.gitleaksignore` at the repo root. There is **no CD**: no
-deploy job, no registry, no cloud credentials.
+The workflow files under `.github/workflows/`, one composite action under
+`.github/actions/` (since 2026-11-07), plus `.github/dependabot.yml`, and
+`.dockerignore`, `.gitleaksignore` and `.trivyignore.yaml` at the repo root.
+There is **no CD**: no deploy job, no registry, no cloud credentials.
 
 The whole design turns on one constraint. The goal was branch protection on
 `main` — a rule that blocks a merge until CI passes — and since 2026-08-07 it is
@@ -169,6 +173,7 @@ branch-checks.yml on: push, branches-ignore main / dependabot / merge queue
 └─ database       →   _database.yml  (run-migrate: false)
 
 codeql.yml        standalone, on main + PR + weekly. NOT part of the gate.
+trivy-weekly.yml  standalone, Mondays 08:00 UTC, scans develop. NOT the gate.
 ```
 
 ### Why path filtering is coarse
@@ -609,9 +614,64 @@ In order:
    "$GITHUB_WORKSPACE/.trivyignore.yaml"`**, so the three never disagree about
    what is excepted (ADR-022, BUG-064). The class-list call needed it too:
    without it, a failure message would name findings the gate had already
-   excepted.
+   excepted. Trivy itself is installed by the shared
+   `.github/actions/setup-trivy` action, below, not by a step of this file.
 
 Container logs dump `if: failure()`; teardown is `if: always()`.
+
+### `.github/workflows/trivy-weekly.yml`
+
+Added 2026-11-07 ([spec](../../specs/2026-11-07-weekly-trivy-scan.md)). The
+PR gate scans only when a PR or branch push triggers it, so BUG-019, BUG-035,
+BUG-050 and BUG-064 were all found on a PR, days after their advisories were
+published. This workflow runs the same scan **every Monday at 08:00 UTC**, an
+hour after CodeQL, with no PR. It also runs on `workflow_dispatch`, and on a PR
+that touches it or the shared action.
+
+**Four targets, one SARIF category each:**
+
+| Category | What | Why |
+|---|---|---|
+| `trivy-backend` | `backend/Dockerfile` | The image the gate scans |
+| `trivy-frontend` | `frontend/Dockerfile --target runner` | Likewise |
+| `trivy-eb` | `deploy/eb/Dockerfile` with the packaged jar as `app.jar` | **What Elastic Beanstalk runs.** Its `25-jre-alpine` base is not the gate's `25-jdk-alpine`, and nothing else ever builds it |
+| `trivy-fs` | `trivy fs .`, skipping `backend/target` | `pom.xml` and `package-lock.json`, which is what Vercel builds the live site from |
+
+Separate categories matter. Code scanning closes an alert when a later upload
+in **the same category** no longer reports it, so one shared category would
+let a clean frontend scan close the backend's alerts.
+
+**Same threshold as the gate:** fixable CRITICAL fails, fixable HIGH is
+reported, and every call reads `.trivyignore.yaml`, so ADR-022's exception and
+its 2026-12-31 expiry apply here too. The scan step runs every target before
+failing on any, so all four SARIF files exist. The uploads run `if: always()`,
+and a final step fails the run, which is what emails Arpan.
+
+**It scans `develop`, from a file on `main`** (Arpan, 2026-11-07). A
+`schedule` only fires from the default branch, so the checkout names `develop`
+explicitly. The uploads pass `ref: refs/heads/develop` and that commit's sha,
+or the alerts would be filed against `main`. A PR run passes neither and
+scans the PR. Consequences, accepted:
+- **A green run says nothing about `main` while a fix sits unmerged.** On the
+  day it was written, `develop` had `next` 16.4.5 while the live site served
+  16.3.8.
+- **Its alerts are under the `develop` branch filter** in Security → Code
+  scanning, not the default view.
+- **Nothing runs on a schedule until the file reaches `main`.**
+
+Images are built with `docker build`, not compose. Compose refuses to render
+a config without `docker/.env`'s secrets, and this job starts nothing. The
+only other workflow holding `security-events: write` is `codeql.yml`, for the
+same reason.
+
+### `.github/actions/setup-trivy/action.yml`
+
+The one place the Trivy version is pinned (0.74.0), used by `_docker.yml` and
+`trivy-weekly.yml`, so the gate and the weekly scan can never run different
+scanners against the same image. A second copy of `TRIVY_VERSION` was the
+alternative, rejected for the reason gitleaks keeps one copy: a pin in two
+files drifts. A composite action runs from the checked-out tree, so a job
+must check out before using it.
 
 ### `.github/workflows/codeql.yml`
 
