@@ -12,6 +12,24 @@ Every command assumes `export AWS_PROFILE=campusvibe-admin AWS_REGION=ca-central
 
 ---
 
+> **2026-11-07 — the load balancer is gone ([ADR-017](../decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md)).**
+> The environment is a **single instance** (Elastic IP `3.97.216.208`) behind
+> CloudFront distribution `E2T616L10NJZG8`, which terminates HTTPS for
+> `api.campusvibe-mcgill.com` with the `us-east-1` certificate and redirects
+> HTTP at the edge. So:
+> - **§1** health check: no target group any more; Elastic Beanstalk's enhanced
+>   health is what reports.
+> - **§2** HTTPS on the load balancer and **§3** the bundle redirect are
+>   **superseded** — kept below as history. The `ca-central-1` certificate is
+>   attached to nothing.
+> - **Port 80** on the instance group admits only CloudFront's prefix list
+>   `pl-38a64351`, a manual rule ([`rules/aws-handling.md`](../../rules/aws-handling.md)).
+> - **`AUTH_RATE_LIMIT_TRUST_XFF=true`** still holds: CloudFront and nginx
+>   each append, which `trusted-proxy-hops: 2` counts from the right.
+> - Every `elbv2` command below now returns nothing.
+>
+> Pause, resume and checks: [`pausing-production.md`](pausing-production.md).
+
 > **2026-09-15 — deployed. The table below is the 2026-09-12 reading, kept as history.**
 > What changed, every write run by Arpan:
 > - **§0:** capped at one instance and the database `/32` revoked. The two *idle Elastic IPs* are the load balancer's own addresses — **do not release them**. The two unused role policies are still attached.

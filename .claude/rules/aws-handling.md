@@ -36,6 +36,16 @@ Everything below binds to both.
 
 ## What is already there
 
+- **Production is paused since 2026-11-07** to cut cost (first paused
+  2026-10-01, resumed in between): the Auto Scaling group is at 0/0/0 and
+  `campusvibe-prod-db` is stopped, so the environment reads Grey and the API
+  hangs about 30 s and answers a CloudFront 504 — expected, not a bug. RDS
+  starts itself after 7 days; the
+  EventBridge schedule `campusvibe-stop-rds-daily` (role
+  `CampusVibe-Scheduler-StopRDS`, stop-only) stops it again at 03:00 Toronto
+  daily. **Disable that schedule before resuming**, or it stops the live
+  database. Resume, re-stop and checks:
+  [`pausing-production.md`](../docs/architecture/pausing-production.md).
 - **`campusvibe-prod-media`** — the media bucket, currently empty. Public access
   blocked on all four, `BucketOwnerEnforced`, SSE-S3 with bucket keys, no
   bucket policy, and **no CORS rule** — the `GET,PUT` one was deleted
@@ -74,20 +84,37 @@ Everything below binds to both.
   copy in the Elastic Beanstalk property — and `campusvibe-database-sg` admits
   only the environment's instance group; the personal `/32` was revoked the same
   day.
-- **The Elastic Beanstalk environment is load balanced**, not the single instance
-  the guide describes — kept 2026-09-12. **CampusVibe runs on it since
-  2026-09-15**: `https://api.campusvibe-mcgill.com`, a 443 listener with an ACM
-  certificate, health check `/actuator/health`, capped at one instance. Port 80
-  still answers plain HTTP. Secrets are environment properties Arpan types in
-  the console; the bootstrap admin switch is off.
-- **A 503 with a clean container log is the load balancer, not the app** (BUG-054).
-  Read `elbv2 describe-target-health` first: `Target.NotInUse` means the
-  instance sits in a zone the load balancer does not serve. Any change that
-  recreates the Auto Scaling group — `MaxSize` did — may move the instance to
-  any subnet the group lists. The load balancer now spans all three default
-  subnets, so the group's list and its own match; keep them matched.
-- **`3.96.239.88` and `15.175.46.76` are the load balancer's addresses**, not idle
-  Elastic IPs. Never release them.
+- **The Elastic Beanstalk environment is a single instance behind CloudFront
+  since 2026-11-07** ([ADR-017](../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md));
+  the load balancer is gone. `https://api.campusvibe-mcgill.com` is a CNAME at
+  Namecheap to distribution `E2T616L10NJZG8` (`d3rljfrq954zy0.cloudfront.net`):
+  the `us-east-1` ACM certificate, HTTP redirected to HTTPS at the edge, caching
+  off, origin the environment CNAME over HTTP on port 80 with a 60 s read
+  timeout. Secrets are environment properties Arpan types in the console; the
+  bootstrap admin switch is off.
+- **`3.97.216.208` is the instance's Elastic IP** and the environment CNAME
+  resolves to it — CloudFront's origin. Elastic Beanstalk allocated it; it stays
+  allocated while paused (~$3.65 a month). Never release it.
+- **Port 80 on `sg-0e9453ad8fbde508e` admits only the CloudFront origin-facing
+  prefix list `pl-38a64351`** — a manual rule, drift Elastic Beanstalk does not
+  know about. After any environment configuration update, check the group: if
+  `0.0.0.0/0` on port 80 is back, the origin is open to the world again. The
+  database group admits this same group id, which survived the switch.
+- **A CloudFront 502 or 504 is the origin, not CloudFront**: the instance is
+  down, paused, booting or slower than 60 s. Read the container log. **A browser
+  that says Failed to fetch while `curl` works** held a pre-switch DNS answer
+  for `api`; `chrome://net-internals/#dns` clears it.
+- **Production CORS admits only the live frontend.** A preflight from
+  `localhost:3000` against production answers 403 by design.
+- **Going back to a load balancer** is ADR-017's rollback, and brings BUG-054
+  back with it: keep `ELBSubnets` matching the Auto Scaling group's subnets.
+- **Reopen ADR-017 when** a second instance is needed (rate limits move out of
+  memory first) · deploy downtime becomes visible to users · traffic nears
+  CloudFront's free tier (10 million requests or 1 TB a month) · a review
+  requires an encrypted origin leg.
+- **The old `ca-central-1` certificate for `api.campusvibe-mcgill.com`** is
+  attached to nothing; deleting it is Arpan's. Its DNS validation CNAME at Namecheap is
+  shared with the `us-east-1` one — never remove that record.
 - **Read the container log with `logs get-log-events`**, the stream named by
   instance id, under
   `/aws/elasticbeanstalk/CampusVibe-Backend-Prod/var/log/eb-docker/containers/eb-current-app/stdouterr.log`.

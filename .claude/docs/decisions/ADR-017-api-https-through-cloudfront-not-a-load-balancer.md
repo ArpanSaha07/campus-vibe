@@ -9,8 +9,7 @@ was never an ADR; it is recorded in
 [`aws-deployment.md`](../architecture/aws-deployment.md) and
 [`connecting-elastic-beanstalk.md`](../architecture/connecting-elastic-beanstalk.md).
 **Approved by:** Arpan, 2026-09-22, scheduled for immediately rather than after the demo ([spec](../../specs/2026-09-22-cloudfront-single-instance.md))
-**Implemented in:** — not yet built. Nothing changes until this is accepted and
-scheduled; the load balancer stays for the demo.
+**Implemented in:** step 1 `6128aa0` (2026-09-22) · steps 2–7 in the account, 2026-11-07 — distribution `E2T616L10NJZG8`, [`pausing-production.md`](../architecture/pausing-production.md), [`rules/aws-handling.md`](../../rules/aws-handling.md). Step 8, deleting the `ca-central-1` certificate, is Arpan's and open.
 
 ## Context
 

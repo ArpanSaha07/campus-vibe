@@ -38,6 +38,13 @@ Already queued in [`todo.md`](../../TODO/todo.md); listed here because the order
   message per call. **Do not set `SPRING_MAIL_HOST` in production until this has
   shipped** — otherwise anyone can spend the sending quota, and the domain's
   reputation, on addresses of their choosing.
+  **Whatever limit it gets is keyed by `ClientIpResolver`**, which since
+  `6128aa0` reads `X-Forwarded-For` from the right: the client is
+  `trusted-proxy-hops` (default 2) entries from the end, because CloudFront
+  appends the viewer and nginx appends CloudFront
+  (`ClientIpResolver.java:19-23`, `:43`). Everything further left was written
+  by the caller, so a forged header cannot buy a fresh budget — unproved
+  through CloudFront until the forged-header test in `todo.md` runs.
 - [ ] Send mail after the transaction commits, not inside it.
 - [ ] Make a failed send visible beyond one log line — during the sandbox every
   send to an unverified address fails that way.

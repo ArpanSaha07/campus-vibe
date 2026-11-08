@@ -8,6 +8,12 @@
 Phases 2–6 — RDS, S3, Elastic Beanstalk, the Vercel/Cloudflare front, CI/CD —
 have **not been started**. Nothing of CampusVibe runs on AWS yet.
 
+> **2026-11-07 — no load balancer.** The API is served by CloudFront in front of
+> a single-instance environment ([ADR-017](../decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md)),
+> and production is paused. Every ALB statement below is history; the live
+> shape is in [`rules/aws-handling.md`](../../rules/aws-handling.md) and
+> [`pausing-production.md`](pausing-production.md).
+
 > **2026-09-12 — the state above is stale, and its S3 half is recorded
 > elsewhere.** A bucket exists (`campusvibe-prod-media`, `ca-central-1`), and the
 > code now reads exactly one bucket from `AWS_S3_BUCKET` —
@@ -291,3 +297,15 @@ above is evidence the *artifact* is sound; none of it is evidence about AWS.
 - 2026-08-18 — Created. Phase 1 (production readiness and EB packaging) written
   from the code and from a verified local run. Phases 2–6 not started. *Claude
   (Opus 5)*
+- 2026-10-01 — Production paused for cost: Auto Scaling group to 0/0/0, RDS
+  stopped; nothing deleted. Runbook:
+  [`pausing-production.md`](pausing-production.md). *Claude (Opus 5.5)*
+- 2026-11-07 — Production paused again (it had been resumed, group 1/1/1, RDS
+  auto-started). Added the daily EventBridge Scheduler re-stop
+  `campusvibe-stop-rds-daily` and its role `CampusVibe-Scheduler-StopRDS`
+  (only `rds:StopDBInstance` on `campusvibe-prod-db`). Disable it before
+  resuming — [`pausing-production.md`](pausing-production.md). *Claude (Opus 5.5)*
+- 2026-11-07 — ADR-017 built: CloudFront distribution `E2T616L10NJZG8` in front
+  of `CampusVibe-Backend-Prod` switched to single instance (Elastic IP
+  `3.97.216.208`), port 80 locked to `pl-38a64351`, the `api` CNAME repointed,
+  the load balancer removed. Paused again afterwards. *Claude (Opus 5.5)*
