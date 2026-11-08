@@ -87,6 +87,7 @@
         "scripts/lint-migrations.mjs",
         "docker/",
         ".dockerignore",
+        ".trivyignore.yaml",
         "frontend/next.config.ts",
         "frontend/Dockerfile",
         "backend/Dockerfile",
@@ -239,7 +240,8 @@
         ".github/workflows/",
         ".githooks/",
         "scripts/verify.mjs",
-        "backend/pom.xml"
+        "backend/pom.xml",
+        ".trivyignore.yaml"
       ]
     },
     "aws-handling.md": {

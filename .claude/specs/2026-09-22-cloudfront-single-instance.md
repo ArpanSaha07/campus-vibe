@@ -1,6 +1,20 @@
 # Retire the load balancer: API HTTPS through CloudFront
 
-**Status:** approved · **Date:** 2026-09-22
+**Status:** shipped 2026-11-07 · **Date:** 2026-09-22
+
+> **Shipped 2026-11-07**, during a resume from the cost pause. Part A was already
+> in the deployed version (`6128aa0` in `63d657f`). Part B: the `us-east-1`
+> certificate existed from 2026-09-22; distribution `E2T616L10NJZG8` created;
+> the environment switched to single instance, Elastic IP `3.97.216.208`; port 80
+> locked to `pl-38a64351`; the `api` CNAME repointed at Namecheap. **Open
+> questions answered:** the instance kept `sg-0e9453ad8fbde508e`, so the database
+> group needed no change; the existing Namecheap validation CNAME validated the
+> `us-east-1` certificate by itself. **Verified:** HTTPS health, the 301, port 80
+> on the Elastic IP timing out, CORS from both live origins, no load balancer
+> left, and in the browser login, a photo upload and the planner stream.
+> **Not as written:** CORS from `localhost` answers 403, because production's
+> `CORS_ALLOWED_ORIGINS` names only the live frontend — expected, not a defect.
+> **Not run:** the forged `X-Forwarded-For` test, queued in `todo.md`.
 
 ## Goal
 

@@ -290,9 +290,14 @@ jobs:
       # CRITICALs were npm packages this repo controls, and the third was npm's
       # own bundled copy inside node:24-alpine, which no published tag fixed.
       # Report the finding class instead and let the reader route it.
+      #
+      # Every pass reads .trivyignore.yaml, so the report, the gate and the
+      # class list agree. Its entries are scoped by id, package version and an
+      # expiry date, and each one needs an ADR (ADR-022).
       - name: Scan images for known vulnerabilities
         run: |
           set -euo pipefail
+          ignorefile="$GITHUB_WORKSPACE/.trivyignore.yaml"
           # TEMP 2026-09-30: no backend container runs, so name the built image.
           # backend_image=$(docker inspect -f '{{.Config.Image}}' campusvibe-backend)
           backend_image=campusvibe-backend
@@ -302,6 +307,7 @@ jobs:
           for img in "$backend_image" campusvibe-frontend:prod; do
             echo "::group::Trivy report (HIGH+CRITICAL, fixable) — $img"
             trivy image --scanners vuln --ignore-unfixed \
+              --ignorefile "$ignorefile" \
               --severity HIGH,CRITICAL --exit-code 0 "$img"
             echo "::endgroup::"
           done
@@ -311,11 +317,13 @@ jobs:
           for img in "$backend_image" campusvibe-frontend:prod; do
             echo "--- Gate: fixable CRITICAL — $img ---"
             if ! trivy image --scanners vuln --ignore-unfixed \
+              --ignorefile "$ignorefile" \
               --severity CRITICAL --exit-code 1 --quiet "$img"; then
               failed=1
               # Which ecosystem a finding came from decides who fixes it, so
               # collect the classes rather than guessing in the error message.
               classes="$classes $(trivy image --scanners vuln --ignore-unfixed \
+                --ignorefile "$ignorefile" \
                 --severity CRITICAL --format json --quiet "$img" \
                 | jq -r '[.Results[]? | select(.Vulnerabilities != null) | .Class]
                          | unique | join(",")')"

@@ -4,7 +4,7 @@ Finished work, moved out of [`todo.md`](todo.md) so the queue stays readable.
 Nothing here needs doing. It is kept because *what was already tried, and why it
 was done that way* is the expensive thing to rediscover.
 
-Last updated: **2026-09-16**
+Last updated: **2026-11-07**
 
 **Two halves, and they answer different questions:**
 
@@ -118,6 +118,7 @@ links resolve unchanged — this file sits in the same directory.
 
 ### AI & Search
 
+- [x] **P2** ~~Watch the planner's stream behind the production load balancer and nginx~~ — **done 2026-11-07, behind CloudFront and nginx instead**, since the load balancer was retired the same day ([ADR-017](../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md)). Arpan sent a planner message on the live site and the intro arrived in pieces, so `X-Accel-Buffering: no` and the 15-second keep-alive hold through CloudFront with caching off and a 60 s origin timeout; no `.platform` change. The `planner.answer` log line for dropped picks was not read.
 - [x] **Demo** **Planner daily limit raised to 1000 for the 2026-09-30 demo** — **done 2026-09-30**, committed in `63d657f`, no spec (Arpan asked for the smallest backend change, frontend untouched). One line, `PlannerLimits.java:16`, marked `TEMP`; the page shows `1000 of 1000` because it reads the limit from the usage response. `PlannerConversationIT:59` was then changed to assert `DAILY_MESSAGES` instead of a literal 15. A bundle was built with `package-eb.mjs` (`dist/eb/campusvibe-backend-20261001-035703-63d657f-dirty.zip`; *dirty* is the uncommitted CI files, not in the jar); **the upload to Elastic Beanstalk is Arpan's and is not recorded here.** The revert is queued as a P0 in `todo.md`. Along the way CI turned out to be red for an unrelated reason, MinIO's images going private ([BUG-063](../bugs/bugs.md#bug-063)).
 
 - [x] **P1** **The planner backend (Unit 2 of the AI planner plan)** — **done 2026-09-16**, [spec](../specs/2026-09-16-planner-backend.md), [ADR-021](../docs/decisions/ADR-021-planner-streams-its-intro-out-of-strict-json.md) Proposed, [implementation doc](../docs/architecture/ai-planner.md). The `/planner` page called six endpoints that did not exist, so every signed-in visitor saw *The planner is unavailable*.
@@ -257,6 +258,9 @@ clubs into every environment it touched.
 
 ### Infrastructure & CI/CD
 
+- [x] **P0** ~~Patch the Next.js RCEs the Trivy gate found in the frontend image~~ — **done 2026-11-07, lockfile only.** PR #71's gate failed on `next` 16.3.8: GHSA-2464-fhr4-w9xw and GHSA-673q-mjm6-r5xr, both unauthenticated RCE, fixed in 16.4.1. `main` and `develop` both locked 16.3.8, so the live Vercel site was exposed. `npm update next` moved `next`, `@next/env` and every `@next/swc-*` to 16.4.5 inside the declared `^16.3.3`; the only other lockfile line is `next`'s own `sharp` range, which the locked 0.35.5 already met. Same lever as `c9debed` on 2026-10-01 (GHSA-vcvr-r3jv-pc5j, 16.3.3 → 16.3.8), which was never recorded here. **Verified:** `verify.mjs --all` green; `npm audit --omit=dev` 0 critical with `next` gone. **Proved in CI:** pushed as `9116608`, run `42439638257` passed the frontend image through the Trivy gate with `next` absent from its report; the job stayed red only on the backend's two `spring-webmvc` findings. **PR #71 stays red** on two `spring-webmvc` CRITICALs until [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md) is decided. `eslint-config-next` 15.5.3 left alone (Dependabot `#22`).
+- [x] **P3** ~~Retire the load balancer: API HTTPS through CloudFront, single-instance environment~~ — **done 2026-11-07**, during a resume from the cost pause ([ADR-017](../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md), [spec](../specs/2026-09-22-cloudfront-single-instance.md)). Distribution `E2T616L10NJZG8` with the `us-east-1` certificate; `CampusVibe-Backend-Prod` switched to single instance on Elastic IP `3.97.216.208`; port 80 on `sg-0e9453ad8fbde508e` locked to `pl-38a64351` by hand; the `api` CNAME repointed at Namecheap. The instance kept its security group, so the database rule needed no change. The paused bill falls from ~$27 to ~$6 a month, the running one from ~$60 to ~$35. Left: the forged `X-Forwarded-For` check (queued in `todo.md`). ADR-017 step 8, the `ca-central-1` certificate, was deleted by Arpan the same day; the environment's 443 listener option still names it, which only matters on a rollback (`rules/aws-handling.md`).
+- [x] **P2** ~~Redirect HTTP to HTTPS from inside the bundle~~ — **done 2026-11-07 without a bundle change**: CloudFront's viewer protocol policy redirects at the edge (ADR-017), and `curl -sI http://api.campusvibe-mcgill.com/actuator/health` answers 301 to `https://`. No `.ebextensions` file was written.
 - [x] **P2** ~~First Elastic Beanstalk deployment — follow [`docker/EB-DEPLOYMENT.md`](../../docker/EB-DEPLOYMENT.md) for the environment-property list.~~ — **done 2026-09-15.** Version `campusvibe-backend-20260915-010151-67ce188` on `CampusVibe-Backend-Prod`: the `prod` profile active, TLS to PostgreSQL 18.3, Flyway applied 33 migrations to the empty schema (V8's pgvector extension included, as the master user), `Started Main` in 22 s. Packaged with `--skip-build` because `package-eb.mjs` could not spawn Maven from Git Bash (queued). The runbook order was followed except for one production-only failure, [BUG-054](../bugs/fixed_bugs.md#bug-054): the deploy was healthy and every request was a 503, because the replacement instance landed in a zone the load balancer did not serve.
 - [x] **P1** ~~**Switch the RDS master password to self-managed — before 2026-09-18, and before the first deploy.**~~ — **done 2026-09-14, by Arpan in the console.** `MasterUserSecret` now reads `None`; the value lives only in the EB property and Arpan's password manager.
 - [x] **P1** ~~**Change the EB health check path from `/` to `/actuator/health` before the first real deploy.**~~ — **done 2026-09-14**, in the same `update-environment` as the properties, run by Arpan with `!`. The sample application went Warning on it, as expected, until the deploy.
@@ -374,6 +378,15 @@ clubs into every environment it touched.
 ---
 
 ## Completed work log
+
+**2026-11-07 — production paused for cost, and the load balancer retired.**
+
+- **The ask:** Arpan wanted AWS spend cut while nobody uses the app, stopping rather than deleting. Production had been resumed since the 2026-10-01 pause and RDS had auto-started, so the bill was back at ~$60 a month.
+- **Paused again, then made to stay paused:** the Auto Scaling group to 0/0/0 and RDS stopped; a daily EventBridge Scheduler schedule `campusvibe-stop-rds-daily` with a stop-only role `CampusVibe-Scheduler-StopRDS` answers the 7-day auto-start. Daily, not weekly as first asked, because a weekly run can miss the auto-start by six days at the same $0.
+- **Terminating the environment was weighed and dropped.** It would have reached ~$3 a month, but no saved configuration exists, so every secret property would be lost, and the database group's reference to the instance group would block termination. Arpan asked whether ADR-017 alone removes the load balancer's ~$25; it does, to a ~$6 floor, so the already-accepted record was built instead of a new one written.
+- **ADR-017 Part B, run by Arpan command by command:** distribution, single instance, port 80 to the CloudFront prefix list, the CNAME at Namecheap. Both open questions in the spec answered in the account: the security group id survived, and the shared validation CNAME covers the `us-east-1` certificate.
+- **One false alarm:** Arpan's browser reported Failed to fetch after the DNS switch while `curl` through the same path got a proper 401 with CORS headers. Chrome held the pre-switch answer for `api`; clearing its host cache fixed it. Recorded in `rules/aws-handling.md`.
+- **Verified:** HTTPS health, the edge 301, port 80 on the Elastic IP timing out, CORS from both live origins, no load balancer left; in the browser, login, a photo upload and the planner stream. **Not run:** the forged `X-Forwarded-For` test, queued as a P2.
 
 **2026-09-15 — Google sign-in, broken in production for some people and not for
 others.**
