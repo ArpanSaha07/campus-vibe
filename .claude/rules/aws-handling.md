@@ -112,9 +112,12 @@ Everything below binds to both.
   memory first) · deploy downtime becomes visible to users · traffic nears
   CloudFront's free tier (10 million requests or 1 TB a month) · a review
   requires an encrypted origin leg.
-- **The old `ca-central-1` certificate for `api.campusvibe-mcgill.com`** is
-  attached to nothing; deleting it is Arpan's. Its DNS validation CNAME at Namecheap is
-  shared with the `us-east-1` one — never remove that record.
+- **The `ca-central-1` certificate was deleted 2026-11-07**; the only one left
+  is CloudFront's in `us-east-1`. Its DNS validation CNAME at Namecheap,
+  `_87eb87b1…api`, is what lets ACM renew it — never remove that record. The
+  environment's `aws:elbv2:listener:443 SSLCertificateArns` option still names
+  the deleted ARN: harmless on a single instance, but ADR-017's rollback to a
+  load balancer fails until a new `ca-central-1` certificate replaces it.
 - **Read the container log with `logs get-log-events`**, the stream named by
   instance id, under
   `/aws/elasticbeanstalk/CampusVibe-Backend-Prod/var/log/eb-docker/containers/eb-current-app/stdouterr.log`.

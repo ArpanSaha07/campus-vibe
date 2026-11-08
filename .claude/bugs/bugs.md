@@ -1,16 +1,17 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-10-01** · Branch: `develop`
+Last updated: **2026-11-07** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
 **Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16) · BUG-062, opened and fixed the same day (2026-09-17, event card actions on touch)
 
-**Highest id issued: BUG-063.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-064.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-064](#bug-064) | High | PR #71's Trivy gate fails on four fixable CRITICALs: `next` 16.3.8, live on Vercel (fixed in the lockfile, uncommitted), and `spring-webmvc` 6.2.19, which no free release fixes ([ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md), Proposed) |
 | [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — commented out until MinIO is replaced |
 | [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
@@ -22,6 +23,47 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | [BUG-004](#bug-004) | Medium | `NEXT_PUBLIC_*` baked in empty by the frontend Docker build |
 | [BUG-007](#bug-007) | Low | `application-test.yml` lives in `src/main/resources` |
 | [BUG-018](#bug-018) | Medium | Vercel builds and deploys outside CI, with configuration recorded nowhere |
+
+---
+
+### BUG-064
+**The Trivy gate fails on four fixable CRITICALs, two of them Next.js RCEs live on Vercel** · High · OPEN
+
+**Found:** 2026-11-07, on PR #71 (`develop` → `main`), run `42436024598`,
+job `Docker / Build images and run the stack`.
+
+**Symptom.** The gate's `--severity CRITICAL --exit-code 1` scan failed with
+*finding classes: lang-pkgs lang-pkgs*. Both base images were clean
+(`alpine 3.24.4`, 0 findings); every finding is an application library.
+
+| Image | Library | Installed | Fixed in | Findings |
+|---|---|---|---|---|
+| `campusvibe-frontend:prod` | `next` | 16.3.8 | 16.4.1 | GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr — unauthenticated RCE |
+| `campusvibe-backend` | `spring-webmvc` | 6.2.19 | 7.0.9 | CVE-2026-47884 (`XsltView`), CVE-2026-47890 (SSE view fragments) |
+
+**Cause.** Not code: advisories published against pinned versions, the same
+shape as BUG-019, BUG-035 and BUG-050. What is new is the backend half. No free
+6.2.x carries the fix and Boot 3.5.16 is the last 3.5, so the version-property
+lever those bugs used has nothing to point at.
+
+**Exposure.**
+- **Frontend: real.** `origin/main` locks `next` 16.3.8, and the live
+  Vercel site is not paused.
+- **Backend: none found.** There is no `XsltView`, view resolver or template
+  engine, and the planner's `SseEmitter` sends JSON only
+  (`SseReplySink.java:94`). Production is paused anyway.
+
+**Fix, half taken.**
+- **Frontend, done 2026-11-07, uncommitted.** `npm update next` moved the
+  lockfile to 16.4.5 inside `^16.3.3`. `verify.mjs --all` is green and
+  `npm audit --omit=dev` reports 0 critical; Trivy was not run locally.
+- **Backend, waiting on Arpan.** [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)
+  proposes a `.trivyignore.yaml` entry scoped by id, `purl` and
+  `expired_at` 2026-12-31, then Spring Boot 4.
+
+**Closes** when PR #71's Docker job is green with `next` 16.4.5 committed
+and ADR-022 built, or Boot 4 merged. Rule:
+`rules/ci-and-build.md` (Spring Framework CVEs have no lever).
 
 ---
 
