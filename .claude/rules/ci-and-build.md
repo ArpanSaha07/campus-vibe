@@ -42,6 +42,10 @@ paths:
   uploads must name `refs/heads/develop`, or the alerts land on `main`. Each
   target keeps its own SARIF `category` — reuse one and a clean scan closes
   another target's alerts.
+- **Every Dockerfile directory needs its own `docker` entry in
+  `.github/dependabot.yml`** — Dependabot does not recurse. `/deploy/eb`, the
+  image production runs, had none until 2026-11-08, so its JRE base got no
+  update PRs while `trivy-weekly.yml` scanned it.
 - **The Elastic Beanstalk zip must use forward slashes in every entry name.**
   Windows PowerShell 5.1's `ZipFile.CreateFromDirectory` writes backslashes for
   anything below the root, and Linux unzip on the instance reads

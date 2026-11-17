@@ -10,7 +10,9 @@ we have, a thing we decided to build, or neither** — which is the question tha
 otherwise gets answered by guessing.
 
 Shipped means it works end to end against the running stack. Planned means it is
-in [`todo.md`](../TODO/todo.md) with a priority; nothing here is a promise.
+in [`todo.md`](../TODO/todo.md) with a priority; nothing here is a promise. An
+idea is neither: raised, not decided, and listed under
+[Ideas — not decided](#ideas--not-decided) at the end.
 
 ---
 
@@ -112,3 +114,24 @@ It needs event end times first ([spec](../specs/2026-09-15-event-end-time.md),
 draft). `LlmClient` is still unscaffolded until that unit; the key handling
 foundation is in
 [`llm-api-key-management.md`](architecture/llm-api-key-management.md).
+
+---
+
+## Ideas — not decided
+
+Features raised but not decided. An idea here has **no todo item and no
+priority**, and no session builds it or treats it as agreed. Deciding it is
+Arpan's: it then moves to the **Planned** paragraph of its area above (or a new
+area), gains a [`todo.md`](../TODO/todo.md) item with a priority, and its line
+here is deleted. Rejecting it deletes the line too, or keeps it with the
+reason, if the reason will matter when someone raises it again.
+
+One line each: the idea, who raised it and when, and any open question already
+known.
+
+- **Adding friends** — students connect with each other on the platform. Raised
+  by Arpan, 2026-11-16. Open: what being friends gives a student (seeing who is
+  going to an event, shared plans, the planner suggesting events friends
+  attend), whether it is a mutual request or a one-way follow, and what a
+  student can hide. Would likely be a new **Social** area, with its own data
+  model and an ADR at its `/start`.
