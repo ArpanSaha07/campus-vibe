@@ -120,6 +120,33 @@ export interface ApiPlannerCreatedConversation {
   evictedId: string | null;
 }
 
+export type PlannerActionType =
+  | "follow"
+  | "unfollow"
+  | "rsvp"
+  | "cancel_rsvp"
+  | "save"
+  | "unsave"
+  | "calendar";
+
+/**
+ * What the agent did to the account in a turn (ADR-023). `outcome` is what
+ * actually happened: `done` changed the account, `offered` is a calendar link
+ * for the student to click, the rest changed nothing.
+ */
+export type PlannerActionOutcome = "done" | "unchanged" | "offered" | "ended" | "not_found" | "not_allowed";
+
+export interface ApiPlannerAction {
+  type: PlannerActionType;
+  targetKind: PlannerPickKind;
+  /** An event id as a string, or a club slug. */
+  id: string;
+  name: string;
+  outcome: PlannerActionOutcome;
+  /** The event, read now, for an offered calendar link; null otherwise or once it has ended. */
+  event: ApiEvent | null;
+}
+
 export interface ApiPlannerMessage {
   id: string;
   role: "user" | "assistant";
@@ -130,6 +157,8 @@ export interface ApiPlannerMessage {
   /** Hydrated fresh on every read; a deleted or ended item is simply absent. */
   events: ApiEvent[];
   clubs: ApiClub[];
+  /** Empty on a user message. */
+  actions: ApiPlannerAction[];
   createdAt: string;
 }
 
@@ -143,6 +172,7 @@ export interface ApiPlannerReplyDone {
   picks: ApiPlannerPick[];
   events: ApiEvent[];
   clubs: ApiClub[];
+  actions: ApiPlannerAction[];
   usage: ApiPlannerUsage;
   conversation: ApiPlannerConversationSummary;
 }
@@ -150,6 +180,16 @@ export interface ApiPlannerReplyDone {
 export type PlannerPick =
   | { kind: "event"; reason: string; event: EventInstance }
   | { kind: "club"; reason: string; club: Club };
+
+export interface PlannerAction {
+  type: PlannerActionType;
+  targetKind: PlannerPickKind;
+  id: string;
+  name: string;
+  outcome: PlannerActionOutcome;
+  /** Present only for an offered calendar link whose event has not ended. */
+  event?: EventInstance;
+}
 
 export interface PlannerMessage {
   id: string;
@@ -159,6 +199,10 @@ export interface PlannerMessage {
   status: "complete" | "failed" | "streaming" | "stopped";
   /** Hydrated and all of one kind, so an answer never has more than one card row. */
   picks: PlannerPick[];
+  /** What the agent did in this turn; empty for most answers. */
+  actions: PlannerAction[];
+  /** While streaming: what the agent is doing before any text arrives. */
+  activity?: string;
   /** Why a failed reply failed, in words for the user. */
   error?: string;
 }

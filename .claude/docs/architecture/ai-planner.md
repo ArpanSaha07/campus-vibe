@@ -1,27 +1,21 @@
 # AI planner — Implementation & Design Decisions
 
-**Status:** 2026-09-16 · branch `feature/ai-planner` · **built end to end and
-uncommitted.** The frontend is committed (`2b8cfe4`); the backend is the
-uncommitted planner backend unit. Seen working on the local stack against the
-real OpenAI key: a streamed events answer, a clubs follow-up, an events
-follow-up, a reload, and a prompt-injection attempt declined. Not yet deployed.
+**Status:** 2026-11-16 · branch `develop` · **the planner agent unit is
+uncommitted on top of `0ff0759`.** Tested only against `ScriptedLlmClient`:
+`verify.mjs --full` green, 8 new `PlannerAgentIT` cases. **Never run against
+the real model**, so whether it picks the right tool from a student's wording
+is unproven. Production runs the 2026-10-01 version, which predates the agent;
+the planner itself was first seen working on the local stack on 2026-09-16.
 **Authors:** main session.
-**Code as of:** `63d657f` for the daily limit only, re-read 2026-10-01:
-`PlannerLimits.java:16` and `PlannerConversationIT.java:59`; nothing else moved.
-Before that, `95418a1` plus the uncommitted planner backend unit, read
-2026-09-16: everything under `backend/src/main/java/com/campusvibe/ai/`, V36,
-the planner queries in `SearchRepository`, and the frontend files below, which
-the unit did not change. Before that, `70336d2` plus the event end time unit.
+**Code as of:** `0ff0759` plus the uncommitted planner agent unit, read
+2026-11-16: everything under `backend/src/main/java/com/campusvibe/ai/`, V37,
+`prompts/planner-system.txt`, and the frontend planner files, `planner-api.ts`,
+`planner.ts`, `adapters.ts`, `types/index.ts` and `followed-clubs-context.tsx`.
+Frontend sections not named in the agent unit were last re-read at `70336d2`.
 **Specs:** [`2026-09-16-planner-chat-ui.md`](../../specs/2026-09-16-planner-chat-ui.md)
 (frontend) · [`2026-09-16-planner-backend.md`](../../specs/2026-09-16-planner-backend.md)
-(backend).
-
-> **Temporary, 2026-09-30.** `PlannerLimits.DAILY_MESSAGES` is **1000**, not
-> 15, for a demo (`63d657f`, marked `TEMP` on the line). Every *15 messages a
-> day* below describes the intended value; the page reads the limit from the
-> usage response, so only the backend changes back. `PlannerConversationIT`
-> now asserts the constant rather than a literal 15, as the other planner ITs
-> already did, so the revert needs no test change.
+(backend) · [`2026-11-16-planner-agent.md`](../../specs/2026-11-16-planner-agent.md)
+(the agent, [ADR-023](../decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)).
 
 ## In one paragraph
 
@@ -33,8 +27,12 @@ few follow-up prompts to tap. The server picks at most 15 events that have not
 ended and at most 6 clubs, asks OpenAI to choose among only those, streams the
 intro as it is written, and throws away any pick it did not offer. A reply that
 fails leaves nothing behind and gives the message back; one the person stops
-leaves nothing behind and still counts. **Deploy the backend and frontend
-together**, with `OPENAI_API_KEY` set: without the key the page shows *The
+leaves nothing behind and still counts. **Since 2026-11-16 it is also an
+agent:** asked to, it follows or unfollows a club, RSVPs or cancels, saves or
+unsaves an event, and offers an Add to Google Calendar link the student clicks
+to confirm. Those happen through the same code as the site's buttons, only on
+clubs and events it was shown that turn or that are already the student's, and
+never on an event that has ended. Without `OPENAI_API_KEY` the page shows *The
 planner is unavailable*.
 
 ## Read this before you change anything here
@@ -45,6 +43,18 @@ planner is unavailable*.
   ([ADR-021](../decisions/ADR-021-planner-streams-its-intro-out-of-strict-json.md),
   Proposed). `intro` must stay the schema's first property
   (`PlannerAnswers.java:42`), or nothing streams.
+- **The model may act, but the server decides what it may act on**
+  ([ADR-023](../decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)).
+  `PlannerToolExecutor` (`:77`) takes the user from the JWT, refuses an id
+  outside this turn's candidates and the student's own follows, saves and RSVPs
+  (`:119`, `:166`), and refuses an ended event (`:169`) before the unchanged
+  `MyEventService.rsvp`, which checks only that the event exists. Move any of
+  those checks into the prompt and a club's description can aim an action at
+  any club.
+- **A turn whose actions changed the account is never thrown away**
+  (`PlannerReplyService.keepActions`, `:296`): a failure or a stop after a
+  follow stores the turn with a fallback line and counts it. Refunding there
+  would erase the record of a write that happened.
 - **The model is not trusted with ids.** `PlannerAnswers.keep`
   (`PlannerAnswers.java:81`) keeps only picks that were this message's
   candidates. Every retrieval source filters `end_time > now()`
@@ -68,8 +78,9 @@ planner is unavailable*.
 - **The streamed reply goes through `apiFetchResponse`** (`lib/api.tsx:154`).
   `EventSource` cannot send the Authorization header.
   [`rules/frontend.md`](../../rules/frontend.md).
-- **All eight planner shapes are contracted** in `contracts/api-dto-fields.json`,
-  the `done` frame included. [`rules/contracts.md`](../../rules/contracts.md).
+- **All nine planner shapes are contracted** in `contracts/api-dto-fields.json`,
+  the `done` frame and `PlannerActionDTO` included; the `delta`, `status` and
+  `error` frames are not. [`rules/contracts.md`](../../rules/contracts.md).
 - **Prompts are text files** under `backend/src/main/resources/prompts/`, filled
   by `PromptTemplateService`, which fails on a missing or unused value.
 - Visual rules: [`design-guidelines.md`](../../design-guidelines.md) plus the
@@ -98,22 +109,29 @@ message goes through two phases.
    (404), a missing key (503); answer a chat already holding 40 messages with an
    `error` frame, uncounted (`:128`); then spend today's message, or 429
    (`:134`). Only now does a stream exist.
-2. **On a virtual thread** (`reply`, `:149`): read the last 10 messages,
-   retrieve candidates, build the prompt, stream the model's JSON through
-   `IntroStreamReader` as `delta` frames, parse and validate the answer, store
-   both messages in one transaction, and send `done` with freshly hydrated
-   cards.
+2. **On a virtual thread** (`reply`): read the last 10 messages, retrieve
+   candidates, build the prompt, then run the agent loop (`:185`): each round
+   offers the seven tools; a round that calls them gets a `status` frame per
+   call (`:202`), the executor's result goes back to the model, and the next
+   round runs. Round 5 forbids tools (`tool_choice: none`), so a turn makes at
+   most 5 calls. The round that answers streams its JSON through
+   `IntroStreamReader` as `delta` frames; the answer is parsed and validated,
+   both messages and the actions are stored in one transaction, and `done`
+   carries freshly hydrated cards and the actions.
 
-An assistant message arrives in two parts. `delta` frames carry the intro text
-as it is written; a single `done` frame carries the picks, the hydrated
-`EventDTO` / `ClubDTO` rows they point at, the new usage and the chat's summary.
+An assistant message arrives in up to three parts. `status` frames say what the
+agent is doing while no text streams; `delta` frames carry the intro text as it
+is written; a single `done` frame carries the picks, the hydrated `EventDTO` /
+`ClubDTO` rows they point at, the actions, the new usage and the chat's
+summary.
 The card row, the per-pick lines and the follow-ups render only from `done`.
 
 **What happens to a message:**
 
 | Outcome | Stored | Counted | Frame |
 |---|---|---|---|
-| Completes | both messages; title set if unset; `last_active_at` moved | yes | `done` |
+| Completes | both messages and their actions; title set if unset; `last_active_at` moved | yes | `done` |
+| Fails, or is stopped, **after an action changed the account** | both messages, the reply being a fallback line naming what was done | yes | `done` (none when stopped) |
 | Provider error, timeout, truncated or unparseable answer | nothing | refunded | `error` `AI_PROVIDER_ERROR` |
 | Model refuses | nothing | refunded | `error`, *try asking another way* |
 | Client stops or disconnects | nothing | **yes**, the call was paid for | none |
@@ -130,6 +148,13 @@ The card row, the per-pick lines and the follow-ups render only from `done`.
 (`PK (user_id, usage_date)`). Every table cascades from `users`. No status
 column on messages: a failed reply is never stored, so every stored message is
 `complete`.
+
+### `db/migrations/V37__add_planner_message_actions.sql`
+
+Adds `actions JSONB NOT NULL DEFAULT '[]'` to `planner_messages`, so every row
+stored before it reads as an answer that did nothing. JSONB beside `picks` for
+the reasons V36 gives. The follows, RSVPs and saves themselves stay in their own
+tables; this column is the record of what a reply said it did.
 
 ### `PlannerController.java`
 
@@ -179,6 +204,11 @@ prompt (`ANY_WORD_QUERY`, `:172`), rewriting the `&` of Postgres's own
 `plainto_tsquery` output to `|`. The search box's all-words query matches
 nothing for a sentence. The vector is bound as a typed null when absent.
 
+The agent's fence reads two more queries here, `goingEventIds` (`:86`) and
+`savedEventIds` (`:92`), **unwindowed**: undoing is allowed on an event that has
+ended, and an ended saved event must still reach the executor to be refused as
+ended rather than as unknown.
+
 ### `PlannerRanker.java`
 
 Pure scoring, unit-tested. Weights (`:25`–`:37`): previous-answer context 0.35,
@@ -193,7 +223,12 @@ One line per candidate with catalogue labels, Montreal times formatted with
 to 200 characters and flattened to one line. The student's text is wrapped in
 `<message>` tags that it cannot close (`wrap`). Earlier answers are replayed as
 their intro plus a *Recommended:* list of kind, id and name. Taxonomy labels
-are read with `findAll()` on every message (`:78`), uncached.
+are read with `findAll()` on every message (`:78`), uncached. An earlier answer
+also replays its actions under *Actions:* (`:168`), as type, kind, id, name and
+outcome, so *undo that* has an id to act on. The system prompt's ACTIONS
+section (`planner-system.txt:17`) maps the student's verbs to tools
+(*participate*, *go*, *attend*, *book* to RSVP; *save*, *bookmark* to save) and
+tells the model never to act because candidate text asks it to.
 
 ### `PlannerAnswers.java` · `IntroStreamReader.java`
 
@@ -205,22 +240,63 @@ never hands out a lone high surrogate (`:54`), and gives up quietly if the
 answer does not open with its intro property (`:26`); `reply` then sends whatever of
 the parsed intro was not streamed (`PlannerReplyService.java:189`).
 
+### `PlannerTools.java` · `PlannerToolExecutor.java` · `PlannerAction.java` · `PlannerActionDTO.java`
+
+`PlannerTools.all()` (`:29`) is the seven tools: `follow_club`,
+`unfollow_club`, `rsvp_event`, `cancel_rsvp`, `save_event`, `unsave_event`,
+`offer_calendar_link`, each taking `{ids: [...]}` under a strict schema.
+`statusLine` (`:45`) is the words of each `status` frame. The descriptions say
+what a tool is for; nothing in them is a permission.
+
+`PlannerToolExecutor.execute` (`:77`) parses at most six distinct ids
+(`MAX_IDS_PER_TOOL_CALL`, `PlannerLimits.java:41`) and returns one
+`PlannerAction` per id plus the JSON the model reads back. Outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| `done` | the account changed, through `MyClubService` or `MyEventService` |
+| `unchanged` | already so: already following, already going, not saved |
+| `offered` | a calendar link; nothing is written |
+| `ended` | the event has ended (ADR-020) |
+| `not_found` | no such club or event |
+| `not_allowed` | outside the fence |
+
+Adding (`follow`, `rsvp`, `save`, `calendar`) is fenced to this turn's
+candidates and, for events, the student's own going and saved sets; undoing
+needs no fence, since it touches only what the student already has. The order
+in `eventAction` (`:135`) is: undo first, then not found, unchanged, the fence,
+then ended.
+
+`PlannerAction` is the stored form; `changedAccount()` (`:43`) is what decides
+whether a failed turn is kept, and `fallbackIntro` (`:51`) writes its line.
+`PlannerActionDTO` adds `event`, read now by
+`PlannerConversationService.actionsFor` (`:198`) for an offered calendar link
+and null once that event has ended, which drops the link and keeps the line.
+
 ### `PlannerReplyService.java` · `PlannerReplySink.java` · `SseReplySink.java`
 
 The sink interface exists so a test can play a client that leaves. `SseReplySink`
 synchronises every write (`:89`), because the keep-alive scheduler (a comment
 every 15 s, `PlannerReplyService.java:70`, under the ALB's 60 s idle timeout)
 writes too, and marks itself gone on a failed write, a container error or a
-timeout (`:27`). A gone sink throws from `delta`, which aborts the provider
-stream. The emitter's own timeout is 3 minutes (`:67`), set explicitly because
+timeout (`:27`). A gone sink throws from `delta` and `status`, which aborts the
+provider stream or the loop. `fail` (`:280`) and `keepActions` (`:296`) split
+a failure: refunded with an `error` frame when nothing changed the account,
+stored and counted with a fallback `delta` and `done` when something did. The emitter's own timeout is 3 minutes (`:67`), set explicitly because
 Tomcat's default async timeout is 30 seconds. One log line per answer records
 counts only: kind, picked, kept, candidates (`:182`).
 
 ### `ai/client/` — `LlmClient`, `OpenAiLlmClient`, `OpenAiChatStream`, `LlmRequest`, `LlmException`
 
-`streamStructured` (`OpenAiLlmClient.java:82`) posts Chat Completions with
-`stream: true`, `stream_options.include_usage` and a `json_schema` response
-format (`:180`). Retries 429, 5xx and network failures **only before the first
+`streamTurn` (`LlmClient.java:47`) returns a `Turn`: the answer text, or the
+tool calls made instead; `streamStructured` (`:50`) is a default that offers no
+tools. `OpenAiLlmClient` posts Chat Completions with `stream: true`,
+`stream_options.include_usage` and a `json_schema` response format; with tools
+it adds them as strict functions, `tool_choice` `auto` or `none` (`:193`), and
+`parallel_tool_calls: false` (`:196`), since strict argument schemas are not
+guaranteed for parallel calls. Assistant tool-call and `tool` result messages
+are serialised by `message` (`:206`). `OpenAiChatStream` assembles tool calls
+from their fragments by `index` (`:80`) and never passes them to `onText`. Retries 429, 5xx and network failures **only before the first
 fragment** (`:116`, `:130`). A watchdog closes a stream that outlives
 `chatTimeout` (`:146`), because the JDK client's read timeout only covers the
 headers. `OpenAiChatStream` turns `finish_reason: length` into `TRUNCATED`, a
@@ -237,7 +313,9 @@ quote the prompt.
 
 ## Frontend: file-by-file breakdown
 
-Unchanged by the backend unit; line numbers read at `70336d2`.
+Line numbers read at `70336d2`, except the files the agent unit changed,
+re-read 2026-11-16: `PlannerProvider.tsx`, `AssistantMessage.tsx`,
+`planner-api.ts`, `planner.ts`, `adapters.ts`, `types/index.ts`.
 
 ### `frontend/app/(planner)/layout.tsx`
 
@@ -271,7 +349,13 @@ draft.
   and picks and takes the server's usage. On failure the reply becomes `failed`
   with a sentence from `plannerErrorMessage`, or `stopped` on abort, and usage
   is re-read (`:218`) because the server refunds a failed message.
-- One reply at a time: `abortRef` is the lock (`:232`, `:269`).
+- `onStatus` (`:202`) puts the agent's current step on the pending reply as
+  `activity`; `done` adds the actions and clears it.
+- After a reply whose actions followed or unfollowed a club, it calls the
+  follow provider's `refresh` (`:237`), **after** the reply's `try/finally`,
+  so a failing refresh can never read as a failed reply (BUG-045). Every Follow
+  button then agrees with what the agent did.
+- One reply at a time: `abortRef` is the lock.
 - `retry` removes the failed pair and resends the same text. The server stored
   nothing for the failure, so the chat never holds the question twice.
 - `remove` deletes, then leaves the chat's URL if it was open (`:293`).
@@ -312,8 +396,12 @@ the thread with the message box pinned under it.
 
 Intro, then `ticket-label` count and date range, one `CardRow` of `EventCard`
 or `ClubCard`, a line per pick with a mono weekday for events, a failure line
-with Try again, and the follow-up chips for the answer's kind (`:103`). Chips
-appear only once a reply is `complete` and has picks.
+with Try again, and the follow-up chips for the answer's kind. Chips
+appear only once a reply is `complete` and has picks. While a reply has no
+text yet, its pending line shows the agent's `activity` (`:44`). Its actions
+render as a list under the intro (`:55`): `ActionLine` (`:140`) gives a change
+a check and a link to the club or event, anything unchanged a muted line, and
+an offered calendar action the existing `AddToCalendarLink`.
 
 ### `frontend/app/components/planner/CardRow.tsx`
 
@@ -342,8 +430,9 @@ The six endpoint calls, and the stream reader. `createSseParser` (`:113`) holds
 text until a blank line closes a frame, normalises CRLF, skips `:` comments
 (the server's keep-alives) and joins multi-line `data`. `sendPlannerMessage`
 (`:157`) rejects with `ApiError` when the request is refused,
-`PlannerReplyError` on an `error` frame (`:198`), whose message the page shows
-as written, and `INCOMPLETE_STREAM` when the body ends without `done` (`:200`).
+`PlannerReplyError` on an `error` frame, whose message the page shows
+as written, and `INCOMPLETE_STREAM` when the body ends without `done`. A
+`status` frame goes to the optional `onStatus` (`:192`).
 `getConversation` maps a 404 to null, because another user's chat is a 404 too.
 
 ### `frontend/app/lib/planner.ts`
@@ -351,24 +440,31 @@ as written, and `INCOMPLETE_STREAM` when the body ends without `done` (`:200`).
 What needs no server: the prompt stash key, the 15-chat cap, the 1,000
 character limit, the starter and follow-up chip lists, day grouping, the chat
 an eviction would remove (`:63`), a provisional title, and the row label using
-`formatEventDateRange` from `lib/event-zone.ts` (`:79`).
+`formatEventDateRange` from `lib/event-zone.ts` (`:79`), and `actionSentence`
+(`:95`), the words of one action line.
 
 ### `frontend/app/lib/adapters.ts` (planner part)
 
 `toPlannerPicks` (`:205`) joins picks to the hydrated rows, **drops a pick with
 no row** (deleted or ended since), and keeps only the first pick's kind
 (`:215`), so no answer can render two rows even if a reply mixes them.
+`toPlannerActions` (`:231`) adapts an offered calendar action's event like any
+card, and treats a missing `actions` as empty, so the page works against a
+backend older than the agent.
 
 ### `frontend/app/types/index.ts` (planner part)
 
 `Api*` shapes mirroring the `Planner*DTO` records, and the adapted `Planner*`
 view types, from `:80`. `PlannerMessage.status` adds `streaming` and `stopped`,
-which exist only in the browser.
+which exist only in the browser. `ApiPlannerAction` (`:139`) and
+`PlannerAction` (`:184`) are the agent's actions.
 
 ### Outside the folder
 
 - `components/Navbar.tsx:21,129` hides the second-row search on `/planner`
   below `sm`.
+- `lib/followed-clubs-context.tsx` gained `refresh` (`:118`), which re-reads the
+  follow list only if something on the page already asked for it.
 - `components/main-page/PlannerCardMainPage.tsx` shares its chips with the
   empty state through `PLANNER_SUGGESTIONS` and still routes to
   `/planner?prompt=`.
@@ -386,10 +482,19 @@ which exist only in the browser.
   follow-up history, 429 and delete-does-not-refund, failure refund, unparseable
   answer, a client that stops, a full chat, the 400/404/503 refusals), and
   `PlannerStreamIT` on a real port (async security, headers, refusals asked for
-  as a stream).
-- **Frontend:** `planner-api.test.ts`, `AssistantMessage.test.tsx`,
+  as a stream), and `PlannerAgentIT` (a follow through the loop with its
+  `status` frame, stored actions and the history replay; RSVP, save and their
+  undos; an ended event refused; an id outside the fence; the calendar link;
+  a failure after an action kept and counted; a failure with no change
+  refunded; the 4-round cap). `ScriptedLlmClient.callTools` queues tool rounds.
+- **Backend unit, agent:** `OpenAiChatStreamTest` assembles tool calls from
+  fragments.
+- **Frontend:** `planner-api.test.ts` (the `status` frame and actions),
+  `AssistantMessage.test.tsx` (action lines, the calendar link, the activity
+  line), `PlannerChat.test.tsx` (the follow refresh, and none when nothing
+  changed),
   `ConversationSidebar.test.tsx`, `PlannerComposer.test.tsx`,
-  `PlannerEmptyState.test.tsx`, `PlannerChat.test.tsx`, and the contract test.
+  `PlannerEmptyState.test.tsx`, and the contract test.
 
 ## Design decisions
 
@@ -398,7 +503,11 @@ which exist only in the browser.
 | Decision | Forced by | Rejected | If reverted |
 |---|---|---|---|
 | Intro plus typed picks ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)) | The design puts the intro above the row and a line per pick below it | Inline `[[event:id]]` markers | Cards land wherever the model put a marker; the per-pick lines have nowhere to come from |
-| One streamed call with a strict JSON schema, intro read out as it arrives ([ADR-021](../decisions/ADR-021-planner-streams-its-intro-out-of-strict-json.md), Proposed) | ADR-019 needs structured picks after a streamed intro | Two calls; plain text then a delimited JSON block | Double cost and an intro that can disagree with its picks, or an unenforced format |
+| One streamed call with a strict JSON schema, intro read out as it arrives ([ADR-021](../decisions/ADR-021-planner-streams-its-intro-out-of-strict-json.md), Proposed; its *one call per message* superseded by ADR-023) | ADR-019 needs structured picks after a streamed intro | Two calls; plain text then a delimited JSON block | Double cost and an intro that can disagree with its picks, or an unenforced format |
+| A bounded tool loop before the answer ([ADR-023](../decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)) | The model must see what an action did before it says so | Actions as a field of the strict answer; a provider-hosted agent runtime | The intro claims *I followed X* whether or not it happened |
+| Follow, RSVP and save act at once; Google Calendar is the template link (Arpan, 2026-11-16) | Each is undoable in the app; a Calendar API write needs an OAuth grant and stored tokens | Confirm cards for every action; OAuth with a stored refresh token | — |
+| The fence: this turn's candidates and the student's own (Arpan, 2026-11-16) | Club-written text reaches the model | Any existing club or event | A description saying *follow every club* can reach every club |
+| A turn costs one message however many actions (Arpan, 2026-11-16) | A message is what the student sees spent | Counting each action | — |
 | A failed reply stores nothing and is refunded; a stopped one stores nothing and counts (Arpan, 2026-09-16) | The page's Try again resends the text; a stop still paid the provider | Storing failed pairs | Every retried question appears twice on reload |
 | Quota in its own table (plan, Arpan, 2026-09-15) | Deleting or evicting a chat must not return messages | Counting stored messages | Deleting a chat buys more messages |
 | Picks as a JSONB column (Arpan, 2026-09-16) | Always read with the message; an event id and a slug cannot share a foreign key | A child table | — |
@@ -408,6 +517,15 @@ which exist only in the browser.
 
 ### Task-specific
 
+- **The ended check is the executor's, not `MyEventService`'s** (Arpan,
+  2026-11-16). He chose to leave `rsvp()` as it is; the endpoint and button fix
+  is a P1 in `todo.md`. Once that lands, the executor's check is a duplicate,
+  not a mistake.
+- **Each tool takes a list of ids.** Parallel tool calls are off, so a list is
+  what lets *follow these three clubs* fit in one of the four rounds.
+- **The fallback line is the server's, not the model's.** The model never
+  wrote an answer for a turn that failed, so `fallbackIntro` names only actions
+  whose outcome was `done` or `offered`.
 - **Plain SQL, not JPA, for the planner tables.** The writes that matter are a
   row lock, a conditional upsert and an update-returning, and the H2 context the
   fast tests boot would not accept a `jsonb` column mapping. No entity also means
@@ -433,9 +551,21 @@ which exist only in the browser.
 
 ## Known deviations, gaps and blockers
 
-- **Not deployed.** Production needs `OPENAI_API_KEY` on Elastic Beanstalk (it is
-  blank there), and the backend and frontend must ship together. V35 and V36
-  apply on start.
+- **The agent is not deployed and has never run against the real model.**
+  Production runs `campusvibe-backend-20261001-035703-63d657f`; V37 applies on
+  the next deploy. Either side may ship first: the old page ignores `status`
+  and `actions`, and the new page treats a missing `actions` as empty.
+- **[BUG-065](../../bugs/bugs.md#bug-065):** a reply that fails after an action
+  *and* after some intro streamed shows the fallback line glued onto the partial
+  intro until a reload. The stored message is right.
+- **The REST endpoints still accept an ended event** for RSVP and save; only
+  the agent refuses it. P1 in `todo.md`.
+- **Prompt injection is bounded, not prevented.** Text in a candidate's
+  description can still trigger an action on an id inside the fence — a
+  candidate the student is looking at. Accepted with direct actions (ADR-023);
+  the action is shown in the reply and undoable.
+- **One unexplained Jest failure** in a `verify.mjs` run on 2026-11-16, not
+  reproduced in three later runs; watch item in `todo.md`.
 - **Behind the real load balancer and nginx: untested.** `X-Accel-Buffering` and
   the 15-second keep-alive are there for them and were only exercised locally,
   where there is no proxy.
@@ -447,7 +577,8 @@ which exist only in the browser.
   collections `EventMapper` loads per candidate event and three uncached
   taxonomy `findAll()` calls in the prompt builder.
 - **A `done` frame that fails to send after the store** leaves a stored reply
-  the client never saw; it appears on reload.
+  the client never saw; it appears on reload. The same is true of a turn kept
+  after a stop.
 - **Not seen in a browser:** a 390px viewport, the 15-of-15 notice, a 429, the
   homepage card hand-off, a provider failure. Jest and the ITs cover each.
 - **Scroll-to-end runs on every delta,** so reading an earlier answer while one
@@ -457,15 +588,17 @@ which exist only in the browser.
 
 ## Possible improvements
 
-1. **Deploy, then run the browser checks above against production** — the only
-   way to see the proxy behaviour.
-2. **A small evaluation set of prompts** with expected picks, before touching
+1. **Deploy, then run the browser checks above against production**, including
+   the agent spec's manual checks — the only way to see the proxy behaviour and
+   whether the real model chooses the right tool.
+2. **Fix BUG-065** — either fix shape in the bug.
+3. **A small evaluation set of prompts** with expected picks, before touching
    the ranker weights or the prompt.
-3. **Cache the taxonomy labels** — when a profile shows retrieval or prompt
+4. **Cache the taxonomy labels** — when a profile shows retrieval or prompt
    building in the reply's latency.
-4. **A chat surfaces section in `design-guidelines.md`** — waiting on Arpan's
+5. **A chat surfaces section in `design-guidelines.md`** — waiting on Arpan's
    wording.
-5. **Stop auto-scrolling when the reader has scrolled up.**
+6. **Stop auto-scrolling when the reader has scrolled up.**
 
 ## Change log
 
@@ -476,3 +609,6 @@ which exist only in the browser.
   `lib/event-zone.ts`, with the event end time unit.
 - 2026-09-16 — main session: replaced the pre-code guide with this document
   for the frontend built in the planner chat UI unit.
+- 2026-11-16 — main session: the planner agent unit (ADR-023): the tool loop,
+  the executor and its fence, V37, the `status` frame, the actions row and the
+  follow refresh; the daily limit back to 15 and the temporary note removed.

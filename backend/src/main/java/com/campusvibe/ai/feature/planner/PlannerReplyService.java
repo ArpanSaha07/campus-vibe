@@ -15,6 +15,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +44,14 @@ import java.util.concurrent.TimeUnit;
  *   <li><b>stopped</b> by the client: nothing stored, the message still counted,
  *       because the provider was already paid (Arpan, 2026-09-16)</li>
  * </ul>
+ *
+ * <p><b>The agent loop (ADR-023).</b> Before its answer the model may call
+ * {@link PlannerTools} for up to {@link PlannerLimits#MAX_TOOL_ROUNDS} rounds;
+ * {@link PlannerToolExecutor} runs each call and its result goes back to the
+ * model, then a round without tools forces the answer. A turn whose actions
+ * changed the account is never thrown away: if the answer then fails or the
+ * client stops, the turn is stored with {@link PlannerAction#fallbackIntro}
+ * and counted (Arpan, 2026-11-16).
  */
 @Service
 public class PlannerReplyService {
@@ -74,6 +83,7 @@ public class PlannerReplyService {
     private final PlannerUsageService usageService;
     private final PlannerRetrievalService retrievalService;
     private final PlannerPromptBuilder promptBuilder;
+    private final PlannerToolExecutor toolExecutor;
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
 
@@ -89,6 +99,7 @@ public class PlannerReplyService {
                                PlannerUsageService usageService,
                                PlannerRetrievalService retrievalService,
                                PlannerPromptBuilder promptBuilder,
+                               PlannerToolExecutor toolExecutor,
                                LlmClient llmClient,
                                ObjectMapper objectMapper) {
         this.conversationService = conversationService;
@@ -96,6 +107,7 @@ public class PlannerReplyService {
         this.usageService = usageService;
         this.retrievalService = retrievalService;
         this.promptBuilder = promptBuilder;
+        this.toolExecutor = toolExecutor;
         this.llmClient = llmClient;
         this.objectMapper = objectMapper;
     }
@@ -149,6 +161,7 @@ public class PlannerReplyService {
     public void reply(long userId, UUID conversationId, String prompt, LocalDate spentOn, PlannerReplySink sink) {
         ScheduledFuture<?> keepAlive = keepAlives.scheduleAtFixedRate(sink::keepAlive,
                 KEEP_ALIVE.toMillis(), KEEP_ALIVE.toMillis(), TimeUnit.MILLISECONDS);
+        List<PlannerAction> actions = new ArrayList<>();
         try {
             Instant now = Instant.now();
             List<PlannerMessageRepository.Row> history =
@@ -166,22 +179,42 @@ public class PlannerReplyService {
                     history.stream().flatMap(row -> row.picks().stream()).toList());
             LlmRequest request = promptBuilder.build(prompt, history, names, candidates, now);
 
-            IntroStreamReader introReader = new IntroStreamReader();
-            String text = llmClient.streamStructured(request, fragment -> {
-                String intro = introReader.feed(fragment);
-                if (!intro.isEmpty()) {
-                    sink.delta(intro);
+            List<LlmRequest.Message> messages = new ArrayList<>(request.messages());
+            IntroStreamReader introReader;
+            LlmClient.Turn turn;
+            for (int round = 0; ; round++) {
+                boolean toolsAllowed = round < PlannerLimits.MAX_TOOL_ROUNDS;
+                IntroStreamReader reader = new IntroStreamReader();
+                introReader = reader;
+                turn = llmClient.streamTurn(
+                        request.withMessages(messages).withTools(PlannerTools.all(), toolsAllowed),
+                        fragment -> {
+                            String intro = reader.feed(fragment);
+                            if (!intro.isEmpty()) {
+                                sink.delta(intro);
+                            }
+                        });
+                if (!turn.calledTools() || !toolsAllowed) {
+                    break;
                 }
-            });
+                messages.add(LlmRequest.Message.toolCalls(turn.toolCalls()));
+                for (LlmRequest.ToolCall call : turn.toolCalls()) {
+                    sink.status(PlannerTools.statusLine(call.name()));
+                    PlannerToolExecutor.Execution execution = toolExecutor.execute(userId, call, candidates, now);
+                    actions.addAll(execution.actions());
+                    messages.add(LlmRequest.Message.toolResult(call.id(), execution.resultForModel()));
+                }
+            }
 
-            PlannerAnswers.ModelAnswer answer = PlannerAnswers.parse(text, objectMapper);
+            PlannerAnswers.ModelAnswer answer = PlannerAnswers.parse(turn.text(), objectMapper);
             List<PlannerPickDTO> picks = PlannerAnswers.keep(answer, candidates);
             String intro = PlannerAnswers.intro(answer, picks);
             // Counts only, never ids or text. A steady stream of dropped picks
             // means the model is naming things it was not offered.
-            log.info("planner.answer kind={} picked={} kept={} candidates={}/{}",
+            log.info("planner.answer kind={} picked={} kept={} candidates={}/{} actions={} changed={}",
                     answer.kind(), answer.picks().size(), picks.size(),
-                    candidates.events().size(), candidates.clubs().size());
+                    candidates.events().size(), candidates.clubs().size(),
+                    actions.size(), actions.stream().filter(PlannerAction::changedAccount).count());
 
             // The page shows the deltas; make sure they add up to the stored
             // intro when the reader could not stream all of it.
@@ -194,43 +227,91 @@ public class PlannerReplyService {
             }
 
             Optional<PlannerConversationService.StoredReply> stored =
-                    conversationService.recordExchange(userId, conversationId, prompt, intro, picks);
+                    conversationService.recordExchange(userId, conversationId, prompt, intro, picks, actions);
             if (stored.isEmpty()) {
                 usageService.refund(userId, spentOn);
                 sink.error(CONVERSATION_GONE, CONVERSATION_GONE_MESSAGE);
                 return;
             }
-            sink.done(new PlannerReplyDoneDTO(
-                    String.valueOf(stored.get().messageId()),
-                    picks,
-                    stored.get().cards().events(),
-                    stored.get().cards().clubs(),
-                    usageService.usage(userId),
-                    stored.get().conversation()));
+            sink.done(doneFrame(userId, stored.get(), picks));
 
         } catch (PlannerReplySink.ClientGoneException e) {
-            if (sink.timedOut()) {
+            if (keepActions(userId, conversationId, prompt, actions, null)) {
+                log.info("Planner reply stopped after its actions changed the account; stored, message counted");
+            } else if (sink.timedOut()) {
                 usageService.refund(userId, spentOn);
                 log.warn("Planner reply ran past the stream timeout; refunded");
             } else {
                 log.info("Planner reply stopped by the client; nothing stored, message counted");
             }
         } catch (LlmException e) {
-            usageService.refund(userId, spentOn);
-            log.warn("Planner reply failed ({}: {}); refunded", e.reason(), e.getMessage());
-            sink.error(PROVIDER_ERROR,
+            log.warn("Planner reply failed ({}: {})", e.reason(), e.getMessage());
+            fail(userId, conversationId, prompt, spentOn, actions, sink,
                     e.reason() == LlmException.Reason.REFUSED ? REFUSED_MESSAGE : PROVIDER_ERROR_MESSAGE);
         } catch (IllegalArgumentException e) {
-            usageService.refund(userId, spentOn);
-            log.warn("Planner reply was not a usable answer ({}); refunded", e.getMessage());
-            sink.error(PROVIDER_ERROR, PROVIDER_ERROR_MESSAGE);
+            log.warn("Planner reply was not a usable answer ({})", e.getMessage());
+            fail(userId, conversationId, prompt, spentOn, actions, sink, PROVIDER_ERROR_MESSAGE);
         } catch (RuntimeException e) {
-            usageService.refund(userId, spentOn);
-            log.error("Planner reply failed unexpectedly; refunded", e);
-            sink.error(PROVIDER_ERROR, PROVIDER_ERROR_MESSAGE);
+            log.error("Planner reply failed unexpectedly", e);
+            fail(userId, conversationId, prompt, spentOn, actions, sink, PROVIDER_ERROR_MESSAGE);
         } finally {
             keepAlive.cancel(false);
             sink.complete();
         }
+    }
+
+    private PlannerReplyDoneDTO doneFrame(long userId, PlannerConversationService.StoredReply stored,
+                                          List<PlannerPickDTO> picks) {
+        return new PlannerReplyDoneDTO(
+                String.valueOf(stored.messageId()),
+                picks,
+                stored.cards().events(),
+                stored.cards().clubs(),
+                stored.actions(),
+                usageService.usage(userId),
+                stored.conversation());
+    }
+
+    /**
+     * A failed answer. When actions already changed the account the turn is
+     * stored with a line saying what was done, counted, and closed with
+     * {@code done}; otherwise it is refunded and closed with {@code error}.
+     */
+    private void fail(long userId, UUID conversationId, String prompt, LocalDate spentOn,
+                      List<PlannerAction> actions, PlannerReplySink sink, String message) {
+        if (keepActions(userId, conversationId, prompt, actions, sink)) {
+            return;
+        }
+        usageService.refund(userId, spentOn);
+        log.warn("Planner reply refunded");
+        sink.error(PROVIDER_ERROR, message);
+    }
+
+    /**
+     * Stores a turn whose actions changed the account, so the chat shows what
+     * was done, and sends {@code done} when a sink is given.
+     *
+     * @return false when nothing changed the account, so nothing was stored
+     */
+    private boolean keepActions(long userId, UUID conversationId, String prompt,
+                                List<PlannerAction> actions, PlannerReplySink sink) {
+        if (actions.stream().noneMatch(PlannerAction::changedAccount)) {
+            return false;
+        }
+        String intro = PlannerAction.fallbackIntro(actions);
+        try {
+            Optional<PlannerConversationService.StoredReply> stored = conversationService.recordExchange(
+                    userId, conversationId, prompt, intro, List.of(), actions);
+            if (sink != null && stored.isPresent()) {
+                // The page replaces a streamed partial intro with the stored one on done.
+                sink.delta(intro);
+                sink.done(doneFrame(userId, stored.get(), List.of()));
+            }
+        } catch (PlannerReplySink.ClientGoneException ignored) {
+            // Stored; the page shows it on the next load.
+        } catch (RuntimeException e) {
+            log.error("Planner could not store a turn whose actions ran", e);
+        }
+        return true;
     }
 }

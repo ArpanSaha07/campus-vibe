@@ -42,6 +42,11 @@ final class SseReplySink implements PlannerReplySink {
     }
 
     @Override
+    public void status(String text) {
+        send("status", Map.of("text", text));
+    }
+
+    @Override
     public void done(PlannerReplyDoneDTO done) {
         send("done", done);
     }

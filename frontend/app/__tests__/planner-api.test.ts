@@ -55,6 +55,9 @@ const done: ApiPlannerReplyDone = {
   ],
   events: [apiEvent(7, "AI Hack Night")],
   clubs: [],
+  actions: [
+    { type: "follow", targetKind: "club", id: "ai-society", name: "McGill AI Society", outcome: "done", event: null },
+  ],
   usage: { used: 4, limit: 15, resetsAt: "2026-09-17T04:00:00Z" },
   conversation: { id: "c-1", title: "Plan my weekend", lastActiveAt: "2026-09-16T15:00:00Z" },
 };
@@ -178,5 +181,22 @@ describe("toPlannerPicks", () => {
     );
     expect(picks).toHaveLength(1);
     expect(picks[0].kind).toBe("club");
+  });
+
+  it("hands status frames to onStatus and returns the agent's actions", async () => {
+    mockFetch.mockResolvedValue(
+      streamResponse([frame("status", { text: "Following clubs…" }), frame("delta", { text: "Done." }), frame("done", done)]),
+    );
+    const statuses: string[] = [];
+
+    const reply = await sendPlannerMessage("c-1", "follow the AI society", {
+      onDelta: () => {},
+      onStatus: (text) => statuses.push(text),
+    });
+
+    expect(statuses).toEqual(["Following clubs…"]);
+    expect(reply.actions).toEqual([
+      { type: "follow", targetKind: "club", id: "ai-society", name: "McGill AI Society", outcome: "done" },
+    ]);
   });
 });

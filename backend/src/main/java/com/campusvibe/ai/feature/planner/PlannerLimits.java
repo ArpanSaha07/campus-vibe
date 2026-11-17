@@ -13,7 +13,7 @@ public final class PlannerLimits {
     public static final int MAX_CONVERSATIONS = 15;
 
     /** Messages per user per America/Toronto day, across every chat. */
-    public static final int DAILY_MESSAGES = 1000; // TEMP demo 2026-09-30: revert to 15
+    public static final int DAILY_MESSAGES = 15;
 
     /** Longest message, in characters. The page's MAX_PROMPT_LENGTH. */
     public static final int MAX_PROMPT_LENGTH = 1000;
@@ -30,6 +30,15 @@ public final class PlannerLimits {
 
     /** Picks kept in one answer: one card row. */
     public static final int MAX_PICKS = 6;
+
+    /**
+     * Tool rounds per turn before the model must answer (ADR-023). A turn costs
+     * one message however many it uses (Arpan, 2026-11-16).
+     */
+    public static final int MAX_TOOL_ROUNDS = 4;
+
+    /** Ids one tool call may act on; the same bound as one card row. */
+    public static final int MAX_IDS_PER_TOOL_CALL = 6;
 
     /** How far ahead retrieval looks. Running events are always in. */
     public static final Duration WINDOW = Duration.ofDays(30);

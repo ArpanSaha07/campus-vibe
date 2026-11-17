@@ -1,5 +1,6 @@
 import { ApiError, apiFetch, apiFetchResponse } from "@/app/lib/api";
 import {
+  toPlannerActions,
   toPlannerConversationSummary,
   toPlannerMessage,
   toPlannerPicks,
@@ -11,6 +12,7 @@ import type {
   ApiPlannerCreatedConversation,
   ApiPlannerReplyDone,
   ApiPlannerUsage,
+  PlannerAction,
   PlannerConversationSummary,
   PlannerMessage,
   PlannerPick,
@@ -94,6 +96,7 @@ export class PlannerReplyError extends Error {
 export interface PlannerReply {
   messageId: string;
   picks: PlannerPick[];
+  actions: PlannerAction[];
   usage: PlannerUsage;
   conversation: PlannerConversationSummary;
 }
@@ -149,7 +152,8 @@ export function createSseParser(onFrame: (frame: SseFrame) => void) {
 /**
  * Sends one message and streams the reply.
  *
- * `onDelta` receives the intro as it is written. Resolves with the `done`
+ * `onStatus` receives what the agent is doing while its tools run, before any
+ * text (ADR-023). `onDelta` receives the intro as it is written. Resolves with the `done`
  * frame. Rejects with `ApiError` when the request is refused (429 at the daily
  * limit, 503 without an AI provider), with `PlannerReplyError` on an `error`
  * frame, and with an `AbortError` when `signal` fires.
@@ -157,7 +161,11 @@ export function createSseParser(onFrame: (frame: SseFrame) => void) {
 export async function sendPlannerMessage(
   conversationId: string,
   content: string,
-  { onDelta, signal }: { onDelta: (text: string) => void; signal?: AbortSignal },
+  {
+    onDelta,
+    onStatus,
+    signal,
+  }: { onDelta: (text: string) => void; onStatus?: (text: string) => void; signal?: AbortSignal },
 ): Promise<PlannerReply> {
   const res = await apiFetchResponse(
     `${BASE}/conversations/${encodeURIComponent(conversationId)}/messages`,
@@ -181,6 +189,7 @@ export async function sendPlannerMessage(
     if (outcome.done || outcome.failure) return;
     const payload = JSON.parse(data);
     if (event === "delta") onDelta(payload.text ?? "");
+    else if (event === "status") onStatus?.(payload.text ?? "");
     else if (event === "done") outcome.done = payload as ApiPlannerReplyDone;
     else if (event === "error") outcome.failure = new PlannerReplyError(payload.code, payload.message);
   });
@@ -201,6 +210,7 @@ export async function sendPlannerMessage(
   return {
     messageId: reply.messageId,
     picks: toPlannerPicks(reply.picks, reply.events, reply.clubs),
+    actions: toPlannerActions(reply.actions),
     usage: toPlannerUsage(reply.usage),
     conversation: toPlannerConversationSummary(reply.conversation),
   };

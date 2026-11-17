@@ -1,5 +1,6 @@
 package com.campusvibe.contract;
 
+import com.campusvibe.ai.feature.planner.PlannerActionDTO;
 import com.campusvibe.ai.feature.planner.PlannerConversationDTO;
 import com.campusvibe.ai.feature.planner.PlannerConversationListDTO;
 import com.campusvibe.ai.feature.planner.PlannerConversationSummaryDTO;
@@ -103,6 +104,7 @@ class ApiContractTest {
         CONTRACTED.put("PlannerConversationSummaryDTO", PlannerConversationSummaryDTO.class);
         CONTRACTED.put("PlannerConversationListDTO", PlannerConversationListDTO.class);
         CONTRACTED.put("PlannerCreatedConversationDTO", PlannerCreatedConversationDTO.class);
+        CONTRACTED.put("PlannerActionDTO", PlannerActionDTO.class);
         CONTRACTED.put("PlannerMessageDTO", PlannerMessageDTO.class);
         CONTRACTED.put("PlannerConversationDTO", PlannerConversationDTO.class);
         CONTRACTED.put("PlannerReplyDoneDTO", PlannerReplyDoneDTO.class);

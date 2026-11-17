@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { Check, Minus, RotateCcw, Sparkles } from "lucide-react";
 import ClubCard from "@/app/components/club/ClubCard";
+import AddToCalendarLink from "@/app/components/event/AddToCalendarLink";
 import EventCard from "@/app/components/event/EventCard";
 import CardRow from "@/app/components/planner/CardRow";
 import { formatEventWeekday } from "@/app/lib/event-zone";
-import { FOLLOW_UPS, pickRowLabel } from "@/app/lib/planner";
-import type { PlannerMessage, PlannerPick } from "@/app/types";
+import { FOLLOW_UPS, actionSentence, pickRowLabel } from "@/app/lib/planner";
+import type { PlannerAction, PlannerMessage, PlannerPick } from "@/app/types";
 
 /**
  * One planner answer, in the order the design fixes: the intro, one row of
@@ -25,6 +26,7 @@ export default function AssistantMessage({
   followUpsDisabled?: boolean;
 }) {
   const { picks, status } = message;
+  const actions = message.actions ?? [];
   const kind = picks[0]?.kind;
   const thinking = status === "streaming" && !message.content;
 
@@ -39,7 +41,7 @@ export default function AssistantMessage({
 
       {thinking ? (
         <p role="status" className="text-[15px] text-ink-600 motion-safe:animate-pulse">
-          Looking through what&apos;s coming up…
+          {message.activity ?? "Looking through what’s coming up…"}
         </p>
       ) : (
         message.content && (
@@ -47,6 +49,14 @@ export default function AssistantMessage({
             {message.content}
           </p>
         )
+      )}
+
+      {actions.length > 0 && (
+        <ul aria-label="What the planner did" className="flex max-w-[720px] flex-col gap-2">
+          {actions.map((action, index) => (
+            <ActionLine key={`${action.type}-${action.id}-${index}`} action={action} />
+          ))}
+        </ul>
       )}
 
       {kind && (
@@ -119,6 +129,48 @@ export default function AssistantMessage({
         </ul>
       )}
     </article>
+  );
+}
+
+/**
+ * One action the agent took (ADR-023). A change to the account reads with a
+ * check; one that changed nothing reads muted. An offered calendar link is the
+ * existing template link: the student's click is the confirmation.
+ */
+function ActionLine({ action }: { action: PlannerAction }) {
+  const changed = action.outcome === "done";
+  const sentence = actionSentence(action);
+
+  if (action.type === "calendar" && action.event) {
+    return (
+      <li className="flex items-center gap-2 text-sm text-ink-900">
+        <AddToCalendarLink event={action.event} />
+        <span className="text-ink-600">{action.name}</span>
+      </li>
+    );
+  }
+
+  const href =
+    changed && action.targetKind === "club"
+      ? `/clubs/${encodeURIComponent(action.id)}`
+      : changed
+        ? `/events/${encodeURIComponent(action.id)}`
+        : null;
+  return (
+    <li className={`flex items-center gap-2 text-sm ${changed ? "text-ink-900" : "text-ink-600"}`}>
+      {changed ? (
+        <Check className="h-3.5 w-3.5 flex-shrink-0 text-lavender-600" aria-hidden="true" />
+      ) : (
+        <Minus className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+      )}
+      {href ? (
+        <Link href={href} className="hover:text-lavender-800">
+          {sentence}
+        </Link>
+      ) : (
+        <span>{sentence}</span>
+      )}
+    </li>
   );
 }
 

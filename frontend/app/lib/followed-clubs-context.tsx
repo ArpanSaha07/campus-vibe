@@ -44,6 +44,11 @@ interface FollowedClubsContextType {
   unfollow: (clubId: string) => Promise<void>;
   /** Called by useFollowedClubs on mount. Triggers the one load, at most once. */
   requestLoad: () => void;
+  /**
+   * Re-reads the list after a follow made somewhere other than a button, such
+   * as the planner agent (ADR-023). Does nothing until something asked for it.
+   */
+  refresh: () => void;
 }
 
 const FollowedClubsContext = createContext<FollowedClubsContextType | undefined>(undefined);
@@ -110,6 +115,10 @@ export function FollowedClubsProvider({ children }: { children: ReactNode }) {
     };
   }, [isAuthenticated, authLoading, wantedTick]);
 
+  const refresh = useCallback(() => {
+    if (wanted.current) setWantedTick((n) => n + 1);
+  }, []);
+
   const followedIds = useMemo(() => new Set(clubs.map((club) => club.clubId)), [clubs]);
 
   const isFollowing = useCallback((clubId: string) => followedIds.has(clubId), [followedIds]);
@@ -154,8 +163,8 @@ export function FollowedClubsProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ready, clubs, failed, isFollowing, follow, unfollow, requestLoad }),
-    [ready, clubs, failed, isFollowing, follow, unfollow, requestLoad],
+    () => ({ ready, clubs, failed, isFollowing, follow, unfollow, requestLoad, refresh }),
+    [ready, clubs, failed, isFollowing, follow, unfollow, requestLoad, refresh],
   );
 
   return (

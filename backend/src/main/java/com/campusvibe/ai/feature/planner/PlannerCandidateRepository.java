@@ -82,6 +82,18 @@ public class PlannerCandidateRepository {
                 params(windowDays).addValue("limit", limit), Long.class);
     }
 
+    /** Every event this user is going to, ended or not: what the agent may cancel (ADR-023). */
+    public List<Long> goingEventIds(long userId) {
+        return jdbc.queryForList("SELECT event_id FROM user_event_rsvps WHERE user_id = :userId",
+                new MapSqlParameterSource("userId", userId), Long.class);
+    }
+
+    /** Every event this user saved, ended or not: what the agent may unsave (ADR-023). */
+    public List<Long> savedEventIds(long userId) {
+        return jdbc.queryForList("SELECT event_id FROM user_saved_events WHERE user_id = :userId",
+                new MapSqlParameterSource("userId", userId), Long.class);
+    }
+
     public List<String> followedClubIds(long userId) {
         return jdbc.queryForList("SELECT club_id FROM user_followed_clubs WHERE user_id = :userId",
                 new MapSqlParameterSource("userId", userId), String.class);

@@ -230,8 +230,8 @@ class PlannerMessageIT extends PlannerIntegrationTest {
         User user = student("student@campus.com");
         String chat = newChat(user);
         for (int i = 0; i < PlannerLimits.MAX_MESSAGES_PER_CONVERSATION / 2; i++) {
-            messageRepository.insert(UUID.fromString(chat), "user", "q" + i, List.of(), Instant.now());
-            messageRepository.insert(UUID.fromString(chat), "assistant", "a" + i, List.of(), Instant.now());
+            messageRepository.insert(UUID.fromString(chat), "user", "q" + i, List.of(), List.of(), Instant.now());
+            messageRepository.insert(UUID.fromString(chat), "assistant", "a" + i, List.of(), List.of(), Instant.now());
         }
 
         List<Frame> frames = frames(send(user, chat, "one more"));
@@ -290,6 +290,11 @@ class PlannerMessageIT extends PlannerIntegrationTest {
             if (gone) throw new ClientGoneException();
             deltas++;
             gone = true;
+        }
+
+        @Override
+        public void status(String text) {
+            if (gone) throw new ClientGoneException();
         }
 
         @Override

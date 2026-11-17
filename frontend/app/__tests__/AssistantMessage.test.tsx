@@ -60,6 +60,7 @@ const eventsAnswer: PlannerMessage = {
     { kind: "event", reason: "matches your AI interest.", event: event(1, "AI Hack Night", "2026-09-18T22:00:00") },
     { kind: "event", reason: "is the music pick.", event: event(2, "Frosh Week Rave", "2026-09-19T21:00:00") },
   ],
+  actions: [],
 };
 
 const clubsAnswer: PlannerMessage = {
@@ -70,6 +71,27 @@ const clubsAnswer: PlannerMessage = {
   picks: [
     { kind: "club", reason: "runs photo walks.", club: club("photo-soc", "Photography Society") },
     { kind: "club", reason: "screens films weekly.", club: club("film-soc", "Film Society") },
+  ],
+  actions: [],
+};
+
+const actionsAnswer: PlannerMessage = {
+  id: "m-3",
+  role: "assistant",
+  content: "Done.",
+  status: "complete",
+  picks: [],
+  actions: [
+    { type: "follow", targetKind: "club", id: "chess-club", name: "Chess Club", outcome: "done" },
+    { type: "rsvp", targetKind: "event", id: "9", name: "Old simul", outcome: "ended" },
+    {
+      type: "calendar",
+      targetKind: "event",
+      id: "1",
+      name: "AI Hack Night",
+      outcome: "offered",
+      event: event(1, "AI Hack Night", "2026-09-18T22:00:00"),
+    },
   ],
 };
 
@@ -141,5 +163,28 @@ describe("AssistantMessage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("The planner is unavailable right now.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalled();
+  });
+
+  it("lists what the agent did, links what changed, and offers the calendar template link", () => {
+    render(<AssistantMessage message={actionsAnswer} onFollowUp={jest.fn()} />);
+
+    const list = screen.getByRole("list", { name: "What the planner did" });
+    expect(list).toHaveTextContent("Followed Chess Club");
+    expect(screen.getByRole("link", { name: "Followed Chess Club" })).toHaveAttribute("href", "/clubs/chess-club");
+    expect(list).toHaveTextContent("Old simul has already ended");
+    expect(screen.queryByRole("link", { name: /Old simul/ })).toBeNull();
+    const calendar = screen.getByRole("link", { name: "Add AI Hack Night to Google Calendar" });
+    expect(calendar.getAttribute("href")).toContain("calendar.google.com");
+  });
+
+  it("shows what the agent is doing while no text has streamed", () => {
+    render(
+      <AssistantMessage
+        message={{ ...actionsAnswer, content: "", status: "streaming", actions: [], activity: "Following clubs…" }}
+        onFollowUp={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Following clubs…");
   });
 });

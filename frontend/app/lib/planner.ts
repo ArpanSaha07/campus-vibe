@@ -1,5 +1,5 @@
 import { formatEventDateRange } from "@/app/lib/event-zone";
-import type { PlannerConversationSummary, PlannerPick, PlannerPickKind } from "@/app/types";
+import type { PlannerAction, PlannerConversationSummary, PlannerPick, PlannerPickKind } from "@/app/types";
 
 /**
  * AI planner helpers that need no server: the prompt stash, the chip lists and
@@ -86,4 +86,31 @@ export function pickRowLabel(picks: PlannerPick[]): string {
   const last = new Date(Math.max(...times));
   const range = formatEventDateRange(first, last);
   return `${count} ${count === 1 ? "event" : "events"} · ${range}`;
+}
+
+/**
+ * One line saying what the agent did, or why it did not (ADR-023). The
+ * calendar link itself is rendered beside the line; this is only the words.
+ */
+export function actionSentence(action: PlannerAction): string {
+  const { type, name, outcome } = action;
+  if (outcome === "ended") return `${name} has already ended`;
+  if (outcome === "not_found" || outcome === "not_allowed") return `Couldn't find ${name} here`;
+  const done = outcome === "done" || outcome === "offered";
+  switch (type) {
+    case "follow":
+      return done ? `Followed ${name}` : `Already following ${name}`;
+    case "unfollow":
+      return done ? `Unfollowed ${name}` : `You weren't following ${name}`;
+    case "rsvp":
+      return done ? `You're going to ${name}` : `Already going to ${name}`;
+    case "cancel_rsvp":
+      return done ? `Cancelled your RSVP to ${name}` : `You hadn't RSVPed to ${name}`;
+    case "save":
+      return done ? `Saved ${name}` : `${name} is already saved`;
+    case "unsave":
+      return done ? `Removed ${name} from saved` : `${name} wasn't saved`;
+    case "calendar":
+      return action.event ? `Add ${name} to Google Calendar` : `${name} can no longer be added`;
+  }
 }
