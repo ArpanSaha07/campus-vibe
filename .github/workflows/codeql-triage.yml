@@ -31,16 +31,17 @@ on:
   # Manual runs, and the only way to exercise this before it reaches `main`.
   workflow_dispatch:
     inputs:
-      branch:
-        description: 'Branch to triage (defaults to the one you launch from)'
-        required: false
+      pr:
+        description: 'Number of the pull request to triage'
+        required: true
         type: string
 
 concurrency:
-  # codeql.yml triggers on both `push` and `pull_request`, so a PR branch
-  # analyses the same commit twice. Keying on the SHA collapses that into one
-  # triage rather than two identical comments.
-  group: codeql-triage-${{ github.event.workflow_run.head_sha || github.sha }}
+  # One triage per PR at a time: a newer analysis of the same PR cancels the
+  # older triage, which would only be overwritten anyway. A run with no PR
+  # (the main baseline analysis, skipped below) keys on its own run id, so it
+  # can never cancel a PR's triage.
+  group: codeql-triage-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -66,57 +67,83 @@ jobs:
     # already triaged on the PR that introduced it — triaging again after the
     # merge spends an agent run on a report with no PR to post to and nobody to
     # read it.
+    #
+    # The PR number comes from the workflow_run payload. It is empty for a PR
+    # from a fork, which this repository does not take; such a run is skipped
+    # rather than guessing a PR from the branch name.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'pull_request' &&
-       github.event.workflow_run.conclusion != 'cancelled')
+       github.event.workflow_run.conclusion != 'cancelled' &&
+       github.event.workflow_run.pull_requests[0].number)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr }}
 
     steps:
-      - name: Checkout the analysed commit
+      - name: Checkout the analysed merge commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # The commit CodeQL actually looked at, not the tip of the branch —
-          # they differ as soon as anyone pushes while the analysis is running,
-          # and reading the wrong one produces triage about the wrong code.
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          # A pull_request analysis runs on the PR's MERGE commit, not its head,
+          # and the alert line numbers point into that merge. Checking out the
+          # head (or the branch) shows Claude different code from the code
+          # CodeQL looked at whenever main has moved since the branch forked.
+          ref: refs/pull/${{ env.PR_NUMBER }}/merge
           fetch-depth: 1
 
       - name: Triage
         uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1.0.193
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANALYSED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-          ANALYSED_BRANCH: ${{ github.event.inputs.branch || github.event.workflow_run.head_branch || github.ref_name }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: >-
             --allowedTools "Bash(gh api:*),Bash(gh pr:*),Bash(echo:*),Read,Grep,Glob"
           prompt: |
-            Triage the CodeQL alerts for commit $ANALYSED_SHA on branch
-            $ANALYSED_BRANCH of ${{ github.repository }}.
+            Triage the CodeQL alerts on pull request #$PR_NUMBER of
+            ${{ github.repository }}. The working directory is that PR's merge
+            commit, the code CodeQL analysed.
 
-            ## Step 1 — get the alerts, and stop early if there are none
+            ## Step 1 — get the PR's alerts
+
+            A pull_request analysis files its alerts under the PR's merge ref,
+            NOT under the branch name. `refs/heads/<branch>` holds whatever the
+            branch had when it was last scanned on its own, which may be months
+            old; never query it.
 
             ```
-            gh api "repos/${{ github.repository }}/code-scanning/alerts?ref=refs/heads/$ANALYSED_BRANCH&state=open&per_page=100"
+            gh api --paginate "repos/${{ github.repository }}/code-scanning/alerts?ref=refs/pull/$PR_NUMBER/merge&tool_name=CodeQL&state=open&per_page=100"
             ```
 
-            If that returns no alerts, write one line saying so to
-            $GITHUB_STEP_SUMMARY and STOP. Do not post a comment. A clean push
-            should cost seconds, not a review — and a bot that comments
-            "nothing found" on every push trains people to ignore it.
+            ## Step 2 — split them into new and pre-existing
 
-            ## Step 2 — decide which ones are new
+            Get the baseline, the alerts open on main:
 
-            Alerts whose location is not in this commit's diff are pre-existing.
-            Say so and keep them in a short separate list; the reader needs to
-            know what THIS push introduced. Use:
-            `gh api repos/${{ github.repository }}/commits/$ANALYSED_SHA`
+            ```
+            gh api --paginate "repos/${{ github.repository }}/code-scanning/alerts?ref=refs/heads/main&tool_name=CodeQL&state=open&per_page=100" --jq '.[].number'
+            ```
 
-            ## Step 3 — classify each alert into exactly one of three
+            An alert open on the PR ref whose `number` is NOT in that list is
+            **new**: this PR introduced it. One whose number is in the list is
+            **pre-existing**. Match on the alert number, never on file or line:
+            the same alert keeps its number across refs while its line moves.
+            If the main query fails or returns nothing, say there is no
+            baseline and treat every alert as new.
+
+            Then find any earlier triage comment of this workflow on the PR
+            (`gh pr view $PR_NUMBER --comments`; it starts with `## CodeQL triage`).
+
+            - **No new alerts and no earlier comment:** write one line to
+              $GITHUB_STEP_SUMMARY and STOP. Do not post. A bot that comments
+              "nothing found" on every PR trains people to ignore it.
+            - **No new alerts but an earlier comment exists:** edit it to say
+              this PR no longer introduces any CodeQL alert, so a stale verdict
+              does not stay on the PR. Then STOP.
+            - Otherwise continue.
+
+            ## Step 3 — classify each NEW alert into exactly one of three
 
             Read the flagged code before judging it. Never classify from the
             rule name alone: whether a finding is real depends on what reaches
@@ -136,18 +163,22 @@ jobs:
 
             ## Step 4 — report
 
-            Find a PR for this branch:
-            `gh pr list --head $ANALYSED_BRANCH --json number --jq '.[0].number'`
+            Post ONE comment on the PR, starting with the heading
+            `## CodeQL triage — PR #$PR_NUMBER`. If the earlier triage comment
+            from Step 2 exists, replace it with
+            `gh pr comment $PR_NUMBER --edit-last --body ...` instead of
+            adding another; otherwise use
+            `gh pr comment $PR_NUMBER --body ...`.
 
-            - **If there is one**, post ONE comment with `gh pr comment`.
-              Before posting, read existing comments and if a previous triage
-              comment from this workflow is already there, edit it with
-              `gh pr comment --edit-last` instead of adding another.
-            - **If there is not**, write the same content to $GITHUB_STEP_SUMMARY.
+            Lead with the count of NEW alerts and the single most serious one.
+            Group the new alerts by classification, most serious first. For
+            each: alert number, rule id, file:line, one sentence on the
+            verdict, and the concrete next action.
 
-            Lead with the count and the single most serious finding. Group by
-            classification, most serious first. For each: rule id, file:line,
-            one sentence on the verdict, and the concrete next action.
+            Close with the pre-existing alerts as a short list of one line
+            each (number, rule id, file:line) and no new verdict: they were
+            triaged on the PR that introduced them, and the reader needs to
+            see what THIS PR adds.
 
             End with a short note that fixes are applied by a human running
             Claude Code locally on the branch, and that dismissals happen on the
