@@ -1,8 +1,9 @@
 package com.campusvibe.ai.feature.planner;
 
 /**
- * Where a streamed reply's frames go (ADR-019): {@code delta} frames of intro
- * text, then one {@code done} or {@code error} frame.
+ * Where a streamed reply's frames go (ADR-019): {@code status} frames while the
+ * agent's tools run (ADR-023), {@code delta} frames of intro text, then one
+ * {@code done} or {@code error} frame.
  *
  * <p>An interface rather than {@code SseEmitter} itself, so a test can play a
  * client that goes away part way through.
@@ -11,6 +12,14 @@ public interface PlannerReplySink {
 
     /** @throws ClientGoneException when the client has disconnected */
     void delta(String text);
+
+    /**
+     * What the agent is doing while no text streams, such as <em>Following
+     * clubs…</em>. Replaces the previous status on the page.
+     *
+     * @throws ClientGoneException when the client has disconnected
+     */
+    void status(String text);
 
     /** @throws ClientGoneException when the client has disconnected */
     void done(PlannerReplyDoneDTO done);

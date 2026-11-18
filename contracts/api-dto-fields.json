@@ -105,13 +105,16 @@
 
   "PlannerCreatedConversationDTO": ["conversation", "evictedId"],
 
+  "PlannerActionDTO": ["type", "targetKind", "id", "name", "outcome", "event"],
+
   "PlannerMessageDTO": [
-    "id", "role", "content", "status", "picks", "events", "clubs", "createdAt"
+    "id", "role", "content", "status", "picks", "events", "clubs", "actions",
+    "createdAt"
   ],
 
   "PlannerConversationDTO": ["id", "title", "lastActiveAt", "messages"],
 
   "PlannerReplyDoneDTO": [
-    "messageId", "picks", "events", "clubs", "usage", "conversation"
+    "messageId", "picks", "events", "clubs", "actions", "usage", "conversation"
   ]
 }

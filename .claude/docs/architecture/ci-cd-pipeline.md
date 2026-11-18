@@ -768,12 +768,16 @@ contract: the backend test failed and the frontend test failed, independently.
 
 ### `.github/dependabot.yml`
 
-Five ecosystems, all weekly on Monday: maven `/backend`, npm `/frontend`,
-github-actions `/`, docker `/backend`, docker `/frontend`. Minor and patch are
-grouped into one PR per ecosystem; **majors are deliberately ungrouped**.
+Six entries, all weekly on Monday: maven `/backend`, npm `/frontend`,
+github-actions `/`, docker `/backend`, docker `/frontend`, docker `/deploy/eb`.
+Minor and patch are grouped into one PR per ecosystem; **majors are deliberately
+ungrouped**.
 
 Docker needs one entry per Dockerfile directory — Dependabot does not search
-recursively. Note that the gitleaks and Trivy binaries are resolved at run time,
+recursively. `/deploy/eb` was missing until 2026-11-08, so the base of the image
+production runs (`eclipse-temurin:25-jre-alpine`, `deploy/eb/Dockerfile:18`) had
+no update PRs at all; `trivy-weekly.yml` could report it but nothing proposed
+the fix. A new Dockerfile directory needs its own entry here. Note that the gitleaks and Trivy binaries are resolved at run time,
 so they are not Dependabot's to manage.
 
 ### `.dockerignore` (repo root)

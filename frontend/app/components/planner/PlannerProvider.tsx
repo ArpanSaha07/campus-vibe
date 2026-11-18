@@ -13,6 +13,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { ApiError } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth-context";
+import { useFollowedClubs } from "@/app/lib/followed-clubs-context";
 import {
   PlannerReplyError,
   createConversation,
@@ -93,6 +94,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { refresh: refreshFollows } = useFollowedClubs();
 
   const [status, setStatus] = useState<PlannerStatus>("loading");
   const [conversations, setConversations] = useState<PlannerConversationSummary[]>([]);
@@ -181,8 +183,8 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       const replyId = `local-reply-${n}`;
       updateThread(id, (messages) => [
         ...messages,
-        { id: `local-user-${n}`, role: "user", content: text, status: "complete", picks: [] },
-        { id: replyId, role: "assistant", content: "", status: "streaming", picks: [] },
+        { id: `local-user-${n}`, role: "user", content: text, status: "complete", picks: [], actions: [] },
+        { id: replyId, role: "assistant", content: "", status: "streaming", picks: [], actions: [] },
       ]);
       setConversations((list) => {
         const current = list.find((c) => c.id === id);
@@ -193,9 +195,11 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController();
       abortRef.current = controller;
       setStreamingId(id);
+      let changedFollows = false;
       try {
         const reply = await sendPlannerMessage(id, text, {
           signal: controller.signal,
+          onStatus: (activity) => updateMessage(id, replyId, (m) => ({ ...m, activity })),
           onDelta: (delta) =>
             updateMessage(id, replyId, (m) => ({ ...m, content: m.content + delta })),
         });
@@ -204,9 +208,14 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
           id: reply.messageId,
           status: "complete",
           picks: reply.picks,
+          actions: reply.actions,
+          activity: undefined,
         }));
         setUsage(reply.usage);
         setConversations((list) => withConversation(list, reply.conversation));
+        changedFollows = reply.actions.some(
+          (a) => (a.type === "follow" || a.type === "unfollow") && a.outcome === "done",
+        );
       } catch (err) {
         updateMessage(id, replyId, (m) =>
           isAbort(err)
@@ -222,8 +231,12 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
         if (abortRef.current === controller) abortRef.current = null;
         setStreamingId(null);
       }
+      // After the write succeeded and outside its try, so a failing refresh can
+      // never be reported as a failed reply (BUG-045). Every Follow button on
+      // the site then agrees with what the agent did.
+      if (changedFollows) refreshFollows();
     },
-    [updateThread, updateMessage],
+    [updateThread, updateMessage, refreshFollows],
   );
 
   const send = useCallback(

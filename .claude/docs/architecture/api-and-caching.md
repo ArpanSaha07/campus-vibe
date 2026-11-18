@@ -5,8 +5,13 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `f7a4399` plus the uncommitted club page and club social links
-unit — re-read 2026-09-16: `ClubSocialLinks` gained `linkedin` and `linktree`,
+**Code as of:** `0ff0759` plus the uncommitted planner agent unit — re-read
+2026-11-16: `PlannerActionDTO` joined `api-dto-fields.json` and both contract
+tests, and `actions` joined `PlannerMessageDTO` and `PlannerReplyDoneDTO`.
+**Nothing this document describes moved**: the planner is still fetched in the
+browser with the token through `apiFetch` and `apiFetchResponse`, never cached,
+and the three data paths are unchanged. Before that, `f7a4399` plus the
+uncommitted club page and club social links unit — re-read 2026-09-16: `ClubSocialLinks` gained `linkedin` and `linktree`,
 so the stored JSON now holds six keys. **No DTO moved and no contract entry
 changed**: `socialLinks` is one opaque `String` on every DTO that carries it, so
 Jackson introspection never looks inside it — which is also why nothing pins

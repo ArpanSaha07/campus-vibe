@@ -14,6 +14,8 @@ import java.util.List;
  * @param events  the picked events, hydrated on this read; one that has ended or
  *                been deleted is absent
  * @param clubs   the picked clubs, hydrated the same way
+ * @param actions what the agent did to the account in this turn (ADR-023); empty
+ *                on a user message
  */
 public record PlannerMessageDTO(String id,
                                 String role,
@@ -22,4 +24,5 @@ public record PlannerMessageDTO(String id,
                                 List<PlannerPickDTO> picks,
                                 List<EventDTO> events,
                                 List<ClubDTO> clubs,
+                                List<PlannerActionDTO> actions,
                                 Instant createdAt) {}

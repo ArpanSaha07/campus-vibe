@@ -48,6 +48,35 @@ class OpenAiChatStreamTest {
     }
 
     @Test
+    void toolCallsAreAssembledFromTheirFragmentsAndNeverReachTheText() throws Exception {
+        List<String> fragments = new ArrayList<>();
+
+        OpenAiChatStream.Result result = OpenAiChatStream.read(stream(
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\","
+                        + "\"type\":\"function\",\"function\":{\"name\":\"follow_club\",\"arguments\":\"\"}}]},"
+                        + "\"finish_reason\":null}]}", "",
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,"
+                        + "\"function\":{\"arguments\":\"{\\\"ids\\\":\"}}]},\"finish_reason\":null}]}", "",
+                "data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,"
+                        + "\"function\":{\"arguments\":\"[\\\"chess-club\\\"]}\"}}]},\"finish_reason\":null}]}", "",
+                chunk(null, "tool_calls"), "",
+                "data: [DONE]", ""), objectMapper, fragments::add);
+
+        assertThat(fragments).isEmpty();
+        assertThat(result.text()).isEmpty();
+        assertThat(result.toolCalls()).containsExactly(
+                new LlmRequest.ToolCall("call_1", "follow_club", "{\"ids\":[\"chess-club\"]}"));
+    }
+
+    @Test
+    void anAnswerHasNoToolCalls() throws Exception {
+        OpenAiChatStream.Result result = OpenAiChatStream.read(stream(
+                chunk("{}", "stop"), "data: [DONE]"), objectMapper, text -> {});
+
+        assertThat(result.toolCalls()).isEmpty();
+    }
+
+    @Test
     void anOutputCutOffAtTheTokenCapIsTruncated() {
         assertThatThrownBy(() -> OpenAiChatStream.read(stream(
                 chunk("{\"intro\":\"Hi", null), chunk(null, "length"), "data: [DONE]"), objectMapper, text -> {}))

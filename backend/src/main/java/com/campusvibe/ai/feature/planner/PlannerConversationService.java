@@ -96,7 +96,7 @@ public class PlannerConversationService {
                 .map(row -> {
                     Cards own = cards.only(row.picks());
                     return new PlannerMessageDTO(String.valueOf(row.id()), row.role(), row.content(), "complete",
-                            row.picks(), own.events(), own.clubs(), row.createdAt());
+                            row.picks(), own.events(), own.clubs(), actionsFor(row.actions()), row.createdAt());
                 })
                 .toList();
 
@@ -112,29 +112,34 @@ public class PlannerConversationService {
         }
     }
 
-    /** A completed exchange as stored, with the cards its picks name. */
-    public record StoredReply(long messageId, PlannerConversationSummaryDTO conversation, Cards cards) {}
+    /** A completed exchange as stored, with the cards its picks name and its actions as the page sees them. */
+    public record StoredReply(long messageId, PlannerConversationSummaryDTO conversation, Cards cards,
+                              List<PlannerActionDTO> actions) {}
 
     /**
      * Stores a completed exchange, the person's message then the reply, and
      * records the reply on the chat: its title if it had none, and its last
-     * activity. Nothing is stored for a reply that did not complete, so this
-     * is the only write a reply makes to a chat.
+     * activity. Nothing is stored for a reply that did not complete, unless its
+     * actions already changed the account (ADR-023), so this is the only write
+     * a reply makes to a chat.
      *
      * @return empty when the chat was deleted while the reply was being written
      */
     @Transactional
     public Optional<StoredReply> recordExchange(long userId, UUID conversationId, String prompt,
-                                                String intro, List<PlannerPickDTO> picks) {
+                                                String intro, List<PlannerPickDTO> picks,
+                                                List<PlannerAction> actions) {
         Instant now = Instant.now();
         Optional<PlannerConversationRepository.Row> conversation =
                 conversationRepository.recordReply(conversationId, userId, titleFrom(prompt), now);
         if (conversation.isEmpty()) {
             return Optional.empty();
         }
-        messageRepository.insert(conversationId, PlannerMessageRepository.USER, prompt, List.of(), now);
-        long replyId = messageRepository.insert(conversationId, PlannerMessageRepository.ASSISTANT, intro, picks, now);
-        return Optional.of(new StoredReply(replyId, summary(conversation.get()), cardsFor(picks).only(picks)));
+        messageRepository.insert(conversationId, PlannerMessageRepository.USER, prompt, List.of(), List.of(), now);
+        long replyId = messageRepository.insert(conversationId, PlannerMessageRepository.ASSISTANT, intro, picks,
+                actions, now);
+        return Optional.of(new StoredReply(replyId, summary(conversation.get()), cardsFor(picks).only(picks),
+                actionsFor(actions)));
     }
 
     /** The first message, on one line and cut to 60 characters without splitting a character. */
@@ -181,6 +186,33 @@ public class PlannerConversationService {
                 .map(clubMapper)
                 .toList();
         return new Cards(events, clubs);
+    }
+
+    /**
+     * Actions as the page receives them. An offered calendar link carries its
+     * event, read now, so the page can build the template link; once the event
+     * has ended or gone the link is dropped and the line remains.
+     *
+     * <p>Call inside a transaction: the mapper reads lazy collections.
+     */
+    public List<PlannerActionDTO> actionsFor(List<PlannerAction> actions) {
+        Set<Long> calendarIds = new LinkedHashSet<>();
+        for (PlannerAction action : actions) {
+            if (PlannerAction.CALENDAR.equals(action.type()) && PlannerAction.OFFERED.equals(action.outcome())) {
+                parseEventId(action.id()).ifPresent(calendarIds::add);
+            }
+        }
+        Instant now = Instant.now();
+        Map<String, EventDTO> events = calendarIds.isEmpty() ? Map.of() : eventRepository.findAllById(calendarIds)
+                .stream()
+                .filter(event -> event.getEndTime().isAfter(now))
+                .map(eventMapper)
+                .collect(Collectors.toMap(event -> String.valueOf(event.id()), Function.identity()));
+        return actions.stream()
+                .map(action -> new PlannerActionDTO(action.type(), action.targetKind(), action.id(), action.name(),
+                        action.outcome(),
+                        PlannerAction.CALENDAR.equals(action.type()) ? events.get(action.id()) : null))
+                .toList();
     }
 
     public static PlannerConversationSummaryDTO summary(PlannerConversationRepository.Row row) {

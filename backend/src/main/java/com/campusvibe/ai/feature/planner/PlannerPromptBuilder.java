@@ -157,12 +157,25 @@ public class PlannerPromptBuilder {
         return DAY_AND_TIME.format(start) + " to " + (startDay.equals(endDay) ? TIME.format(end) : DAY_AND_TIME.format(end));
     }
 
-    /** An earlier answer as the model sees it again: its intro, then what it picked. */
+    /**
+     * An earlier answer as the model sees it again: its intro, what it did to
+     * the account (ADR-023), so <em>undo that</em> has ids to act on, then
+     * what it picked.
+     */
     static String earlierAnswer(PlannerMessageRepository.Row row, Map<String, String> names) {
-        if (row.picks().isEmpty()) {
-            return row.content();
+        StringBuilder text = new StringBuilder(row.content());
+        if (!row.actions().isEmpty()) {
+            text.append("\nActions:");
+            for (PlannerAction action : row.actions()) {
+                text.append("\n- ").append(action.type()).append(' ').append(action.targetKind()).append(' ')
+                        .append(action.id()).append(": ").append(oneLine(action.name()))
+                        .append(" (").append(action.outcome()).append(')');
+            }
         }
-        StringBuilder text = new StringBuilder(row.content()).append("\nRecommended:");
+        if (row.picks().isEmpty()) {
+            return text.toString();
+        }
+        text.append("\nRecommended:");
         for (PlannerPickDTO pick : row.picks()) {
             String name = names.getOrDefault(pick.kind() + ":" + pick.id(), "(no longer listed)");
             text.append("\n- ").append(pick.kind()).append(' ').append(pick.id())

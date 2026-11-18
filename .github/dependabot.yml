@@ -72,3 +72,16 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+
+  # The image Elastic Beanstalk actually runs in production. Its base
+  # (eclipse-temurin:25-jre-alpine) is a different tag from backend/'s JDK
+  # base, so a bump there never reaches this one. The PR gate does not build
+  # this image; trivy-weekly.yml scans it (target trivy-eb), and this entry is
+  # what turns a finding there into a PR. Every Dockerfile directory needs its
+  # own entry, since Dependabot does not search recursively.
+  - package-ecosystem: docker
+    directory: /deploy/eb
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

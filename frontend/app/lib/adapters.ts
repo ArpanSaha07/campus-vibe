@@ -2,6 +2,7 @@ import type {
   ApiClub,
   ApiEvent,
   ApiMyEvent,
+  ApiPlannerAction,
   ApiPlannerConversationSummary,
   ApiPlannerMessage,
   ApiPlannerPick,
@@ -9,6 +10,7 @@ import type {
   Club,
   EventInstance,
   MyEvent,
+  PlannerAction,
   PlannerConversationSummary,
   PlannerMessage,
   PlannerPick,
@@ -225,6 +227,18 @@ export function toPlannerPicks(
   return hydrated;
 }
 
+/** The agent's actions, with the calendar link's event adapted like any card's. */
+export function toPlannerActions(actions: ApiPlannerAction[] | undefined): PlannerAction[] {
+  return (actions ?? []).map((action) => ({
+    type: action.type,
+    targetKind: action.targetKind,
+    id: action.id,
+    name: action.name,
+    outcome: action.outcome,
+    ...(action.event ? { event: toEventInstance(action.event) } : {}),
+  }));
+}
+
 export function toPlannerMessage(api: ApiPlannerMessage): PlannerMessage {
   return {
     id: api.id,
@@ -232,6 +246,7 @@ export function toPlannerMessage(api: ApiPlannerMessage): PlannerMessage {
     content: api.content,
     status: api.status,
     picks: api.role === "assistant" ? toPlannerPicks(api.picks, api.events, api.clubs) : [],
+    actions: api.role === "assistant" ? toPlannerActions(api.actions) : [],
   };
 }
 

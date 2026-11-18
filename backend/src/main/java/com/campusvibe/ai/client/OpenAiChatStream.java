@@ -8,6 +8,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
@@ -17,16 +21,21 @@ import java.util.function.Consumer;
  * <p>Separate from {@link OpenAiLlmClient} so it can be tested on a byte
  * stream with no HTTP. It knows nothing about retries or timeouts, and it lets
  * an exception from {@code onText} through untouched.
+ *
+ * <p>Tool calls arrive as fragments keyed by {@code index}: the first carries
+ * the call's id and name, later ones append to its arguments. They are
+ * assembled here and never reach {@code onText} (ADR-023).
  */
 final class OpenAiChatStream {
 
     /** What the stream produced. {@code totalTokens} is -1 when the provider sent no usage. */
-    record Result(String text, int totalTokens) {}
+    record Result(String text, List<LlmRequest.ToolCall> toolCalls, int totalTokens) {}
 
     private OpenAiChatStream() {}
 
     static Result read(InputStream body, ObjectMapper objectMapper, Consumer<String> onText) throws IOException {
         StringBuilder text = new StringBuilder();
+        Map<Integer, PartialCall> calls = new TreeMap<>();
         String finishReason = null;
         int totalTokens = -1;
         boolean done = false;
@@ -68,6 +77,14 @@ final class OpenAiChatStream {
                     onText.accept(fragment);
                 }
             }
+            for (JsonNode call : delta.path("tool_calls")) {
+                PartialCall partial = calls.computeIfAbsent(call.path("index").asInt(calls.size()),
+                        index -> new PartialCall());
+                if (call.hasNonNull("id")) partial.id = call.path("id").asText();
+                JsonNode function = call.path("function");
+                if (function.hasNonNull("name")) partial.name = function.path("name").asText();
+                if (function.hasNonNull("arguments")) partial.arguments.append(function.path("arguments").asText());
+            }
             if (choice.hasNonNull("finish_reason")) {
                 finishReason = choice.path("finish_reason").asText();
             }
@@ -82,6 +99,19 @@ final class OpenAiChatStream {
         if (finishReason == null || !done) {
             throw new LlmException(LlmException.Reason.FAILED, "The stream ended before the completion finished");
         }
-        return new Result(text.toString(), totalTokens);
+        List<LlmRequest.ToolCall> toolCalls = new ArrayList<>();
+        for (PartialCall partial : calls.values()) {
+            if (partial.id == null || partial.name == null) {
+                throw new LlmException(LlmException.Reason.FAILED, "A tool call arrived without its id or name");
+            }
+            toolCalls.add(new LlmRequest.ToolCall(partial.id, partial.name, partial.arguments.toString()));
+        }
+        return new Result(text.toString(), List.copyOf(toolCalls), totalTokens);
+    }
+
+    private static final class PartialCall {
+        private String id;
+        private String name;
+        private final StringBuilder arguments = new StringBuilder();
     }
 }

@@ -73,4 +73,13 @@ Kept deliberately short: this loads on every backend Java read.
   the exception, so delete both entries and fix the version first (Spring
   Boot 4). The planner's `SseEmitter` must keep sending JSON data.
   (BUG-064, [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md))
+- **The planner agent's permissions live in `PlannerToolExecutor`, never in
+  the prompt.** The user is the JWT principal; an id must be one of this turn's
+  candidates or the student's own; an ended event is refused before the
+  unchanged `MyEventService.rsvp`. **Reopen ADR-023 before adding a tool** that
+  cannot be undone, costs money or reaches another person, or if the loop needs
+  more than `MAX_TOOL_ROUNDS` (4), the provider loses streamed tool calls, or a
+  prompt-injected action is seen in production.
+  ([ADR-023](../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md),
+  [`ai-planner.md`](../docs/architecture/ai-planner.md))
 - **The IT suites need Testcontainers:** `node scripts/verify.mjs --full`.

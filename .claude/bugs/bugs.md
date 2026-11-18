@@ -1,16 +1,17 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-11-07** · Branch: `develop`
+Last updated: **2026-11-16** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
 **Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-064 (2026-11-07, Trivy gate) · BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16) · BUG-062, opened and fixed the same day (2026-09-17, event card actions on touch)
 
-**Highest id issued: BUG-064.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-065.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-065](#bug-065) | Low | A planner reply that fails after its agent acted, and after some intro already streamed, shows the fallback summary glued onto the partial intro until a reload |
 | [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — commented out until MinIO is replaced |
 | [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
@@ -64,6 +65,45 @@ needs a Proposed ADR first; swap the image in `MinioTestContainer` and
 green PR run with the ITs back on.
 
 ---
+
+### BUG-065
+**The agent's fallback summary is appended to a partly streamed intro** · Low · OPEN
+
+**Found:** 2026-11-16, reading the planner agent code
+([ADR-023](../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md),
+[spec](../specs/2026-11-16-planner-agent.md)) after `verify.mjs --full` was
+green. Not seen in a browser; no test covers it.
+
+**When it happens.** All three at once: an action in the turn changed the
+account (a follow, RSVP or save with outcome `done`); the final round then
+streamed part of its intro; and that round then failed (provider error,
+truncation, unparseable answer). A failure *before* any intro text, which
+`PlannerAgentIT.anAnswerThatFailsAfterAnActionIsStoredWithWhatWasDoneAndCounted`
+covers, is fine.
+
+**Symptom.** The page shows the partial intro immediately followed by
+*Done: followed Chess Club. I couldn't finish the rest of my answer…*, as one
+paragraph, until the chat is reloaded. The **stored** message is correct:
+`recordExchange` writes only the fallback text, so a reload shows it alone.
+
+**Cause.** `PlannerReplyService.keepActions`
+(`backend/src/main/java/com/campusvibe/ai/feature/planner/PlannerReplyService.java:296`)
+sends the fallback as one more `delta` frame (`:307`), and the page appends
+every `delta` to what it already has
+(`frontend/app/components/planner/PlannerProvider.tsx:203-204`). The `done`
+frame carries no text, so the page never learns the stored intro differs from
+what streamed.
+
+**Fix (untaken), two shapes:**
+- A frame that **replaces** the text, for example a `reset` frame sent before
+  the fallback `delta`, handled in `planner-api.ts` and `PlannerProvider`. Not
+  contracted, like `delta` and `status` (`rules/contracts.md`).
+- `done` carries the stored `content`, and the page replaces the streamed text
+  with it. Changes `PlannerReplyDoneDTO`, so it goes through the contract on
+  both sides.
+
+The second also fixes any other drift between streamed and stored intro. Which
+one is Arpan's call.
 
 ### BUG-061
 **The navbar logo file does not exist** · Low · OPEN

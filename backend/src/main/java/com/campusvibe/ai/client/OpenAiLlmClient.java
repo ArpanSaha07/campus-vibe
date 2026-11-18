@@ -27,7 +27,8 @@ import java.util.function.Consumer;
 
 /**
  * {@link LlmClient} on OpenAI Chat Completions, streamed, with a strict
- * {@code json_schema} response format.
+ * {@code json_schema} response format, optionally offering function tools
+ * (ADR-023).
  *
  * <p>Uses the shared {@code openAiRestClient}, so the key is still read in one
  * place ({@code AiClientConfig}). Logs operational metadata only: never the
@@ -79,7 +80,7 @@ public class OpenAiLlmClient implements LlmClient {
     }
 
     @Override
-    public String streamStructured(LlmRequest request, Consumer<String> onText) {
+    public LlmClient.Turn streamTurn(LlmRequest request, Consumer<String> onText) {
         if (!isConfigured()) {
             throw new LlmException(LlmException.Reason.NOT_CONFIGURED, "OPENAI_API_KEY is not set");
         }
@@ -109,7 +110,7 @@ public class OpenAiLlmClient implements LlmClient {
                             return readWithDeadline(response.getBody(), tracking);
                         });
                 logUsage(request.feature(), startedAt, result.totalTokens());
-                return result.text();
+                return new LlmClient.Turn(result.text(), result.toolCalls());
 
             } catch (ProviderStatusException e) {
                 boolean transientStatus = e.status == RATE_LIMITED || e.status >= 500;
@@ -164,11 +165,7 @@ public class OpenAiLlmClient implements LlmClient {
     }
 
     private Map<String, Object> requestBody(LlmRequest request) {
-        List<Map<String, String>> messages = request.messages().stream()
-                .map(message -> Map.of(
-                        "role", message.role().name().toLowerCase(Locale.ROOT),
-                        "content", message.content()))
-                .toList();
+        List<Map<String, Object>> messages = request.messages().stream().map(OpenAiLlmClient::message).toList();
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", properties.chatModel());
@@ -183,7 +180,40 @@ public class OpenAiLlmClient implements LlmClient {
                         "name", request.schemaName(),
                         "strict", true,
                         "schema", request.jsonSchema())));
+        if (!request.tools().isEmpty()) {
+            body.put("tools", request.tools().stream()
+                    .map(tool -> Map.of(
+                            "type", "function",
+                            "function", Map.of(
+                                    "name", tool.name(),
+                                    "description", tool.description(),
+                                    "strict", true,
+                                    "parameters", tool.parameters())))
+                    .toList());
+            body.put("tool_choice", request.toolsAllowed() ? "auto" : "none");
+            // Strict function schemas are not guaranteed for parallel calls;
+            // each tool takes a list of ids instead.
+            body.put("parallel_tool_calls", false);
+        }
         return body;
+    }
+
+    private static Map<String, Object> message(LlmRequest.Message message) {
+        Map<String, Object> wire = new LinkedHashMap<>();
+        wire.put("role", message.role().name().toLowerCase(Locale.ROOT));
+        wire.put("content", message.content());
+        if (!message.toolCalls().isEmpty()) {
+            wire.put("tool_calls", message.toolCalls().stream()
+                    .map(call -> Map.of(
+                            "id", call.id(),
+                            "type", "function",
+                            "function", Map.of("name", call.name(), "arguments", call.arguments())))
+                    .toList());
+        }
+        if (message.toolCallId() != null) {
+            wire.put("tool_call_id", message.toolCallId());
+        }
+        return wire;
     }
 
     private void logUsage(String feature, long startedAt, int totalTokens) {

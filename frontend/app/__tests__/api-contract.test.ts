@@ -5,6 +5,7 @@ import type {
   ApiClub,
   ApiEvent,
   ApiMyEvent,
+  ApiPlannerAction,
   ApiPlannerConversation,
   ApiPlannerConversationList,
   ApiPlannerConversationSummary,
@@ -285,6 +286,15 @@ const plannerCreatedConversationFields: Record<keyof ApiPlannerCreatedConversati
   evictedId: true,
 };
 
+const plannerActionFields: Record<keyof ApiPlannerAction, true> = {
+  type: true,
+  targetKind: true,
+  id: true,
+  name: true,
+  outcome: true,
+  event: true,
+};
+
 const plannerMessageFields: Record<keyof ApiPlannerMessage, true> = {
   id: true,
   role: true,
@@ -293,6 +303,7 @@ const plannerMessageFields: Record<keyof ApiPlannerMessage, true> = {
   picks: true,
   events: true,
   clubs: true,
+  actions: true,
   createdAt: true,
 };
 
@@ -308,6 +319,7 @@ const plannerReplyDoneFields: Record<keyof ApiPlannerReplyDone, true> = {
   picks: true,
   events: true,
   clubs: true,
+  actions: true,
   usage: true,
   conversation: true,
 };
@@ -337,6 +349,7 @@ const MIRRORS: Record<string, Record<string, true>> = {
   PlannerConversationSummaryDTO: plannerConversationSummaryFields,
   PlannerConversationListDTO: plannerConversationListFields,
   PlannerCreatedConversationDTO: plannerCreatedConversationFields,
+  PlannerActionDTO: plannerActionFields,
   PlannerMessageDTO: plannerMessageFields,
   PlannerConversationDTO: plannerConversationFields,
   PlannerReplyDoneDTO: plannerReplyDoneFields,

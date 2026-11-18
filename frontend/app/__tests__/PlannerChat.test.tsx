@@ -31,6 +31,11 @@ jest.mock("@/app/lib/auth-context", () => ({
   useAuth: () => ({ isAuthenticated: authenticated, loading: false }),
 }));
 
+const mockRefreshFollows = jest.fn();
+jest.mock("@/app/lib/followed-clubs-context", () => ({
+  useFollowedClubs: () => ({ refresh: mockRefreshFollows }),
+}));
+
 const mockOpenAuth = jest.fn();
 jest.mock("@/app/lib/auth-modal-context", () => ({
   useAuthModal: () => ({ openAuth: mockOpenAuth }),
@@ -92,6 +97,7 @@ describe("PlannerChat", () => {
       return {
         messageId: "m-2",
         picks: [{ kind: "event", reason: "matches your AI interest.", event: hackNight }],
+        actions: [],
         usage: usage(3),
         conversation: { ...summary, title: "Plan my weekend" },
       };
@@ -135,10 +141,44 @@ describe("PlannerChat", () => {
     expect(api.getUsage).toHaveBeenCalled();
   });
 
+  it("refreshes every Follow button once the agent has followed a club, and only then", async () => {
+    mockRefreshFollows.mockClear();
+    api.sendPlannerMessage.mockResolvedValueOnce({
+      messageId: "m-2",
+      picks: [],
+      actions: [{ type: "follow", targetKind: "club", id: "chess-club", name: "Chess Club", outcome: "done" }],
+      usage: usage(3),
+      conversation: summary,
+    });
+    renderNewChat();
+
+    await userEvent.type(await screen.findByRole("textbox"), "Follow the chess club{Enter}");
+    await waitFor(() => expect(mockRefreshFollows).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not refresh follows when the agent changed none", async () => {
+    mockRefreshFollows.mockClear();
+    api.sendPlannerMessage.mockResolvedValueOnce({
+      messageId: "m-2",
+      picks: [],
+      actions: [{ type: "follow", targetKind: "club", id: "chess-club", name: "Chess Club", outcome: "unchanged" }],
+      usage: usage(3),
+      conversation: summary,
+    });
+    renderNewChat();
+
+    await userEvent.type(await screen.findByRole("textbox"), "Follow the chess club{Enter}");
+    await waitFor(() => expect(api.sendPlannerMessage).toHaveBeenCalled());
+    // Let the reply settle: the refresh would run right after it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockRefreshFollows).not.toHaveBeenCalled();
+  });
+
   it("sends the homepage prompt once the planner is ready", async () => {
     api.sendPlannerMessage.mockResolvedValue({
       messageId: "m-2",
       picks: [],
+      actions: [],
       usage: usage(3),
       conversation: summary,
     });
