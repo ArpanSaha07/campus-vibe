@@ -141,7 +141,8 @@ public class PlannerToolExecutor {
             case PlannerTools.UNSAVE_EVENT -> PlannerAction.UNSAVE;
             default -> PlannerAction.CALENDAR;
         };
-        Optional<Event> event = parseEventId(id).flatMap(eventRepository::findById);
+        Optional<Long> parsedId = parseEventId(id);
+        Optional<Event> event = parsedId.flatMap(eventRepository::findById);
         String name = event.map(Event::getTitle).orElse(id);
 
         // Undoing: only what the student already has; ended or not, it may go.
@@ -150,7 +151,8 @@ public class PlannerToolExecutor {
             if (!(rsvp ? going : saved).remove(id)) {
                 return event(type, id, name, PlannerAction.UNCHANGED);
             }
-            long eventId = Long.parseLong(id);
+            // Present: the id matched a member of a set built from List<Long>.
+            long eventId = parsedId.orElseThrow();
             if (rsvp) myEventService.cancelRsvp(email, eventId); else myEventService.unsaveEvent(email, eventId);
             return event(type, id, name, PlannerAction.DONE);
         }
