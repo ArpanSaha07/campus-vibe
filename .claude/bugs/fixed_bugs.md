@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-11-07**
+Last updated: **2026-11-17**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-066](#bug-066) | Medium | 2026-11-17 | The CodeQL triage read `refs/heads/<branch>`, a stale analysis, instead of the PR's merge ref: on PR #74 it triaged nine old alerts and missed alert 73, the only new one |
 | [BUG-064](#bug-064) | High | 2026-11-07 | The Trivy gate failed on two `next` 16.3.8 RCEs and two `spring-webmvc` 6.2.19 CVEs that no free release fixes: `next` 16.4.5 in the lockfile, and a scoped, expiring exception for Spring ([ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)) |
 | [BUG-062](#bug-062) | Low | 2026-09-17 | An event card's Like and Share buttons were invisible on every phone and tablet, yet still tappable: Tailwind v4 only applies `group-hover` where the device can hover |
 | [BUG-060](#bug-060) | Medium | 2026-09-16 | Every club photo answered 400 the first time a page rendered `club.images`: a `remotePatterns` entry written as `new URL(...)` forbids a query string, and the error blamed the hostname |
@@ -54,6 +55,37 @@ Last updated: **2026-11-07**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-066
+**The CodeQL triage read a stale ref and missed the PR's one new alert** · Medium · FIXED 2026-11-17, unproved until a run
+
+**Found:** 2026-11-17, on PR #74 (`develop` → `main`). The triage comment on
+`cebcd12` reported nine pre-existing alerts and nothing new, while the
+code-scanning bot had flagged alert 73 (`java/uncaught-number-format-exception`,
+`PlannerToolExecutor.java:153`) on the same PR.
+
+**Cause.** A `pull_request` analysis files its alerts under
+`refs/pull/N/merge`. The triage queried
+`code-scanning/alerts?ref=refs/heads/$ANALYSED_BRANCH`, and `codeql.yml`
+analyses pushes to `main` only, so `refs/heads/develop` held an analysis last
+refreshed at `2fa196b8`. Alert 73 existed only on `refs/pull/74/merge`. A
+second fault made it look plausible: new versus old was judged by the head
+commit's diff, and a merge commit's diff was empty, so everything read as
+pre-existing.
+
+**Fix.** `.github/workflows/codeql-triage.yml`: the PR number comes from
+`workflow_run.pull_requests[0]` (a fork PR is skipped); alerts are read from
+`refs/pull/N/merge` with `tool_name=CodeQL`; checkout is the same merge ref;
+an alert is new when its number is open on the PR ref and not on
+`refs/heads/main`; only new alerts get a verdict; a stale triage comment is
+edited when nothing new remains; concurrency is keyed on the PR number.
+Reasoning in [`ci-cd-pipeline.md`](../docs/architecture/ci-cd-pipeline.md).
+
+**Not yet proved.** `workflow_run` uses the copy on `main`, so until this
+merges only `gh workflow run codeql-triage.yml --ref develop -f pr=74`
+exercises it. Rule: `rules/ci-and-build.md`.
 
 ---
 

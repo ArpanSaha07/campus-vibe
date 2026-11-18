@@ -90,6 +90,12 @@ paths:
   `guard-aws.test.mjs` asserts a `PreToolUse` hook, which only ever runs in a
   session on a developer's machine; a runner has none, so there is nothing for
   a CI job to assert. It is not drift and it does not want a workflow.
+- **A PR's code-scanning alerts live under `refs/pull/N/merge`, never
+  `refs/heads/<branch>`.** `codeql.yml` analyses pushes to `main` only, so a
+  branch ref holds a stale analysis; querying it made `codeql-triage.yml`
+  miss the one new alert on PR #74. Decide new versus pre-existing by alert
+  number against `refs/heads/main`, not by a commit diff, and pass
+  `tool_name=CodeQL` so Trivy's alerts stay out. (BUG-066)
 - **`ci.yml` gates pull requests, `branch-checks.yml` is the fast push loop, and
   `_*.yml` are reusable workflows that are never triggered directly.**
 - **`--no-verify` is not a workflow.** `0357b78` went around the pre-push hook

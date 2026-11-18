@@ -4,7 +4,9 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `7909cea` plus the uncommitted weekly scan for the overview,
+**Code as of:** `8c41f59` plus the uncommitted merge-ref fix for the
+`codeql-triage.yml` section, re-read 2026-11-17; no other section was re-read.
+Before that, `7909cea` plus the uncommitted weekly scan for the overview,
 `_docker.yml` step 7, `trivy-weekly.yml` and `setup-trivy` sections, re-read
 2026-11-07; no other section was re-read. Before that, `9116608` plus the
 uncommitted ADR-022 exception for the
@@ -698,8 +700,10 @@ required to upload SARIF.
 
 ### `.github/workflows/codeql-triage.yml`
 
-Added 2026-08-16. Reads the alerts a CodeQL run produced and writes a triage
-back — a PR comment when the branch has a PR, the job summary otherwise.
+Added 2026-08-16. Reads the alerts a pull request's CodeQL run produced and
+writes a triage of the ones that PR introduced back as one PR comment, edited
+in place on later runs. A PR with no new alerts and no earlier comment gets
+only a line in the job summary.
 
 **Why it is a separate workflow.** `codeql.yml` uploads SARIF and exits; the
 alerts do not exist until the code-scanning service has ingested it. Anything
@@ -723,12 +727,25 @@ it.
   also analyses `main` to keep the baseline fresh, but those alerts were already
   triaged on the PR that introduced them, so triaging again after the merge
   spends an agent run producing a report with no PR to post to. The
-  `concurrency` group is still keyed on the analysed SHA rather than the ref, as
-  a second guard against duplicate comments.
+  `concurrency` group is keyed on the PR number, so a newer analysis of the
+  same PR cancels the older triage instead of racing it to the comment.
 
-Checkout uses `workflow_run.head_sha`, not the branch tip: they diverge the
-moment anyone pushes while an analysis is running, and the triage would then
-describe code CodeQL never looked at.
+**The alerts live under `refs/pull/N/merge`, not under the branch.** A
+`pull_request` analysis files its alerts under the PR's merge ref. Until
+2026-11-17 the triage queried `refs/heads/<branch>`, which for `develop` held
+a months-old analysis (`codeql.yml` only scans pushes to `main`), so on PR #74
+it reported nine stale alerts and missed alert 73, the one new finding. The PR
+number now comes from `workflow_run.pull_requests[0]` (empty only for a fork
+PR, which is skipped), and checkout uses the same merge ref, because the
+alert line numbers point into the merge commit, not the PR head.
+
+**New versus pre-existing is decided by alert number against `main`.** An
+alert open on the PR ref and not open on `refs/heads/main` is one this PR
+introduced; only those get a verdict, and the rest are listed one line each.
+This is what the `main` baseline run in `codeql.yml` exists for. Both queries
+pass `tool_name=CodeQL`, so Trivy's alerts on the same refs stay out of it.
+When a later push leaves no new alert, the earlier triage comment is edited to
+say so rather than left standing with a stale verdict.
 
 ### `contracts/api-dto-fields.json` — the API contract
 
