@@ -64,6 +64,7 @@ changing; the pre-push hook runs it as a notice and never blocks.
 | [`connecting-s3.md`](architecture/connecting-s3.md) | Runbook 3 of 4 — the bucket property and CORS removal (both done 2026-09-12), why the role holds `ListBucket`, the nginx body limit, the duplicate policy, verifying the first upload | 📋 Checklist · account changed 2026-09-12 |
 | [`connecting-ses.md`](architecture/connecting-ses.md) | Runbook 4 of 4 — code gates first, domain identity and DKIM at Namecheap, MAIL FROM on `bounce.`, DMARC, production access, SMTP credentials under ADR-013 | 📋 Checklist · account read 2026-09-12 |
 | [`pausing-production.md`](architecture/pausing-production.md) | Runbook — switching production off to save money and back on: the Auto Scaling group to zero, stopping RDS and its 7-day auto-start, the resume order, health checks and what to read when it does not come back | 📋 Runbook · written 2026-10-01 |
+| [`pausing-production-checklist.md`](architecture/pausing-production-checklist.md) | The copy-paste version of the runbook above: pause, resume in order, then the five checks that production is back; the runbook stays the source of truth | 📋 Checklist · account read 2026-11-17 |
 | [`connecting-beanstalk-to-rds.md`](architecture/connecting-beanstalk-to-rds.md) | The security-group walkthrough that lets the Elastic Beanstalk instance reach RDS on 5432 | ✅ Done in the account, 2026-09-12 |
 
 **On the ⚠ marks.** These predate the documentation standard and were moved into
