@@ -271,9 +271,10 @@ back. Do not restore it before then thinking it is a gap; it is not.
 **`develop` is governed by the `Protect develop branch` ruleset** (id
 `27950932`, active, created by Arpan 2026-11-23). Read back through
 `/repos/{owner}/{repo}/rulesets/27950932` the same day, every rule below matched,
-**but `conditions.ref_name.include` was empty — the ruleset targeted no branch
-and protected nothing** until `refs/heads/develop` is added as its target. Read
-it back after any edit; an empty target list is silent in the UI. A teammate's PRs target `develop` and `develop` to `main` is Arpan's
+but `conditions.ref_name.include` was empty — the ruleset targeted no branch
+and protected nothing. Arpan added `refs/heads/develop` that evening, confirmed
+by read-back (`updated_at` 20:20 -05:00). Read a ruleset back after any edit;
+an empty target list is silent in the UI. A teammate's PRs target `develop` and `develop` to `main` is Arpan's
 release PR ([spec](../../specs/2026-11-23-teammate-pr-workflow.md)), so
 `ci.yml` and `claude-code-review.yml` now run on PRs into `develop` too.
 
@@ -1262,7 +1263,7 @@ Ordered by value, each with the reason it has not been done. Tracked in
   spec-and-template step; `pr-checks.yml` (warning-only title, template, size)
   and `scripts/pr-checks.mjs` are new; `.github/CODEOWNERS` and the PR template
   are new. Arpan created `Protect develop branch`; read back the same day, its
-  target list was empty. CodeQL still runs on PRs into `main` only. Implementing
+  target list was empty, and Arpan added `refs/heads/develop` that evening. CodeQL still runs on PRs into `main` only. Implementing
   agent.
 - **2026-09-15** — `next.config.ts` gained a versioned form of each `/media`
   rewrite, `/:version` on the end and ignored by the destination, for media URLs

@@ -109,8 +109,8 @@ paths:
 - **Read a ruleset back after creating or editing it:** `gh api
   repos/{owner}/{repo}/rulesets/<id>` and check `conditions.ref_name.include`.
   `Protect develop branch` (27950932) was created 2026-11-23 with every rule
-  right and an empty target list — active, and protecting nothing. The UI does
-  not warn. (spec 2026-11-23-teammate-pr-workflow)
+  right and an empty target list — active, and protecting nothing until the
+  target was added that evening. The UI does not warn. (spec 2026-11-23-teammate-pr-workflow)
 - **`--no-verify` is not a workflow.** `0357b78` went around the pre-push hook
   and put a backend that did not compile onto `develop`; CI found it minutes
   later, and clearing it took three more commits. If a hook is red, stop and
