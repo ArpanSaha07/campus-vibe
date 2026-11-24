@@ -66,6 +66,7 @@ campusvibe/
 | Touch a migration, seed or role grant | [`skills/database-lifecycle/SKILL.md`](skills/database-lifecycle/SKILL.md) — **mandatory** |
 | Build or restyle UI | [`design-guidelines.md`](design-guidelines.md) — binding on all UI work |
 | Know what this unit of work agreed to | [`specs/`](specs/README.md) — one spec per feature, written by `/start` |
+| Onboard a teammate, or open a PR into `develop` | [`CONTRIBUTING.md`](../CONTRIBUTING.md) — the flow, the checks, the rules; `/open-pr` drafts the title and description |
 | Find the doc for code you touched | [`scripts/docs-map.json`](../scripts/docs-map.json); `node scripts/check-docs.mjs` reports what drifted |
 
 ## Hard rules
