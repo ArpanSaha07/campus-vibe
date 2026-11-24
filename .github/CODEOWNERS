@@ -1,0 +1,26 @@
+# Paths where a change needs Arpan's review. GitHub requests the review
+# automatically, and the `Protect develop` ruleset makes it required.
+#
+# GitHub reads this file from each PR's BASE branch, so a change here takes
+# effect for PRs into develop once it is on develop, and for PRs into main once
+# it is on main. A PR cannot change its own reviewers.
+#
+# Anything not listed still needs one approval; these paths make sure the
+# review lands on the parts that are hardest to undo.
+# Spec: .claude/specs/2026-11-23-teammate-pr-workflow.md
+
+# The API contract: a rename here breaks the frontend and backend together.
+/contracts/                                        @ArpanSaha07
+
+# Authentication, authorisation, CORS and rate limiting.
+/backend/src/main/java/com/campusvibe/security/    @ArpanSaha07
+
+# CI, the merge gate, this file and the PR template.
+/.github/                                          @ArpanSaha07
+
+# The rules every Claude session follows, and the settled decisions.
+/.claude/rules/                                    @ArpanSaha07
+/.claude/docs/decisions/                           @ArpanSaha07
+
+# What the product is meant to be.
+/.claude/docs/product.md                           @ArpanSaha07

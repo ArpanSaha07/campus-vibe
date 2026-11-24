@@ -1,0 +1,64 @@
+name: PR checks
+
+# Title, template and size on pull requests into develop. WARNINGS ONLY.
+#
+# Every finding is a `::warning::` annotation on the PR and the job succeeds.
+# Arpan decided all three guide rather than block, and that they apply to PRs
+# into develop only, not to his develop-to-main release PRs
+# (.claude/specs/2026-11-23-teammate-pr-workflow.md). The logic lives in
+# scripts/pr-checks.mjs so it can be tested locally:
+#
+#   node --test scripts/pr-checks.test.mjs
+#
+# NEVER NAME ANYTHING HERE `CI`. A required status check is matched by name,
+# and `CI` is the one context the rulesets require (see ci.yml's header). This
+# workflow is not required and must not become so while it only warns.
+
+on:
+  pull_request:
+    branches: [develop]
+    # `edited` re-checks when the author fixes the title or the description.
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Only to list the PR's changed files for the size count.
+  pull-requests: read
+
+jobs:
+  pr-checks:
+    name: PR checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: List changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          # Per file, so lockfiles can be left out of the count. --paginate
+          # because the endpoint returns 30 files a page by default.
+          gh api --paginate "repos/${GH_REPO}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | {filename, additions, deletions}' \
+            > "${RUNNER_TEMP}/files.jsonl"
+
+      # The title and body arrive through env, never interpolated into the
+      # script: both are written by whoever opens the PR, and `${{ }}` inside a
+      # run block is a shell-injection sink.
+      - name: Check title, template and size (warnings only)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: node scripts/pr-checks.mjs "${RUNNER_TEMP}/files.jsonl"

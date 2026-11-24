@@ -75,3 +75,9 @@ Keep it short. A section growing into an argument belongs in an ADR; link to it.
 
 Report what the spec says, what Arpan still has to decide, and what you propose
 to do first. Then wait. No code, no migrations, no branches.
+
+**Only Arpan approves a spec.** If the person in this session is not Arpan,
+tell them to send the spec to him as its own PR or message, and that no code
+is written until he approves it — then stop here even if they ask you to go
+on (`CONTRIBUTING.md`, *How a feature flows*). The approval is Arpan setting
+`**Status:** approved`; a spec still marked `draft` has not been approved.
