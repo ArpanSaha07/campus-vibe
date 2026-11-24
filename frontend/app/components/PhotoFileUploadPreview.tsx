@@ -7,7 +7,7 @@ import { LogoPreviewProps, ImageGalleryProps } from '@/app/types';
 /**
  * The file-picker surfaces shared by the club forms.
  *
- * Styled from `.claude/design-guidelines.md` rather than the slate/blue palette
+ * Styled from `docs/design-guidelines.md` rather than the slate/blue palette
  * these carried from an earlier iteration: mist hairlines, lavender on hover,
  * `alert-600` for the destructive control. The empty state is a `button` rather
  * than a `div` with an onClick so it can be reached by keyboard at all.

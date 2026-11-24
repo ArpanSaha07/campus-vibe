@@ -6,7 +6,7 @@
  *
  * Tests do not drift, because something fails. Docs drift because updating them
  * is a separate act of will performed after the work already feels finished —
- * three of the twelve docs in .claude/docs/architecture/ are stamped `never`
+ * three of the twelve docs in docs/architecture/ are stamped `never`
  * because they were never reconciled with the code at all, which is what that
  * looks like after a few months.
  *
@@ -28,7 +28,7 @@
  *   2. Stamp-based — a doc's `Code as of:` sha is N commits behind HEAD.
  *      Catches slow drift, where each individual change felt too small to
  *      document.
- *   3. Status — `.claude/STATUS.md` carries the same stamp, and a session
+ *   3. Status — `docs/STATUS.md` carries the same stamp, and a session
  *      orients from it, so it being far behind HEAD matters more than any one
  *      doc being behind.
  *
@@ -61,9 +61,9 @@ import { fileURLToPath } from "node:url";
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
 const CLAUDE_DIR = join(REPO, ".claude");
-const DOCS_DIR = join(CLAUDE_DIR, "docs", "architecture");
+const DOCS_DIR = join(REPO, "docs", "architecture");
 const RULES_DIR = join(CLAUDE_DIR, "rules");
-const STATUS_PATH = join(CLAUDE_DIR, "STATUS.md");
+const STATUS_PATH = join(REPO, "docs", "STATUS.md");
 const MAP_PATH = join(REPO, "scripts", "docs-map.json");
 
 const argv = process.argv.slice(2);
@@ -106,7 +106,7 @@ const findings = [];
 
 for (const [docFile, entry] of Object.entries(map.docs)) {
   const hits = changed.filter((f) => entry.paths.some((p) => f.startsWith(p)));
-  if (hits.length > 0 && !touched(`.claude/docs/architecture/${docFile}`)) {
+  if (hits.length > 0 && !touched(`docs/architecture/${docFile}`)) {
     findings.push({ kind: "diff", doc: docFile, hits, covers: entry.covers });
   }
 }
@@ -178,7 +178,7 @@ for (const [docFile, entry] of Object.entries(map.docs)) {
     kind: stamp.kind, // unstamped | unparseable
     doc: docFile,
     raw: stamp.raw,
-    docEdited: lastTouched([`.claude/docs/architecture/${docFile}`]),
+    docEdited: lastTouched([`docs/architecture/${docFile}`]),
     areaChanged: lastTouched(entry.paths),
   });
 }
@@ -277,12 +277,12 @@ if (missing.length > 0) {
   console.log("");
 }
 if (status && (!quiet || status.behind > STATUS_QUIET_THRESHOLD)) {
-  console.log(`docs: .claude/STATUS.md was written ${status.behind} commit(s) ago (${status.sha}).`);
+  console.log(`docs: docs/STATUS.md was written ${status.behind} commit(s) ago (${status.sha}).`);
   console.log("      A session orients from it; /wrap-up refreshes it.");
   console.log("");
 }
 if (statusBad) {
-  console.log(`docs: .claude/STATUS.md has no parseable 'Code as of:' stamp (reads '${statusBad.raw.slice(0, 60)}').`);
+  console.log(`docs: docs/STATUS.md has no parseable 'Code as of:' stamp (reads '${statusBad.raw.slice(0, 60)}').`);
   console.log("");
 }
 

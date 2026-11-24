@@ -1,6 +1,6 @@
 ---
 name: start
-description: Start, begin, kick off or pick up a unit of work on CampusVibe. Orients from the decisions index and the one relevant doc, asks Arpan about everything still undecided, then writes a short spec to .claude/specs/ for approval before any code is written.
+description: Start, begin, kick off or pick up a unit of work on CampusVibe. Orients from the decisions index and the one relevant doc, asks Arpan about everything still undecided, then writes a short spec to docs/specs/ for approval before any code is written.
 allowed-tools: Read, Write, Glob, Grep, AskUserQuestion, Bash(git status:*), Bash(git log:*), Bash(git diff:*), Bash(ls:*)
 ---
 
@@ -17,19 +17,19 @@ starts. A spec written after the code is a description, not an agreement.
 
 `STATUS.md` has already arrived with the session; do not re-read it.
 
-1. [`docs/decisions/README.md`](../../docs/decisions/README.md) — the ADR index,
+1. [`docs/decisions/README.md`](../../../docs/decisions/README.md) — the ADR index,
    and the decisions still waiting to be written. Read this **before** the doc.
    A choice already settled must not be silently remade, and one already
    *proposed* is not yours to flip.
-2. [`docs/README.md`](../../docs/README.md) — the index, then **the one document**
+2. [`docs/README.md`](../../../docs/README.md) — the index, then **the one document**
    it names for this area. Not all of them.
-3. `grep` [`todo.md`](../../TODO/todo.md) and [`bugs/bugs.md`](../../bugs/bugs.md)
+3. `grep` [`todo.md`](../../../docs/TODO/todo.md) and [`bugs/bugs.md`](../../../docs/bugs/bugs.md)
    for the item. Grep, never read whole — both are large on purpose.
-4. `grep` [`tasks-completed.md`](../../TODO/tasks-completed.md) for anything that
+4. `grep` [`tasks-completed.md`](../../../docs/TODO/tasks-completed.md) for anything that
    sounds like what you are about to build. It may already exist.
 
 **If the work is a bug fix, add one more:** grep
-[`fixed_bugs.md`](../../bugs/fixed_bugs.md) for the *file* you are about to
+[`fixed_bugs.md`](../../../docs/bugs/fixed_bugs.md) for the *file* you are about to
 touch, not the symptom. A second bug in the same method is a trap that survived
 its first fix — that wants a line in `.claude/rules/` with both bug ids, not
 another point fix. `ClubService.create` cost two bugs this way (BUG-034, then
@@ -54,8 +54,8 @@ whether to open one first.
 
 ## 3. Write the spec
 
-`.claude/specs/YYYY-MM-DD-<slug>.md`, following
-[`specs/README.md`](../../specs/README.md):
+`docs/specs/YYYY-MM-DD-<slug>.md`, following
+[`specs/README.md`](../../../docs/specs/README.md):
 
 - **Goal** — one paragraph. What is true after this ships that is not true now.
 - **Out of scope** — what a reader would reasonably assume is included and is not.

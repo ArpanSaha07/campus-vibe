@@ -10,7 +10,7 @@
  * send sessions to the foot of a 26 KB queue to find out, which cost tokens and
  * still missed the traps.
  *
- * So the answer arrives unasked. .claude/STATUS.md is the one file that says
+ * So the answer arrives unasked. docs/STATUS.md is the one file that says
  * where the project stands, and this prints it, with the branch, the last
  * commits and the working tree around it.
  *
@@ -39,7 +39,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
-const STATUS_PATH = join(REPO, ".claude", "STATUS.md");
+const STATUS_PATH = join(REPO, "docs", "STATUS.md");
 
 const LOG_COUNT = 8;
 const TREE_LINES = 10;
@@ -70,7 +70,7 @@ function build() {
   if (!existsSync(STATUS_PATH)) {
     out.push("");
     out.push(
-      "`.claude/STATUS.md` is missing. Orient from `.claude/CLAUDE.md` and the log below.",
+      "`docs/STATUS.md` is missing. Orient from `.claude/CLAUDE.md` and the log below.",
     );
   } else {
     const text = readFileSync(STATUS_PATH, "utf8");
@@ -111,7 +111,7 @@ function build() {
 try {
   console.log(build());
 } catch (err) {
-  console.log(`## Session context\n\nOrientation hook failed (${err.message}). Read \`.claude/STATUS.md\`.`);
+  console.log(`## Session context\n\nOrientation hook failed (${err.message}). Read \`docs/STATUS.md\`.`);
 }
 
 process.exit(0);

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Dead-link check for the knowledge base under .claude/.
+ * Dead-link check for the knowledge base: docs/, .claude/ and CONTRIBUTING.md.
  *
  * WHY THIS EXISTS
  *
- * The files in .claude/ point at each other constantly — a todo item at the bug
+ * These files point at each other constantly — a todo item at the bug
  * it fixes, a bug at the doc that explains the subsystem, a doc at the decision
  * behind it. Those links are how a session gets from the one file it was told
  * to read to the one it actually needs. Nothing checked them, and by 2026-09-06
@@ -14,14 +14,17 @@
  *
  * WHAT IT CHECKS
  *
- *   - every `[text](target)` in every .md under .claude/ whose target is a
- *     relative path: the file (or directory) must exist
+ *   - every `[text](target)` in every .md under docs/ and .claude/, and in
+ *     CONTRIBUTING.md, whose target is a relative path: the file (or
+ *     directory) must exist. The list is `SCAN` below; the knowledge base
+ *     moved from .claude/ to docs/ in 2026-11, which a single hard-coded root
+ *     would have missed without a word.
  *   - a `#fragment` on a markdown target, or on its own, must match a heading
  *     in that file, slugged the way GitHub does it
  *
  * Skipped: http(s) and mailto links, targets inside fenced code blocks or
- * inline code (SKILL.md templates show link syntax as examples), and
- * `.claude/docs/commit-message.md`, which is a gitignored scratch file.
+ * inline code (SKILL.md templates show link syntax as examples), and the
+ * gitignored scratch files in `SKIP`.
  *
  * Advisory, like check-docs.mjs, and for the same reason: a broken link is not
  * a broken build, and a blocking check would teach --no-verify. `--strict` is
@@ -39,8 +42,15 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = dirname(dirname(fileURLToPath(import.meta.url)));
-const ROOT = join(REPO, ".claude");
-const SKIP = new Set([join(ROOT, "docs", "commit-message.md")]);
+// What is scanned: whole folders are walked for .md files, single files are
+// taken as they are. A missing entry is skipped, so a moved folder shows up as
+// a lower link count rather than a crash.
+const SCAN = [".claude", "docs", "CONTRIBUTING.md"].map((p) => join(REPO, p));
+const SCOPE = ".claude/, docs/ and CONTRIBUTING.md";
+// Gitignored scratch files, matching .gitignore.
+const SKIP = new Set(
+  [".claude/docs/commit-message.md", ".claude/docs/pr-body.md"].map((p) => join(REPO, p)),
+);
 
 const argv = process.argv.slice(2);
 const quiet = argv.includes("--quiet");
@@ -55,6 +65,16 @@ function walk(dir, out = []) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) walk(full, out);
     else if (name.endsWith(".md") && !SKIP.has(full)) out.push(full);
+  }
+  return out;
+}
+
+function filesToScan() {
+  const out = [];
+  for (const entry of SCAN) {
+    if (!existsSync(entry)) continue;
+    if (statSync(entry).isDirectory()) walk(entry, out);
+    else if (!SKIP.has(entry)) out.push(entry);
   }
   return out;
 }
@@ -113,7 +133,7 @@ function insideInlineCode(line, index) {
 const problems = [];
 let checked = 0;
 
-for (const file of walk(ROOT)) {
+for (const file of filesToScan()) {
   const lines = readFileSync(file, "utf8").split("\n");
   let inFence = false;
   lines.forEach((line, i) => {
@@ -152,12 +172,12 @@ for (const file of walk(ROOT)) {
 // ---------------------------------------------------------------------------
 
 if (problems.length === 0) {
-  if (!quiet) console.log(`links: ${checked} checked under .claude/, none dead.`);
+  if (!quiet) console.log(`links: ${checked} checked in ${SCOPE}, none dead.`);
   process.exit(0);
 }
 
 console.log("");
-console.log(`links: ${problems.length} dead of ${checked} checked under .claude/ —`);
+console.log(`links: ${problems.length} dead of ${checked} checked in ${SCOPE} —`);
 for (const p of problems) console.log(`      ${p}`);
 console.log("");
 if (strict) {

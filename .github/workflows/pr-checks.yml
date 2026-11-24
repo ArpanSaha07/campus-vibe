@@ -5,7 +5,7 @@ name: PR checks
 # Every finding is a `::warning::` annotation on the PR and the job succeeds.
 # Arpan decided all three guide rather than block, and that they apply to PRs
 # into develop only, not to his develop-to-main release PRs
-# (.claude/specs/2026-11-23-teammate-pr-workflow.md). The logic lives in
+# (docs/specs/2026-11-23-teammate-pr-workflow.md). The logic lives in
 # scripts/pr-checks.mjs so it can be tested locally:
 #
 #   node --test scripts/pr-checks.test.mjs

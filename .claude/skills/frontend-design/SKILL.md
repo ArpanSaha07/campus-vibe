@@ -5,7 +5,7 @@ description: Guidance for distinctive, intentional visual design when building n
 
 # Frontend Design
 
-**Read [`design-guidelines.md`](../../design-guidelines.md) first — it is binding
+**Read [`design-guidelines.md`](../../../docs/design-guidelines.md) first — it is binding
 on all UI work in this repository.** This skill is the aesthetic layer on top of
 it, for a new surface that needs a point of view; it never overrides a rule set
 out there.

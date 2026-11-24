@@ -34,7 +34,7 @@ paths:
   2026-09-16 and left for Arpan.
 - **Shape translation belongs in `frontend/app/lib/adapters.ts`**, not in
   components. See
-  [`api-and-caching.md`](../docs/architecture/api-and-caching.md).
+  [`api-and-caching.md`](../../docs/architecture/api-and-caching.md).
 - **Per-user data must never enter Next's data cache.** The guard and the three
   data paths are described in the same document; a DTO that starts carrying
   user-specific fields changes what is safe to cache.
@@ -50,8 +50,8 @@ paths:
   is nested in both the `done` frame and `PlannerMessageDTO`, so it has its own
   row. The `delta`, `status` and `error` frames are small maps built in
   `SseReplySink` and are not contracted
-  ([ADR-019](../docs/decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md),
-  [ADR-023](../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)).
+  ([ADR-019](../../docs/decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md),
+  [ADR-023](../../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)).
   **A new field on the `done` frame needs a default on the page** —
   `toPlannerActions` treats a missing `actions` as empty — because the backend
   and the Vercel frontend deploy separately.
@@ -61,7 +61,7 @@ paths:
   fails, because the contract covers DTOs going out, not request records coming
   in. This rule loads on both files. **Adding a field to either? Add it to the
   other, or record why it does not belong there.**
-  [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) names
+  [ADR-005](../../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) names
   this as the standing cost of keeping a proposal in its own table, and sets the
   threshold: one divergence is a bug, **two means the shapes should be unified
   behind a shared embeddable**. The count is at one and a half — the contact

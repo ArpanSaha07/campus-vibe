@@ -1,7 +1,7 @@
 # Architecture Decision Records
 
 An ADR records **one decision, at the moment it was made**, and is then frozen.
-It lives at `.claude/docs/decisions/ADR-NNN-<slug>.md`.
+It lives at `docs/decisions/ADR-NNN-<slug>.md`.
 
 This is the other half of the knowledge base described in
 [`SKILL.md`](SKILL.md). The difference is worth being precise about, because
@@ -13,7 +13,7 @@ writing the wrong one wastes the effort:
 | Written | **before** the code | **after** the code |
 | Lifetime | frozen once accepted | rewritten whenever the code changes |
 | When wrong | superseded by a new ADR | edited in place |
-| Lives in | `.claude/docs/decisions/` | `.claude/docs/architecture/` |
+| Lives in | `docs/decisions/` | `docs/architecture/` |
 
 An ADR is never edited to reflect a change of mind. That is the whole value: it
 preserves what was known and believed at the time, including the options that
@@ -45,7 +45,7 @@ Roughly: if the answer to *what else did we consider* is nothing, skip it.
 ## Numbering
 
 Sequential, zero-padded to three digits, never reused: `ADR-001`, `ADR-002`.
-Take the next number by listing `.claude/docs/decisions/`. Two ADRs written in
+Take the next number by listing `docs/decisions/`. Two ADRs written in
 the same session take consecutive numbers — do not batch them under one.
 
 The slug is the decision, not the area: `ADR-004-jwt-in-httponly-cookie.md`,

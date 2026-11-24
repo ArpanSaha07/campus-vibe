@@ -86,7 +86,7 @@ export function checkTemplate(body) {
   const spec = specLine ? specLine.replace(/^\s*spec:/i, "").trim() : "";
   if (!spec) {
     warnings.push(
-      "No spec linked. Fill the Spec: line with the approved spec in .claude/specs/, or n/a for a one-line fix.",
+      "No spec linked. Fill the Spec: line with the approved spec in docs/specs/, or n/a for a one-line fix.",
     );
   }
 
