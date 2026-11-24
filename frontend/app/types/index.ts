@@ -81,7 +81,7 @@ export type Club = {
     interests: string[];
 };
 
-// AI planner (see .claude/specs/2026-09-16-planner-chat-ui.md and
+// AI planner (see docs/specs/2026-09-16-planner-chat-ui.md and
 // 2026-09-16-planner-backend.md). The Api* shapes mirror the Planner*DTO
 // records in com.campusvibe.ai.feature.planner and are contracted in
 // contracts/api-dto-fields.json.
@@ -224,7 +224,7 @@ export interface PlannerUsage {
 //
 // ROLE_CLUB_ADMIN is deliberately absent. Managing a club is a relationship
 // with that club, not an attribute of the account — see ClubRole below and
-// .claude/docs/architecture/club_admin_governance.md.
+// docs/architecture/club_admin_governance.md.
 export enum Role {
   USER = "ROLE_USER",
   ADMIN = "ROLE_ADMIN",

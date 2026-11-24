@@ -8,7 +8,7 @@ import EventLikeButton from "@/app/components/event/EventLikeButton";
 import EventShareButton from "@/app/components/event/EventShareButton";
 
 // Ticket-stub card: image on top, perforated divider, printed (mono) data below.
-// See .claude/design-guidelines.md — "Signature: the ticket perforation".
+// See docs/design-guidelines.md — "Signature: the ticket perforation".
 //
 // The whole card is the link. Rather than wrap everything in one <Link> — which
 // would nest the like/share <button>s inside an <a> — the title link stretches

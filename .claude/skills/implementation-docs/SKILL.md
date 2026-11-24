@@ -1,17 +1,17 @@
 ---
 name: implementation-docs
-description: Write or update a design-decisions document in .claude/docs/architecture after implementing a feature, backend/frontend module, database change, or CI/CD workflow. Explains what the current code does and why it was built that way, for Arpan and for teammate agents who start with no memory of the work. Use after finishing a unit of work, when asked to document an existing implementation, or when a review asks where the reasoning is written down.
+description: Write or update a design-decisions document in docs/architecture after implementing a feature, backend/frontend module, database change, or CI/CD workflow. Explains what the current code does and why it was built that way, for Arpan and for teammate agents who start with no memory of the work. Use after finishing a unit of work, when asked to document an existing implementation, or when a review asks where the reasoning is written down.
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(git log:*), Bash(git diff:*), Bash(git status:*)
 ---
 
 # Implementation & Design-Decision Docs
 
-`.claude/docs/` is the project's knowledge base: what the code does, and why it
+`docs/` is the project's knowledge base: what the code does, and why it
 is shaped that way. Every completed unit of work — a feature, a backend module, a
 frontend area, a database change, a CI/CD workflow — leaves a document there.
 
 ```
-.claude/docs/
+docs/
 ├── README.md            index — every doc, one line each. Update it or the doc is invisible.
 ├── architecture/        implementation docs (this file)    — living, describe code as it is
 └── decisions/           ADRs                               — dated, frozen, describe a choice
@@ -107,14 +107,14 @@ marketing, and it will be believed.
 
 ## Update or create?
 
-**Look first.** `ls .claude/docs/architecture/` and read anything on the same
+**Look first.** `ls docs/architecture/` and read anything on the same
 topic.
 
 - Same topic exists → **update it**. Revise the affected sections in place and
   append to its Change log. Do not create a second document that contradicts the
   first; two docs on one topic means neither can be trusted.
 - No document covers this topic → create one, and add it to
-  `.claude/docs/README.md` in the same edit.
+  `docs/README.md` in the same edit.
 - The work spans two existing topics → update both, each from its own angle.
   Cross-link rather than duplicating.
 
@@ -141,7 +141,7 @@ For each significant decision, answer: what problem forced this? What else was
 considered? What breaks if someone undoes it?
 
 Sources, in order of reliability: comments in the code (this repo comments the
-reasoning, not the mechanism — mine them), `.claude/docs/decisions/`, the plan
+reasoning, not the mechanism — mine them), `docs/decisions/`, the plan
 file, commit messages, `todo.md` and `bugs.md`, then the conversation.
 
 **If a decision's rationale cannot be recovered, say so** — write
@@ -152,8 +152,8 @@ wrong explanation is worse than an admitted gap, because it will be believed.
 
 Structure below. Then:
 
-- add or update the one-line entry in `.claude/docs/README.md`;
-- update `.claude/TODO/todo.md` per CLAUDE.md;
+- add or update the one-line entry in `docs/README.md`;
+- update `docs/TODO/todo.md` per CLAUDE.md;
 - if the work came out of an ADR, add the `Implemented in:` back-link to it.
 
 ---

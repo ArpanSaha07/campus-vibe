@@ -119,3 +119,11 @@ paths:
   all three — `pre-commit` (doc drift, advisory), `commit-msg` (semantic
   subjects, in pure `sh` so GUI clients honour it) and `pre-push`. Nothing here
   protects a colleague who has not run it.
+- **The knowledge base lives in `docs/`; `.claude/` holds only what Claude
+  Code executes.** Move a folder and its readers move in the same change:
+  `check-links.mjs` `SCAN`, `check-docs.mjs` `DOCS_DIR` and `STATUS_PATH`,
+  `session-context.mjs` `STATUS_PATH`, CODEOWNERS, and `docs-map.json`. A
+  checker with a hard-coded root does not fail when the folder leaves — it
+  checks less and reports clean: on 2026-11-23 `check-links.mjs` passed 83
+  links in `.claude/` while 540 more in the moved folder were dead. Never
+  edit a migration comment to follow a move; the checksum changes. (ADR-025)

@@ -1,0 +1,850 @@
+# API & Caching — Implementation & Design Decisions
+
+**Status:** 2026-08-14, extended 2026-08-15 · branch `develop` · **live and
+verified end-to-end against the running Docker stack.** Every claim below was
+read from the code or measured; the two places where a rationale could not be
+recovered say so.
+**Authors:** main session.
+**Code as of:** `0ff0759` plus the uncommitted planner agent unit — re-read
+2026-11-16: `PlannerActionDTO` joined `api-dto-fields.json` and both contract
+tests, and `actions` joined `PlannerMessageDTO` and `PlannerReplyDoneDTO`.
+**Nothing this document describes moved**: the planner is still fetched in the
+browser with the token through `apiFetch` and `apiFetchResponse`, never cached,
+and the three data paths are unchanged. Before that, `f7a4399` plus the
+uncommitted club page and club social links unit — re-read 2026-09-16: `ClubSocialLinks` gained `linkedin` and `linktree`,
+so the stored JSON now holds six keys. **No DTO moved and no contract entry
+changed**: `socialLinks` is one opaque `String` on every DTO that carries it, so
+Jackson introspection never looks inside it — which is also why nothing pins
+those six key names (see `rules/contracts.md`). Before that, `95418a1` plus the
+uncommitted planner backend unit — re-read on
+2026-09-16: the eight `Planner*DTO` records joined `api-dto-fields.json` and
+both contract tests; `DefaultExceptionHandler` gained a 503 entry for
+`AiServiceUnavailableException` and now presets `application/json` on the
+handlers a streaming request can reach. No cache policy or data path moved.
+Before that, `70336d2` plus the event end time unit — re-read on
+2026-09-16: `EventDTO` gained `endTime` and its row in `api-dto-fields.json`;
+`GET /api/v1/events` gained `upcoming=true`, served by
+`EventRepository.findByEndTimeAfterOrderByDateTimeAsc` with the organizer
+graph; `toEventInstance` maps `endTime`. No cache policy or data path moved.
+Before that, `b0c5e63` plus the uncommitted planner chat UI unit — re-read on
+2026-09-16: `api.tsx` gained `apiFetchResponse` for streamed bodies, sharing two
+new helpers, `requestHeaders` and `throwIfNotOk`, with `apiFetch`, which moved
+its line numbers; `adapters.ts` gained the planner adapters; `types/index.ts`
+gained the planner shapes, deliberately not yet in the contract. No existing
+data path, cache policy or DTO field moved. Before that, `12afebf` plus the
+uncommitted club and event management unit —
+re-read on 2026-09-15: `event.tsx` gained `getEventForEdit` (raw and uncached),
+`updateEvent`, `deleteEvent`, `uploadEventImages`, `deleteEventImage` and
+`setEventBanner`; `adapters.ts` versions every media URL by a hash of its stored
+key and gained `toManagedClub`; the `events` cache tag got its first caller; and
+`EventController` gained `PUT /events/{id}`, `DELETE /events/{id}/images/{index}`
+and `PUT /events/{id}/images/{index}/banner`. No DTO field moved. Before that,
+`680da0e` plus the event photo unit — re-read on 2026-09-12:
+`EventController` gained `GET /events/{id}/images/{index}`, `ClubController`'s
+image response moved into `s3/StoredImageResponses` unchanged, and
+`toEventInstance` now maps event image keys to `/media/events/...` (BUG-042). No
+DTO field, cache policy or data path moved. Before that, `081d7b3` — re-stamped 2026-09-11: `handleMaxUploadSize` dropped
+its unused exception parameter (CodeQL alert 53) and still answers the same 413;
+nothing this document says about it moved. Before that, `77baaab` — re-read on 2026-09-11 for the BUG-039 narrow fix:
+the upload endpoints on `ClubController` and `EventController`, the new
+`MaxUploadSizeExceededException` → 413 entry in `DefaultExceptionHandler`, and
+the key shape `adapters.ts` receives. No data path, cache policy or DTO field
+moved; the key stored in `clubs.logo` changed shape and the adapter maps it the
+same way. Before that, `3fec570` — re-read on 2026-09-10 for the contact links a club
+proposal now carries: `ClubCreationRequestDTO` gained `socialLinks` and its row
+in `api-dto-fields.json`, and `parseSocialLinks` in `adapters.ts` became
+exported because the admin queue reads a proposal's links before a club exists.
+Neither changes a data path or what may be cached. Re-stamped again for
+`3fec570`, the official email seeded at creation: it adds a field to
+`ClubCreateRequest`, which is a request record rather than a DTO — it has no row
+in `api-dto-fields.json` and no contract test asserts it — so nothing here
+moves. Re-read on 2026-09-09 for
+the club ownership spine:
+`api.tsx` (the multipart branch), `cache.ts` and its first real invalidator,
+`adapters.ts` (the media-URL boundary), and the new club media endpoints.
+Re-read again the same day for the create-club form work, which moved
+`frontend/app/types/index.ts` and `ClubCreateRequest.java` and so is mapped
+here: neither change touches this document. `ClubFormData` is form state, not a
+DTO — it has no row in `api-dto-fields.json` and no contract test asserts it —
+and the `ClubCreateRequest` edit is javadoc only.
+
+**Two older strata, named rather than glossed.** The **storage layers**,
+**rules** and **client-query-library** sections were written on 2026-08-15
+against the working tree at that date — `api.tsx`, `cache.ts`,
+`followed-clubs-context.tsx`, the Server/Client split across every `page.tsx`,
+and a grep confirming no `Cache-Control` or `ETag` anywhere in
+`backend/src/main` were all re-read then. The **backend controller and
+repository** sections have not been re-read since `e12cd19` and still describe
+it; the endpoint list below was extended in 2026-09-09 but those two sections
+were not otherwise checked.
+
+## In one paragraph
+
+Every screen in CampusVibe gets its data from the Spring Boot API over plain
+HTTP JSON, and the frontend keeps a thin layer in front of that so pages do not
+each invent their own way of asking. The important recent change is that public
+data — the club list, the event list, individual club and event pages — is now
+held for five minutes instead of being re-fetched on every single page view, so
+the database is asked far less often while the pages still feel current. Anything
+personal to a signed-in user, such as which clubs you follow, is deliberately
+*never* held that way, because a shared cache would hand one person's data to the
+next visitor; the code refuses to do it rather than relying on anyone remembering.
+The one thing worth knowing before deciding anything here: **the login token is
+kept in browser storage, which means pages that need to know who you are cannot
+be rendered on the server**, and that single fact is the ceiling on how fast the
+signed-in parts of the app can get. Moving it to a cookie is the next significant
+piece of work and it is already written up as [BUG-003](../bugs/bugs.md#bug-003).
+
+## Read this before you change anything here
+
+- **`frontend/app/lib/api.tsx` is the only place that calls `fetch`.** Every
+  other module goes through `apiFetch`. Adding a bare `fetch` elsewhere bypasses
+  the base-URL switch, the error typing and the caching guard all at once.
+- **The invariant that is easy to break:** `auth: true` and caching must never be
+  combined. `apiFetch` throws if they are (`api.tsx:110`). Next keys its data
+  cache on the URL, and the bearer token is not part of that key, so a cached
+  authenticated response is one user's data served to the next caller. If that
+  throw is ever in your way, the answer is not to remove it.
+- **`ApiError.status` is load-bearing, not decoration.** The club and event pages
+  route a 404 to `notFound()` and anything else to `error.tsx`. Collapsing the
+  two is what used to tell a user their club had been deleted whenever the
+  backend was merely down ([BUG-022](../bugs/fixed_bugs.md#bug-022)).
+- **A Server Component that fetches and takes no params will be prerendered at
+  build time**, and the build then needs a live backend that CI does not have
+  ([BUG-027](../bugs/fixed_bugs.md#bug-027)). Run `npm run verify` before
+  pushing — it builds against a closed port and reproduces exactly that failure.
+- Bound by [`user-roles.md`](user-roles.md) for who may call what, and by
+  [`ci-cd-pipeline.md`](ci-cd-pipeline.md) for how the checks run.
+- Open defects: [`bugs.md`](../bugs/bugs.md) · backlog:
+  [`todo.md`](../TODO/todo.md).
+
+---
+
+## Overview
+
+The API is a conventional REST surface under `/api/v1`, served by Spring Boot,
+consumed by a Next.js App Router frontend. There is no GraphQL layer, no BFF, and
+no shared client generated from a schema — the contract is maintained by hand in
+two places (`EventDTO`/`ClubDTO` on one side, `ApiEvent`/`ApiClub` in
+`frontend/app/types/index.ts` on the other) and reconciled by adapters.
+
+The one architectural idea that makes the rest legible: **the frontend has three
+distinct data paths, and which one a page uses is decided by whether the data is
+public and whether the page needs to know who is asking.**
+
+| Path | Used for | Cached | Rendered |
+|---|---|---|---|
+| Server Component → `apiFetch` with a policy | `/clubs`, `/events`, club and event detail | 5 min, shared | Server |
+| Client Component → `apiFetch` with `auth: true` | `/my-clubs`, `/my-events`, dashboards, `/planner` (its reply read through `apiFetchResponse`) | Never | Browser |
+| Client Component → `apiFetch` plain | search | Never | Browser |
+
+The middle row is not a preference. The JWT lives in `localStorage`, which a
+Server Component cannot read, so every authenticated page is forced into the
+browser and pays a round trip to `/api/v1/users/me` before it can ask anything
+else. That constraint shapes more of this design than any decision taken on
+purpose.
+
+Caching exists in exactly one layer: **Next's data cache, opted into per call.**
+There is no Spring `@Cacheable`, no Redis, no HTTP `Cache-Control` on API
+responses — all three verified absent by grep across `backend/src/main` and
+`next.config.ts`. That is a real gap rather than a considered position, and it is
+recorded below.
+
+---
+
+## Storage layers, and what owns what
+
+### The principle
+
+**No single browser storage mechanism is right for all of it.** Each layer has a
+job, and the failure mode when one is used for another's job is always the same:
+two copies of the truth that disagree. The corollary matters more than the rule —
+**every piece of data has exactly one authoritative owner**, and every other copy
+is a cache that must be able to be thrown away without losing anything.
+
+What CampusVibe actually runs today, in full:
+
+| Layer | Holds | Notes |
+|---|---|---|
+| PostgreSQL | Everything authoritative | The only source of truth |
+| Next data cache | Public club and event reads, 5 min | The **only** data cache in the system |
+| React context | The followed-clubs list, once per session | `followed-clubs-context.tsx`, the only client cache |
+| `localStorage` | **One item: the JWT** | And that is the thing that should not be there |
+| Caffeine (backend) | Auth and search rate-limit counters, lockout counters, **query embeddings** | Only the last is a data cache, and only of provider output — never of results |
+
+There is **no Redis, no IndexedDB, no client query library, and no HTTP caching**
+on API responses. Three of those are correct for the current scale; the fourth
+(HTTP caching) is a real gap, recorded below.
+
+The one backend cache that holds provider output rather than counters is
+`QueryEmbeddingCache` (2026-08-15, [BUG-005](../bugs/fixed_bugs.md#bug-005)).
+It sits around the **embedding call only**, never around the ranked results —
+results change whenever an event is added and must not be served stale, whereas
+the embedding of the string *chess club* is the same forever.
+
+### The shape of it
+
+```text
+                     PostgreSQL  ← source of truth
+                          │
+                   Spring Boot API
+                    (no Cache-Control,
+                     no ETag — a gap)
+                          │
+        ┌─────────────────┴─────────────────┐
+        │                                   │
+  Server Component                    Client Component
+  apiFetch + policy                   apiFetch, auth: true
+        │                                   │
+  Next data cache                     never cached
+  5 min, shared,                      (guard throws)
+  tag-invalidatable                         │
+        │                             React context for
+  /clubs, /events,                    the one list read
+  detail pages                        by many buttons
+                                            │
+                                     localStorage: JWT only
+```
+
+The asymmetry is the whole design. Public data is cached because it is the same
+for everyone; per-user data is never cached because it is not, and `apiFetch`
+enforces that rather than trusting anyone to remember.
+
+### Where a new piece of data belongs
+
+Ask in this order. Most answers are the first two.
+
+| The data | Where | Why |
+|---|---|---|
+| Session credential | httpOnly cookie *(today: `localStorage`)* | Must not be readable by page scripts, and the server needs it before rendering. The gap is [BUG-003](../bugs/bugs.md#bug-003) |
+| Saved events, followed clubs, RSVPs | PostgreSQL | Must follow the user to another device and survive a cleared browser |
+| Roles, club-admin links | PostgreSQL | Authorisation input; the JWT carries role *names* only, and ownership is re-checked per request |
+| `email_verified`, `auth_provider` | PostgreSQL | Account facts, not display state |
+| Club and event lists, detail pages | Next data cache, 5 min | Public, identical for everyone, changes a few times a day |
+| Search results | Nothing | Unbounded query space; caching fills the store with entries never asked for twice. Deliberately absent from `cache.ts` |
+| Planner prompt across a sign-in redirect | `sessionStorage` (`planner.ts`) | Survives one navigation, dies with the tab — which is the intended lifetime |
+| Planner results | Page state | Not persisted. If *Save plan* is ever built, that is PostgreSQL, on an explicit user action |
+| A grid-vs-list toggle, a dismissed banner | `localStorage` | None exist yet. When one does, this is where it goes — small, non-sensitive, disposable, no cross-device meaning |
+| Anything the server must know before rendering | Cookie | `localStorage` is invisible to a Server Component. This is not a preference, it is a hard constraint |
+
+### PostgreSQL is the source of truth
+
+Browser storage is never authoritative for any of: users, clubs, events, saved
+events, followed clubs, RSVPs, roles and club-admin relationships, verification
+state, or auth tokens. All of it is server-owned, and every one of those is
+re-read from the database on the request that depends on it — including the
+principal itself, which `JWTAuthenticationFilter` loads by id on every
+authenticated request rather than trusting the claims.
+
+That last one is not incidental. It is the only reason deleting a user
+immediately invalidates their token, and it is currently the system's *only*
+revocation mechanism.
+
+---
+
+## File-by-file breakdown
+
+### `frontend/app/lib/api.tsx` — the single HTTP boundary
+
+**Multipart**: `apiFetch` omits its default `Content-Type: application/json`
+when the body is a `FormData`, because that header carries the multipart
+boundary and only the browser knows it. Sending JSON alongside a FormData body
+makes the server read every part as one opaque string and each `@RequestPart`
+arrives missing. This is the first code in the app that ever sent a file.
+
+
+Every request in the application passes through `apiFetch` (`api.tsx:104`). It
+carries four responsibilities that would otherwise be scattered:
+
+**Base URL by side (`api.tsx:15`).** In the browser the public URL is right; on
+the server it is not, because inside the frontend container `localhost:8080` is
+that container, not the backend. `API_INTERNAL_URL` is deliberately *not*
+`NEXT_PUBLIC_` — a Docker service name is meaningless to a browser, so it must
+stay out of the client bundle.
+
+**Typed errors (`api.tsx:32`).** `ApiError` keeps the HTTP status as a field so
+callers can distinguish *no such thing* from *the server is broken*. The message
+stays the raw response body, so pre-existing callers and `parseApiError` behave
+as before.
+
+**The caching guard (`api.tsx:110`).** Combining `auth: true` with `revalidate` or
+`tags` throws immediately, before the request is issued. See *Design decisions*.
+
+**Empty bodies (`api.tsx:141`).** A 204 has nothing to parse, so `undefined` is
+returned and cast to `T`; callers of no-body endpoints type them `apiFetch<void>`.
+
+**Streamed bodies (`api.tsx:154`).** `apiFetchResponse` makes the same request
+and hands back the unread `Response`, for the planner reply, a
+`text/event-stream` that `apiFetch` would wait out in full. `EventSource` is no
+alternative: it cannot send the Authorization header. Headers and error typing
+live in `requestHeaders` and `throwIfNotOk` (`api.tsx:81`, `:98`), shared by
+both, so a refused stream (429, 503) is an `ApiError` before any body is read.
+It takes **no cache options at all**, rather than guarding them, because a
+streamed reply is per-user by construction. The reader is
+`lib/planner-api.ts`; see [`ai-planner.md`](ai-planner.md).
+
+### `frontend/app/lib/cache.ts` — the cache policy, in one place
+
+Three exported constants and a comment explaining what is *not* here. Five
+minutes (`cache.ts:18`) applies to clubs and events (`cache.ts:26-27`), each
+tagged so a mutation can invalidate rather than wait out the TTL.
+
+**The `clubs` tag now has a caller**, which it did not until 2026-09-09:
+`app/lib/actions/revalidate.ts` is a Server Action called after a club is
+created and after a proposal is approved. It uses **`updateTag`, not
+`revalidateTag`** — this is a read-your-own-writes case, the person who just
+created the club is the one about to look at the list, and `revalidateTag`'s
+stale-while-revalidate semantics would hand them back the list without their
+club in it. `updateTag` is Server-Action-only, which is the other reason that
+file exists: both callers are client components.
+
+**The `events` tag got its caller on 2026-09-15**, `revalidateEvents`, beside
+`revalidateClubs` and for the same reason. It runs after an event is edited or
+deleted, after its photos are added, removed or reordered, and after a club is
+renamed, since every event carries its organizer's name. One coarse tag covers
+the list, each club's list and each event; nothing finer exists to evict.
+
+Search is deliberately absent (`cache.ts:30`): its query space is unbounded, so
+caching it fills the store with entries nobody asks for twice, and results are
+ranked per query rather than being a stable resource.
+
+### `frontend/app/lib/club.tsx` · `event.tsx` — the domain reads
+
+Thin, and deliberately so: build a path, pass a cache policy, map through an
+adapter. Two behaviours are worth knowing.
+
+`getClubById` (`club.tsx:42`) and `getEvent` (`event.tsx:33`) return `null` for a
+404 and rethrow everything else. `getEvent` also short-circuits a non-numeric id
+before making any request, because event ids are database bigints and a slug
+cannot name one.
+
+**An edit form never reads through these.** `getEventForEdit` (`event.tsx`) and
+`getClubForEdit` (`services/clubService.ts`) fetch with `auth: true` and no cache
+policy, and return the raw `ApiEvent` / `ApiClub`. Two reasons: the public read
+is cached for five minutes, so a form seeded from it could save back a copy older
+than the last save; and `toEventInstance` turns a null location, price and
+capacity into `Location TBA`, `Free` and `0`, which a form would then submit as
+real values.
+
+`getTotalEventsForClub` (`club.tsx:75`) counts the club's own events. It
+previously returned `Math.floor(Math.random() * 100)`, so the club page printed a
+different total on every load.
+
+The comment at `club.tsx:55` marks a deleted function rather than existing code:
+`getClubNameById` used to title-case a slug when it could not find a club in mock
+data. That guess was right for the seeded clubs only by coincidence.
+
+### `frontend/app/lib/followed-clubs-context.tsx` — the one shared client cache
+
+The only client-side cache in the app, and the only place where *when* to fetch
+is a design question. A Follow button cannot know its own label; asking per
+button would mean twelve identical requests on a grid of twelve. The list is
+fetched once and every button reads from it.
+
+Two deliberate refusals, both documented at the top of the file: it does not
+fetch on mount (`requestLoad`, `context.tsx:62`, is called by the consuming hook
+at `context.tsx:193`, so a route with no Follow button never asks), and it keeps
+whole `Club` objects rather than ids, so `/my-clubs` reads them instead of
+fetching the same endpoint a second time.
+
+Writes are optimistic and revert on failure. A *failed* load leaves every button
+reading `Follow`, which is the safe direction: following again is idempotent
+server-side, whereas a false `Following` offers an unfollow that would do nothing.
+
+### `frontend/app/lib/adapters.ts` — the DTO boundary
+
+Maps `ApiEvent`/`ApiClub`/`ApiMyEvent` onto the UI shapes, and is where nullable
+backend fields acquire UI defaults (`Location TBA`, `Free`, a fallback image).
+`parseSocialLinks` tolerates malformed JSON by returning an empty record rather
+than throwing — the club page renders without social links instead of failing.
+It is **exported** since 2026-09-10, because a club proposal carries the same
+JSON string and the admin review queue reads it before any club exists, so the
+translation is no longer only `toClub`'s business. What it parses is now always
+the server's own JSON: `ClubSocialLinks.normalise` validates and re-serialises
+on every write path, so the column holds six known keys or NULL — `email`,
+`website`, `facebook`, `instagram`, and `linkedin` and `linktree` since
+2026-09-16. **The key list is a code change, not configuration**: the mapper
+runs with `FAIL_ON_UNKNOWN_PROPERTIES` off, so a key the record does not name
+is accepted and silently dropped rather than refused.
+
+**Planner answers are joined here too** (`adapters.ts:205`). `toPlannerPicks`
+matches each pick to the `EventDTO` or `ClubDTO` hydrated beside it, drops a
+pick with no row, and keeps one kind, so a planner answer never has two card
+rows ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)).
+The planner `Api*` types mirror the `Planner*DTO` records in
+`com.campusvibe.ai.feature.planner` and are contracted like every other DTO;
+`ApiPlannerReplyDone` is the stream's closing `done` frame rather than a
+response body.
+
+**It is also where an S3 object key becomes a URL.** `clubs.logo` and
+`club_images.url` hold two different kinds of thing: absolute Unsplash URLs in
+the demo data, and object keys like `clubs/{id}/logos/{uuid}.png` for anything
+uploaded through the product — `clubs/{id}/logo-{filename}` for one uploaded
+before 2026-09-11, when keys stopped being built from the browser's filename
+([BUG-039](../bugs/fixed_bugs.md#bug-039)). The adapter does not care which:
+it never parses a key, only tells a key from a URL. A key is fetchable by nobody, and handed to
+`next/image` it throws `Failed to construct 'URL': Invalid URL` at render time
+— which `onError` cannot catch, so it takes the page down
+([BUG-040](../bugs/fixed_bugs.md#bug-040)). `clubLogoUrl` and `clubImageUrls`
+pass absolute URLs through and turn keys into same-origin `/media/clubs/...`
+paths.
+
+**Event photos go through the same boundary since 2026-09-12.**
+`events.images` was passed through untouched until then, so an uploaded photo's
+key reached `next/image` on the event page, `EventCard` and `MyEventCard` and
+threw exactly as a club logo had ([BUG-042](../bugs/bugs.md#bug-042)).
+`eventImageUrls` maps a key to `/media/events/{id}/images/{index}`. It differs
+from `clubImageUrls` in one respect: a **root-relative path also passes
+through**, because event pictures in the demo data live in the frontend's own
+`public/` folder and `next/image` accepts such a path as it is. Keys are
+addressed by position, so one written under the retired `events/{id}/banners/`
+prefix maps the same way.
+
+**Every media URL ends in a version segment since 2026-09-15**, a short FNV-1a
+hash of the stored key: `/media/events/3/images/0/1jfp5m2`,
+`/media/clubs/{id}/logo/{hash}` ([BUG-056](../bugs/fixed_bugs.md#bug-056),
+[ADR-016](../decisions/ADR-016-media-urls-versioned-by-key-hash.md)). A position
+is not a photo: choosing a new banner or removing a photo moves a different image
+to the same position, and the image response is cached for five minutes
+(`StoredImageResponses.java:64`), so the browser kept showing the old one. Every
+upload gets a unique key, so the tag changes exactly when the image does and the
+cache stays useful. **A path segment, never `?v=`:** `next/image` throws during
+render on a local `src` with a query string unless `images.localPatterns` names
+it (`next/dist/shared/lib/image-loader.js:55`), and the first attempt answered
+500 on every page with an uploaded image. `next.config.ts` rewrites the
+versioned path to the same endpoint and ignores the segment.
+
+**`toManagedClub` applies the same logo mapping to `ManagedClubDTO`**, whose
+`logo` is the stored key exactly as `ClubDTO.logo` is. The managed-club reads in
+`club-admin-requests.ts` used to skip the adapter, so `ClubLogo` received a key,
+refused it, and an uploaded logo never showed in the dashboard
+([BUG-055](../bugs/fixed_bugs.md#bug-055)).
+
+The path is same-origin, and deliberately not an absolute API URL, because the
+two sides reach the backend at different hosts — emitting the internal one
+server-side and the public one in the browser would be a hydration mismatch on
+`src`. `next.config.ts` rewrites `/media/**` to `API_INTERNAL_URL`, resolved at
+request time rather than baked, so unlike `NEXT_PUBLIC_*` it is not subject to
+[BUG-004](../bugs/bugs.md#bug-004).
+
+### `frontend/app/lib/search.ts` — uncached by design
+
+Both functions call `apiFetch` with no policy, and return early on an empty
+query without making a request.
+
+### `backend/.../EventController.java` — the collection filter
+
+`list` (`EventController.java:73`) takes an optional `organizerId` and filters
+server-side. Chosen over a nested `/clubs/{id}/events` route; see *Design
+decisions*.
+
+`upcoming=true` returns only events that have not ended, soonest start first
+(`EventService.java:43`). It is opt-in, not the default, because the manage
+Events page lists a club's past events too, and it does not combine with
+`organizerId`. It is the one definition of still attendable, `end_time >
+now()`, shared with search ([ADR-020](../decisions/ADR-020-event-attendable-until-its-end-time.md)).
+
+### `backend/.../EventRepository.java` — the N+1 fix
+
+Every read attaches `@EntityGraph(attributePaths = "organizer")`. `Event.organizer`
+is `LAZY`, which is correct for the write paths, but `EventMapper` reads the
+club's *name* for the DTO — and a lazy proxy answers `getId()` from the
+identifier while `getName()` must initialize it. **Measured on
+`GET /api/v1/events` with 6 events: 13 statements with the graph, 17 without.**
+
+### `backend/.../MyClubController.java` — the me-scoped pattern
+
+The acting user comes from the JWT via `Authentication`, never from a path
+variable, so one user cannot read or change another's follows. The file also
+records a non-obvious security fact: the `permitAll` entry for
+`GET /api/v1/clubs/**` does not reach these routes, because they live under
+`/api/v1/users/me` and fall through to `.anyRequest().authenticated()`
+(`SecurityFilterChainConfig.java:45-51`).
+
+### `backend/.../DefaultExceptionHandler.java` — status mapping
+
+A `@ControllerAdvice` mapping thirteen exception types onto statuses, with a
+catch-all `Exception` handler returning 500. *(Re-read 2026-08-15; three
+handlers were added by the authentication work.)*
+
+The entries that carry reasoning worth preserving:
+
+- `AccessDeniedException` exists so `@PreAuthorize` denials return 403 rather
+  than falling through to the catch-all as 500s.
+- `MethodArgumentTypeMismatchException` does the same for a malformed path
+  variable ([BUG-024](../bugs/fixed_bugs.md#bug-024)), and deliberately does
+  not echo `e.getMessage()`, which names the target Java type and the controller
+  parameter.
+- `ConstraintViolationException` → 400, added 2026-08-15. `@Valid` covers request
+  bodies only, so a constraint on a `@RequestParam` raises this instead and was
+  answering **500** for an ordinary malformed query string
+  ([BUG-029](../bugs/fixed_bugs.md#bug-029)).
+- `TooManyAttemptsException` → 429 with `Retry-After`, and
+  `EmailNotVerifiedException` → 403. Both from the auth work; see
+  [`authentication.md`](authentication.md).
+- `AiServiceUnavailableException` → 503, added 2026-09-16 for the planner: no
+  provider key means the feature is off, not broken, and the planner page shows
+  its unavailable state for exactly this status.
+- **Handlers a streaming endpoint can reach preset `application/json`**
+  (`DefaultExceptionHandler.java:35`, `json` at `:306`): 404, 400, 429, 503 and
+  the catch-all. The planner message endpoint is asked for
+  `Accept: text/event-stream`, and an `ApiError` negotiated against that finds
+  no writer: the 429 and 503 left as bodiless 500s. The 400 and 404 had survived
+  only through `@ResponseStatus` on their exceptions, without a body.
+  `PlannerStreamIT` asserts the statuses on a real port. See
+  [`rules/backend-java.md`](../../.claude/rules/backend-java.md).
+- `MaxUploadSizeExceededException` → 413, added 2026-09-11 when the per-file
+  multipart cap went from 10MB to 5MB
+  ([BUG-039](../bugs/fixed_bugs.md#bug-039)). It was answering 500 through
+  the catch-all, which any phone photo would now reach. Spring does not say
+  which cap was hit — Tomcat reports `-1` — so the sentence names both, read
+  from the same two `spring.servlet.multipart` properties that enforce them.
+  **MockMvc never applies those caps**, so the only test that sees this entry
+  is `MediaUploadLimitIT`, on a real port. A refused image *type* is a plain
+  `RequestValidationException` → 400.
+
+**The catch-all no longer echoes `e.getMessage()`.** It logs the exception at
+ERROR and returns a fixed string. Echoing handed internal detail to the caller
+for anything unmapped — a JVM helpful-NPE naming a private field is what
+prompted the change. The practical consequence for this document: **an unmapped
+exception is now opaque to clients by design**, so anything a caller must act on
+needs its own handler and its own status rather than relying on the message.
+
+**Every handler has its own name**, as of 2026-08-16. They were thirteen
+overloads of `handleException` distinguished only by parameter type. Spring
+dispatches on the `@ExceptionHandler` annotation and never on the signature, so
+the overloading bought nothing and cost two things: a reader had to match brace
+to signature to see which one ran, and a stack trace said `handleException`
+thirteen times. CodeQL flagged it as `java/confusing-method-signature`, which was
+right for a duller reason than it thought. Two handlers whose message is a fixed
+string also dropped their unused exception parameter — legal, because the
+annotation already names the type.
+
+**The catch-all scrubs the URI before logging it**
+([BUG-033](../bugs/fixed_bugs.md#bug-033)). `Logs.safe` strips control
+characters and bounds the length. The reasoning is in the bug entry; the point
+for this document is that **any new log line carrying request data must go
+through `Logs`**, and the catch-all is the line that most needs it.
+
+**Undocumented here:** `AuthenticationController`, `UserController`,
+`ClubAdminRequestController`, `SearchController` and `MyEventController` are part
+of the same API surface but were not read for this document. Auth is covered by
+[`authentication.md`](authentication.md); search by [`search.md`](search.md).
+
+---
+
+## Design decisions
+
+### General
+
+| Decision | Problem it solves | Rejected alternative | If reverted |
+|---|---|---|---|
+| One `apiFetch` boundary | Base URL, auth headers, error typing and caching each needed doing once, not per call site | Per-module `fetch` calls | Server-side rendering breaks in Docker; the caching guard stops applying |
+| Opt-in caching, never on by default | `fetch` is uncached by default in this Next version, so every server render re-queried the backend | Caching everything by default | Per-user data becomes cacheable by accident — the failure the guard exists to prevent |
+| Cache policies centralised in `cache.ts` | A TTL repeated at each call site drifts | Literal `revalidate: 300` per call | Changing the TTL means finding every caller |
+| Hand-maintained DTO/type pairs | No codegen toolchain exists | OpenAPI generation | Nothing immediate; the drift risk is already live (see gaps) |
+
+### Task-specific
+
+**Refusing to cache authenticated responses (`api.tsx:110`).** Next keys the data
+cache on the URL; the bearer token is not part of that key. A cached
+authenticated response is therefore not stale data, it is *the wrong user's*
+data. The alternative considered was a comment warning against it. Rejected
+because the failure is silent — nothing crashes, the wrong name simply appears on
+someone else's screen — and a comment does not fail a build. Reverting it
+reintroduces a cross-account leak with no symptom. Covered by
+`app/__tests__/api.test.ts` (7 tests).
+
+**`null` for 404, throw for everything else.** Any slug can be typed into the
+address bar, so a miss is an ordinary outcome of a URL the user chose, while a
+500 is a genuine fault the caller cannot render its way out of. The alternative —
+returning `null` for both — is what shipped originally and produced *Club not
+found* for a backend that was merely down. The split is what lets the page send a
+real 404 status rather than a 200 carrying an error message.
+
+**`organizerId` as a filter on `/api/v1/events` rather than a nested route.** The
+club dashboard downloaded every event in the system and filtered in the browser.
+A nested `/clubs/{id}/events` was rejected as a second route returning the same
+representation of the same collection; the filter reuses the existing one. If
+reverted, the dashboard's cost grows with the size of the whole events table
+rather than with one club's.
+
+**`connection()` rather than `dynamic = 'force-dynamic'` on `/clubs`.** The docs
+state `force-dynamic` is equivalent to `fetchCache = 'force-no-store'`, which
+would strip the five-minute cache off every read in that tree and silently undo
+the work that added it. `connection()` changes only *when* the render happens.
+Verified by measurement: three consecutive request-time renders of `/clubs`
+produced **one** upstream `GET /api/v1/clubs` through a counting proxy.
+
+**`cacheComponents: true` was considered and rejected.** It makes every dynamic
+route stream a static shell first, and a streamed response cannot change its
+status — the real 404s would silently degrade to soft ones.
+
+**Demand-driven follow list.** Fetching on mount cost a `/users/me/clubs` request
+on every route a signed-in user opened, including the five of seven measured that
+have no Follow button on them. The `authLoading` guard
+(`followed-clubs-context.tsx:74`) is what prevents a 403 during the initial
+`/users/me` round trip; removing it makes the request fire before the user
+resolves.
+
+**No backend cache layer.** *Rationale not recorded* — this appears to be
+absence rather than a decision. Nothing in the code or the commit history argues
+against `@Cacheable`; it was simply never added. Note the Caffeine caches added
+2026-08-15 in `security/ratelimit/` are **not** a counter-example: they hold
+rate-limit counters, not query results, and nothing reads application data
+through them.
+
+**No client query library (TanStack Query and equivalents), deferred not
+rejected.** *Decided 2026-08-15.* The obvious targets — clubs, events, detail
+pages, search — are already Server Components reading through the Next data
+cache, so adopting one there would move rendering off the server to acquire a
+cache that already exists. It would be a regression, not an upgrade.
+
+Where it would genuinely pay is the client surface: `followed-clubs-context.tsx`
+is roughly two hundred lines hand-rolling exactly what `useQuery` plus
+`useMutation` with optimistic rollback provide, four client pages each repeat
+`useState(null)` + `useEffect` + an error flag, and `todo.md` has a **second**
+bespoke provider queued for saved events.
+
+It is still deferred, because that surface is not fixed yet. **The `localStorage`
+JWT is the reason those pages are client-rendered at all** — a Server Component
+cannot read the token, so every authenticated page is forced into the browser.
+Move auth to a cookie ([BUG-003](../bugs/bugs.md#bug-003)) and several of them
+can become Server Components, which changes what is left to serve. Adopting a
+query library first would mean fitting it to a shape about to change.
+
+**Trigger to revisit:** after the cookie migration lands, or sooner if a third
+hand-rolled client cache is about to be written — at that point the duplication
+outweighs the dependency.
+
+---
+
+## Rules for changing this area
+
+Placement rules, meant to be checkable against a diff. The entry-point bullets at
+the top of this document cover the `apiFetch` boundary itself; these cover where
+data is allowed to live.
+
+### Do
+
+- Give every new piece of data **one authoritative owner**, and treat every other
+  copy as disposable.
+- Put anything that must follow a user across devices in **PostgreSQL**.
+- Reach for a **Server Component + a policy from `cache.ts`** for public reads.
+  It is the cheapest path and already the majority of the app.
+- Add new cache policies **to `cache.ts`**, not as a literal `revalidate` at a
+  call site.
+- Choose a TTL from how fast that resource actually changes. Club descriptions
+  and a live event's status do not want the same number.
+- Keep authorisation in **Spring Security**. A frontend check is a UI affordance,
+  never a boundary.
+- Ask *does the server need this before it renders?* before choosing
+  `localStorage` — if yes, it is a cookie or it is account data.
+
+### Don't
+
+- **Do not put fetched events, clubs, profiles or search results in
+  `localStorage`.** It buys one avoided request and takes on expiry,
+  invalidation, cross-tab divergence and a second serialisation format. Nothing
+  in the app does this today; keep it that way.
+- **Do not combine `auth: true` with `revalidate` or `tags`.** `apiFetch` throws
+  (`api.tsx:110`). The throw is the feature.
+- **Do not put application data in cookies.** They ride along on matching
+  requests, so a cached list there is paid for on every call.
+- **Do not treat `localStorage` as a second database**, and do not add a second
+  item to it before the JWT has left.
+- **Do not add Redis to look production-shaped.** The honest triggers are more
+  than one backend instance (which the rate limiter already names), a measured
+  database bottleneck, or expensive computed results worth sharing.
+- **Do not persist AI planner responses** without a product decision to. The
+  prompt survives a redirect in `sessionStorage`; the results do not survive at
+  all, on purpose.
+- **Do not assume an httpOnly cookie is free.** Moving the JWT there brings CSRF
+  into scope, and CSRF is currently disabled — correctly, for a bearer-token API.
+  The two changes go together or neither goes.
+
+---
+
+## Known deviations, gaps and blockers
+
+**The JWT is in `localStorage`, and it is the structural constraint here.**
+`auth-context.tsx:26` reads it on mount and calls `/api/v1/users/me` before
+anything else can proceed. Two consequences: authenticated pages cannot be server
+rendered at all, and every one of them pays a sequential round trip before its
+own data request starts. It is also an XSS token-theft path. Tracked as
+[BUG-003](../bugs/bugs.md#bug-003); moving to an httpOnly cookie touches every
+auth endpoint, `apiFetch`, `AuthProvider` and `ProtectedRoute`, and logs out every
+existing session.
+
+**Invalidation happens only where a form does it.** Both tags have callers now —
+`revalidateClubs` after a club is created, edited or approved, `revalidateEvents`
+after an event is created, edited, deleted or has its photos changed. The writes
+themselves go straight to Spring Boot, so Next never sees them: the eviction is
+the form's job, not the write's, and a write made any other way — a script, or
+`curl` — leaves the public reads stale for up to five minutes.
+
+**`images` and `categories` are still N+1**, at two statements per event from the
+`@ElementCollection` copies in `EventMapper` — 2 of the 13 statements measured
+above, times the event count. Pre-dates the `organizerName` work.
+[todo.md](../TODO/todo.md) P3.
+
+**The DTO/type contract is hand-maintained and has already drifted once.** Event
+cards derived the organizing club's name by title-casing its slug against mock
+data; it agreed with the real name only by coincidence, and never for a club like
+*Making Waves Montréal*. Fixed by carrying `organizerName` on `EventDTO`, but
+nothing structural prevents the next divergence.
+
+**No HTTP caching on API data responses.** No `Cache-Control` and no `ETag` on
+JSON. **The one exception is stored images**, which `StoredImageResponses`
+serves with `max-age=300, public` since 2026-09-09 — the reason a media URL has to
+change when its image does ([BUG-056](../bugs/fixed_bugs.md#bug-056)). The
+2026-08-15 grep that said no response carries `Cache-Control` predates it. Every
+other cache hit is Next's in-process data cache, which means a second frontend
+instance shares nothing with the first.
+
+**No global ceiling on search spend.** The per-IP budget added for
+[BUG-005](../bugs/fixed_bugs.md#bug-005) bounds one caller, not the sum of
+them: a thousand IPs each staying under 30/min is still a thousand times the
+cost. The honest control is a hard monthly cap on the OpenAI project itself,
+which is a dashboard setting rather than code and is tracked in
+[`todo.md`](../TODO/todo.md) under *AI & Search*.
+
+**Rate-limit counters are per instance.** Both the auth and search budgets live
+in memory, so they reset on restart and a second backend instance would enforce
+its own copy — doubling every effective limit. Accepted while there is one
+instance; that is the trigger to move them to Redis.
+
+**Admin and dashboard over-fetch.** Whole lists are pulled for two counts, and
+all events for eight. Against 8 clubs and 0 events this is not measurable, and it
+is recorded rather than fixed.
+
+**`PingPongController` and `/api/v1/search`** exist in the surface inventory but
+were not read for this document.
+
+---
+
+## Possible improvements
+
+Prioritised, each with the trigger for doing it.
+
+1. **Move the JWT to an httpOnly cookie** (P1, blocked on a decision, not on
+   work). Unblocks server rendering for authenticated pages, deletes the
+   `/users/me` waterfall, and closes the XSS path. Do it with
+   [BUG-003](../bugs/bugs.md#bug-003) rather than separately. **Trigger:** the
+   next time signed-in page latency or route protection comes up.
+2. **Call `revalidateTag` from the write paths** (P2). The tags already exist,
+   but the writes do not go through Next — the create forms are Client
+   Components posting straight to Spring Boot, so Next never learns that
+   anything changed. Doing this needs a Next Route Handler or Server Action for
+   the client to call after a successful write, which is a small piece of
+   design rather than a one-liner, and it adds an endpoint that can evict the
+   cache. **Trigger:** the first complaint that a new event does not appear, or
+   the first real club admin.
+3. **Batch the `images`/`categories` collections** (P3) with a batch size or a
+   second entity graph. **Trigger:** event count reaching the low hundreds, where
+   2n statements start to show.
+4. **Generate the frontend types from the backend DTOs** (P3). Would have made
+   the `organizerName` drift a compile error. **Trigger:** a second contract
+   divergence, or adding a third consumer of the API.
+5. **Decide whether the API should send `Cache-Control`** (P3, needs a decision
+   first). Only becomes load-bearing behind a CDN or with more than one frontend
+   instance. **Trigger:** an actual deployment target existing — there is none
+   today.
+6. **Reconsider a client query library** (P3, deliberately deferred — see Design
+   decisions). Not for the public pages, which are Server Components already.
+   For the client surface, where `followed-clubs-context.tsx` and four pages
+   hand-roll it. **Trigger:** the cookie migration landing, or a third bespoke
+   client cache being about to be written.
+
+---
+
+## Change log
+
+- **2026-09-16** — Planner backend. The eight planner DTOs contracted on both
+  sides; `AiServiceUnavailableException` → 503; error handlers preset their JSON
+  content type so a stream request cannot turn a refusal into a 500.
+  *(main session)*
+- **2026-09-16** — Event end time. `EventDTO.endTime` added, contracted on
+  both sides; `GET /events?upcoming=true` filters on it. *(main session)*
+- **2026-09-16** — Planner chat UI. `apiFetchResponse` added for streamed
+  bodies, sharing header and error handling with `apiFetch`; `/planner` joins
+  the authenticated client path; planner adapters and types added, uncontracted
+  until the planner backend exists. *(main session)*
+- **2026-09-15** — Club and event management. New endpoints `PUT /events/{id}`
+  (full replacement, `canManageEvent`), `DELETE /events/{id}/images/{index}` and
+  `PUT /events/{id}/images/{index}/banner`; an event holds at most ten photos
+  and the first is its banner
+  ([ADR-015](../decisions/ADR-015-event-banner-is-the-first-photo.md)).
+  `event.tsx` and `clubService.ts` gained the write calls and an uncached raw
+  read for each edit form. The `events` tag got its caller. `adapters.ts`
+  versions media URLs by key hash as a path segment, after a `?v=` attempt
+  crashed every page with an image ([BUG-056](../bugs/fixed_bugs.md#bug-056),
+  [ADR-016](../decisions/ADR-016-media-urls-versioned-by-key-hash.md)), and
+  gained `toManagedClub` ([BUG-055](../bugs/fixed_bugs.md#bug-055)).
+  Corrected the stale claim that no API response carries `Cache-Control`. No DTO
+  field or cache policy moved. Implementing agent.
+- **2026-09-12** — Event photos can be displayed
+  ([BUG-042](../bugs/bugs.md#bug-042), events half). New endpoint
+  `GET /events/{id}/images/{index}`, public under the existing
+  `GET /api/v1/events/**` matcher and addressed by index like the club one.
+  `ClubController`'s image response — the raster-only content types,
+  `nosniff`, `inline` and the five-minute public cache — moved into
+  `s3/StoredImageResponses` so both controllers share one SVG guard; it now also
+  answers 404 for a root-relative stored value instead of letting
+  `assertSafeKey` refuse it. `toEventInstance` maps keys through
+  `eventImageUrls`, and `next.config.ts` gained the `/media/events/**` rewrite.
+  Upload keys moved from `events/{id}/banners/` to `events/{id}/images/`. No DTO
+  field or cache policy moved. Implementing agent.
+- **2026-09-11** — The BUG-039 narrow fix, raised by the PR #44 security review.
+  Upload keys are generated by `s3/MediaKeys` rather than taken from the
+  browser's filename, so the key shape in `clubs.logo` changed and this
+  document's example with it; the adapter needed no change, since it never
+  parses a key. `DefaultExceptionHandler` gained the 413 entry above. The
+  upload endpoints now answer 400 for anything that is not PNG, JPEG or WebP,
+  read from the bytes. No endpoint, DTO field or cache policy moved.
+  Implementing agent.
+- **2026-09-09** — The club ownership spine, and the media read path it made
+  necessary. `apiFetch` learned to leave `Content-Type` alone for a `FormData`
+  body — the first file upload the app has ever sent. `adapters.ts` gained the
+  key-to-URL boundary and `next.config.ts` the `/media/**` rewrite behind it
+  ([BUG-040](../bugs/fixed_bugs.md#bug-040)). `cache.ts`'s `clubs` tag got
+  its first invalidator, using `updateTag` rather than `revalidateTag` for
+  read-your-own-writes. New endpoints: `POST /club-creation-requests` and its
+  queue, `PATCH /clubs/{id}/official-email`, `GET /clubs/{id}/logo` and
+  `GET /clubs/{id}/images/{index}`. `ClubCreationRequestDTO` was added to
+  `contracts/api-dto-fields.json` and both suites. Implementing agent.
+- **2026-08-16** — Acted on the CodeQL findings from
+  [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31). The one with a
+  consequence for this document is
+  [BUG-032](../bugs/fixed_bugs.md#bug-032): the 429 written by the rate-limit
+  filters was hand-built JSON carrying three of `ApiError`'s four fields, so the
+  error shape this document describes was not in fact uniform across statuses. It
+  now goes back through `@ControllerAdvice` and is. Also recorded the handler
+  renames and the log scrubbing
+  ([BUG-033](../bugs/fixed_bugs.md#bug-033)). *(main session)*
+- **2026-08-15 (b)** — Search spend controls for
+  [BUG-005](../bugs/fixed_bugs.md#bug-005): a per-IP budget on the two public
+  search endpoints, a 200-character query cap, and `QueryEmbeddingCache` around
+  the provider call. Recorded two limits that came with them and are not fixed —
+  no global spend ceiling, and per-instance counters. Also noted why
+  `revalidateTag` is not the one-liner it looks like: the write paths do not go
+  through Next at all. *(main session)*
+- **2026-08-15 (a)** — Added *Storage layers, and what owns what* (the principle,
+  the real layer inventory, the shape of the data paths, a placement table and
+  the source-of-truth statement) and *Rules for changing this area*. Recorded the
+  decision to **defer a client query library** with its trigger, and noted that
+  the new Caffeine rate-limit caches are not a data cache. Ideas adapted from a
+  generic guidelines note; only the parts true of this codebase were kept —
+  its TanStack-for-everything recommendation was rejected on the grounds that
+  the pages it names are already server-rendered. Also re-read
+  `DefaultExceptionHandler` and corrected the status-mapping section: three
+  handlers were added by the authentication work, and the catch-all no longer
+  echoes exception messages to callers. *(main session)*
+- **2026-08-14** — Created. Documents the API boundary, the caching model
+  introduced in `482c4dd`, and the constraints the `localStorage` JWT imposes on
+  both. Written after the caching work was verified end-to-end: the guard has
+  tests, the `@EntityGraph` saving was measured at 13 statements against 17, and
+  the `/clubs` data cache was measured at three renders to one upstream query.
+  Records two gaps that are absence rather than decision — no backend cache layer
+  and no cache invalidation — and marks the backend-cache rationale as not
+  recorded rather than inventing one. *(main session)*

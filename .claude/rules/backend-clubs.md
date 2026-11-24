@@ -81,7 +81,7 @@ reads.
   `hasEnded` all use it. An end is required, after the start and at most 14
   days later, checked in `EventService.requireValidTimes` for a 400 and by
   V35's CHECK constraints behind it. A new event fixture must set
-  `endTime` or the insert fails. ([ADR-020](../docs/decisions/ADR-020-event-attendable-until-its-end-time.md))
+  `endTime` or the insert fails. ([ADR-020](../../docs/decisions/ADR-020-event-attendable-until-its-end-time.md))
 - **`DevDataSeeder` is idempotent per club, not wholesale.** It skipped for
   months because V6 had already inserted eight clubs, so it had never run and
   every seeded club had a null embedding. V32 retires those rows; do not restore
@@ -129,7 +129,7 @@ decision is a new ADR, and only Arpan flips a status.
 
 - **Adding a field to `ClubCreateRequest`? Add it to the proposal too, or record
   why not.** The two shapes duplicate each other by design, and
-  [ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) says
+  [ADR-005](../../docs/decisions/ADR-005-club-proposal-is-its-own-table.md) says
   one divergence is a bug, two means unifying them behind a shared embeddable.
   **The count is at one and a half:** the contact links were missing from the
   proposal entirely (fixed 2026-09-10), and `officialEmail` now sits on
@@ -142,7 +142,7 @@ decision is a new ADR, and only Arpan flips a status.
   that no row exists before approval.
 - **Never add a *mark as verified* control for `official_email`,** however much
   it would unblock the §17 notices.
-  [ADR-006](../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)
+  [ADR-006](../../docs/decisions/ADR-006-official-email-verified-only-by-round-trip.md)
   forecloses an administrative override by name: it is the rejected option
   wearing a different label, and it gets reached for exactly when someone is
   impatient. Verified means a link mailed to the address was redeemed, and until
@@ -151,8 +151,8 @@ decision is a new ADR, and only Arpan flips a status.
   in ADR-006 so it is not re-derived, and its redeem endpoint's matcher must sit
   **above** the broad public-GET block in `SecurityFilterChainConfig`.
 - **A club whose proposal nobody reviews holds its slug forever**
-  ([ADR-005](../docs/decisions/ADR-005-club-proposal-is-its-own-table.md)), and
+  ([ADR-005](../../docs/decisions/ADR-005-club-proposal-is-its-own-table.md)), and
   nothing tells the requester anything at all
-  ([ADR-004](../docs/decisions/ADR-004-two-paths-create-a-club.md)). Both are
-  queued in [`todo.md`](../TODO/todo.md); the second stops being a consequence
+  ([ADR-004](../../docs/decisions/ADR-004-two-paths-create-a-club.md)). Both are
+  queued in [`todo.md`](../../docs/TODO/todo.md); the second stops being a consequence
   and becomes a bug the day notifications exist.

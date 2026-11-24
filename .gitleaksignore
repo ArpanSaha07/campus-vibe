@@ -11,5 +11,5 @@
 # because HS256 requires >= 32 bytes; it signs tokens that exist inside a single
 # unit test and authenticates nothing. Flagged as generic-api-key on entropy
 # alone. The real committed JWT fallback secret was BUG-010, which is fixed —
-# see .claude/bugs/fixed_bugs.md.
+# see docs/bugs/fixed_bugs.md.
 442bffa1bdff5acbc1081097e9a4813bf57fadeb:backend/src/test/java/com/campusvibe/jwt/JWTUtilTest.java:generic-api-key:12

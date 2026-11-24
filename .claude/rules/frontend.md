@@ -12,16 +12,16 @@ paths:
 - **This is not the Next.js in your training data.** Read
   `node_modules/next/dist/docs/` before relying on a remembered API shape;
   `frontend/AGENTS.md` says the same thing and is the local authority.
-- **[`design-guidelines.md`](../design-guidelines.md) is binding on all UI
+- **[`design-guidelines.md`](../../docs/design-guidelines.md) is binding on all UI
   work.** For a brand-new surface, use `/frontend-design` on top of it, never
   instead of it.
 - **Every backend call goes through `apiFetch`** (`app/lib/api.tsx`). The three
   data paths, the cache tags and the error-status mapping are in
-  [`api-and-caching.md`](../docs/architecture/api-and-caching.md). **Per-user
+  [`api-and-caching.md`](../../docs/architecture/api-and-caching.md). **Per-user
   data must never enter Next's data cache.** A body read as it streams goes
   through `apiFetchResponse`, its sibling, never a bare `fetch` or
   `EventSource`, which cannot send the token
-  ([`ai-planner.md`](../docs/architecture/ai-planner.md)).
+  ([`ai-planner.md`](../../docs/architecture/ai-planner.md)).
 - **`npm run verify` before claiming green, and the production build must pass
   with the backend down.** A page that fetches at build time turns a dev machine
   that happens to have the backend running into a green build that fails in CI.

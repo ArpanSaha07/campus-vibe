@@ -5,8 +5,8 @@ paths:
   - "backend/src/main/resources/application-prod.yml"
   - "docker/Dockerrun.aws.json"
   - "docker/EB-DEPLOYMENT.md"
-  - ".claude/docs/architecture/aws-deployment.md"
-  - ".claude/docs/architecture/CampusVibe_AWS_Deployment_Guide.md"
+  - "docs/architecture/aws-deployment.md"
+  - "docs/architecture/CampusVibe_AWS_Deployment_Guide.md"
 ---
 
 # AWS
@@ -24,7 +24,7 @@ first write of a session.
 Never request, create, display, store or commit AWS access keys.
 
 **One named exception —
-[ADR-013](../docs/decisions/ADR-013-ses-mail-over-smtp-credentials.md):** the
+[ADR-013](../../docs/decisions/ADR-013-ses-mail-over-smtp-credentials.md):** the
 SES SMTP credentials production mail is sent with. Arpan creates them in the SES
 console, never a session; the IAM user may only `ses:SendRawEmail` on the
 `campusvibe-mcgill.com` identity; the values live in two Elastic Beanstalk
@@ -45,7 +45,7 @@ Everything below binds to both.
   `CampusVibe-Scheduler-StopRDS`, stop-only) stops it again at 03:00 Toronto
   daily. **Disable that schedule before resuming**, or it stops the live
   database. Resume, re-stop and checks:
-  [`pausing-production.md`](../docs/architecture/pausing-production.md).
+  [`pausing-production.md`](../../docs/architecture/pausing-production.md).
 - **`campusvibe-prod-media`** — the media bucket, currently empty. Public access
   blocked on all four, `BucketOwnerEnforced`, SSE-S3 with bucket keys, no
   bucket policy, and **no CORS rule** — the `GET,PUT` one was deleted
@@ -85,7 +85,7 @@ Everything below binds to both.
   only the environment's instance group; the personal `/32` was revoked the same
   day.
 - **The Elastic Beanstalk environment is a single instance behind CloudFront
-  since 2026-11-07** ([ADR-017](../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md));
+  since 2026-11-07** ([ADR-017](../../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md));
   the load balancer is gone. `https://api.campusvibe-mcgill.com` is a CNAME at
   Namecheap to distribution `E2T616L10NJZG8` (`d3rljfrq954zy0.cloudfront.net`):
   the `us-east-1` ACM certificate, HTTP redirected to HTTPS at the edge, caching
@@ -124,10 +124,10 @@ Everything below binds to both.
   The guard hook refuses `logs tail`; set `MSYS_NO_PATHCONV=1` in Git Bash.
 - **SES is in the sandbox** with no verified identity.
 - **What is left to connect, service by service:**
-  [`connecting-rds.md`](../docs/architecture/connecting-rds.md),
-  [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md),
-  [`connecting-s3.md`](../docs/architecture/connecting-s3.md),
-  [`connecting-ses.md`](../docs/architecture/connecting-ses.md).
+  [`connecting-rds.md`](../../docs/architecture/connecting-rds.md),
+  [`connecting-elastic-beanstalk.md`](../../docs/architecture/connecting-elastic-beanstalk.md),
+  [`connecting-s3.md`](../../docs/architecture/connecting-s3.md),
+  [`connecting-ses.md`](../../docs/architecture/connecting-ses.md).
 
 ## Free — no approval
 
@@ -167,8 +167,8 @@ or flagging spend that is not earning its keep, is welcome unprompted.
 
 - Disable a security control to make a deployment work.
 - Make RDS publicly accessible unless explicitly told to.
-- Print a secret value into chat, into a file under `.claude/`, or into a
-  commit. This repository is public and `.claude/` is committed.
+- Print a secret value into chat, into a file under `.claude/` or `docs/`,
+  or into a commit. This repository is public and both folders are committed.
 
 ## Enforced, not just written
 
@@ -187,5 +187,5 @@ is still Arpan's* above.
 `AWS_PROFILE` is pinned for every tool call in `.claude/settings.json`.
 
 An infrastructure change is recorded in
-[`docs/architecture/aws-deployment.md`](../docs/architecture/aws-deployment.md).
+[`docs/architecture/aws-deployment.md`](../../docs/architecture/aws-deployment.md).
 The bucket is tagged `ManagedBy=Manual`; nothing else tracks the drift.

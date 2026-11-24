@@ -26,10 +26,10 @@ the rules are short because the repo checks most of them for you.
    container can silently run an old jar. The `dev` profile seeds demo clubs.
 
 3. Read, in this order: [`.claude/CLAUDE.md`](.claude/CLAUDE.md),
-   [`.claude/STATUS.md`](.claude/STATUS.md),
-   [`.claude/docs/product.md`](.claude/docs/product.md),
-   [`.claude/design-guidelines.md`](.claude/design-guidelines.md) and the
-   decisions index, [`.claude/docs/decisions/README.md`](.claude/docs/decisions/README.md).
+   [`docs/STATUS.md`](docs/STATUS.md),
+   [`docs/product.md`](docs/product.md),
+   [`docs/design-guidelines.md`](docs/design-guidelines.md) and the
+   decisions index, [`docs/decisions/README.md`](docs/decisions/README.md).
 
 You have GitHub *Write* access. You do not need production AWS access, and the
 `.claude/` setup stops Claude from making AWS changes.
@@ -39,7 +39,7 @@ You have GitHub *Write* access. You do not need production AWS access, and the
 1. **Discuss it with Arpan.** Agree what it is and roughly how.
 2. **Brainstorm with Claude.** Share the discussion, explore the options.
 3. **Write the spec with `/start`.** It reads the relevant docs, asks about
-   anything undecided, and writes `.claude/specs/<date>-<slug>.md`.
+   anything undecided, and writes `docs/specs/<date>-<slug>.md`.
 4. **Wait for Arpan to approve the spec.** Send it to him as its own PR or
    message. **Do not write code before he approves it** — only Arpan approves
    a spec, and review compares your PR against the approved version. Code

@@ -5,7 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 // Labelled input for the auth modal. Password fields get a reveal toggle, which
 // matters most here: these forms are where a typo costs you the whole attempt.
-// Styling follows .claude/design-guidelines.md — mist-100 fill, radius 12,
+// Styling follows docs/design-guidelines.md — mist-100 fill, radius 12,
 // transparent border that turns lavender on focus.
 
 export default function AuthTextField({

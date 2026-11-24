@@ -28,7 +28,7 @@ git diff origin/develop...HEAD
 
 ## 2. Find the spec
 
-The branch's spec is a file under `.claude/specs/`: one the diff adds or
+The branch's spec is a file under `docs/specs/`: one the diff adds or
 changes, or one the author names. If none, ask with `AskUserQuestion`. A
 one-line fix or a dependency bump may use `n/a`.
 
@@ -57,7 +57,7 @@ overwrites it in step 5.
 Follow `.github/pull_request_template.md` section by section, without its
 HTML comments:
 
-- **Spec:** the path, as `Spec: .claude/specs/<file>.md`.
+- **Spec:** the path, as `Spec: docs/specs/<file>.md`.
 - **What and why:** two to four sentences — what a student or club sees
   differently, and why. From the spec's Goal, not a file list.
 - **How I tested:** only what **this session actually ran and saw**: the

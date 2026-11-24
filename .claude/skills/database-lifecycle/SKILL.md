@@ -61,7 +61,7 @@ manual.
 **The lesson worth carrying forward** is the one that step turned up. Seeding
 through the service layer is mandated here so that derived columns get written,
 but doing it exposed that `ClubService.create` was not writing them either
-([BUG-034](../../bugs/fixed_bugs.md#bug-034)): `Club.id` is assigned rather than
+([BUG-034](../../../docs/bugs/fixed_bugs.md#bug-034)): `Club.id` is assigned rather than
 generated, so Hibernate had not issued the INSERT when the raw-JDBC embedding
 UPDATE ran, and it silently matched zero rows. Any code that mixes a JPA write
 with a `JdbcTemplate` write in one transaction needs a flush between them —
