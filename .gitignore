@@ -6,6 +6,7 @@
 *.pem
 
 .claude/docs/commit-message.md
+.claude/docs/pr-body.md
 
 # Personal Claude Code settings — permissions and preferences per machine.
 # .claude/settings.json is the shared one and IS committed.

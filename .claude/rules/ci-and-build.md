@@ -98,6 +98,19 @@ paths:
   `tool_name=CodeQL` so Trivy's alerts stay out. (BUG-066)
 - **`ci.yml` gates pull requests, `branch-checks.yml` is the fast push loop, and
   `_*.yml` are reusable workflows that are never triggered directly.**
+- **`ci.yml` and `claude-code-review.yml` gate PRs into `main` and `develop`;
+  `pr-checks.yml` and the review's spec step run on PRs into `develop` only.**
+  `pr-checks.yml` (title, template, size) is warning-only by Arpan's decision:
+  it never exits non-zero on a finding, never emits a check named `CI`, and is
+  never made required while it only warns. Its logic is `scripts/pr-checks.mjs`;
+  change the PR template and `pr-checks.test.mjs` together, since the template
+  check recognises the template's own unchecked boxes. CodeQL still runs on
+  PRs into `main` only. (spec 2026-11-23-teammate-pr-workflow)
+- **Read a ruleset back after creating or editing it:** `gh api
+  repos/{owner}/{repo}/rulesets/<id>` and check `conditions.ref_name.include`.
+  `Protect develop branch` (27950932) was created 2026-11-23 with every rule
+  right and an empty target list — active, and protecting nothing. The UI does
+  not warn. (spec 2026-11-23-teammate-pr-workflow)
 - **`--no-verify` is not a workflow.** `0357b78` went around the pre-push hook
   and put a backend that did not compile onto `develop`; CI found it minutes
   later, and clearing it took three more commits. If a hook is red, stop and

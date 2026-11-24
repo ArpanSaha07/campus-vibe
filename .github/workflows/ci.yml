@@ -16,8 +16,8 @@ name: CI
 # with no code in it — nothing does. See the `changes` job for why per-component
 # globs were the wrong shape for this repository.
 #
-# BRANCH PROTECTION: the `Protect main` ruleset requires exactly one check, "CI",
-# which is the `ci-success` job below. Never require the component jobs — that
+# BRANCH PROTECTION: the `Protect main` and `Protect develop` rulesets each
+# require exactly one check, "CI", which is the `ci-success` job below. Never require the component jobs — that
 # reintroduces the deadlock this design exists to avoid.
 #
 # WHY THERE IS NO `push:` TRIGGER — AND WHY ADDING ONE WOULD BE A BUG
@@ -37,14 +37,23 @@ name: CI
 # own check name, and a job that skips everything when the branch already has an
 # open PR so no commit is ever tested twice.
 #
-# Nothing runs after a merge to main. The ruleset sets
+# Nothing runs after a merge to main or develop. Both rulesets set
 # `strict_required_status_checks_policy: true`, so a PR branch must be up to
-# date with main before merging — what the PR tested IS the merge result. If
-# that strict setting is ever turned off, this reasoning dies with it.
+# date with its base before merging — what the PR tested IS the merge result.
+# If that strict setting is ever turned off on either, this reasoning dies
+# with it for that branch.
+#
+# WHY develop IS HERE
+#
+# A teammate's PRs target develop, and develop-to-main is Arpan's release PR
+# (.claude/specs/2026-11-23-teammate-pr-workflow.md). Without develop here, a
+# PR into develop got only branch-checks.yml — no integration tier, no Flyway
+# migration, no Docker stack — and the first full run of that code was the
+# release PR, after it had already merged.
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   merge_group:
   workflow_dispatch:
 
@@ -193,7 +202,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # THE required status check — the `CI` context named in the `Protect main`
-  # ruleset. Require this one, and only this one.
+  # and `Protect develop` rulesets. Require this one, and only this one.
   #
   # `always()` is what makes it report even when every component skipped, and
   # the failure test below counts only real failures and cancellations —

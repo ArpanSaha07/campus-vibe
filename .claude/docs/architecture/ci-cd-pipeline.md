@@ -4,7 +4,11 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `8c41f59` plus the uncommitted merge-ref fix for the
+**Code as of:** `8ee9db6` plus the uncommitted teammate PR workflow
+([spec](../../specs/2026-11-23-teammate-pr-workflow.md)) for the `Protect develop`
+paragraph, the `ci.yml` trigger, and the `pr-checks.yml` and
+`claude-code-review.yml` sections, re-read 2026-11-23; no other section was
+re-read. Before that, `8c41f59` plus the uncommitted merge-ref fix for the
 `codeql-triage.yml` section, re-read 2026-11-17; no other section was re-read.
 Before that, `7909cea` plus the uncommitted weekly scan for the overview,
 `_docker.yml` step 7, `trivy-weekly.yml` and `setup-trivy` sections, re-read
@@ -263,6 +267,30 @@ it can merge, what the PR tested *is* the merge result — a main run would
 re-prove the same commit seconds later. If `strict_required_status_checks_policy`
 is ever turned off, that reasoning dies and `push: branches: [main]` has to come
 back. Do not restore it before then thinking it is a gap; it is not.
+
+**`develop` is governed by the `Protect develop branch` ruleset** (id
+`27950932`, active, created by Arpan 2026-11-23). Read back through
+`/repos/{owner}/{repo}/rulesets/27950932` the same day, every rule below matched,
+**but `conditions.ref_name.include` was empty — the ruleset targeted no branch
+and protected nothing** until `refs/heads/develop` is added as its target. Read
+it back after any edit; an empty target list is silent in the UI. A teammate's PRs target `develop` and `develop` to `main` is Arpan's
+release PR ([spec](../../specs/2026-11-23-teammate-pr-workflow.md)), so
+`ci.yml` and `claude-code-review.yml` now run on PRs into `develop` too.
+
+| Setting | Value | Why |
+|---|---|---|
+| Target | `refs/heads/develop` | |
+| Enforcement | Active | |
+| Bypass list | Repository admin role (Arpan), *always* | GitHub never lets an author approve their own PR; without the bypass, the approval rule blocks Arpan's own PRs into `develop` |
+| `pull_request` | 1 approval · require review from Code Owners · dismiss stale approvals on push · require approval of the most recent push · require conversation resolution · merge methods `merge` and `squash` | The teammate cannot merge, or slip a commit in after approval; squash for feature PRs, merge for syncing `main` into `develop` |
+| `required_status_checks` | Exactly one context: **`CI`** | Same rule as `main`: never the component jobs, never `PR checks` |
+| `strict_required_status_checks_policy: true` | On (Arpan, 2026-11-23) | Keeps the *no CI after merge* reasoning above true for `develop` |
+| `deletion`, `non_fast_forward` | On | |
+
+`PR checks` (`pr-checks.yml`: title, template, size) is **not** required and
+must not be while it only warns. `.github/CODEOWNERS` takes effect for PRs
+into `develop` once it is on `develop`, and the PR template only once it is on
+`main` — GitHub reads templates from the default branch.
 
 **What this costs.** While a PR is open, every push to that branch runs the
 **full** suite through `pull_request: synchronize`, not the fast one. That is
@@ -747,6 +775,44 @@ pass `tool_name=CodeQL`, so Trivy's alerts on the same refs stay out of it.
 When a later push leaves no new alert, the earlier triage comment is edited to
 say so rather than left standing with a stale verdict.
 
+### `.github/workflows/pr-checks.yml` + `scripts/pr-checks.mjs`
+
+Title, template and size on PRs into `develop` only, **warnings only** (Arpan,
+2026-11-23). Each finding is a `::warning::` annotation plus a step-summary
+line; the job succeeds regardless, and is not a required check. The title uses
+`.githooks/commit-msg`'s pattern, because a squash merge makes the PR title the
+commit subject and no hook ever sees that commit. The template check wants a
+`Spec:` value, a non-empty *What and why*, and *How I tested* holding something
+beyond the template's own unticked boxes — so the template and
+`pr-checks.test.mjs` change together. Size is additions + deletions from the
+paginated `pulls/N/files` endpoint, lockfiles excluded, warning over 4,000.
+
+The logic is a script rather than inline shell so `node --test
+scripts/pr-checks.test.mjs` proves it locally. Title and body reach it through
+`env:`, never `${{ }}` in a `run:` block: both are written by whoever opens the PR.
+
+### `.github/workflows/claude-code-review.yml`
+
+Runs on PRs into `main` and `develop`, on `opened`, `ready_for_review` and
+`reopened` only (not `synchronize`, which spent an agent run per push). Two
+`claude-code-action` steps in one job:
+
+1. **Bug review** — the packaged `code-review` plugin, inline comments. It
+   knows nothing about specs.
+2. **Spec and template check** — PRs into `develop` only, `!cancelled()` so a
+   failed step 1 does not skip it. One top-level comment: changes outside the
+   linked spec, a spec still marked draft, a suggested semantic title, and a
+   drafted description whose *How I tested* is always a TODO for the author.
+   A separate step rather than extra text on the plugin command, which is not
+   documented to take a checklist (Arpan, 2026-11-23). `--permission-mode
+   default` makes its `--allowedTools` a strict list: `gh pr view`, `gh pr
+   diff`, `gh pr comment`, and file reads. The PR title and body are never
+   interpolated into its prompt; it reads them and is told they are data.
+
+The job holds `pull-requests: write` since 2026-11-23, for step 2's comment.
+The local counterpart is the `/open-pr` skill, which drafts the same title and
+body from the session that ran the tests.
+
 ### `contracts/api-dto-fields.json` — the API contract
 
 One list of JSON field names per DTO, read by a test on **each** side:
@@ -1190,6 +1256,14 @@ Ordered by value, each with the reason it has not been done. Tracked in
 
 ## Change log
 
+- **2026-11-23** — A teammate's PRs target `develop`
+  ([spec](../../specs/2026-11-23-teammate-pr-workflow.md)). `ci.yml` and
+  `claude-code-review.yml` gained `develop` as a PR base; the review gained a
+  spec-and-template step; `pr-checks.yml` (warning-only title, template, size)
+  and `scripts/pr-checks.mjs` are new; `.github/CODEOWNERS` and the PR template
+  are new. Arpan created `Protect develop branch`; read back the same day, its
+  target list was empty. CodeQL still runs on PRs into `main` only. Implementing
+  agent.
 - **2026-09-15** — `next.config.ts` gained a versioned form of each `/media`
   rewrite, `/:version` on the end and ignored by the destination, for media URLs
   that change when their image does
