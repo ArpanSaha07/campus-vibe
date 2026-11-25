@@ -22,7 +22,8 @@ club-scoped checks — [`docs/architecture/user-roles.md`](../docs/architecture/
   that extension is why the compose image is not stock `postgres`.
 - **One DTO contract, asserted twice** — `contracts/api-dto-fields.json` lists the JSON field
   names; a test on each side checks it, or a rename goes green on both suites and broken live.
-- **Local is `docker compose`** (frontend, backend, db); production is Vercel plus Elastic
+- **Local is `docker compose`** (frontend, backend, db, s3mock), started with one command,
+  `node scripts/dev.mjs` — see the map below; production is Vercel plus Elastic
   Beanstalk (Docker), RDS and S3 — none of it live yet.
 - **Tests:** Jest + React Testing Library, JUnit + Testcontainers ITs, the contract pair.
 ## Where the code lives
@@ -34,7 +35,8 @@ campusvibe/
 ├── contracts/     # The API contract: one list of JSON field names per DTO, asserted
 │                  #   by a test on EACH side
 ├── docker/        # Compose, and where PostgreSQL is configured — the pgvector image
-├── scripts/       # verify.mjs (runs what CI runs, locally) · check-docs.mjs + docs-map.json
+├── scripts/       # dev.mjs (starts the local stack) · verify.mjs (runs what CI runs, locally) ·
+│                  #   check-docs.mjs + docs-map.json
 ├── .githooks/     # pre-push runs verify.mjs. Per clone: git config core.hooksPath .githooks
 ├── .github/       # ci.yml gates merges; branch-checks.yml is the push loop; _*.yml reusable
 ├── docs/          # The knowledge base: STATUS.md · product.md · architecture/ · decisions/ ·
@@ -68,6 +70,7 @@ campusvibe/
 | Touch a migration, seed or role grant | [`skills/database-lifecycle/SKILL.md`](skills/database-lifecycle/SKILL.md) — **mandatory** |
 | Build or restyle UI | [`design-guidelines.md`](../docs/design-guidelines.md) — binding on all UI work |
 | Know what this unit of work agreed to | [`specs/`](../docs/specs/README.md) — one spec per feature, written by `/start` |
+| Run the app locally, or stop it | `node scripts/dev.mjs` (`--stop`, `--down`, `--jar` after Java changes) — [`docs/architecture/dev-script.md`](../docs/architecture/dev-script.md) says what each step does and what to do when one fails |
 | Onboard a teammate, or open a PR into `develop` | [`CONTRIBUTING.md`](../CONTRIBUTING.md) — the flow, the checks, the rules; `/open-pr` drafts the title and description |
 | Find the doc for code you touched | [`scripts/docs-map.json`](../scripts/docs-map.json); `node scripts/check-docs.mjs` reports what drifted |
 

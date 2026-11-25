@@ -76,6 +76,13 @@
       ]
     },
 
+    "dev-script.md": {
+      "covers": "The one-command local start script: Docker, docker/.env generation, ports, the database password, the jar build, compose watch, --stop and --down",
+      "paths": [
+        "scripts/dev.mjs"
+      ]
+    },
+
     "ci-cd-pipeline.md": {
       "covers": "GitHub Actions, tiering, the ci-success gate, local CI parity, and the dependency pins the Trivy gate depends on",
       "paths": [
