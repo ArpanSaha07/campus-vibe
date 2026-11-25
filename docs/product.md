@@ -59,9 +59,9 @@ writes nothing; `/my-events` with Upcoming and Past tabs and `/my-clubs`;
 Google Calendar export (client-side, no backend, with the event's real end
 time); `/invitations`, where a person accepts or declines an invitation to
 administer a club or an offer of a club's ownership; and the profile:
-`/profile` plus the settings sections at `/profile/edit` (program, interests,
-notifications, account), persisted through a full-replace `PUT` with a
-slug-keyed interest catalogue —
+`/profile` plus the settings sections at `/profile/edit` (edit profile,
+program, interests, notifications, account), persisted through a full-replace
+`PUT` with a slug-keyed interest catalogue —
 [`user-profiles.md`](architecture/user-profiles.md). The planner ranks events by
 a person's saved interests.
 
