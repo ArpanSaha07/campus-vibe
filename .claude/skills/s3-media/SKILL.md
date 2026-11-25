@@ -93,10 +93,15 @@ implemented, and the reference does not say so.
   ([ADR-011](../../../docs/decisions/ADR-011-minio-replaces-fakes3.md)) — the flag
   defaulted to true, so the branch production uses had *never executed anywhere*,
   which is how BUG-039 and BUG-051 both arrived. What varies now is only where
-  the client points: `aws.s3.endpoint` set means **MinIO** (local, CI and the
-  media ITs, through `MinioTestContainer`); unset means AWS, with credentials
-  from the default provider chain. MinIO comes from **quay.io, not Docker Hub** —
-  `docker pull minio/minio` is refused outright.
+  the client points: `aws.s3.endpoint` set means **S3Mock** (local, CI and the
+  media ITs, through `S3MockTestContainer`); unset means AWS, with credentials
+  from the default provider chain. S3Mock replaced MinIO on 2026-11-25
+  ([ADR-026](../../../docs/decisions/ADR-026-s3mock-replaces-minio.md)), because
+  MinIO's images stopped pulling without a login (BUG-063).
+  `adobe/s3mock` is pinned to one exact tag in both the IT container and
+  compose; keep them equal. It is a test double: it checks no credentials or
+  permissions, so a behaviour where it and real S3 differ shows only in
+  production.
 - **One bucket, not two** ([ADR-012](../../../docs/decisions/ADR-012-one-media-bucket-with-prefixes.md)).
   `MediaBucket` reads `aws.s3.bucket` from `AWS_S3_BUCKET`, which has **no
   default and rejects a blank value**, so an environment that does not name its
@@ -106,7 +111,7 @@ implemented, and the reference does not say so.
 - **Key safety is ours, not the store's.** `MediaKeys.assertSafeKey` refuses a
   key that is absolute, or has a `.` or `..` segment, a backslash, a `//` or a
   scheme, and `S3Service` applies it to every put, get and delete. The deleted
-  stub used to carry this because it joined the key onto a directory; MinIO and
+  stub used to carry this because it joined the key onto a directory; S3Mock and
   S3 both treat a key as an opaque string and would accept all of it. **That is
   the reason to keep the check, not to drop it** (BUG-039).
 - **The backend generates every key — `s3/MediaKeys` and nothing else.** Since
@@ -132,7 +137,7 @@ implemented, and the reference does not say so.
   object that is not there is a real state — §21's accepted orphan — rather than
   a server fault. **In production that depends on the instance role holding
   `s3:ListBucket`**: without it S3 answers a missing key with 403, not
-  NoSuchKey, and the read is a 500. MinIO always lists, so no test shows it.
+  NoSuchKey, and the read is a 500. S3Mock checks no permissions, so no test shows it.
 - **A replaced logo's old object is deleted, in §19's order**: store the new
   object, point the row at it, and delete the old one only after
   `ClubService.updateLogo` has committed. A failed delete is logged and does not
@@ -154,7 +159,8 @@ refactor, and its revisit triggers are listed there: media past 5MB, or upload
 traffic that is a measurable share of backend memory.
 
 **The old argument for it is spent.** ADR-007 rejected presigning partly because
-the local store could not presign. MinIO can. If the subject comes back, argue it
+the local store could not presign. MinIO could; S3Mock's presign support is
+unchecked, and needing it is a revisit trigger of ADR-026. If the subject comes back, argue it
 on the content-validation ground, which still holds, and not on that one.
 
 **Building the missing avatar read path** should follow the club and event ones

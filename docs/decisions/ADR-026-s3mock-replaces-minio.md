@@ -4,7 +4,7 @@
 **Date:** 2026-11-24
 **Decided in:** a `/start` session, 2026-11-24 — [spec](../specs/2026-11-24-s3mock-replaces-minio.md)
 **Participants:** Claude · **Approved by:** Arpan, 2026-11-24
-**Implemented in:** — added when the work lands
+**Implemented in:** `fix(ci): run integration tests again on s3mock` on `fix/integration-tests`, 2026-11-25 — `S3MockTestContainer.java`, `docker/docker-compose.yml`, `_backend.yml`, `_docker.yml`; add the sha once it reaches `develop`
 **Supersedes:** [ADR-011](ADR-011-minio-replaces-fakes3.md)
 
 ## Context

@@ -18,7 +18,7 @@ import java.io.IOException;
  * it reaches the store.
  *
  * <p>The check used to live inside the filesystem stub that stood in for S3,
- * which needed it because it joined the key onto a directory (BUG-039). MinIO
+ * which needed it because it joined the key onto a directory (BUG-039). S3Mock
  * does not need it — a key is an opaque string to a real store — which is
  * exactly why it has to be here now: a guard that lived only in the stub would
  * have been deleted along with it (ADR-011).

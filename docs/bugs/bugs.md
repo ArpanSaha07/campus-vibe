@@ -1,6 +1,6 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-11-17** · Branch: `develop`
+Last updated: **2026-11-25** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
@@ -12,7 +12,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 | ID | Severity | Summary |
 |---|---|---|
 | [BUG-065](#bug-065) | Low | A planner reply that fails after its agent acted, and after some intro already streamed, shows the fallback summary glued onto the partial intro until a reload |
-| [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — commented out until MinIO is replaced |
+| [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — **fixed 2026-11-25 on `fix/integration-tests` (S3Mock, ADR-026); open until a green PR run** |
 | [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
@@ -27,7 +27,7 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 ---
 
 ### BUG-063
-**MinIO's images can no longer be pulled, so CI runs no integration tests and never starts the stack** · High · OPEN
+**MinIO's images can no longer be pulled, so CI runs no integration tests and never starts the stack** · High · OPEN — fixed 2026-11-25 on `fix/integration-tests`, awaiting a green PR run
 
 **Found:** 2026-09-30, on PR #68 (`develop`), run `36810797005`.
 
@@ -58,11 +58,21 @@ Arpan was offered a registry login in CI and a replacement store, and chose
 the stopgap. `MinioTestContainer`, compose and `verify.mjs --full` are unchanged, so
 **locally the ITs still need a MinIO image already in the Docker cache**.
 
-**Fix (untaken).** Replace MinIO with a store that can be pulled, which
-overturns [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) and so
-needs a Proposed ADR first; swap the image in `MinioTestContainer` and
-`docker-compose.yml` together; then uncomment both workflow blocks. Close on a
-green PR run with the ITs back on.
+**Fix, 2026-11-25, on `fix/integration-tests`.** Adobe S3Mock
+(`adobe/s3mock:5.2.3`, Docker Hub) replaces MinIO, per
+[ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md), accepted by Arpan
+2026-11-24, which supersedes ADR-011
+([spec](../specs/2026-11-24-s3mock-replaces-minio.md)).
+`MinioTestContainer` became `S3MockTestContainer`, compose's `minio` and
+`minio-init` became one `s3mock` service, and both `TEMP 2026-09-30` blocks
+are restored. Verified locally: the image pulled with no login; all 340 ITs
+passed with S3Mock in the log and no MinIO; the stack came up healthy, a club
+logo uploaded and read back byte-identical and survived `compose down`; the
+CI smoke checks passed against it.
+
+**Close on** a green PR run with `Backend / Build and test` running the ITs and
+`Docker / Build images and run the stack` passing the smoke test. Then move
+this entry to `fixed_bugs.md`.
 
 ---
 

@@ -1,6 +1,20 @@
 # S3Mock replaces MinIO, and the ITs run in CI again
 
-**Status:** approved 2026-11-24 (Arpan) · **Date:** 2026-11-24
+**Status:** shipped 2026-11-25 on `fix/integration-tests` · approved 2026-11-24 (Arpan) · **Date:** 2026-11-24
+
+> **As built, 2026-11-25.** Every decision below held. Open question 1 was
+> settled by running: the image has busybox `wget` and no `curl`, so the
+> compose healthcheck uses `wget`; S3Mock answered unsigned requests, so it
+> checks no credentials; both the IT container and compose wait on the
+> bucket path, which answers 200 only once the bucket exists. One drift: the
+> IT container also takes its bucket from
+> `COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS` rather than a
+> `createBucket` call, so `S3MockTestContainer` builds no client of its own.
+> No IT failed for a reason other than the store, so nothing was filed.
+> Verification: the anonymous pull and `verify.mjs --all --full` passed (340
+> ITs); the stack came up and a logo round-tripped. `docker logout` was not
+> run, to keep Arpan's session; the pull was of an image not in the cache.
+> The PR run is still to come, and BUG-063 stays open until it is green.
 
 ## Goal
 

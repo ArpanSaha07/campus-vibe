@@ -63,8 +63,8 @@ Everything below binds to both.
   `ListBucket` on the bucket itself, and nothing wider. **`ListBucket` is
   load-bearing even though no code lists:** without it S3 answers a missing
   key with 403 AccessDenied rather than NoSuchKey, `S3Service.getObject`
-  catches only `NoSuchKeyException`, and the read becomes a 500. MinIO's root
-  credentials always list, so no test shows it. Added 2026-09-12. An unattached
+  catches only `NoSuchKeyException`, and the read becomes a 500. S3Mock checks
+  no permissions, so no test shows it. Added 2026-09-12. An unattached
   duplicate, `CampusVibeProdMediaS3Access`, still exists; deleting it is
   Arpan's. The environment proxies through **nginx**, whose 1 MB default body
   limit sits under the 5 MB upload cap. `deploy/eb/.platform/nginx/conf.d/`
@@ -77,7 +77,7 @@ Everything below binds to both.
   never-read `S3_BUCKET_NAME` is gone. The first deployed upload landed
   2026-09-15, which closed BUG-051.
 - **Outside production nothing talks to AWS at all.** `AWS_S3_ENDPOINT` points
-  the same real `S3Client` at MinIO locally and in CI (ADR-011); production
+  the same real `S3Client` at S3Mock locally and in CI (ADR-026); production
   leaves it unset and resolves the instance role. There is no mock flag any
   more.
 - **`campusvibe-prod-db`** — PostgreSQL **18.3**, private, TLS forced,

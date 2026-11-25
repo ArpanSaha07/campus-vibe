@@ -63,8 +63,8 @@ aws:
 
     # Blank means AWS itself, with credentials from the default provider chain
     # (the EC2 instance role on Elastic Beanstalk). Anything else is an
-    # S3-compatible store -- MinIO, locally and in CI -- which needs the
-    # credentials below, because it has no instance role to borrow (ADR-011).
+    # S3-compatible store -- S3Mock, locally and in CI -- which needs the
+    # credentials below, because it has no instance role to borrow (ADR-026).
     #
     # There is no longer a mock flag: the client is always a real S3Client and
     # only its endpoint varies. The flag defaulted to true, so the real branch
