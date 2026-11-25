@@ -14,8 +14,10 @@ paths:
 ## Getting in
 
 Profile `campusvibe-admin`, region `ca-central-1`, IAM Identity Center SSO with
-temporary credentials, pinned as `env.AWS_PROFILE` in
-[`settings.json`](../settings.json) so every tool call carries it. Do not rely
+temporary credentials, pinned as `env.AWS_PROFILE` in Arpan's gitignored
+`.claude/settings.local.json` so every tool call carries it. A clone without
+that file has no pin, so `guard-aws.mjs` refuses any `aws` call that names no
+profile. Do not rely
 on a profile exported in a terminal — that does not reach a tool shell — and
 never fall back to `default`, which holds a dead static key and fails
 `InvalidClientTokenId`. Confirm with `aws sts get-caller-identity` before the
@@ -184,7 +186,8 @@ nothing. For a one-off approved write, hand Arpan the exact command to run with
 **The S3 carve-out covers creating and configuring, not deleting:** every
 `delete-*` is refused, `delete-bucket-cors` included, which matches *deleting
 is still Arpan's* above.
-`AWS_PROFILE` is pinned for every tool call in `.claude/settings.json`.
+`AWS_PROFILE` is pinned for every tool call in `.claude/settings.local.json`,
+which is gitignored and exists only on Arpan's machine.
 
 An infrastructure change is recorded in
 [`docs/architecture/aws-deployment.md`](../../docs/architecture/aws-deployment.md).
