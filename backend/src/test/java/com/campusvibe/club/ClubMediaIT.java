@@ -181,8 +181,8 @@ class ClubMediaIT extends AbstractIntegrationTest {
      * Before 2026-09-11 it was concatenated into the key, and the filesystem
      * stub that then stood in for S3 joined the key onto a directory, so this
      * wrote a file wherever it pointed. Now the filename is never read: the key
-     * is generated, and the probe path is never created. The store is MinIO
-     * since 2026-09-12 (ADR-011), which would not have been vulnerable to this
+     * is generated, and the probe path is never created. The store is S3Mock
+     * since 2026-11-25 (ADR-026), which would not have been vulnerable to this
      * at all — the assertion stays because what it pins is the controller
      * ignoring the name, not the store surviving it.
      *

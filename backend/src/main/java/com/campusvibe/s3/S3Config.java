@@ -27,9 +27,9 @@ import java.net.URI;
  * points:
  *
  * <ul>
- *   <li>{@code aws.s3.endpoint} set — MinIO, locally and in CI. Path-style
+ *   <li>{@code aws.s3.endpoint} set — S3Mock, locally and in CI (ADR-026). Path-style
  *       addressing, because virtual-host style would need a DNS name per
- *       bucket, and static credentials, because MinIO has no instance role.</li>
+ *       bucket, and static credentials, because S3Mock has no instance role.</li>
  *   <li>{@code aws.s3.endpoint} unset — AWS, resolving credentials through the
  *       default provider chain: the EC2 instance role on Elastic Beanstalk, a
  *       developer's own profile anywhere else.</li>

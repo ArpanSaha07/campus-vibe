@@ -4,7 +4,12 @@
 **`main` is governed by the `Protect main` ruleset; the pipeline is a real merge
 gate** · **these workflows deploy nothing — but Vercel does, outside them.**
 **Authors:** main session (pre-dates the agent team).
-**Code as of:** `750f250` plus the uncommitted knowledge-base move
+**Code as of:** `bb49c9e` plus the S3Mock swap
+([spec](../specs/2026-11-24-s3mock-replaces-minio.md), [ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md))
+for `_backend.yml`, `_docker.yml`, `_database.yml`, `docker-compose.yml` and
+`.env.example`, re-read 2026-11-25: the BUG-063 stopgap is reverted, so the PR
+runs the ITs and starts the stack again, and the stack's object store is
+`s3mock`; no other section was re-read. Before that, `750f250` plus the uncommitted knowledge-base move
 ([ADR-025](../decisions/ADR-025-knowledge-base-lives-in-docs-claude-keeps-the-wiring.md)),
 re-stamped 2026-11-23 without a content change: `check-links.mjs` now scans
 `.claude/`, `docs/` and `CONTRIBUTING.md`, the checkers and CODEOWNERS read
@@ -39,17 +44,16 @@ assertion reconciled 2026-09-08 ([BUG-038](../bugs/fixed_bugs.md#bug-038)),
 plus the `hooks` component of `verify.mjs` added 2026-09-08. Other sections are
 unreviewed since 2026-08-16.
 
-> **Temporary, 2026-09-30 — read before anything below.** quay.io stopped
-> serving `minio/minio` and `minio/mc` without a login, and every IT starts
-> MinIO, so the PR run lost 314 of 332 ITs and the stack job died at `compose
-> up` ([BUG-063](../../bugs/bugs.md#bug-063)). At Arpan's instruction both are
-> commented out: `_backend.yml` always runs `-DskipITs`, ignoring
-> `run-integration-tests`, and `_docker.yml` builds the images, boots the
-> production frontend and runs Trivy, but no longer starts the stack, waits on
-> it or smoke-tests it. **Where this document says the PR runs the integration
-> suites or the Docker stack, it does not today.** `verify.mjs --full` still
-> runs them locally. Both blocks are marked `TEMP 2026-09-30`; they come back
-> together once MinIO has a pullable replacement.
+> **Resolved 2026-11-25 on `fix/integration-tests` — kept as a record.** From 2026-09-30
+> quay.io stopped serving `minio/minio` and `minio/mc` without a login, every
+> IT started MinIO, and the PR run lost 314 of 332 ITs while the stack job died
+> at `compose up` ([BUG-063](../bugs/bugs.md#bug-063)). Both were commented out
+> as `TEMP 2026-09-30`. The S3Mock swap
+> ([ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md)) restored both
+> blocks together: `_backend.yml` honours `run-integration-tests` again, and
+> `_docker.yml` starts the stack, waits on it, smoke-tests it and hands Trivy
+> the running backend's image. The ITs and the stack passed locally on
+> 2026-11-25; **until a PR run is green on GitHub, that is a local result.**
 
 > **Note, 2026-08-16.** The dated banner below is kept as a record of where the
 > pipeline stood on 2026-08-07 and **parts of it have since been overtaken**:
@@ -563,7 +567,7 @@ different things and previously produced the same message.
 boots the jar with no profile — unlike the IT suites, which get `application-test.yml`
 or name properties inline. Today that is the datasource, `JWT_SECRET` and, since
 2026-09-14, `AWS_S3_BUCKET` (`campusvibe-ci`, a name nothing calls: the job
-never touches S3, so it has no MinIO service). `806a1d0` removed that bucket's
+never touches S3, so it has no S3Mock service). `806a1d0` removed that bucket's
 default and missed this block, and nothing caught it for three days: the push
 loop passes `run-migrate: false`, and `verify.mjs` never boots the jar, so the
 omission could only fail on a pull request — PR #51

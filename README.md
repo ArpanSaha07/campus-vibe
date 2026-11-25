@@ -11,7 +11,8 @@ A campus event platform to allow students to discover, get notified, plan and ke
 - **Browse and discover** — home page, event pages, club pages, categories
 - **Accounts** — follow clubs, save events, RSVP, export to Google Calendar
 - **Roles** — regular user, club admin, admin, enforced server-side
-- **Local development** — Docker Compose with live reload for all three services
+- **Local development** — Docker Compose with live reload, started with
+  `node scripts/dev.mjs` (see [`CONTRIBUTING.md`](CONTRIBUTING.md))
 - **CI** — GitHub Actions: lint, type-check, Jest, build, JUnit unit and
   integration suites, Flyway migration checks, Docker stack boot, Trivy image
   scan and gitleaks secret scanning

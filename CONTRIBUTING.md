@@ -14,16 +14,24 @@ the rules are short because the repo checks most of them for you.
    They check commit subjects, warn about docs that drifted, and run
    `scripts/verify.mjs` before every push.
 
-2. Run the stack locally. Copy `docker/.env.example` to `docker/.env` and ask
-   Arpan for the values. Then:
+2. Run the stack locally — one command, needing only Node and Docker:
 
    ```bash
-   cd backend && ./mvnw package && cd ..     # the image copies this jar
-   cd docker && docker compose watch          # frontend, backend, pgvector db
+   node scripts/dev.mjs            # frontend, backend, pgvector db, s3mock
    ```
 
-   Use `watch` rather than `up`: with plain `up`, a recreated backend
-   container can silently run an old jar. The `dev` profile seeds demo clubs.
+   It starts Docker if it is closed, creates `docker/.env` from the template
+   with fresh secrets, builds the backend jar in a Maven container, and runs
+   `docker compose watch`, printing the addresses once the app answers. After
+   changing Java, rerun with `--jar`; stop with `--stop` (keep the containers)
+   or `--down` (remove them; the data stays). The `dev` profile seeds demo
+   clubs. Optional features (OpenAI, Google sign-in, mail) stay off until you
+   ask Arpan for those values and add them to `docker/.env`.
+
+   Every checkout shares one database volume, so in a second clone or a
+   worktree copy your existing `docker/.env` across before the first run.
+   Details and troubleshooting:
+   [`docs/architecture/dev-script.md`](docs/architecture/dev-script.md).
 
 3. Read, in this order: [`.claude/CLAUDE.md`](.claude/CLAUDE.md),
    [`docs/STATUS.md`](docs/STATUS.md),

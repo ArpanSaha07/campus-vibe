@@ -1,8 +1,8 @@
 aws:
   s3:
     # Set so a Spring context can start. The fast *Test suites never touch S3;
-    # the media ITs override all four properties from the MinIO container
-    # (MinioTestContainer), which outranks any property file.
+    # the media ITs override all four properties from the S3Mock container
+    # (S3MockTestContainer), which outranks any property file.
     bucket: campusvibe-test
 
 # Test-only, non-production values. These exist so tests never depend on the

@@ -36,9 +36,10 @@ Kept deliberately short: this loads on every backend Java read.
   the caller wrote — go through `s3/MediaKeys`.** A filename of `../../x` used
   to be a file write anywhere the backend could reach, because the local stand-in
   for S3 joined the key onto a directory. **That stand-in is gone** — MinIO
-  replaced it 2026-09-12 (ADR-011) and would have shrugged at the traversal, as
-  real S3 always would. So the guard is ours alone now: `MediaKeys.assertSafeKey`,
-  enforced on every `S3Service` put, get and delete. Do not remove it on the
+  replaced it 2026-09-12 (ADR-011), S3Mock replaced MinIO 2026-11-25 (ADR-026),
+  and both shrug at the traversal, as real S3 always would. S3Mock stores
+  objects on its own filesystem, so the guard matters as much as ever. So the
+  guard is ours alone now: `MediaKeys.assertSafeKey`, enforced on every `S3Service` put, get and delete. Do not remove it on the
   grounds that the store no longer needs it — that is precisely why it is here.
   (BUG-039)
 - **Every Spring context needs `aws.s3.bucket` set.** `MediaBucket` is a

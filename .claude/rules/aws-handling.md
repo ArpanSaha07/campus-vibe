@@ -14,8 +14,10 @@ paths:
 ## Getting in
 
 Profile `campusvibe-admin`, region `ca-central-1`, IAM Identity Center SSO with
-temporary credentials, pinned as `env.AWS_PROFILE` in
-[`settings.json`](../settings.json) so every tool call carries it. Do not rely
+temporary credentials, pinned as `env.AWS_PROFILE` in Arpan's gitignored
+`.claude/settings.local.json` so every tool call carries it. A clone without
+that file has no pin, so `guard-aws.mjs` refuses any `aws` call that names no
+profile. Do not rely
 on a profile exported in a terminal — that does not reach a tool shell — and
 never fall back to `default`, which holds a dead static key and fails
 `InvalidClientTokenId`. Confirm with `aws sts get-caller-identity` before the
@@ -61,8 +63,8 @@ Everything below binds to both.
   `ListBucket` on the bucket itself, and nothing wider. **`ListBucket` is
   load-bearing even though no code lists:** without it S3 answers a missing
   key with 403 AccessDenied rather than NoSuchKey, `S3Service.getObject`
-  catches only `NoSuchKeyException`, and the read becomes a 500. MinIO's root
-  credentials always list, so no test shows it. Added 2026-09-12. An unattached
+  catches only `NoSuchKeyException`, and the read becomes a 500. S3Mock checks
+  no permissions, so no test shows it. Added 2026-09-12. An unattached
   duplicate, `CampusVibeProdMediaS3Access`, still exists; deleting it is
   Arpan's. The environment proxies through **nginx**, whose 1 MB default body
   limit sits under the 5 MB upload cap. `deploy/eb/.platform/nginx/conf.d/`
@@ -75,7 +77,7 @@ Everything below binds to both.
   never-read `S3_BUCKET_NAME` is gone. The first deployed upload landed
   2026-09-15, which closed BUG-051.
 - **Outside production nothing talks to AWS at all.** `AWS_S3_ENDPOINT` points
-  the same real `S3Client` at MinIO locally and in CI (ADR-011); production
+  the same real `S3Client` at S3Mock locally and in CI (ADR-026); production
   leaves it unset and resolves the instance role. There is no mock flag any
   more.
 - **`campusvibe-prod-db`** — PostgreSQL **18.3**, private, TLS forced,
@@ -184,7 +186,8 @@ nothing. For a one-off approved write, hand Arpan the exact command to run with
 **The S3 carve-out covers creating and configuring, not deleting:** every
 `delete-*` is refused, `delete-bucket-cors` included, which matches *deleting
 is still Arpan's* above.
-`AWS_PROFILE` is pinned for every tool call in `.claude/settings.json`.
+`AWS_PROFILE` is pinned for every tool call in `.claude/settings.local.json`,
+which is gitignored and exists only on Arpan's machine.
 
 An infrastructure change is recorded in
 [`docs/architecture/aws-deployment.md`](../../docs/architecture/aws-deployment.md).
