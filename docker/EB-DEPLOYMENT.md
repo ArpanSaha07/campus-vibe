@@ -19,7 +19,7 @@ Set these under **Configuration → Updates, monitoring, and logging →
 Environment properties** in the EB console (or via `eb setenv`).
 
 Step-by-step runbooks, with the order and the account as it stood on
-2026-09-12: `.claude/docs/architecture/connecting-elastic-beanstalk.md`, and
+2026-09-12: `docs/architecture/connecting-elastic-beanstalk.md`, and
 `connecting-rds.md`, `connecting-s3.md` and `connecting-ses.md` beside it.
 
 ### Required

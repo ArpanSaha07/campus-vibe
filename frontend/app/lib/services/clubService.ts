@@ -138,7 +138,7 @@ export async function uploadClubLogo(clubId: string, file: File): Promise<void> 
  *
  * Not called from the create form: banner photos are a club's own content
  * rather than part of deciding it should exist, so they belong to the club
- * editor ([BUG-043](../../../.claude/bugs/bugs.md)) alongside every other field
+ * editor ([BUG-043](../../../../docs/bugs/bugs.md)) alongside every other field
  * an owner edits after the fact. The endpoint and the read path (ADR-007) both
  * exist; only the editor does not.
  */

@@ -23,4 +23,4 @@ Notes:
   fine for an API URL or a Google *client* id (both are public by design), and
   is a disclosure for anything else. LLM provider keys in particular must never
   appear here — all AI calls go through the Spring backend. See
-  `.claude/docs/architecture/llm-api-key-management.md`.
+  `docs/architecture/llm-api-key-management.md`.

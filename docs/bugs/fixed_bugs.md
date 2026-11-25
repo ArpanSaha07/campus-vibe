@@ -1,0 +1,2676 @@
+# CampusVibe — Fixed Bugs
+
+Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
+
+Last updated: **2026-11-17**
+
+| ID | Severity | Fixed | Summary |
+|---|---|---|---|
+| [BUG-066](#bug-066) | Medium | 2026-11-17 | The CodeQL triage read `refs/heads/<branch>`, a stale analysis, instead of the PR's merge ref: on PR #74 it triaged nine old alerts and missed alert 73, the only new one |
+| [BUG-064](#bug-064) | High | 2026-11-07 | The Trivy gate failed on two `next` 16.3.8 RCEs and two `spring-webmvc` 6.2.19 CVEs that no free release fixes: `next` 16.4.5 in the lockfile, and a scoped, expiring exception for Spring ([ADR-022](../decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)) |
+| [BUG-062](#bug-062) | Low | 2026-09-17 | An event card's Like and Share buttons were invisible on every phone and tablet, yet still tappable: Tailwind v4 only applies `group-hover` where the device can hover |
+| [BUG-060](#bug-060) | Medium | 2026-09-16 | Every club photo answered 400 the first time a page rendered `club.images`: a `remotePatterns` entry written as `new URL(...)` forbids a query string, and the error blamed the hostname |
+| [BUG-057](#bug-057) | High | 2026-09-15 | Google sign-in answered *not ready yet* on every click for some people and worked normally for others: GIS began serving its button as a cross-origin iframe, and the click proxy went looking for Google’s markup in our own DOM |
+| [BUG-059](#bug-059) | Medium | 2026-09-16 | A 429, a 503 or the catch-all 500 asked for with a non-JSON `Accept` left as a bodiless 500: the `ApiError` could not be negotiated, and the planner's stream request asks for `text/event-stream` |
+| [BUG-058](#bug-058) | Medium | 2026-09-16 | Server-rendered event times were the server's UTC clock: the event page read `7:00 PM UTC` for an event at 3 PM, and a Montreal evening event's card showed the next day |
+| [BUG-056](#bug-056) | Medium | 2026-09-15 | A photo change looked undone for up to five minutes: media URLs name a position, not an image, and the response is cached — and the first fix, `?v=`, answered 500 on every page with an image |
+| [BUG-055](#bug-055) | Low | 2026-09-15 | An uploaded club logo never showed in the club's own dashboard: the managed-club reads handed `ClubLogo` the raw S3 key |
+| [BUG-043](#bug-043) | Low | 2026-09-15 | A club could not be edited after creation, from anywhere — every endpoint existed and no screen called them |
+| [BUG-006](#bug-006) | Low | 2026-09-15 | Events were never re-indexed after an edit, because no event update path existed at all |
+| [BUG-054](#bug-054) | Blocker | 2026-09-15 | The first production deploy was healthy and every request was a 503: the replacement instance landed in `ca-central-1d`, a zone the load balancer did not serve |
+| [BUG-051](#bug-051) | High | 2026-09-15 | Production was configured for S3 buckets that did not exist; closed by the first upload landing in `campusvibe-prod-media` through the deployed backend |
+| [BUG-052](#bug-052) | Blocker | 2026-09-14 | `Database / Apply migrations to a clean database` failed on PR #51: the jar refused to boot because the job never set `AWS_S3_BUCKET`, which lost its default in `806a1d0` — not a stale build, and every migration applied |
+| [BUG-050](#bug-050) | Blocker | 2026-09-11 | The Trivy gate blocked PR #45 on two newly published CRITICALs — `next` 16.3.0 and `netty-handler` 4.1.135 — with nothing in the repo having changed |
+| [BUG-039](#bug-039) | High | 2026-09-11 | Uploads named their own S3 object from the browser filename, and against `FakeS3` a `..` in it was a file write anywhere on disk — which our own entry had ruled out |
+| [BUG-049](#bug-049) | Medium | 2026-09-10 | The create-club form had no `noValidate`, so the browser blocked submit on an invalid type=email or type=url and `clubValidator` never ran at all |
+| [BUG-048](#bug-048) | High | 2026-09-10 | A club's social links were stored exactly as sent and rendered into an `href` with no scheme check on either side |
+| [BUG-047](#bug-047) | Medium | 2026-09-09 | The fix for BUG-045 left the other half silent: the success callback's promise was dropped, so a club was created and the user was told nothing |
+| [BUG-045](#bug-045) | Medium | 2026-09-09 | A club that was created reported itself as not created: the success callback ran inside the try that wrapped the write |
+| [BUG-046](#bug-046) | Low | 2026-09-09 | Every `select` in the app was a plain pill — `selectClasses` reserved the chevron's space and position but never supplied the image |
+| [BUG-041](#bug-041) | High | 2026-09-09 | `DevDataSeeder` had never once run: V6 still inserted the clubs it was written to replace, so every seeded club had a NULL embedding |
+| [BUG-040](#bug-040) | High | 2026-09-09 | An uploaded club logo took the whole `/clubs` page down — `next/image` throws on an S3 object key, during render, where `onError` cannot catch it |
+| [BUG-038](#bug-038) | Blocker | 2026-09-08 | A deleted endpoint turned the Docker API smoke test into a 404 assertion, blocking every merge to `main` |
+| [BUG-037](#bug-037) | High | 2026-09-05 | A club's category and interests were discarded at creation: `saveAndFlush` returned a different instance from the one being tagged |
+| [BUG-036](#bug-036) | Blocker | 2026-09-05 | Backend CI stopped compiling — the `feature/user-profile` merge changed two signatures and left two call sites behind |
+| [BUG-035](#bug-035) | High | 2026-09-03 | Backend jar shipped Tomcat 10.1.55 with three CRITICAL CVEs, and the parent-version lever that fixed this last time was exhausted |
+| [BUG-034](#bug-034) | High | 2026-08-16 | Every club ever created had `embedding` NULL — the index UPDATE ran before Hibernate had inserted the row |
+| [BUG-033](#bug-033) | Medium | 2026-08-16 | Three log statements interpolated caller-supplied text, so a newline could forge log entries |
+| [BUG-032](#bug-032) | Medium | 2026-08-16 | The rate-limit 429 built its JSON by string interpolation, escaping nothing and omitting a field every other error carries |
+| [BUG-025](#bug-025) | Low | 2026-08-14 | `formatDayLabel` followed the host locale while its own labels were hardcoded English, mixing languages in one list |
+| [BUG-027](#bug-027) | High | 2026-08-14 | `/clubs` was prerendered at build time, so `next build` required a live backend and failed CI with ECONNREFUSED |
+| [BUG-026](#bug-026) | High | 2026-08-14 | Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]` |
+| [BUG-024](#bug-024) | Medium | 2026-08-13 | A non-numeric path variable answered 500 instead of 400, app-wide |
+| [BUG-023](#bug-023) | Medium | 2026-08-13 | The event detail page served one hardcoded event for every URL, with a club nobody has |
+| [BUG-022](#bug-022) | High | 2026-08-13 | Every club page showed "Club not found": the detail route read mock data whose slugs no seeded club shares |
+| [BUG-021](#bug-021) | Low | 2026-08-13 | Stale Turbopack cache in the frontend container served pre-edit CSS, so new styles silently did nothing |
+| [BUG-020](#bug-020) | High | 2026-08-12 | Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume (28P01) |
+| [BUG-019](#bug-019) | High | 2026-08-07 | Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs |
+| [BUG-017](#bug-017) | High | 2026-08-07 | `output: standalone` broke every Vercel build with an ENOENT on the trace file |
+| [BUG-016](#bug-016) | High | 2026-08-07 | Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate |
+| [BUG-015](#bug-015) | High | 2026-08-07 | `/actuator/health` never existed; two CI jobs waited on it until timeout |
+| [BUG-008](#bug-008) | Low | 2026-08-05 | `.ci/build-publish.sh` was empty; frontend CD was hard-disabled |
+| [BUG-014](#bug-014) | Medium | 2026-08-05 | Google sign-in passed `client_id: undefined`, hidden by `(window as any)` |
+| [BUG-009](#bug-009) | Blocker | 2026-07-30 | Duplicate methods from merge `8f81d82` broke compilation |
+| [BUG-010](#bug-010) | High | 2026-07-30 | Committed JWT fallback secret |
+| [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
+| [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
+| [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-066
+**The CodeQL triage read a stale ref and missed the PR's one new alert** · Medium · FIXED 2026-11-17, unproved until a run
+
+**Found:** 2026-11-17, on PR #74 (`develop` → `main`). The triage comment on
+`cebcd12` reported nine pre-existing alerts and nothing new, while the
+code-scanning bot had flagged alert 73 (`java/uncaught-number-format-exception`,
+`PlannerToolExecutor.java:153`) on the same PR.
+
+**Cause.** A `pull_request` analysis files its alerts under
+`refs/pull/N/merge`. The triage queried
+`code-scanning/alerts?ref=refs/heads/$ANALYSED_BRANCH`, and `codeql.yml`
+analyses pushes to `main` only, so `refs/heads/develop` held an analysis last
+refreshed at `2fa196b8`. Alert 73 existed only on `refs/pull/74/merge`. A
+second fault made it look plausible: new versus old was judged by the head
+commit's diff, and a merge commit's diff was empty, so everything read as
+pre-existing.
+
+**Fix.** `.github/workflows/codeql-triage.yml`: the PR number comes from
+`workflow_run.pull_requests[0]` (a fork PR is skipped); alerts are read from
+`refs/pull/N/merge` with `tool_name=CodeQL`; checkout is the same merge ref;
+an alert is new when its number is open on the PR ref and not on
+`refs/heads/main`; only new alerts get a verdict; a stale triage comment is
+edited when nothing new remains; concurrency is keyed on the PR number.
+Reasoning in [`ci-cd-pipeline.md`](../architecture/ci-cd-pipeline.md).
+
+**Not yet proved.** `workflow_run` uses the copy on `main`, so until this
+merges only `gh workflow run codeql-triage.yml --ref develop -f pr=74`
+exercises it. Rule: `rules/ci-and-build.md`.
+
+---
+
+### BUG-064
+**The Trivy gate failed on four fixable CRITICALs, two of them Next.js RCEs live on Vercel** · High · FIXED 2026-11-07
+
+**Found:** 2026-11-07, on PR #71 (`develop` → `main`), run `42436024598`,
+job `Docker / Build images and run the stack`.
+
+**Symptom.** The gate's `--severity CRITICAL --exit-code 1` scan failed with
+*finding classes: lang-pkgs lang-pkgs*. Both base images were clean
+(`alpine 3.24.4`, 0 findings); every finding is an application library.
+
+| Image | Library | Installed | Fixed in | Findings |
+|---|---|---|---|---|
+| `campusvibe-frontend:prod` | `next` | 16.3.8 | 16.4.1 | GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr — unauthenticated RCE |
+| `campusvibe-backend` | `spring-webmvc` | 6.2.19 | 7.0.9 | CVE-2026-47884 (`XsltView`), CVE-2026-47890 (SSE view fragments) |
+
+**Cause.** Not code: advisories published against pinned versions, the same
+shape as BUG-019, BUG-035 and BUG-050. What is new is the backend half. No free
+6.2.x carries the fix and Boot 3.5.16 is the last 3.5, so the version-property
+lever those bugs used has nothing to point at.
+
+**Exposure.**
+- **Frontend: real.** `origin/main` locks `next` 16.3.8, and the live
+  Vercel site is not paused.
+- **Backend: none found.** There is no `XsltView`, view resolver or template
+  engine, and the planner's `SseEmitter` sends JSON only
+  (`SseReplySink.java:94`). Production is paused anyway.
+
+**Fix, half taken.**
+- **Frontend, done 2026-11-07, uncommitted.** `npm update next` moved the
+  lockfile to 16.4.5 inside `^16.3.3`. `verify.mjs --all` is green and
+  `npm audit --omit=dev` reports 0 critical. **Proved in CI** once pushed as
+  `9116608`: run `42439638257` passed the frontend image through the gate,
+  and the failure named one finding class, the backend's, where the first
+  run named two.
+- **Backend, accepted and built 2026-11-07, uncommitted.** Arpan chose option B with the 2026-12-31 expiry. [ADR-022](../decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)
+  sets a `.trivyignore.yaml` entry scoped by id, `purl` and
+  `expired_at` 2026-12-31, then Spring Boot 4.
+
+**Closed 2026-11-07, proved in CI.** Run `42442088359` on PR #71 passed the
+Docker job and `CI`. The backend report fell from 9 findings (7 HIGH,
+2 CRITICAL) to 7 (7 HIGH, 0 CRITICAL): exactly the two ADR-022 CVEs dropped
+out, and the Jackson, Guava and pgjdbc HIGHs stayed listed, so nothing else
+was hidden. Trivy 0.74.0 matches a versioned `purls` entry; the `@6.2.19`
+fallback was not needed. The frontend half was proved earlier, in run
+`42439638257`.
+
+**Still open, and not this bug:** the live Vercel site serves `next` 16.3.8
+until PR #71 merges to `main`; the exception expires 2026-12-31, by which
+Spring Boot 4 must land. Both are in `todo.md`. Rules:
+`rules/ci-and-build.md` and `rules/backend-java.md`.
+
+---
+
+### BUG-062
+**Event card actions invisible on touch devices, and still tappable** · Low · FIXED 2026-09-17
+
+**Found:** 2026-09-17, by Arpan: Like and Share never appeared on an event card
+in mobile view.
+
+**Cause.** `EventCard.tsx` hid the actions with `opacity-0 group-hover:opacity-100`.
+Tailwind v4 wraps every `hover:` and `group-hover:` in `@media (hover: hover)`
+(`tailwindcss` 4.1.13, `node_modules/tailwindcss/dist/lib.js`), and a phone or
+tablet never matches it, so the actions stayed at opacity 0 for good. Opacity
+does not remove a hit target: a tap near the bottom right of the image could
+like an event through a button nobody could see.
+
+**Fix.** `EventCard.tsx:49` is visible by default and hidden only where the
+device can hover: `opacity-100 [@media(hover:hover)]:opacity-0
+group-hover:opacity-100 focus-within:opacity-100`. The compiled CSS puts the
+hiding rule last, but `group-hover` and `focus-within` still win, since each adds
+a pseudo-class (0,2,0 against 0,1,0). `focus-within` also shows the actions to a
+keyboard user on desktop, who used to focus them invisibly. Rejected: user-agent
+detection (iPads send a desktop agent, and the render needs a request or a
+client), a `matchMedia` hook (client code and a flash before hydration), and an
+`md:` breakpoint (a wide tablet still cannot hover).
+
+**Still armed.** `ManageClubPill.tsx:44` and `ConversationSidebar.tsx:135` use the
+same pattern; queued in `todo.md` under *Frontend / Features*, not fixed here.
+Held by `rules/frontend.md`.
+
+**Verified:** `node scripts/verify.mjs` green (lint, type-check, Jest, build).
+Not seen on a touch device or in DevTools device emulation.
+
+---
+
+### BUG-057
+**Google sign-in answered *not ready yet* on every click, while the script, the
+client id and the origin were all fine** · High · FIXED 2026-09-15
+
+**Found:** 2026-09-15, reported by Arpan. Google sign-in worked on localhost,
+worked for other people against the same production URL, and failed on every one
+of his devices — incognito included, and after a cache clear. Clicking *Continue
+with Google* answered *Google sign-in is not ready yet. Try again in a moment.*
+
+**The message was a lie, and the code proved it before the browser did.** The
+visible button was disabled until `ready`, and `ready` was set immediately after
+`renderButton` returned. A disabled button fires no click, so the message could
+only ever appear once GIS had loaded, initialised and been asked to render. The
+script was never the problem, which ruled out the whole family of causes that
+were being chased — a blocked script, a missing client id, a CSP entry, an
+unregistered origin.
+
+**Cause.** Reproduced in the browser on `https://www.campusvibe-mcgill.com`:
+`gsi/client` answered 200, `window.google.accounts.id` was present, the console
+was clean — no CSP violation, no `GSI_LOGGER` origin error — and both the apex
+and `www` were registered as authorized origins. What the hidden box held was
+`div > div > div > iframe`, the iframe served from
+`accounts.google.com/gsi/button`, and the page carried no `div[role=button]`
+anywhere. GIS had begun serving the button as a **cross-origin iframe**, while
+`handleClick` looked for Google’s markup in our DOM in order to call `.click()`
+on it. Nothing in a page can click into a cross-origin iframe, so the selector
+was not too narrow — the assumption under it was wrong.
+
+**Why it looked device-specific.** The shape varies by context, not only by
+browser: in the same Chrome within the same minute, `http://localhost:3000`
+painted the light-DOM markup and production painted the iframe. That is why
+development never saw it and why it shipped intact. What kept other people’s
+browsers on the old shape was not established, and the fix does not depend on
+knowing — as their browsers move, they land where Arpan did.
+
+**Fix.**
+[ADR-018](../decisions/ADR-018-google-renders-and-styles-its-own-button.md):
+Google renders and styles its own button, and nothing of ours inspects, wraps or
+clicks anything inside its container. The proxy, the hidden box and the click
+forwarding are deleted. An empty container after 8 seconds now reports that
+sign-in could not load and names the email alternative, instead of blaming
+timing for a structural failure.
+
+**Live in production until the frontend is deployed.** The fix is verified
+locally, in the suite and in the browser; production keeps serving the broken
+build until Vercel takes the new one.
+
+**The test could not have caught it.** The fake GIS in
+`GoogleAuthButton.test.tsx` appended a `div[role=button]` **synchronously**,
+modelling Google’s private DOM as a stable contract — so the suite stayed green
+through a production outage. It now paints an iframe, asynchronously, and covers
+the case where GIS paints nothing at all.
+
+---
+
+### BUG-060
+**A `remotePatterns` URL literal forbade the query string every seeded club photo carries** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, by Arpan, opening a club page the moment it began
+rendering `club.images`. Every photo failed and the page showed a runtime error:
+
+```
+Invalid src prop (https://images.unsplash.com/photo-1512790182412-b19e6d62bc39?w=400)
+on `next/image`, hostname "images.unsplash.com" is not configured under images
+in your `next.config.js`
+```
+
+**Cause.** The hostname *was* configured — `next.config.ts:80` read
+`remotePatterns: [new URL("https://images.unsplash.com/**")]`. That URL carries
+no query string, and Next 16 reads a missing search as `search: ""`, which means
+*the src must not have one either* (`node_modules/next/dist/docs/01-app/
+03-api-reference/02-components/image.md:563`: "must start with
+`https://example.com/account123/` and **must not have a query string**"). Every
+seeded club photo is `?w=400`, so every one was refused. The message names the
+hostname for any `remotePatterns` miss, which sent the first look at the wrong
+half of the entry entirely.
+
+**Why it had never fired.** Nothing rendered `club.images` until the club page
+redesign did. The entry was added 2026-09-09 with the club media read path and
+had only ever been exercised by same-origin `/media/...` paths, which do not go
+through `remotePatterns` at all.
+
+**Fix.** The object form, with `search` omitted so any query string is allowed,
+the hostname still pinned to one public image CDN (`next.config.ts:76-101`).
+Pinning an exact `search` would not have worked: the seed holds both `?w=400`
+and `?w=400&q=80`.
+
+**Verified.** In the running stack — `/_next/image` for both seeded URLs
+answers 200 in ~0.24s, and the club page loads with zero console errors and zero
+failed requests. Held by [`rules/frontend.md`](../../.claude/rules/frontend.md), beside the
+`localPatterns` rule it is the remote twin of, and described in
+[`ci-cd-pipeline.md`](../architecture/ci-cd-pipeline.md).
+
+### BUG-059
+**Error responses failed content negotiation under a non-JSON Accept** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, in `PlannerMessageIT`, building the planner backend. A
+send refused at the daily limit, and one refused for a missing provider key,
+were both asked for as `Accept: text/event-stream`, which is what the planner
+page sends. Neither came back as 429 or 503: MockMvc surfaced the original
+exception instead.
+
+**Cause.** `DefaultExceptionHandler` returned `ResponseEntity<ApiError>` with
+no content type, so Spring negotiated one against the request's `Accept`
+header. Nothing writes an `ApiError` as `text/event-stream`, the handler
+itself failed with `HttpMediaTypeNotAcceptableException`, and the refusal fell
+through as a 500 with no body. The 400 and 404 looked fine only because
+`RequestValidationException` and `ResourceNotFoundException` carry
+`@ResponseStatus`, which a fallback resolver honours without a body.
+`TooManyAttemptsException` has no such annotation. Predates the planner: any
+client asking for HTML or a stream from an endpoint that raised these had the
+same 500; nothing in the product did until the planner.
+
+**Fix.** The handlers a streaming request can reach, 404, 400, 429, 503 and the
+catch-all 500, preset `application/json` (`DefaultExceptionHandler.java:306`).
+A preset content type skips negotiation entirely.
+
+**Verified.** `PlannerMessageIT.theSixteenthMessageOfTheDayIsRefusedAndDeletingAChatDoesNotGiveItBack`
+and `refusalsBeforeTheStreamAreStatusesAndCostNothing` through MockMvc, and
+`PlannerStreamIT.refusalsAskedForAsAStreamKeepTheirStatusAndBody` on a real
+port, which also reads the 503 body. Held by
+[`rules/backend-java.md`](../../.claude/rules/backend-java.md).
+
+### BUG-058
+**Server-rendered event times were the server's UTC clock** · Medium · FIXED 2026-09-16
+
+**Found:** 2026-09-16, in the browser, verifying the event end time unit. The
+event page ticket for an event stored at `2026-09-17T19:00:00Z` — 3:00 PM in
+Montreal — read `7:00 PM UTC` and `Until 9:00 PM UTC`.
+
+**Cause.** Every event date and time was formatted with
+`toLocaleDateString(undefined, …)` or `toLocaleTimeString(undefined, …)`, which
+format in the zone the process runs in. The event page is a Server Component, and
+the server runs in UTC (the frontend container, and Vercel), so it printed UTC
+clock times and, because `formatTime` asked for `timeZoneName: "short"`, said
+so. `EventCard` renders on the server too, through `EventGrid` and
+`EventSectionMainPage`, so an evening event's card carried the next day's date.
+Client-rendered cards printed the viewer's zone instead (`EDT`), so the same
+event could read two ways. Predates this unit: it was on the event page since the
+page stopped being hardcoded (BUG-023).
+
+**Fix.** Every event takes place in one zone (Arpan, 2026-09-16), so
+`frontend/app/lib/event-zone.ts` formats every event date and time in
+America/Toronto and `en-US`, with no zone label, and the create and edit form
+reads and writes its `datetime-local` values in that zone through
+`toEventInputValue` and `fromEventInputValue`, whatever the browser's zone. Call
+sites: the event page, `EventCard`, `MyEventCard` via `formatEventDateTime`, the
+search dropdown, and the planner's day labels and range. The backend is
+unchanged and still sends instants.
+
+**Why not drop the label only.** The label was the visible half. Without it the
+page would still have printed 7:00 PM, now with nothing saying why.
+
+**Verified.** `event-zone.test.ts` pins summer and winter offsets, a late-evening
+date, no zone name in any output, the input round-trip and both daylight-saving
+changeover days, and passes with the test process forced to UTC. On the rebuilt
+local stack the event page HTML reads `3:00 PM` and `Until 5:00 PM` and
+contains no `UTC`; the edit form loads `15:00`.
+
+**Still open.** My events groups by the browser's calendar day; queued in
+`todo.md`. Held by [`rules/frontend.md`](../../.claude/rules/frontend.md).
+
+### BUG-056
+**A photo change looked undone for five minutes: media URLs name a position, not an image** · Medium · FIXED 2026-09-15
+
+**Found:** 2026-09-15, in the browser, verifying the event banner. After *Make
+banner* moved the red test photo first, the server held red then blue — read back
+by colour from `GET /api/v1/events/3/images/0` — and `/events/3` still showed
+blue.
+
+**Cause.** A media URL names an owner and a position —
+`/media/events/3/images/0`, `/media/clubs/{id}/logo` — and
+`StoredImageResponses` serves it with `max-age=300, public`
+(`StoredImageResponses.java:64`). Its own comment foresaw a long cache pinning a
+replaced image; five minutes was still long enough once this unit made
+reordering and removing photos routine, since both move a different image to the
+same URL at once. A replaced club logo has had the same exposure since
+2026-09-09 by the same mechanism — read from the code, not observed.
+
+**The first fix broke render.** A `?v=<hash>` query string made `/events/3`
+answer HTTP 500: `Image with src "/media/events/3/images/0?v=1jfp5m2" is using a
+query string which is not configured in images.localPatterns.` Next 16 applies
+`[{ pathname: '**', search: '' }]` when `localPatterns` is unset and throws
+during render on a local `src` with a query
+(`next/dist/shared/lib/image-loader.js:55`). The optimizer-side
+`hasLocalMatch`, which allows everything when the option is unset, was read
+first and wrongly taken as the whole answer. Local only, never committed.
+
+**Fix.** `mediaVersion(key)` in `adapters.ts`, an FNV-1a hash of the stored key,
+as the last path segment: `/media/events/3/images/0/1jfp5m2`. Every upload writes
+a unique key, so the URL changes exactly when the image does. `next.config.ts`
+gained a versioned form of each rewrite that ignores the segment
+([ADR-016](../decisions/ADR-016-media-urls-versioned-by-key-hash.md)).
+
+**Verified:** `/events/3` answers 200 with the versioned path in its HTML, and
+that path answers 200 `image/png` through the rewrite; the page shows the red
+banner the server holds; `adapters.test.ts` asserts that a reorder changes the
+URL and an unchanged list keeps it; `verify.mjs --all --full` green.
+
+**Trap, now in `rules/frontend.md`:** version a media URL by path segment, never
+by query string, and give a new media route its versioned rewrite.
+
+### BUG-055
+**An uploaded club logo never showed in the club's own dashboard** · Low · FIXED 2026-09-15
+
+**Found:** 2026-09-15, checking the dashboard header after the club editor
+landed.
+
+**Cause.** `ManagedClubDTO.logo` is `club.getLogo()` passed straight through
+(`ClubAdminService.toManagedClubDto`, and the same in `ClubOwnershipService`) —
+the stored S3 key, as in `ClubDTO`. `ClubDTO` goes through `toClub`, which maps a
+key to `/media/clubs/{id}/logo`; the managed-club calls in
+`club-admin-requests.ts` returned the DTO raw. `ClubLogo`'s `isRenderableSrc`
+refused the key and drew the club's initial, so there was no crash —
+[BUG-040](#bug-040)'s guard held — and no logo either, in the dashboard header
+and on the `/manage` cards.
+
+**Fix.** `toManagedClub` in `adapters.ts`, applied in `getManagedClubs`,
+`getManagedClub`, `setClubOfficialEmail`, `acceptClubInvitation` and
+`acceptOwnership`.
+
+**Verified:** a test logo uploaded through the club editor for McGill Atheletics
+rendered in the dashboard header and on `/clubs/mcgill-atheletics`, decoded with
+`naturalWidth` 128, and the backend served it as `image/png`, 6870 bytes.
+`adapters.test.ts` covers `toManagedClub`.
+
+**Trap, now in `rules/frontend.md`:** every DTO carrying a stored key goes
+through an adapter.
+
+### BUG-043
+**A club could not be edited after creation, from anywhere** · Low · FIXED 2026-09-15
+
+**Found:** 2026-09-09, wiring the club create form's uploads. `/manage/[clubId]`
+had no club-details editor and there was no `updateClub` in the frontend, so a
+user approved as a club's owner could not give it a logo — the promise ADR-004
+made to that user. Every endpoint existed: `PUT /clubs/{id}`,
+`POST /clubs/{id}/logo`, `POST /clubs/{id}/images`.
+
+**Fix.** The Club page section of the dashboard (`manage/[clubId]/club/page.tsx`,
+`components/manage/ClubEditForm.tsx`), for everyone `canManageClub` admits —
+Arpan, 2026-09-15. It edits name, description, category, tags, logo, photos and
+contact links; not the slug, and not the official email, which stays
+admin-only. It calls `revalidateClubs`, and `revalidateEvents` on a rename, as
+the original entry asked.
+
+**Verified:** a logo uploaded through it for McGill Atheletics rendered in the
+dashboard and on the public club page, with *Saved. Your club page shows the
+changes now.* and no field errors. No automated test drives the form.
+
+### BUG-006
+**Events were never re-indexed after an edit** · Low · FIXED 2026-09-15
+
+**Found:** 2026-07-30, comparing `EventService` against `search.md`, which
+specifies regenerating an event's embedding when its title, description or tags
+change. `EventService` indexed only on create and had no update method at all.
+The organizer-rename half — an event's embedded text carries its club's name —
+was fixed 2026-09-14 and is covered by `SearchIT.renamingAClubReindexesItsEvents`.
+
+**Fix.** `EventService.update` behind `PUT /api/v1/events/{id}`: full
+replacement, tags cleared and refilled rather than reassigned, and
+`saveAndFlush` before `indexEvent`, because the embedding is written through
+`JdbcTemplate`, which cannot see unflushed work ([BUG-034](#bug-034)).
+
+**Verified:** `EventUpdateIT`, 7 tests — owner, club admin and platform admin may
+edit; an outsider gets 403; an unknown tag, a blank title or a missing date is
+400; an unknown event is 404 for staff. **Not covered:** that the embedding
+actually changes. The original entry asked for that test and it was not written.
+
+---
+
+### BUG-054
+**The first production deploy was healthy and unreachable: the instance was in a zone the load balancer did not serve** · Blocker · FIXED 2026-09-15
+
+**Found:** 2026-09-15, minutes after the first CampusVibe version deployed to
+`CampusVibe-Backend-Prod`. The container log was clean — `prod` profile, 33
+migrations, `Started Main` — and every request, `/actuator/health` included,
+answered `503 Service Temporarily Unavailable` from the load balancer.
+
+**The misleading part.** Elastic Beanstalk reported the deploy as successful and
+the environment Warning on 5xx. Nothing in the application was wrong, so reading
+the application's log could never find it.
+
+**Cause.** `aws elbv2 describe-target-health` answered `Target.NotInUse` for the
+only instance, `i-005f652168477efa0`, in `ca-central-1d`. The load balancer was
+enabled in `ca-central-1a` and `1b` only; the Auto Scaling group's subnets span
+`1a`, `1b` and `1d`. The instance had been placed there an hour earlier, by the
+`update-environment` that set `aws:autoscaling:asg MaxSize=1`: *Requested update
+requires the creation of a new physical resource*, so Elastic Beanstalk created
+a new Auto Scaling group and a new instance, and the zone was free to change.
+The sample application sat on that instance briefly too, and nobody requested it.
+
+**Fix.** `aws:ec2:vpc ELBSubnets` extended to all three default subnets, run by
+Arpan with `!` in the same update that added the 443 listener. All three are
+public subnets routed to `igw-0e34ba3d48dddfb17`. Rejected: restricting the
+instance to `1a`/`1b`, which replaces the running instance. Arpan chose on cost:
+the load balancer's third public IPv4 is about $3.60 a month.
+
+**Verified:** target `healthy`, environment Green,
+`https://api.campusvibe-mcgill.com/actuator/health` → `{"status":"UP"}`.
+
+**Trap, now in `rules/aws-handling.md`:** when a load-balanced environment
+answers 503 with a clean container log, read target health before the
+application — and an ASG-recreating change can move the instance to any subnet
+the group lists.
+
+### BUG-051
+**Production was configured for S3 buckets that did not exist** · High · FIXED 2026-09-15
+
+**Renumbered 2026-09-12 — first filed as BUG-040**, an id the club-logo crash
+([BUG-040](#bug-040)) also carries.
+
+**Found:** 2026-09-08, reading the live account while writing
+[`rules/aws-handling.md`](../../.claude/rules/aws-handling.md). The backend resolved two
+buckets from `AWS_S3_BUCKET_CLUBS` and `AWS_S3_BUCKET_EVENTS`, defaulting to
+`campusvibe-clubs` and `campusvibe-events`. The environment set neither — only
+`S3_BUCKET_NAME=campusvibe-prod-media`, which no code read — and neither default
+bucket existed. The IAM grant named `campusvibe-prod-media/*` alone. Every
+production upload would have failed `NoSuchBucket`. **A second fault sat under
+it:** `aws.region` defaulted to `us-east-1`, and the bucket is in `ca-central-1`.
+Neither had ever run, because the `aws.s3.mock` flag defaulted to true
+everywhere but `prod`.
+
+**Fix, in three steps.**
+- **Code, 2026-09-12** ([ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md), [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md)): one `MediaBucket` reading `AWS_S3_BUCKET` with no default and a blank check; `aws.region` defaulting to `ca-central-1`; the mock flag deleted, the client always real and pointed at MinIO locally.
+- **Account, 2026-09-12, by Arpan:** `AWS_S3_BUCKET` set, `S3_BUCKET_NAME` removed, and `s3:ListBucket` granted so a missing key is NoSuchKey rather than a 403 that `S3Service` would turn into a 500.
+- **Deploy, 2026-09-15:** the first CampusVibe version ran on the environment.
+
+**Verified in production, 2026-09-15:** Arpan created a club and uploaded a
+photo; `aws s3 ls s3://campusvibe-prod-media --recursive` shows one object of
+1,763,667 bytes. That one upload proves the bucket property, the region, the
+instance-role credentials through the default chain, and — being over 1 MB —
+nginx's raised body limit in `deploy/eb/.platform/`.
+
+**Not proved by it:** the `ListBucket` 404 path, which needs a read of a
+missing key; and a 3 MB upload, the size the runbook named.
+
+---
+
+### BUG-052
+**The clean-database CI job could not boot the jar once `AWS_S3_BUCKET` lost its default** · Blocker · FIXED 2026-09-14
+
+**Found:** 2026-09-14, on [PR #51](https://github.com/ArpanSaha07/campus-vibe/pull/51)
+(`develop` → `main`), run 34921822202. `Database / Apply migrations to a clean
+database` failed at *Apply migrations to an empty schema* with `Application
+exited before becoming healthy.`, so `CI` failed and `Protect main` blocked the
+merge. Everything else passed.
+
+**Not a stale build, and not a migration.** The jar was packaged in the job from
+`bfc3c02` (`BUILD SUCCESS`). The uploaded `boot-1.log` shows Flyway applying all
+33 migrations to the empty schema and Hibernate starting. The context then
+failed creating `ClubController` → `MediaBucket`:
+`PlaceholderResolutionException: Could not resolve placeholder 'AWS_S3_BUCKET' in value "${AWS_S3_BUCKET}" <-- "${aws.s3.bucket}"`.
+
+**Cause.** `806a1d0` (2026-09-12) gave `aws.s3.bucket` no default on purpose
+(ADR-012, BUG-051), so every context that starts the app must name a bucket. It
+updated `application-test.yml`, `SearchIT`, `SearchRateLimitIT`, compose and
+`_docker.yml`, and missed the `migrate` job in `_database.yml`, which runs
+`java -jar` with no profile.
+
+**Why it waited three days.** `branch-checks.yml` calls `_database.yml` with
+`run-migrate: false`, so every push skipped the job. `verify.mjs` runs only the
+migration lint and never boots the jar. The last `ci.yml` run on `develop` was
+2026-09-11, before the change — PR #51 was the first full tier since.
+
+**Fix.** `AWS_S3_BUCKET: campusvibe-ci` in the `migrate` job's `env:`, covering
+both boots. Nothing in the job calls S3: with no endpoint, `S3Config` builds a
+real client whose credentials resolve lazily, and `AWS_REGION` defaults — so no
+MinIO service is needed. Putting a default back in `application.yml` was
+rejected; it would reopen the silence BUG-051 was.
+
+**Verified:** `node scripts/verify.mjs` green. **Not yet:** the re-run of PR #51,
+which is the only place this job runs. The jar was not booted locally — the
+compose stack held port 8080.
+
+**Trap, now in `rules/ci-and-build.md`:** a property with no default must also
+reach `_database.yml`'s `migrate` env.
+
+### BUG-050
+**The Trivy gate blocked PR #45 on two CRITICALs nobody wrote** · Blocker · FIXED 2026-09-11
+
+**Found:** 2026-09-11, on [PR #45](https://github.com/ArpanSaha07/campus-vibe/pull/45)
+(`develop` → `main`), immediately after PR #44 merged. Every job passed except
+`Docker / Build images and run the stack`, which failed only at *Scan images for
+known vulnerabilities*; `CI` reported `docker: failure`, and the `Protect main`
+ruleset requires `CI`, so the merge was blocked. The build, the boot and the API
+smoke tests all passed.
+
+**Two fixable CRITICALs, both published after the code was written:**
+
+| Image | Package | Installed | Fixed in | Advisory |
+|---|---|---|---|---|
+| frontend | `next` | 16.3.0 | 16.3.3 | CVE-2026-75604 and GHSA-2xp9-vwfh-vxw4, both unauthenticated remote code execution — the second through the image optimization API |
+| backend | `io.netty:netty-handler` | 4.1.135.Final | 4.1.137.Final | CVE-2026-75595 |
+
+`main` carries the same two versions, so this was not introduced by the PR — it
+is the third time a branch went red from a newly published advisory rather than
+new code ([BUG-019](#bug-019), [BUG-035](#bug-035)). The Vercel preview built from
+the same lockfile, so it was running 16.3.0 too.
+
+**Netty is not used by the app.** `dependency:tree -Dincludes=io.netty` shows it
+arriving only through `software.amazon.awssdk:s3` 2.20.26 → `netty-nio-client`,
+the async HTTP client, while `S3Config` builds the synchronous `S3Client`. Its
+version is the Spring Boot 3.5.16 BOM's.
+
+**Fix:**
+
+- **`<netty.version>4.1.137.Final</netty.version>`** in `backend/pom.xml`,
+  beside `<tomcat.version>` and by the same lever. Arpan chose the override over
+  excluding `netty-nio-client`; the reasoning is
+  [ADR-008](../decisions/ADR-008-netty-pinned-beyond-the-boot-bom.md). All
+  ten `io.netty` artifacts resolve to 4.1.137 afterwards, and the version was
+  checked on Maven Central before pinning — ADR-003's advisory had named a Tomcat
+  release that was never published.
+- **`next` 16.3.3**, with the range raised from `^16.2.0` to `^16.3.3` so a
+  lockfile regeneration cannot slide back below the fix.
+
+**A lockfile drift came out with it.** `npm install next@16.3.3` also removed
+`axios` and five of its dependencies from `package-lock.json`. `axios` was
+listed in the lock's root dependencies but not in `package.json`, and nothing
+imports it — the lock had fallen out of sync when it was removed from the
+manifest. The pruning is correct; it is recorded so the diff is not a surprise.
+
+**Verified:** Trivy run locally from the `aquasec/trivy` image with the gate's
+own flags (`--severity CRITICAL --ignore-unfixed`) — the frontend lockfile and
+the built backend jar both report zero. `verify --all --full` passes except
+`SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords`
+([BUG-001](bugs.md#bug-001)), which fails the same way on a clean checkout and
+passes in GitHub's backend job. **Not yet verified:** the gate itself on GitHub,
+which re-runs when this reaches `develop` and PR #45 picks it up. The lockfile
+scan covers every dependency, a superset of what the standalone production image
+ships, so it is the stricter of the two for the frontend.
+
+**Held by:** [`rules/ci-and-build.md`](../../.claude/rules/ci-and-build.md) — netty takes the
+Tomcat lever — and [`ci-cd-pipeline.md`](../architecture/ci-cd-pipeline.md)
+under the Trivy gate.
+
+---
+
+### BUG-039
+**Image uploads let the caller name the S3 object, and validate nothing about it** · High · FIXED 2026-09-11
+
+**Found:** 2026-09-07, while distilling `CampusVibe_S3_Media_Security.md` into
+[`s3-media/SKILL.md`](../../.claude/skills/s3-media/SKILL.md). The document had been sitting
+inside a vendored `aws-s3` skill folder that nothing pointed at, so its rules had
+never been read against the code they govern.
+
+**Symptom:** none visible. Uploads succeed, keys are stored, nothing errors.
+
+All three upload paths build the S3 object key by concatenating the browser's
+own filename:
+
+```java
+String key = "clubs/" + id + "/logo-" + file.getOriginalFilename();   // ClubController.java:82
+String key = "clubs/" + id + "/images/" + file.getOriginalFilename(); // ClubController.java:91
+String key = "events/" + id + "/images/" + file.getOriginalFilename();// EventController.java:108
+```
+
+`reference.md` §7 says *never let a client provide an arbitrary full S3 object
+key*, and §13 says *do not use user-supplied filenames as the canonical S3 object
+name*. Both are violated at every call site.
+
+**What actually goes wrong, in order of how sure it is:**
+
+1. **Silent overwrite.** `putObject` replaces whatever is at the key. Upload
+   `logo.png` twice and the second silently destroys the first. On
+   `/{id}/images` it is worse: the object is replaced but `addImages` still
+   appends the key, so the list holds two entries pointing at one object.
+2. **No stable key, so the documented model cannot be built on top.** §19 needs
+   a new uuid key per upload to do upload → confirm → update database → delete
+   old. With the filename as the key there is no old and new to order.
+3. **Content type is never checked.** The endpoints declare
+   `consumes = MULTIPART_FORM_DATA_VALUE`, which constrains the request, not the
+   part. Any bytes under any name are stored — §12 asks for
+   `image/jpeg`, `image/png`, `image/webp` only.
+4. **`getOriginalFilename()` is nullable**, giving keys like
+   `clubs/24/logo-null`.
+
+**What is NOT wrong, so nobody re-derives it:** size is bounded —
+`application.yml:30-31` caps multipart at 10MB (the reference asks for 5MB, so
+the cap is loose rather than absent). And a `..` in a filename is not traversal:
+S3 keys are opaque strings, the `clubs/{id}/` prefix is still prepended
+literally, so prefix-scoped IAM and lifecycle rules are not evaded.
+
+**No longer armed — fired.** This entry used to say that nothing served the
+media back, that `S3Service.getObject` had no caller anywhere, and that every
+missing control would go live at once the moment a read path landed. **That
+happened on 2026-09-09** ([BUG-040](#bug-040)): the club create form
+now uploads, and `GET /clubs/{id}/logo` and `/images/{index}` serve the bytes
+back. Every control listed above is now missing on a live path, on top of keys
+that are already in S3 and in the database and would need migrating.
+
+Two of the consequences were closed at the read end rather than the write end,
+and they are mitigations, not the fix: an uploaded SVG is served
+`application/octet-stream` with `nosniff` so it cannot execute on the API's
+origin, and images are addressed by *index* so no caller can name an object key.
+The caller still names the object on upload, still overwrites silently on a
+repeated filename, and nothing checks that the bytes are an image at all.
+An unvalidated SVG or HTML byte stream stored today becomes a stored-XSS question
+the day it is served inline.
+
+**The fix is a decision, not a patch.** Generating `{uuid}.webp` keys changes what
+is stored in `clubs.logo_key`, `club_images` and `event_images`, so existing rows
+need a backfill or a compatibility read. Doing it at the same time as the move to
+presigned uploads is one piece of work; doing it separately means touching the
+same three endpoints twice. Write the ADR before either. The narrow version —
+stop the caller naming the object, keep direct byte upload — is a much smaller
+change and would close 1, 2 and 4 on its own.
+
+**Correction, 2026-09-11 — the paragraph above headed *What is NOT wrong* was
+wrong about traversal.** It reasoned from real S3, where a key is an opaque
+string and `..` in one is two characters. But `aws.s3.mock` is true everywhere
+except the `prod` profile (`application.yml:52`, `docker-compose.yml:116`, the
+CI Docker job), and `FakeS3.buildObjectFullPath` concatenated the key onto a
+directory — where `..` climbs. So on every non-prod stack, a club owner, club
+admin or event manager who sent a filename like `../../x` got a file write
+anywhere the backend process could reach, which in the dev compose container is
+root. The same sentence was copied into `s3-media/SKILL.md`, so anyone who read
+the knowledge base before the code was told not to worry about exactly this.
+
+**Found by the Claude security review on PR #44**, not by us. The review's claim
+was checked against the code before anything was done: `FakeS3.java:79-81` did
+join the key onto `~/.arpan/s3/{bucket}/` with no check, and the config does
+default to `FakeS3`. **The write itself was never observed** — by the time a
+test first exercised it, the `FakeS3` guard below was already in place and the
+request answered 500 instead. The claim rests on reading the code. Nor was it
+tested whether Tomcat's multipart parser passes `../` through in a filename;
+the fix does not depend on it, because the filename is no longer read.
+
+**Fix — the narrow one this entry proposed, decided by Arpan 2026-09-11 and
+landed before PR #44 merged**
+([`2026-09-11-upload-keys-generated-server-side.md`](../specs/2026-09-11-upload-keys-generated-server-side.md)):
+
+- **`s3/MediaKeys` is the only thing that builds a key.** `{prefix}/{uuid}.{ext}`
+  in the `reference.md` §7 layout — `clubs/{id}/logos/`, `clubs/{id}/images/`,
+  `events/{id}/banners/`. Closes 1, 2 and 4 above: no caller character reaches
+  the key, a repeated upload is a new object, and there is no `null` to append.
+- **The extension comes from the file's leading bytes**, and only PNG, JPEG and
+  WebP are accepted; the filename and the part's `Content-Type` are ignored,
+  since the caller writes both. Anything else, or an empty file, is a 400. This
+  closes 3. A multi-file upload is checked in full before anything is stored.
+- **`FakeS3` refuses any key that resolves outside its bucket's directory**, on
+  put, get and delete — so the stub is not a traversal primitive for any future
+  caller that builds a key by hand.
+- **5MB per file, 10MB per request**, where it was 10MB / 10MB, and an oversize
+  upload is a 413 with a sentence rather than a 500 through the catch-all.
+- **A replaced logo's old object is deleted**, after `ClubService.updateLogo`
+  commits and only if `MediaKeys.belongsToClub` says it is that club's own. A
+  failed delete is logged, not thrown. Without this, uuid keys would have
+  turned every logo change into an orphan.
+
+**What still differs from `reference.md`, and is not a bug:** there is no
+presigning (§9), which is now an ADR queued in [`todo.md`](../TODO/todo.md)
+rather than part of this entry; images are not re-encoded to WebP (§14); banner
+images have no delete and a deleted club's objects are not deleted (§20). Keys
+stored before 2026-09-11 keep the `logo-{filename}` shape and were not migrated
+— reads use whatever key is stored. **Two read-side mitigations stay** as the
+second line of defence: SVG served `application/octet-stream` with `nosniff`
+([ADR-007](../decisions/ADR-007-uploaded-media-is-streamed-by-the-api.md)),
+since objects stored before the fix were never checked, and images addressed by
+index.
+
+**Tests, written first and seen failing:** `MediaKeysTest` (19) and
+`FakeS3Test` (8) as plain unit tests; `ClubMediaIT` from 6 to 15; `EventMediaIT`
+(3), the first test the event upload has ever had; and `MediaUploadLimitIT`
+(2), on a real port, because **MockMvc never applies the multipart caps** and
+every other media test is blind to them. Checked against the compose stack with
+a raw `curl` upload naming `../../…/tmp/probe.png`: a uuid key, and no probe
+file.
+
+**Held by:** [`rules/backend-java.md`](../../.claude/rules/backend-java.md) — never build a
+key from anything the caller wrote — and
+[`rules/backend-clubs.md`](../../.claude/rules/backend-clubs.md) for the key layout and the
+delete ordering. The lesson that generalises: **a stub that stands in for a
+service does not inherit the service's safety properties**, and a bug entry that
+reasons from the real one can talk the next reader out of the actual defect.
+
+---
+
+### BUG-049
+**A form that validated in JavaScript was overruled by the browser** · Medium · FIXED 2026-09-10
+
+`CreateClubForm`'s `<form>` had no `noValidate`. The contact email is
+`type="email"` and two link fields are `type="url"`, so an invalid value in any
+of them made the browser refuse to fire `submit` at all: `handleSubmit` never
+ran, `clubValidator` never ran, and the message it writes beside the field was
+never rendered. The user got a native bubble instead — or, in a browser that
+shows none, nothing whatsoever.
+
+**This form had already decided the opposite.** `FormField` refuses to set the
+`required` attribute for exactly this reason, and says so in a comment
+(`FormField.tsx:60-63`): validation belongs to `clubValidator`, not to the
+browser's bubbles. The attribute one level up, on the form itself, was missed —
+so the policy was half-applied and looked complete.
+
+**Latent until the contact email became optional.** While it was required on
+every path, a bad address was refused by *some* rule and the outcome looked
+about right. Making it optional on the proposal path turned a typo into
+something silently unsubmittable: no error, no request, no explanation.
+
+**Found by a test that could not pass.** A new case asserting the validator's
+own message for a malformed address failed with the form still on screen and
+`proposeClub` never called — which is not what a validation failure looks like.
+
+Fixed with `noValidate` on the form, plus a test asserting the attribute is
+there, since nothing else would notice its removal. The rule is now in
+[`rules/frontend.md`](../../.claude/rules/frontend.md).
+
+---
+
+### BUG-048
+**A club's social links reached an `href` with nothing checking them** · High · FIXED 2026-09-10
+
+`ClubService.update` stored `request.socialLinks()` exactly as it arrived — a
+JSON string, unparsed and unvalidated — and the club page put two of its values
+straight into an `href` (`clubs/[clubId]/page.tsx:58`, `:68`). Nothing checked
+the scheme on either side, so a stored `javascript:` link was a script on the
+club's public page waiting for a click.
+
+**The rule to prevent it already existed and could not be reached.** The
+profile side had refused exactly this since it was built, in
+`ProfileLinks.normalise` — a class that was **package-private in
+`com.campusvibe.user.profile`**. Club code could not call it, so clubs simply
+went without. That is the whole defect: not a missing idea, a missing import.
+
+**Severity is about who could write it, and that was changing.** Only a club
+owner or platform admin could reach `PUT /clubs/{id}`, which kept it small. The
+work in progress — a club proposal carrying the same four fields — was about to
+open the same values to every signed-in user, which is what turned a latent
+issue into one worth fixing before shipping.
+
+Fixed by moving the class to `common/WebLinks`, unchanged, and giving it three
+callers: the profile, `ClubService.update`, and `ClubCreationRequestService`.
+`ClubSocialLinks` parses the JSON, normalises each value and re-serialises, so
+the column now holds our four keys or NULL rather than whatever a client sent.
+Two ITs pin it, one per write path — the proposal one is new behaviour, the
+`PUT` one is this bug. The trap is in
+[`rules/backend-clubs.md`](../../.claude/rules/backend-clubs.md).
+
+**Not fixed here:** the *render* side still trusts nothing and normalises
+anyway, which is correct and stays — a row written before this rule existed
+would otherwise still reach an href.
+
+---
+
+### BUG-047
+**A club was created and the user was told nothing** · Medium · FIXED 2026-09-09
+
+The other half of [BUG-045](#bug-045), and introduced by its fix. Moving the
+success callback out of the write's `try` stopped the form claiming the club
+could not be created — but the callback is `async`, and it was called without
+`await`, so its promise was dropped on the floor.
+
+A rejection inside it therefore became an **unhandled promise rejection**:
+nothing caught it, nothing rendered, and `handleSubmit` had already blanked the
+form on the line above. The user pressed *Create club*, the club was written,
+the navigation failed, and they were left looking at an empty form with no
+message — the silent reset the whole rebuild set out to remove, reintroduced
+through the back door one commit later.
+
+**Found by a test, not by hand.** Writing coverage for the form surfaced it
+immediately: asserting that no create-failure alert appears made Jest report
+`revalidation exploded` as an unhandled rejection instead. Both hand checks
+before that had exercised the happy path, where the callback never rejects.
+
+Fixed by awaiting the callback inside a `catch` of its own, and saying
+something true rather than nothing: *Your club was created, but we could not
+open its dashboard. You will find it under Manage.* — with a different sentence
+on the proposal path, where no club exists and there is nothing under Manage to
+point at. `onSuccess` is now typed `void | Promise<void>` so the promise cannot
+be dropped silently again.
+
+---
+
+### BUG-045
+**A club that was created reported itself as not created** · Medium · FIXED 2026-09-09
+
+`useCreateClubForm.handleSubmit` called its `onSuccess` callback **inside** the
+`try` that wrapped the write. That callback is not part of the write: it
+refreshes the managed-clubs provider, revalidates the `clubs` cache tag and
+navigates to `/manage/[clubId]`. Any one of those throwing was caught by the
+same `catch` and rendered as `general` — so the form said the club could not be
+created while sitting on top of a club that had been, and a second attempt hit a
+409 on a slug the user had genuinely just taken.
+
+Fixed by moving the callback past the `try/finally` and reading it through a
+ref, so a failure there is what it actually is: a failure to *leave* a page that
+is still correct. The `catch` now also routes through `parseApiError` rather
+than `error.message` — `ApiError` carries the raw response body, so the message
+a user saw was a line of JSON.
+
+**Reported as `onSuccess is not a function`,** which was a second thing wearing
+the same costume. The running dev container was serving a stale Turbopack bundle
+whose `useCreateClubForm` still took one argument, so the new two-argument call
+bound the string `'create'` to `onSuccess` — truthy, and not callable. The same
+stale cache reported `Module not found: Can't resolve
+'@/app/lib/actions/revalidate'` for a file that was present on disk and in
+`HEAD`, and that `npm run build` compiled cleanly. Restarting
+`campusvibe-frontend` cleared both. The `typeof callback === 'function'` guard
+now makes the first failure impossible rather than merely unlikely; the second
+is an environment trap and is recorded in
+[`rules/frontend.md`](../../.claude/rules/frontend.md).
+
+---
+
+### BUG-046
+**Every `select` in the app was a plain pill with no affordance that it opened** · Low · FIXED 2026-09-09
+
+`selectClasses` (`frontend/app/components/ui/FormField.tsx`) set
+`appearance-none`, which removes the UA's own chevron, then reserved the slot for
+a replacement — `bg-[length:16px] bg-[right_1rem_center] bg-no-repeat pr-10` —
+and never supplied a `background-image`. Every one of those utilities was doing
+nothing, and there was `pr-10` of unexplained padding on the right of each
+control.
+
+Invisible because a `select` still opens on click, so nothing was broken enough
+to notice; it read as a text input that surprised you. Present wherever
+`selectClasses` is used, which is the create-club category field and the
+interest picker's category filter, not just the page it was found on.
+
+The image is `.select-chevron` in `globals.css` rather than a Tailwind arbitrary
+value, because the data URI contains spaces and that syntax cannot carry them.
+It is folded into `selectClasses` itself, so no future caller can take the
+padding without the chevron.
+
+---
+
+### BUG-041
+**`DevDataSeeder` had never once run, so every seeded club had a NULL embedding** · High · FIXED 2026-09-09
+
+**Found:** 2026-09-09, doing the `docker compose down -v && up` step of the
+club-governance verification — a cold start printed `Dev seed: 8 club(s) already
+present; skipping`, which on an empty database it should not have been able to.
+
+**What was wrong.** `DevDataSeeder` was written on 2026-08-16 to replace
+`V6__insert_mock_clubs.sql`, for two stated reasons: Flyway runs everywhere, so
+production would ship fake clubs; and a raw `INSERT` bypasses the service layer,
+leaving `clubs.embedding` NULL because it is written by `SearchIndexService` as a
+side effect of the normal create path. **The replacement half never happened.**
+No migration ever removed V6's rows, so on every cold start V6 inserted its eight
+clubs and the seeder's guard — *skip if any club exists* — then tripped.
+
+Measured on the cold start: eight clubs, `count(*) FILTER (WHERE embedding IS
+NULL)` = 8. The seeder existed for months, was covered by nothing, and did
+nothing.
+
+**Why nobody noticed.** `database-lifecycle/SKILL.md`'s known-deviations table
+recorded the row as *Retired 2026-08-16 by `V12__remove_mock_club_seed_data.sql`*.
+There is no such file — V12 is `create_club_admin_assignments`. A deviation
+recorded as fixed is one nobody re-checks, which is the general lesson worth more
+than the specific bug.
+
+**The fix.** `V32__retire_mock_club_seed_data.sql` deletes the eight, and the
+seeder's guard became **per club** rather than wholesale, so the two cannot fight
+on a database where one was kept. V32 spares any club that has events or
+assignments attached: `events.organizer_id` and `club_images.club_id` both
+`ON DELETE CASCADE`, so an unqualified delete would destroy a developer's local
+work. Verified on a fresh `down -v` boot: 8 clubs, **0 null embeddings**, 6 owned
+by the demo account and 2 deliberately ownerless.
+
+**Held by** [`rules/backend-clubs.md`](../../.claude/rules/backend-clubs.md) (do not restore
+a `count() > 0` guard) and [`rules/db-migrations.md`](../../.claude/rules/db-migrations.md)
+(the cascade guard, and the recorded-as-retired trap).
+
+---
+
+### BUG-040
+**An uploaded club logo took the whole `/clubs` page down** · High · FIXED 2026-09-09
+
+**Found:** 2026-09-09 by Arpan, loading `/clubs` after the club-governance work
+wired the logo upload: `Console TypeError: Failed to construct 'URL': Invalid
+URL` at `ClubLogo.tsx:58`.
+
+**What was wrong.** `ClubController.uploadLogo` stores an S3 object *key* —
+`clubs/{id}/logo-{filename}` — in `clubs.logo`, and `ClubDTO` handed it to the
+browser untouched. There was **no read path turning a key into a URL**, for club
+logos or anything else. `next/image` accepts a root-relative path or an absolute
+http(s) URL and throws on everything else, and it throws **during render**, so
+`ClubLogo`'s own `onError` fallback — written for exactly this class of problem —
+never got a chance and the page came down rather than degrading.
+
+Latent for as long as nothing could upload a logo: before this branch, nothing
+had ever written `clubs.logo` and it was NULL for every club.
+
+**The fix, in two parts.**
+
+1. `ClubLogo` checks a value is addressable before rendering it and falls back to
+   the club's initial otherwise. `javascript:` and `data:` parse as valid URLs, so
+   the protocol check rather than the `try/catch` is what keeps them out of an
+   `img src`.
+2. The read path Arpan chose: `GET /api/v1/clubs/{id}/logo` and
+   `/images/{index}` stream the bytes through the previously uncalled
+   `S3Service.getObject`. Presigned URLs cannot work against `FakeS3`, and no
+   bucket or CDN is provisioned to be public with.
+
+**Three things that did not work on the way**, recorded because each looks
+correct until it is run:
+
+- `images.remotePatterns` pointing at the API host — Next 16 refuses to optimize
+  an upstream image whose hostname resolves to a private IP, which loopback
+  always is in development. 400, with the reason only in the server log.
+- `images.dangerouslyAllowLocalIP` — got past that into `ECONNREFUSED`: the
+  optimizer runs *server-side*, where `localhost:8080` is the frontend container,
+  not the backend.
+- Emitting `API_INTERNAL_URL` server-side and the public URL in the browser would
+  then have been a hydration mismatch on `src`.
+
+All three dissolve into one same-origin `/media/**` rewrite resolving
+`API_INTERNAL_URL` at request time — the split `apiFetch` already makes. So
+`remotePatterns` is Unsplash-only, no SSRF flag is set, and the CSP `img-src` did
+not have to be loosened.
+
+**Verified** in the browser, not only in tests: `/clubs` renders every uploaded
+logo decoded, zero console errors, zero failed requests. 6 tests in `ClubMediaIT`
+(including that an uploaded SVG is served `application/octet-stream` — nothing
+validates uploads, [BUG-039](#bug-039), and an SVG can carry script), 8 in
+`ClubLogo.test.tsx`, 3 in `adapters.test.ts`.
+
+**Not fixed:** event banners and profile avatars have the same missing read path.
+Latent for the same reason this was — no UI uploads either yet.
+
+**Held by** [`rules/frontend.md`](../../.claude/rules/frontend.md) and
+[`rules/backend-clubs.md`](../../.claude/rules/backend-clubs.md).
+
+---
+
+### BUG-038
+**A deleted endpoint turned the Docker API smoke test into a 404 assertion** · Blocker · FIXED 2026-09-08
+
+**Found:** 2026-09-08, on [PR #41](https://github.com/ArpanSaha07/campus-vibe/pull/41)
+(`develop` → `main`). `Docker / Build images and run the stack` was the only
+failing job, which failed the aggregate `CI` gate and left the PR `BLOCKED`.
+Backend, Frontend, Database, Secret scan, both CodeQL analyses and Vercel all
+passed.
+
+**Symptom:** the *Smoke test the API* step, on its last assertion:
+
+```
+--- GET /api/v1/clubs/my-club (expect 401/403) ---
+status: 404
+::error::Protected endpoint returned 404 for an unauthenticated request.
+```
+
+Every earlier assertion passed — `/ping`, `/api/v1/clubs` returning 8, search
+returning 1 hit — so the stack was built, healthy and talking to Postgres. The
+message reads like a security regression: a route that should reject anonymous
+callers apparently did something else.
+
+**Cause.** It is not a security regression. The endpoint no longer exists.
+`GET /api/v1/clubs/my-club` was deleted on this branch — it could only ever
+answer with one club and gated on the platform-wide `ROLE_CLUB_ADMIN`, which no
+longer exists — and superseded by `GET /api/v1/users/me/managed-clubs`
+(`ClubController.java:51`, already recorded in
+[`club-administration.md`](../architecture/club-administration.md#backend--elsewhere)).
+
+The part worth keeping is *why it answers 404 rather than 401*. With the mapping
+gone, `/api/v1/clubs/my-club` does not fall off the end of the router — it falls
+through to `@GetMapping("/{id}")` with `id = "my-club"`. That route sits under
+`SecurityFilterChainConfig`'s GET `"/api/v1/clubs/**"` **permitAll** rule, so the
+request is never challenged at all. It reaches `ClubService.get("my-club")`,
+finds no such club, and answers 404.
+
+A path that used to be protected quietly became public, and the assertion could
+not tell that apart from a rename. Both surface only as *not 401/403*.
+
+**Why it broke only now.** `.github/workflows/_docker.yml` is untouched by this
+PR. It is correct on `main`, which still has `@GetMapping("/my-club")`
+(`git show origin/main:…/ClubController.java` → line 53). The merge is what
+invalidates it — exactly the failure a merge gate exists to catch. The gate
+worked; its message just pointed at the wrong culprit.
+
+**Fix:** retarget the assertion at the endpoint that actually replaced
+`my-club`. `GET /api/v1/users/me/managed-clubs` matches no permitAll matcher —
+there is none for `/api/v1/users/**` — so it falls through to
+`.anyRequest().authenticated()` and is genuinely protected. The smoke test keeps
+testing the same *property* (a protected route rejects anonymous callers) rather
+than being deleted for convenience.
+
+404 is now a separate branch with a message that names the real cause. A missing
+route and an unprotected route are different failures and should not share one
+diagnosis.
+
+**Affected files**
+- `.github/workflows/_docker.yml:199-222` — the retargeted assertion and the 404 branch.
+- `.claude/docs/architecture/ci-cd-pipeline.md` — step 5 named no route; it does
+  now, with the permitAll trap written down.
+
+**Verified:** the compose stack built and run locally, replaying the CI step by
+hand — `/ping` → `Pong: 1`; `/api/v1/clubs` → **8**; `clubs/search?q=coding` →
+**1** hit; `/api/v1/users/me/managed-clubs` → **403**, body *"Full authentication
+is required to access this resource"*, which confirms Security rejected it rather
+than a controller answering. The old path was re-checked in the same run and
+still returns **404**, so the diagnosis was confirmed rather than assumed.
+
+403 and not 401 because `DefaultExceptionHandler:49-59` maps
+`InsufficientAuthenticationException` to 403; the assertion accepts either.
+`ClubAdminListingIT.managedClubsRequiresAuthentication()` already pins that same
+403, so the smoke test and the integration suite now agree on one endpoint.
+
+**Not chased:** nothing else in CI asserts on a stale route — `_database.yml` and
+the rest of `_docker.yml` probe only `/actuator/health`, `/ping`,
+`/api/v1/clubs` and `/api/v1/clubs/search`, all of which still exist. Two
+mentions of `/clubs/my-club` survive in the frontend
+(`club-dashboard/page.tsx:6`, `club-admin-requests.ts:44`); both are comments
+explaining the removal, not calls.
+
+---
+
+### BUG-037
+**A club's category and interests were discarded at creation** · High · FIXED 2026-09-05
+
+**Found:** 2026-09-05, running the full `./mvnw verify` after clearing
+[BUG-036](#bug-036). `ClubTaxonomyIT.aClubCanBeClassifiedAtCreation` failed on
+`$.category`: *Expected: is "departmental" but: was null*. Nothing else in the
+248-test suite noticed.
+
+**Symptom:** `POST /api/v1/clubs` accepted a `category` and `interests`, answered
+`200`, and returned a `ClubDTO` with `category: null` and no interests. The row
+was written the same way — the tags were not merely missing from the response,
+they were never persisted. The club was also embedded for semantic search
+*without* its interest labels, so a club created with tags searched as though it
+had none. `PUT` was unaffected: it works on an entity loaded by `findClub`.
+
+**Cause.** The order of the four statements in `ClubService.create`:
+
+```java
+Club saved = clubRepository.saveAndFlush(club);
+club.setCategorySlug(taxonomyService.requireKnownClubCategory(category));
+club.getInterestSlugs().addAll(taxonomyService.requireKnownInterests(...));
+searchIndexService.indexClub(saved);
+return clubMapper.apply(saved);
+```
+
+`saved` and `club` look like the same object. They are not. `Club.id` is an
+**assigned** String slug with no `@GeneratedValue`, and `Club` does not implement
+`Persistable`, so Spring Data's `isNew()` sees a non-null id and decides the
+entity is *not* new — `SimpleJpaRepository.save` therefore calls `em.merge()`
+rather than `persist()`. **`merge()` returns a different, managed copy.** The
+original `club` is left detached. Both setters then wrote to the detached object,
+where nothing tracks them: no dirty check at commit, no INSERT column, and
+`clubMapper.apply(saved)` read the managed copy that was never told.
+
+This is the same assigned-id trap as [BUG-034](#bug-034), one layer up. There it
+decided *when* the INSERT ran; here it decides *which object you are holding*.
+Both are invisible in `EventService`, whose `IDENTITY` id makes `save()` take the
+`persist()` branch and hand the same instance straight back.
+
+**Fix:** move the two taxonomy statements above `saveAndFlush`, so they mutate
+`club` while it is still the object being merged. Three lines reordered, no new
+code. The existing comment already claimed the validation happened *before* the
+insert — the code had drifted from it, and now matches again.
+
+**Why the reorder is the better fix**, rather than retagging `saved`: validating
+first means a bad slug throws before anything is written, so a misclassified club
+never reaches the database even momentarily; and `indexClub(saved)` now sees the
+interest labels it is supposed to embed, which retagging after the save would not
+have fixed.
+
+**Verified:** `./mvnw -B clean verify` — 57 unit + 248 integration tests green,
+including the two taxonomy suites and `abadSlugRefusesTheWholeCreation`, which
+still refuses the whole creation.
+
+**Not chased:** `Club` could implement `Persistable` and answer `isNew()` honestly,
+which would make `save()` take the `persist()` branch and remove this class of
+surprise for every future caller. That changes write behaviour for every club
+path, so it belongs in its own commit — noted in `todo.md`.
+
+---
+
+### BUG-036
+**Backend CI stopped compiling after the `feature/user-profile` merge** · Blocker · FIXED 2026-09-05
+
+**Found:** 2026-09-05, Branch checks → *Backend / Build and test*,
+[run 33916539063](https://github.com/ArpanSaha07/campus-vibe/actions/runs/33916539063/job/101164951602)
+on `develop` at `168bd4a`.
+
+**Symptom:** `mvn verify` failed in `default-compile`, one error, no tests run
+and no test reports uploaded:
+
+```
+DevDataSeeder.java:[65,29] incompatible types: invalid method reference
+  method create in class ClubService cannot be applied to given types
+  required: Club,String,List<String>
+  found:    Club
+```
+
+**Cause.** The taxonomy work widened two signatures and updated the callers it
+could see:
+
+| Changed | New shape | Call site left behind |
+|---|---|---|
+| `ClubService.create` | `(Club, String, List<String>)` | `DevDataSeeder:65` — `clubService::create` |
+| `BootstrapProperties` | gained a fourth component, `name` | `AdminBootstrapRunnerIT:33` |
+
+`ClubController` was updated, `DevDataSeeder` was not — a method *reference*
+rather than a call, so it reads as a name and not as an argument list. The
+`BootstrapProperties` miss is a record whose canonical constructor grew in the
+very last commit on the branch.
+
+**Why CI only reported one of them.** `javac` stops the module at the first
+failing phase: `default-compile` never finished, so `default-testCompile` never
+ran and the second break was invisible in the log. Fixing only what the workflow
+printed would have produced an identical-looking failure on the next push. Both
+were found by running `./mvnw -B verify -DskipITs` locally — the exact command
+`_backend.yml` runs.
+
+**Fix:** two call sites, no signature changes.
+
+- `DevDataSeeder` → `create(club, null, List.of())`. `TaxonomyService` already
+  treats a null category and an empty interest list as legitimately absent
+  (clubs predating V23 have neither), so the demo clubs seed uncategorised,
+  exactly as `V6` inserted them.
+- `AdminBootstrapRunnerIT` → passes `null` for `name`, which the compact
+  constructor defaults to `"Administrator"` — the value an environment that sets
+  no display name gets. No assertion in that suite reads the name.
+
+**Verified:** `./mvnw -B verify -DskipITs` green (57 tests), then a full
+`clean verify` to cover the integration test that had been edited — which is how
+[BUG-037](#bug-037) surfaced.
+
+---
+
+### BUG-035
+**Backend jar shipped Tomcat 10.1.55 with three CRITICAL CVEs** · High · FIXED 2026-09-03
+
+**Found:** 2026-09-03, Docker workflow → *Scan images for known vulnerabilities*,
+[run 33825682549](https://github.com/ArpanSaha07/campus-vibe/actions/runs/33825682549/job/100877748407)
+on [PR #39](https://github.com/ArpanSaha07/campus-vibe/pull/39).
+
+**Symptom:** three fixable CRITICALs, all `lang-pkgs`, all one library, all inside
+`app/app.jar`. The `alpine 3.24.1` layer reported **0**, and the production
+frontend image reported **0 fixable HIGH and 0 CRITICAL** — it still holds the
+[BUG-016](#bug-016) result. Same shape as [BUG-019](#bug-019), one bump later.
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `tomcat-embed-core` | CVE-2026-65182 — bypass of the longest-prefix security constraint | 10.1.55 | 10.1.58 |
+| `tomcat-embed-core` | CVE-2026-65905 — limited replay attack against DIGEST authentication | 10.1.55 | 10.1.58 |
+| `tomcat-embed-core` | CVE-2026-68525 — redirect after FORM auth bypasses method-specific constraints | 10.1.55 | 10.1.58 |
+
+Checked against the GitHub Advisory Database rather than read off the scanner:
+Trivy renders one merged *Fixed Version* cell across all three rows, which looks
+like an assumption until you confirm each advisory separately gives
+`org.apache.tomcat.embed:tomcat-embed-core` the range `>= 10.1.0-M1, < 10.1.58`.
+
+**Cause.** Identical to BUG-019, and worth repeating because it is the recurring
+shape: `tomcat-embed-core` appears nowhere in `pom.xml`. It arrives transitively
+through `spring-boot-starter-web`, and its version is dictated by
+`spring-boot-starter-parent` 3.5.16, whose BOM sets
+`<tomcat.version>10.1.55</tomcat.version>`.
+
+Nothing in this repository changed between the green run and the red one. These
+are newly published advisories, not newly reached code — the second time that
+has happened here, which makes it a property of pinning a framework rather than
+an incident.
+
+**Two things made this one different from BUG-019.**
+
+**1. The parent-version lever is exhausted.** BUG-019 fixed the same failure by
+moving the parent 3.5.5 → 3.5.16 and recorded that *"the parent version is the
+only lever — overriding `<tomcat.version>` by hand would leave the rest of the
+tree on 3.5.5's matrix."* That reasoning held while the 3.5 line still had room
+above the pin. It does not hold now: **3.5.16 is the newest 3.5.x published**.
+The next parent is 4.0.0 — a major, which `todo.md` records as failing both CI
+tiers (Dependabot `#17`), and taking a framework migration as a CVE remedy is
+exactly what BUG-019 refused to do. So the override BUG-019 dismissed is what is
+left, and it is in any case Spring Boot's own documented mechanism: the BOM
+declares all four `tomcat-embed-*` artifacts at `${tomcat.version}`, so a child
+property moves them together rather than desynchronising them.
+
+**2. The version the advisories name does not exist.** Every advisory says the
+fix is **10.1.58**. Maven Central has no such artifact — the published 10.1.5x
+line runs 55, 56, 57, **59**; the `10.1.58/` directory returns 404. Copying the
+number out of the scanner report gives a build that cannot resolve, with an error
+that says nothing about why. **10.1.59** is the first release that both exists
+and satisfies the range.
+
+**Fix.** `<tomcat.version>10.1.59</tomcat.version>` in `backend/pom.xml`
+`<properties>`, with the parent left at 3.5.16. The comment on the property
+records the 10.1.58 trap and the condition for removing the override (a parent
+that manages 10.1.58 or newer), so a later tidy-up does not quietly reintroduce
+three CRITICALs. The stale comment on the parent `<version>` — which claimed
+3.5.16 was the floor for the Trivy gate — was corrected at the same time, since
+left alone it points the next reader at the wrong lever.
+
+**Verified locally, 2026-09-03**, with Docker Desktop running. Version identity
+is strong evidence for these three findings and silent about any fourth, so the
+gate itself was replayed rather than inferred, with Trivy **0.74.0** — the same
+version `_docker.yml` installs — run from the `aquasec/trivy` image against the
+daemon:
+
+| Check | Result |
+|---|---|
+| `./mvnw -B verify -DskipITs` | BUILD SUCCESS, **39/39** unit tests |
+| `./mvnw -B verify` (full) | BUILD SUCCESS, **149/149** — 39 unit + 110 integration, `SearchIT` included |
+| `dependency:list` | `tomcat-embed-core`/`-el`/`-websocket` all **10.1.59**; `spring-security-*` unchanged at **6.5.11** |
+| Fat jar contents | `BOOT-INF/lib/tomcat-embed-core-10.1.59.jar` |
+| **Gate — fixable CRITICAL** | **exit 0** · alpine **0** · `app/app.jar` **0** |
+| Container boots | Tomcat starts, `/actuator/health` `{"status":"UP"}` |
+| CI smoke replay | `/ping` `Pong: 2` · `/api/v1/clubs` **8** · `clubs/search?q=coding` **1** hit · `/my-club` **403** |
+
+The boot check is not ceremony. Spring Boot reaches into Tomcat internals through
+`TomcatServletWebServerFactory`, so a Tomcat bump under a fixed Boot version is
+not structurally free the way a leaf-library bump is; a resolved version proves
+the jar changed, not that the server still starts.
+
+**New fixable-HIGH baseline for the backend image**, measured in the same run —
+**12 findings, 0 CRITICAL**, none of which the gate can see. Tomcat is now absent
+from HIGH as well as CRITICAL:
+
+| Class | Library | CVE | Installed | Fixed in | Whose to fix |
+|---|---|---|---|---|---|
+| `os-pkgs` | `libcrypto3`, `libssl3`, `openssl` | CVE-2026-14456 | 3.5.7-r0 | 3.5.8-r0 | `eclipse-temurin:25-jdk-alpine` |
+| `os-pkgs` | `libexpat` | CVE-2026-66046, -76641 | 2.8.3-r0 | 2.8.4-r0 | same base image |
+| `lang-pkgs` | `commons-io` | CVE-2024-47554 | 2.11.0 | 2.14.0 | **ours** — hard-pinned in `pom.xml` |
+| `lang-pkgs` | `netty-codec` | CVE-2026-59901 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http` | CVE-2026-55831, -55833, -56745 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http2` | CVE-2026-56819 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `org.postgresql:postgresql` | CVE-2026-54291 | 42.7.11 | 42.7.12 | BOM |
+
+The `p11-kit` pair from the BUG-019 table is gone; `libcrypto3`/`libssl3`/
+`openssl` are new. The `lang-pkgs` half is unchanged from BUG-019, including the
+open question it left: all five netty artifacts still enter through
+`software.amazon.awssdk:s3` → `netty-nio-client`, the SDK's *async* transport, so
+if the S3 client in use is synchronous an `<exclusion>` deletes five of the twelve
+outright. Still worth establishing before bumping anything.
+
+**Deliberately left alone:** everything in the HIGH table. The gate is
+CRITICAL-only, none of these blocks CI, and `commons-io` in particular is part of
+the hard-pinned, BOM-free block that Dependabot's maven entry exists to service.
+Tightening the gate to HIGH remains blocked for the same reason as before.
+
+**Affected files:** `backend/pom.xml`
+
+---
+
+### BUG-032
+**The rate-limit 429 built its JSON by string interpolation** · Medium · FIXED 2026-08-16
+
+**Found:** 2026-08-16, by CodeQL on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31)
+(`java/xss`, reported High).
+
+`RateLimitResponses.tooManyRequests` wrote the refusal body like this:
+
+```java
+response.getWriter().write("""
+        {"path":"%s","message":"%s","statusCode":429}"""
+        .formatted(request.getRequestURI(), message.formatted(retryAfterSeconds)));
+```
+
+Two separate defects in three lines.
+
+**1. Nothing is escaped.** `getRequestURI()` is written by whoever made the
+request. A `"` in it closes the JSON string and everything after it is parsed as
+document structure. *Not exploitable as the code stood* — both filters call this
+only from `doFilterInternal`, and their `shouldNotFilter` returns early unless
+the URI **exactly equals** one of six constants, so the value reaching the
+formatter was provably one of those six. That is an invariant held in a different
+method of a different class, though, and the next filter to reuse this helper
+with a prefix match reintroduces the hole silently. CodeQL was reading the sink,
+which is the right thing to read.
+
+**2. The body is the wrong shape.** It emitted three fields; `ApiError` has four.
+A throttled caller got a body missing `localDateTime` that every other error in
+the API carries — the class javadoc claimed the shapes matched, and they did not.
+
+**Fix:** stop writing the body here at all. The filter now hands a
+`TooManyAttemptsException` to `handlerExceptionResolver`, which runs the refusal
+back through the existing `@ControllerAdvice` — same handler, same serializer,
+same shape. There is no hand-rolled JSON left to escape, and no second copy of
+the error format to keep in step. `@Lazy` on the injected resolver keeps the MVC
+infrastructure out of the security chain's construction.
+
+**Covered by a test:** `AuthRateLimitIT.aRefusalHasTheSameBodyAsEveryOtherError`
+asserts all four fields on a real 429. The eight pre-existing rate-limit tests
+pass unchanged, which is the evidence that status, `Retry-After` and `message`
+still come out identical.
+
+---
+
+### BUG-034
+**Club search embeddings were never written** · High · FIXED 2026-08-16
+
+**Found:** 2026-08-16, while replacing the `V6` mock-club seed with a dev seeder
+during AWS production preparation. The seeder creates clubs through
+`ClubService`, precisely so embeddings are populated on the normal write path —
+and `count(embedding)` still came back `0` of `8`.
+
+**Symptom:** every club in the database had `embedding IS NULL`, so the semantic
+half of hybrid club search matched nothing. Keyword search still worked, which is
+why this never looked broken. No error, no warning, no failing test.
+
+**Cause:** `ClubService.create` did
+
+```java
+Club saved = clubRepository.save(club);
+searchIndexService.indexClub(saved);   // UPDATE clubs SET embedding = ... WHERE id = ?
+```
+
+`Club.id` is an **assigned** String slug, not a generated key. Hibernate has no
+reason to contact the database before commit, so the INSERT sits in the action
+queue. `indexClub` writes through `JdbcTemplate`, and a raw JDBC statement is not
+a JPA query, so it does not trigger a flush either. The UPDATE therefore ran
+against a row that did not exist yet, matched zero rows, and reported success —
+`JdbcTemplate.update` returns a count nobody was checking.
+
+**Why events escaped it.** `Event.id` is `GenerationType.IDENTITY`. Hibernate
+cannot obtain an IDENTITY key without executing the INSERT, so by the time
+`indexEvent` runs the row is really there. Identical-looking code, opposite
+outcome, decided entirely by the id strategy — which is why reading
+`EventService` as proof that the pattern works is misleading.
+
+**Fix:** `clubRepository.saveAndFlush(club)` in `ClubService.create`. The
+`update` path was already correct: it targets a row that exists.
+
+**Verified:** local `clubs` went from `0/8` to `8/8` rows carrying an embedding.
+
+**Left alone deliberately:** `SearchIndexService` still ignores the update count.
+Making it warn on a zero-row index write would have caught this years earlier and
+is worth doing, but it is a change to shared indexing behaviour and belongs in
+its own commit — noted in `todo.md`.
+
+---
+
+### BUG-033
+**Caller-supplied text reached three log statements unescaped** · Medium · FIXED 2026-08-16
+
+**Found:** 2026-08-16, same CodeQL run (`java/log-injection`, three instances).
+
+A log line is text. A value containing a newline does not appear *inside* an
+entry — it ends that entry and begins one the caller composed. Three sinks took
+request data straight into a format argument:
+
+- `DefaultExceptionHandler:221` — `request.getRequestURI()` and `getMethod()`.
+  The worst of the three: this is the line someone reads to find out what broke,
+  so it is the last one that should be writable by whoever broke it.
+- `SmtpMailSender:39` — the recipient address, i.e. whatever was typed into the
+  forgot-password form.
+- `LoggingMailSender:25` — recipient, subject and the whole body, which is
+  assembled from the user's own display name.
+
+**Reachability was limited, not absent.** `getRequestURI()` is *not* URL-decoded
+by the servlet container, and Tomcat rejects a raw control character in the
+request line, so the exception-handler sink was hard to drive. The mail sinks had
+no such protection: a display name is stored and echoed verbatim.
+
+**Fix:** `com.campusvibe.common.Logs`. `safe()` replaces the whole `\p{Cntrl}`
+class — CR and LF, and also ESC, since a log tailed in a terminal will interpret
+escape sequences and repaint the operator's screen — then bounds the length,
+because nothing forces a URI to be short. `safeBlock()` is the variant for the
+mail body, whose line breaks are the point: it keeps them and prefixes every
+line, so injected content still cannot pass as an entry of its own.
+
+**Covered by a test:** `LogsTest`, eight cases including the forged-entry and
+terminal-escape ones.
+
+---
+
+### BUG-025
+**`formatDayLabel` followed the host locale while its own labels were hardcoded English** · Low · FIXED 2026-08-14
+
+**Found:** 2026-08-14, running the frontend CI steps locally. It failed here and
+passed on CI, which is the signature worth recognising.
+
+**Symptom:** `app/__tests__/my-events.test.ts:198`
+
+```
+Expected substring: Aug
+Received string:    mar. 25 aout
+```
+
+**Cause:** `formatDayLabel` returns hardcoded English for the near days —
+`Today`, `Tomorrow`, `Yesterday` — and then formatted the fallback with
+`toLocaleDateString(undefined, …)`, which follows the host. The GitHub runner is
+en-US, this machine is fr-CA.
+
+**The test failure was the smaller half.** The real defect is in the product: a
+My Events list on a French machine renders `Today` directly above `mar. 25
+aout`. Half the labels ignore the locale and half follow it, so the result is
+never right in either language.
+
+**Fix:** pin `en-US` in the formatter, matching the hardcoded labels above it.
+Localising properly means translating those three strings too, and that is a
+different piece of work — noted in the code comment so the next person sees both
+halves together.
+
+**Why it was fixed now rather than left open.** It blocked something else: local
+verification (`scripts/verify.mjs`) reports what CI would report, and a suite
+with one permanent machine-specific failure trains you to skim past the summary.
+A guardrail that always shows a red line is a guardrail that gets ignored. Suite
+is now 130/130 locally and on CI.
+
+**Affected files**
+- `frontend/app/lib/my-events.ts` — the pinned locale
+
+---
+
+### BUG-027
+**`/clubs` was prerendered at build time, so `next build` required a live backend** · High · FIXED 2026-08-14
+
+**Found:** 2026-08-14, on the push that fixed [BUG-026](#bug-026). The Frontend
+job got past `type-check` and `test` and then failed in `build`:
+
+```
+Error occurred prerendering page "/clubs".
+[TypeError: fetch failed] { digest: '3227098399',
+  [cause]: AggregateError: { code: 'ECONNREFUSED' } }
+```
+
+**Cause:** converting `/clubs` to a Server Component made it a *static* route —
+it takes no params and reads no request-time API, so Next prerendered it during
+`next build`, which ran `getAllClubs()` against a backend that does not exist on
+a CI runner. The build output named it plainly and was not read carefully
+enough: `/clubs` was the one route listed as `○ (Static)` *with* a revalidate
+window, which is exactly the signature of build-time fetching.
+
+**Why local builds passed and CI did not.** The dev machine had the Docker
+backend up on `localhost:8080` throughout, so the build-time fetch succeeded and
+the route prerendered fine. Verifying a build on a machine where the API happens
+to be running does not test what CI does. Reproduced by pointing
+`API_INTERNAL_URL` at a dead port, which produced the identical digest.
+
+**Fix:** `await connection()` at the top of the page, so rendering waits for a
+real request and never happens at build time.
+
+**Rejected: `export const dynamic = 'force-dynamic'`.** The docs state it is
+equivalent to `fetchCache = 'force-no-store'`, which would strip the
+five-minute cache off every read in this tree and undo the whole point of the
+change that introduced it. `connection()` moves only *when* the render happens
+and leaves the data cache alone.
+
+**Measured, not assumed.** Against a counting proxy in front of the backend,
+three consecutive request-time renders of `/clubs` produced **one** upstream
+`GET /api/v1/clubs`. Caching survived the fix. The page returns 200 and renders
+all 8 seeded clubs server-side.
+
+**The general rule this establishes:** a frontend build must not depend on the
+API being reachable. Any Server Component that fetches and takes no params is a
+candidate for this failure — check the build output for a route marked `○` that
+also has a revalidate window.
+
+**Affected files**
+- `frontend/app/(main)/clubs/page.tsx` — the `connection()` call and its comment
+
+---
+
+### BUG-026
+**Frontend CI broke on `main`: `as const` cache policies would not assign to a mutable `tags: string[]`** · High · FIXED 2026-08-14
+
+**Found:** 2026-08-14, when the push of `482c4dd` failed the Frontend job. The
+commit message for that change said in as many words that the second half had
+not been typechecked. It had not, and this is what was in it.
+
+**Symptom:** `npm run type-check` failed with five instances of TS2345:
+
+```
+app/lib/club.tsx(8,63): error TS2345: Argument of type
+'{ readonly revalidate: 300; readonly tags: readonly ["clubs"]; }'
+is not assignable to parameter of type 'FetchOptions'.
+  Types of property 'tags' are incompatible.
+    The type 'readonly ["clubs"]' is 'readonly' and cannot be
+    assigned to the mutable type 'string[]'.
+```
+
+**Cause:** `PUBLIC_READ_CACHE` in `app/lib/cache.ts` is declared `as const`, so
+its tag arrays are readonly tuples. `FetchOptions.tags` was typed `string[]`,
+which a readonly array cannot satisfy. The two were written in the same change
+and never compiled together.
+
+**Fix:** widen the option to `tags?: readonly string[]` — `apiFetch` only reads
+it — and copy into a mutable array at the `fetch` boundary, because Next types
+`RequestInit['next'].tags` as `string[]` (`next/types/global.d.ts:166`). Copying
+also stops a caller from mutating the shared policy object for every other call
+site.
+
+**Why it reached `main`:** nothing here is subtle; the change was simply pushed
+without running the checks CI runs. The four frontend CI steps are cheap
+(`type-check`, `lint`, `test`, `build`) and reproduce it exactly.
+
+**Also surfaced, and fixed alongside:** three assertions in `club.test.ts` and
+`event.test.ts` still expected `apiFetch` to be called with a bare path and were
+failing on the new second argument. They now assert the cache policy too, so a
+public read that silently loses its policy fails a test instead of quietly going
+back to hitting the backend on every render. A new `app/__tests__/api.test.ts`
+(7 tests) covers the guard that refuses `auth` combined with `revalidate`/`tags`
+— the case where a cached response would hand one user's data to the next
+caller, which had no test at all.
+
+**Affected files**
+- `frontend/app/lib/api.tsx` — the `tags` type and the copy at the fetch call
+- `frontend/app/__tests__/api.test.ts` — new
+- `frontend/app/__tests__/club.test.ts`, `event.test.ts` — updated assertions
+
+---
+
+### BUG-024
+**A non-numeric path variable answered 500 instead of 400** · Medium · FIXED 2026-08-13
+
+**Found:** 2026-08-13, probing the event API while fixing
+[BUG-023](#bug-023).
+
+**Symptom:** `GET /api/v1/events/dance-party` returned **500**:
+
+```json
+{"path":"/api/v1/events/dance-party",
+ "message":"Method parameter 'id': Failed to convert value of type 'java.lang.String' to required type 'java.lang.Long'",
+ "statusCode":500}
+```
+
+**Cause:** Spring raises `MethodArgumentTypeMismatchException` when a path
+variable cannot be converted to the controller's parameter type.
+`DefaultExceptionHandler` had no handler for it, so it fell through to the
+catch-all `@ExceptionHandler(Exception.class)` and was reported as a server
+fault — for what is a malformed request the server understood perfectly well.
+
+Not specific to events: it applied to every `Long` path variable in the app —
+`DELETE /api/v1/events/{id}`, the image upload routes, and anything added later.
+It was reachable from the UI rather than only by hand, because the old hardcoded
+event page linked to a slug id (`dance-party`).
+
+The raw exception message also leaked the target Java type and the controller
+parameter name into the response body.
+
+**Fix:** a `MethodArgumentTypeMismatchException` handler returning **400** with
+`"Invalid value for '%s'".formatted(e.getName())` — the parameter name only, not
+the type detail. Ordering does not matter here: Spring picks the most specific
+handler regardless of declaration order.
+
+**Verification:** `EventLookupIT.nonNumericIdIs400NotAServerError` and
+`aDecimalIdIsAlso400`, plus live checks — `/api/v1/events/dance-party` and
+`/api/v1/events/1.5` both **400**, `/api/v1/events/999999` still **404**, a real
+id still **200**.
+
+---
+
+### BUG-023
+**Event detail page served one hardcoded event, with a club nobody has** · Medium · FIXED 2026-08-13
+
+**Found:** 2026-08-13, split out of [BUG-022](#bug-022) — same root cause, second
+page.
+
+**Symptom:** `app/(main)/events/[eventId]/page.tsx` built its entire event from a
+literal — title, date, location, categories, organizer — and ignored the
+`eventId` in the route, so every event URL rendered the same "Dance Party". Its
+`organizer.name` was `fashion-takes-action`: a slug rather than a name, and one
+no seeded club shares. So the organizer link went nowhere, and
+`<ClubFollowButton clubId={event.organizer.name} />` posted an id the API
+rejects — the label flipped to *Following* and reverted a moment later when the
+404 came back. Before the follow work that button did nothing at all, which is
+why the mismatch had stayed invisible.
+
+**Fix:** the same treatment the club page had in BUG-022, now an established
+pattern rather than a one-off.
+
+- `getEvent` returns `EventInstance | null` — `null` for a 404, rethrowing
+  everything else. It also answers `null` for an id that is not a positive
+  integer, without spending a request: event ids are database bigints, so a slug
+  cannot name one. That is what makes `/events/dance-party` a 404 rather than a
+  round trip ending in [BUG-024](#bug-024).
+- The page is an async Server Component calling `notFound()`, with scoped
+  `not-found.tsx` and `error.tsx` beside it.
+- The organizer block is resolved from the event's real `organizerId` via
+  `getClubById`, giving a working club link, the club's actual name, and a
+  Follow button with an id the API accepts. It reuses `ClubLogo`, so a club
+  without a logo shows its initial instead of the old hardcoded `/frosh1.jpeg`.
+  A missing club degrades that one section rather than 404ing the whole page —
+  the event is real even if its club has been removed.
+- The `/events` listing became a Server Component too, reading `?q=` from the
+  `searchParams` prop. That removed the `useSearchParams` + `Suspense` wrapper
+  and the "Loading events…" flash, and its former inline error branch is now
+  `app/(main)/events/error.tsx`. No `notFound()` there on purpose: `/events`
+  always exists, and an empty result is an empty state, not a 404.
+
+**Verification:** measured against the running stack with a throwaway event
+(since removed). `/events/1` → **200**, `<title>E2E Chess Night · CampusVibe</title>`,
+organizer rendered as *Chess Club* linking to `/clubs/chess-club`;
+`/events/999999`, `/events/dance-party` and `/events/1.5` → real **404**s
+carrying `noindex`, the navbar, and Browse all events; `/events` and
+`/events?q=chess` → **200** with no loading flash. Following from the event page
+wrote `chess-club` to `user_followed_clubs` and **stayed** *Following* — the
+exact symptom this bug was about. With the backend stopped, both pages showed
+their Try again boundary rather than a not-found. 10 new tests in
+`event.test.ts`, 5 in `EventLookupIT`.
+
+---
+
+### BUG-022
+**Every club page showed "Club not found"** · High · FIXED 2026-08-13
+
+**Found:** 2026-08-13, while checking the new Follow button on the club detail
+page. The button could not be reached, because the page it lives on never
+rendered.
+
+**Symptom:** `/clubs/chess-club` — a club that exists, is listed on `/clubs`,
+and is served fine by the API — rendered the empty state:
+
+```
+Club not found
+This club page doesn't exist — it may have been renamed or removed.
+```
+
+**Cause:** `getClubById` in `app/lib/club.tsx` searched `app/data/data.ts`, and
+the two id spaces had never overlapped. Mock: `mcgill-ski-club`,
+`fashion-takes-action`, `eng-frosh`, `startup-montreal`, `tech-montreal`,
+`montreal-artists`. Seeded by `V6` and served by the API: `chess-club`,
+`coding-club`, `debate-club`, and five more. `getAllClubs` *did* call the API,
+so `/clubs` handed out real ids the detail page could not resolve. Every route
+in was affected: each `ClubCard`, each `MyClubCard` on the new My clubs page,
+and the club link on every event card. `GET /api/v1/clubs/{id}` had been
+implemented and serving 200 the whole time (`ClubController.java:55`).
+
+Two further problems were tangled into the same page and fixed with it:
+
+1. **A missing club threw.** `getClubById` threw for an unknown id, and its one
+   caller caught the throw and turned it straight back into `setClub(null)` —
+   an exception that existed only to be swallowed one line later. Anyone can
+   type any slug, so a miss is an ordinary outcome; Next's error-handling guide
+   is explicit that expected errors should be return values.
+2. **The 404 was a soft one.** The page was a Client Component, so `club` began
+   as `null` and both SSR and the first client paint rendered "Club not found" —
+   every *valid* club briefly flashed its own error state — and the response was
+   `200 OK` either way, so a dead club looked fine to a crawler.
+
+**Fix**, in four parts:
+
+- `apiFetch` now throws an `ApiError` carrying `status`. The status was
+  previously lost, which is why `auth-errors.ts:1` has to `JSON.parse` the
+  message back out of the body. `Error.message` is unchanged, so every existing
+  caller and `parseApiError` behave exactly as before.
+- `getClubById` calls the endpoint and returns `Club | null` — `null` only for a
+  404, rethrowing everything else.
+- The page became an async Server Component calling `notFound()`, with the tab
+  state extracted to `ClubEventTabs` (`"use client"`). The check runs in the
+  page body rather than inside a `<Suspense>` boundary, which is what makes the
+  response non-streamed and therefore a real 404 rather than a 200.
+- A scoped `not-found.tsx` carries the previous EmptyState markup verbatim, and
+  a new `error.tsx` handles the genuinely exceptional case. Splitting those two
+  is what stops a backend outage from telling a user their club was deleted.
+
+Server-side fetching was new to this app and needed one piece of plumbing:
+`NEXT_PUBLIC_API_URL` is `http://localhost:8080`, which inside the frontend
+container is that container. `api.tsx` now picks `API_INTERNAL_URL`
+(`http://backend:8080`, set in `docker-compose.yml`) when `window` is undefined.
+It is deliberately not `NEXT_PUBLIC_`: a Docker service name is meaningless to a
+browser and must not be inlined into the client bundle.
+
+**Verification:** `/clubs/chess-club` → **200** with `Chess Club` in the SSR
+HTML, `<title>Chess Club · CampusVibe</title>`, and no "Club not found" visible;
+`/clubs/nonsense` and the stale mock slug `/clubs/tech-montreal` → a real
+**404** carrying `noindex`, the unchanged empty state, and the `(main)` navbar
+and footer. With the backend stopped the page shows "Couldn't load this club"
+and a working Try again, *not* the not-found card. Follow / unfollow works from
+the club page and writes to `user_followed_clubs`, and a My clubs card now
+clicks through to a rendered club page. 7 new tests in `club.test.ts`.
+
+**Left open as [BUG-023](#bug-023), fixed the same day:** the event detail page has the same
+root cause — a hardcoded event whose `organizer.name` is a slug no club shares —
+and still needs wiring to `GET /api/v1/events/{id}`.
+
+---
+
+### BUG-021
+**Stale Turbopack cache in the frontend container served pre-edit CSS** · Low · FIXED 2026-08-13
+
+**Found:** 2026-08-13. The My clubs cards stopped drifting on hover. `globals.css` still
+held `.lift-tr`, `MyClubCard.tsx` still carried the class, and nothing in `git diff`
+explained it.
+
+**Symptom:** the stylesheet Next actually served was the version from *before* the
+`.lift-tr` edit — the rule was absent entirely, and the `prefers-reduced-motion` block
+still listed only the original two selectors:
+
+```
+$ curl -s http://localhost:3000/_next/static/chunks/'[root-of-the-server]__0oeaxs7._.css' | grep lift
+2835:.lift {
+2839:.lift:hover {
+2849:  .lift, .lift:hover {
+```
+
+while inside the container the source was current (`grep -c lift-tr app/globals.css` → 6).
+Source and served output disagreed, which is why reading the code proved nothing.
+
+**Cause:** `.next/` lives in the container's writable layer, and `docker compose up -d` on
+an existing stopped container **starts it rather than recreating it**, so that directory
+survives. The container here had been created on 2026-08-10; `next dev` restarted today at
+13:11 on top of a three-day-old Turbopack persistent cache and reused the CSS chunk it
+found there instead of recompiling from the newer file synced in at 13:01.
+
+The frontend service deliberately has **no bind-mount** — `develop.watch` syncs source in
+instead, to avoid the slow Windows bind-mount into the VM (`docker-compose.yml:112-170`).
+That is the right trade-off, but it means the container's idea of the source and its cache
+can drift apart in a way a bind-mounted setup would not.
+
+**Fix:** drop the cache and restart.
+
+```sh
+docker exec campusvibe-frontend rm -rf .next
+docker restart campusvibe-frontend
+```
+
+**Verification:** the served chunk then contained `.lift-tr`, `.lift-tr:hover,
+.lift-tr:focus-visible`, and the five-selector reduced-motion block. Measured in headless
+Chromium on `/my-clubs`: resting `transition-duration: 0.22s`, hover transform
+`matrix(1, 0, 0, 1, 8, -8)`, 6.8px of it already travelled 80ms in (so it eases rather
+than jumps), and `:focus-visible` producing the same transform.
+
+**Prevention:** when a CSS or config edit appears to have no effect, diff the *served*
+asset against the source before touching the code — the same class of mistake as
+[BUG-013](#bug-013), where `compose watch` synced into an image that could not recompile.
+Remember that plain `docker compose up -d` does not re-sync source into an existing
+container; `docker compose watch` is what propagates edits, and a container restart alone
+keeps whatever cache was already there.
+
+---
+
+### BUG-020
+**Changing `POSTGRES_PASSWORD` in `.env` locked the backend out of the existing volume** · High · FIXED 2026-08-12
+
+**Found:** 2026-08-12, after rotating the local Postgres password in `docker/.env`.
+`campusvibe-db` came up healthy, `campusvibe-backend` exited 1 during Flyway's very
+first connection attempt.
+
+**Symptom:**
+
+```
+SQL State  : 28P01
+Message    : FATAL: password authentication failed for user "arpan"
+```
+
+The confusing part is that `db` reported **healthy** throughout. Its healthcheck is
+`pg_isready`, which only asks whether the server accepts connections — it never
+authenticates, so a password mismatch is invisible to it. Compose therefore satisfied
+`depends_on: service_healthy` and started the backend straight into the failure.
+
+**Cause:** `POSTGRES_PASSWORD` is read by the Postgres image's entrypoint **only when it
+runs `initdb` on an empty data directory**. The `docker_db_data` volume was initialized
+under the old password, so the `arpan` role kept the old SCRAM verifier while
+`SPRING_DATASOURCE_PASSWORD` (`docker-compose.yml:56`) now carried the new one. Compose
+did recreate the `db` container on the next `up` — its `POSTGRES_PASSWORD` env var
+matched `.env` exactly — but a recreated *container* over a pre-existing *volume* changes
+nothing about the role that already exists inside the database. The env var is an init
+input, not a desired-state declaration.
+
+**Fix:** reset the role in place, over the container's Unix socket. The image's generated
+`pg_hba.conf` keeps `local all all trust`, so the forgotten old password was not needed:
+
+```sh
+docker exec campusvibe-db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '"'"'$POSTGRES_PASSWORD'"'"'"'
+```
+
+Both variables expand *inside* the container, so the value comes from the env Compose
+already injected from `.env` and the secret never lands in host argv or shell history.
+Postgres 15 defaults `password_encryption` to `scram-sha-256`, matching the
+`host all all all scram-sha-256` line the image appends, so the new verifier was usable
+by the JDBC driver immediately.
+
+Rejected the obvious alternative, `docker compose down -v`: it re-runs `initdb` with the
+new password and Flyway rebuilds the schema, but it drops the volume — 8 clubs and 1 user
+here, none of it reproducible from migrations.
+
+Verified with a TCP login (`PGPASSWORD=… psql -h 127.0.0.1`), which is the path the
+backend actually uses rather than the trust-based socket, then `compose up -d`: backend
+`Up (healthy)`, `/actuator/health` `{"status":"UP"}`, Flyway logged *Current version of
+schema "public": 8 — no migration necessary*, and `clubs` still held 8 rows.
+
+Also documented the one-shot nature of the variable in `docker/.env.example`, since
+nothing at the point of edit hinted that changing it would not take effect.
+
+**Affected files:** `docker/.env.example` *(comment only — the fix itself was a one-off
+database command, no application or compose change)*
+
+---
+
+### BUG-019
+**Backend jar shipped Tomcat and Spring Security with four CRITICAL CVEs** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Docker workflow → *Scan images for known vulnerabilities*,
+the run after [BUG-016](#bug-016). The frontend image came back clean, so the gate
+moved on to the backend and failed there.
+
+**Symptom:** four fixable CRITICALs, every one `jar`, every one inside
+`app/app.jar`. The `alpine 3.23.5` layer reported **0** — this is `lang-pkgs`,
+not the base image, which is exactly the distinction the gate message rewritten
+in BUG-016 was added to draw.
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `tomcat-embed-core` | CVE-2026-41293 — HTTP/2 request headers not validated | 10.1.44 | 10.1.55 |
+| `tomcat-embed-core` | CVE-2026-43512 — authentication bypass via digest authentication | 10.1.44 | 10.1.55 |
+| `tomcat-embed-core` | CVE-2026-43515 — improper authorization allows security bypass | 10.1.44 | 10.1.55 |
+| `spring-security-web` | CVE-2026-22732 — security policy bypass and information disclosure | 6.5.3 | 6.5.9 |
+
+**Cause.** Neither library appears in `pom.xml`. Both arrive transitively through
+`spring-boot-starter-web` and `-starter-security`, and both versions are dictated
+by `spring-boot-starter-parent`, which was pinned at **3.5.5**. That BOM manages
+tomcat 10.1.44 and spring-security 6.5.3, so the jar ships them regardless of
+anything this repository declares. **The parent version is the only lever** — a
+direct dependency bump would be overridden by the BOM, and overriding
+`<tomcat.version>` by hand would leave the rest of the tree on 3.5.5's matrix.
+
+Worth naming because it changes how this reads: **the image did not get worse,
+the database did.** BUG-016 recorded the backend image as clean one run earlier,
+on this same 3.5.5 jar. Nothing in the repo changed between those runs — these
+are newly published advisories, not newly *reached* ones. Anything that pins a
+framework version is on a clock it does not control.
+
+**Fix.** Parent `3.5.5` → **3.5.16**, picked as the *floor* rather than as
+"latest":
+
+| Boot | tomcat | spring-security | Clears the gate |
+|---|---|---|---|
+| 3.5.5 | 10.1.44 | 6.5.3 | no |
+| 3.5.12 | 10.1.52 | 6.5.9 | spring-security only |
+| 3.5.14 | 10.1.54 | 6.5.10 | spring-security only |
+| **3.5.16** | **10.1.55** | **6.5.11** | **yes** |
+
+Staying on the 3.5 line is deliberate. It is a patch-level move within a minor,
+so no API surface shifts and no migration reading is required. Boot **4.1.0**
+exists and is what Dependabot `#17` proposes; that is a major, it fails both CI
+tiers today, and taking it as a CVE remedy would mean debugging a framework
+migration against a security deadline. A comment on the `<version>` element
+records that 3.5.16 is a floor, so that a later tidy-up downward does not quietly
+reintroduce four CRITICALs.
+
+**Verified locally:**
+
+| Check | Result |
+|---|---|
+| `./mvnw -B verify -DskipITs` | BUILD SUCCESS, 16/16 unit tests |
+| `dependency:list` | `tomcat-embed-core` **10.1.55**, `spring-security-web`/`-core` **6.5.11** |
+| Fat jar contents | `BOOT-INF/lib/tomcat-embed-core-10.1.55.jar`, `spring-security-web-6.5.11.jar` |
+
+The evidence above is **version identity** — every installed version meets or
+exceeds the *Fixed Version* Trivy named. Strong for these four findings, silent
+about any fifth, so it needed the gate itself to confirm it.
+
+**Confirmed against the gate, 2026-08-08**, once Docker Desktop was running. The
+whole `_docker.yml` sequence was replayed locally with Trivy **0.73.0** — the
+same version `install.sh` fetches today, run from the `aquasec/trivy` image
+against the daemon rather than installed to `/usr/local/bin`:
+
+| Workflow step | Result |
+|---|---|
+| Compose fail-fast secret guard | refuses to produce a config; names `POSTGRES_PASSWORD` |
+| `compose build` + `up -d` | db healthy, backend **UP**, frontend serving |
+| API smoke tests | `/ping` ok · `/api/v1/clubs` **8** · search **1** hit · `/my-club` **403** |
+| Production frontend image | builds, serves `/` on :3001 |
+| **Gate — fixable CRITICAL** | **backend 0** (alpine **0**, `app/app.jar` **0**) · **frontend 0** · **exit 0** |
+
+So the four findings are gone from the artifact the gate actually scans, not
+merely from the dependency tree. `trivy fs` against the bare jar, tried while
+Docker was down, was never evidence of this: it reported
+`Number of language-specific files num=0` and scanned nothing, so a green result
+there would have meant only that it looked at nothing.
+
+**The fixable-HIGH report has now been read** — that was the open question, and
+the answer is that the backend image is **not** clean at HIGH. Ten findings, none
+of which the CRITICAL gate can see:
+
+| Class | Library | CVE | Installed | Fixed in | Whose to fix |
+|---|---|---|---|---|---|
+| `os-pkgs` | `libexpat` | CVE-2026-56408 | 2.8.1-r0 | 2.8.2-r0 | `eclipse-temurin:25-jdk-alpine` |
+| `os-pkgs` | `p11-kit`, `p11-kit-trust` | CVE-2026-2100 | 0.25.5-r2 | 0.26.2-r0 | same base image |
+| `lang-pkgs` | `commons-io` | CVE-2024-47554 | 2.11.0 | 2.14.0 | **ours** — hard-pinned in `pom.xml` |
+| `lang-pkgs` | `netty-codec` | CVE-2026-59901 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http` | CVE-2026-55831, -55833, -56745 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `netty-codec-http2` | CVE-2026-56819 | 4.1.135.Final | 4.1.136.Final | BOM |
+| `lang-pkgs` | `org.postgresql:postgresql` | CVE-2026-54291 | 42.7.11 | 42.7.12 | BOM |
+
+The production frontend image reports **0 HIGH and 0 CRITICAL**, holding the
+BUG-016 result.
+
+Two things this measurement settles. First, **tightening the gate to HIGH would
+fail today** — that task's precondition is now measured rather than assumed, and
+the answer is "not yet". Second, **netty is in the jar by accident**:
+`dependency:tree` shows all five netty artifacts arriving through
+`software.amazon.awssdk:s3` → `netty-nio-client`, the SDK's *async* transport.
+The version is Boot's (the BOM overrides what awssdk 2.20.26 asks for), so the
+CVEs are real, but if the S3 client here is the synchronous one then six of the
+ten HIGHs belong to a transport nothing calls, and an `<exclusion>` removes them
+outright. Worth establishing before bumping anything.
+
+**Deliberately left alone:** the hard-pinned block outside the BOM —
+`software.amazon.awssdk:s3` 2.20.26, `commons-io` 2.11.0, `jjwt` 0.11.5, and the
+three Google client libraries. Only `commons-io` surfaced above, and none of them
+reached the CRITICAL gate. These are what Dependabot's maven entry exists for.
+
+**Overlaps a Dependabot PR.** `#15` (`maven-minor-patch`, 7 updates) almost
+certainly carries this same parent bump plus six others, and is currently red in
+both tiers. This change is the minimum that clears the gate and does not settle
+`#15`, which still needs triage on its own merits.
+
+---
+
+### BUG-017
+**`output: standalone` broke every Vercel build with an ENOENT on the trace file** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Vercel preview deployment of `77bd2e5` — the commit that
+fixed [BUG-016](#bug-016). **A regression introduced by that fix**, caught by a
+deployment path this repository does not manage and its own CI never exercises.
+
+**Symptom:**
+
+```
+> Build error occurred
+Error: ENOENT: no such file or directory, open
+  '/vercel/path0/frontend/.next/next-server.js.nft.json'
+Error: Command "npm run build" exited with 1
+```
+
+**Cause.** `next build` itself crashed — this is not Vercel's post-build
+packaging. Traced through the installed Next 16.3.0:
+
+- `build/index.js:2817` calls `writeStandaloneDirectory`, guarded by
+  `if (config.output === 'standalone')`.
+- That calls `copyTracedFiles` (`build/utils.js:1106`), which reads
+  `distDir/next-server.js.nft.json` to learn which modules to copy into the
+  bundle.
+
+**That read is the standalone path's only caller.** Without
+`output: standalone` the file is never opened, which is why every build before
+`77bd2e5` passed. Vercel performs its own file tracing and does not leave that
+artifact where the standalone step expects it, so the step ENOENTs. Next's own
+documentation says standalone is a self-hosting option and is not needed on
+Vercel; this is what *not needed* turns into in practice.
+
+**A hypothesis that had to be ruled out first.** The same commit also bumped
+`next` 16.2.0 → 16.3.0, so a builder incompatibility with a new minor was
+equally plausible from the error text alone. Ruled out by reading the call
+graph rather than guessing: the failing read sits behind the `output` check, not
+behind anything version-specific. Local builds were no help — the file *is*
+produced locally under standalone, so the failure does not reproduce off-Vercel.
+
+**Fix.** `output` is now conditional on `process.env.VERCEL`, which Vercel sets
+on every build:
+
+```ts
+const isVercel = Boolean(process.env.VERCEL);
+output: isVercel ? undefined : "standalone",
+```
+
+Self-hosting stays the default and Vercel is the exception, deliberately. The
+inverse — opting in only for Docker — would mean a plain `npm run build` no
+longer produces what the image ships, and `npm start` would have no bundle to
+serve.
+
+**Verified locally, both branches:**
+
+| Build | `.next/standalone` | Result |
+|---|---|---|
+| `VERCEL=1 npm run build` | absent | succeeds; trace file present and untouched |
+| `npm run build` | `server.js` present, 11 packages, no `tar` | succeeds |
+| Docker `--target runner` | — | boots HTTP 200, Trivy gate exit 0 |
+
+**The wider miss this exposed.** The pipeline documentation asserted *nothing
+deploys*. Vercel has been building this repository through its GitHub
+integration the whole time, outside `ci.yml` and outside `ci-success`, so a
+build that CI calls green can still fail there — and nothing in the repo said
+so. Corrected in
+[`ci-cd-pipeline.md`](../architecture/ci-cd-pipeline.md). See
+[BUG-018](../bugs/bugs.md#bug-018) for the gap that remains: Vercel is an
+unguarded deployment surface with no build-time environment configuration
+recorded anywhere.
+
+---
+
+### BUG-016
+**Production frontend image shipped the whole devDependency tree, failing the Trivy CRITICAL gate** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, Docker workflow → *Scan images for known vulnerabilities*,
+on the run that followed the [BUG-015](#bug-015) fix. This was the first time the
+scan step had ever reached the frontend image, because the job used to die at the
+health probe before getting there.
+
+**Symptom:** three fixable CRITICALs in `campusvibe-frontend:prod`, all
+`node-pkg`:
+
+| Library | CVE | Installed | Fixed in |
+|---|---|---|---|
+| `swiper` | CVE-2026-27212 — prototype pollution | 12.0.2 | 12.1.2 |
+| `tar` | CVE-2026-59873 — DoS via crafted gzip bomb | 7.4.3 | 7.5.19 |
+| `tar` | CVE-2026-59873 | 7.5.16 | 7.5.19 |
+
+**Cause — three separate ones wearing the same error message.** The gate printed
+`Bump the base image`, which was wrong for all three:
+
+1. **`swiper` 12.0.2** was a genuine, directly declared runtime dependency. The
+   hero banner slider uses it, and the code ships to the browser. A real fix.
+
+2. **`tar` 7.4.3** was never a runtime dependency at all. It arrives as
+   `tailwindcss → @tailwindcss/postcss → @tailwindcss/node → @tailwindcss/oxide
+   → tar`, marked `"dev": true` in the lockfile. It was in the production image
+   only because the `runner` stage did `COPY --from=builder /app/node_modules`,
+   which copies **the entire tree, devDependencies included**, into the artifact
+   that would ship. A build-time archive extractor was being shipped to
+   production so that Tailwind, which never runs there, could have it.
+
+3. **`tar` 7.5.16** was not ours in any sense: it is the copy npm bundles at
+   `/usr/local/lib/node_modules/npm/node_modules/tar`, inside `node:24-alpine`
+   itself. Verified by inspecting the image directly — node 24.19.0 ships npm
+   11.17.0, which bundles tar 7.5.16. **No published tag fixed it**:
+   `node:25-alpine` is worse (npm 11.12.1, tar 7.5.11). Only npm 12.0.2 bundles
+   the patched 7.5.19, and no Node release carries it yet.
+
+**Fix.**
+
+- `swiper` `^12.0.2` → `^12.2.0`.
+- `tar` updated in place to 7.5.22 via `npm update tar`, which stays inside the
+  `^7.4.3` range `@tailwindcss/oxide` declares, so nothing was overridden.
+- `output: "standalone"` in `next.config.ts`, and the `runner` stage rebuilt
+  around `.next/standalone` instead of a wholesale `node_modules` copy. The
+  bundle carries **11 top-level packages** rather than the full tree, and `tar`
+  is not among them.
+- **npm deleted from the `runner` stage.** Nothing in that stage invokes it —
+  the entrypoint is now plain `node server.js` — so the vendored tar goes with
+  it. This is what resolved finding 3, and it is the only available answer while
+  no Node tag ships a fixed npm. It is also the better answer regardless: a
+  production image has no business carrying a package manager.
+
+**A trap worth naming.** The standalone change alone would have turned the scan
+green *without fixing anything*, because `swiper` has no `package.json` in the
+standalone bundle — it is compiled into the client chunks — so Trivy simply stops
+seeing it. The vulnerable code still reaches every visitor's browser. **Trivy no
+longer has visibility into client-side dependencies of this image.** Dependabot
+and `npm audit` are the controls for those now, not the image scan. Do not read a
+green Trivy result as a statement about the frontend's npm tree.
+
+**Verified locally**, each step against the real image:
+
+| Check | Result |
+|---|---|
+| `tsc --noEmit` | clean |
+| `eslint` | 0 errors, 15 warnings (unchanged baseline) |
+| Jest | 23/23 |
+| `next build` | succeeds, 14 routes |
+| Standalone bundle | 11 top-level packages, no `tar` |
+| Image boots | HTTP 200 on `/`, `Ready in 0ms`, 323 MB |
+| **Trivy gate, fixable CRITICAL** | **exit 0** |
+| **Trivy fixable HIGH + CRITICAL** | **zero findings** |
+| Gate still fires | `node:24-alpine` → exit 1, class `lang-pkgs` |
+
+**Picked up on the way.** The HIGH report — printed but non-blocking — showed 12
+findings against `next` 16.2.0, including **CVE-2026-64642, an authentication
+bypass leading to unauthorized access**, fixed in 16.2.11. All 12 sat inside the
+declared `^16.2.0` range, so `npm update next sharp` cleared them; that resolved
+next to **16.3.0** and sharp to 0.35.3, which also cleared the one HIGH against
+sharp 0.34.5 (inherited libvips CVEs). The gate never required this. Leaving a
+known auth bypass in place because the gate only checks CRITICAL would have been
+the wrong call.
+
+**Two follow-on repairs, both caused by the standalone switch:**
+
+- `next start` does not work with `output: standalone` — it boots, warns, and
+  serves markup with no styles. `npm start` pointed at it. Replaced with
+  `frontend/scripts/start-standalone.mjs`, which performs the two copies Next
+  leaves out of the trace (`.next/static`, `public/`) and then runs `server.js`.
+- That script initially failed on Windows in a way worth recording: standalone's
+  `server.js` binds `process.env.HOSTNAME`, and Git Bash exports `HOSTNAME` as
+  the machine name — so it bound the machine interface, `http://localhost:PORT`
+  was refused, and the banner still said `Ready`. The first verification pass
+  appeared to succeed only because Docker Desktop's proxy was answering on
+  port 3000. The script now pins `HOSTNAME` to `127.0.0.1` unless
+  `NEXT_HOSTNAME` overrides it. The Dockerfile sets it to `0.0.0.0` explicitly
+  for the same reason.
+- `jest-haste-map` began reporting a module naming collision between
+  `package.json` and `.next/standalone/package.json` on any local run made after
+  a build. Silenced with `modulePathIgnorePatterns`. CI never saw it, since
+  tests run before the build there.
+
+**Also changed:** the gate's failure message. `Bump the base image` was actively
+misleading — it named the one cause that applied to none of the three findings.
+It now reports the Trivy finding *class* and explains how to route `lang-pkgs`
+(check the Target path: under `/app` it is ours, under
+`/usr/local/lib/node_modules` it is vendored tooling) versus `os-pkgs`.
+
+**Not verified on GitHub.** Everything above is local. The backend image was
+clean in the failing run and was not re-scanned locally.
+
+---
+
+### BUG-015
+**`/actuator/health` never existed; two CI jobs waited on it until timeout** · High · FIXED 2026-08-07
+
+**Found:** 2026-08-07, on the first run of the pipeline after `ci/github-actions`
+merged to `main` — the first time these workflows had ever executed on GitHub.
+
+**Symptom:** two jobs failed, both on a readiness probe:
+
+- Database → *Apply migrations to an empty schema*:
+  `Timed out waiting for the application to become healthy.`
+- Docker → *Wait for the backend*: `Backend never became healthy.`
+
+Everything else in the run passed.
+
+**Cause:** `backend/pom.xml` never declared `spring-boot-starter-actuator`. The
+`management.endpoints.web.exposure.include: "health,info"` block in
+`application.yml:36` was therefore inert configuration — it names endpoints that
+do not exist. `SecurityFilterChainConfig.java:47` already permitted
+`/actuator/**`, which made the gap easy to miss: every part of the wiring was in
+place except the dependency that creates the endpoint.
+
+Both jobs poll with `curl -fsS … | grep -q '"status":"UP"'`. With no actuator,
+the request falls through to static-resource handling and the global exception
+handler returns **500**:
+
+```
+{"path":"/actuator/health","message":"No static resource actuator/health.","statusCode":500}
+```
+
+`-f` makes curl exit non-zero, the loop retries, and it exhausts every attempt.
+Confirmed directly against the still-running pre-fix dev container.
+
+The failure mode is the expensive kind: the application was **completely
+healthy** the whole time. Migrations applied, entities validated, `/ping` and
+`/api/v1/clubs` both served. The database job burned its full 3-minute wait and
+the docker job its full 200-second wait proving nothing, and reported it as an
+application fault.
+
+**Fix:** added `spring-boot-starter-actuator` to `backend/pom.xml`. No
+configuration change was needed — the existing `include` and the existing
+security permit were already correct and became live the moment the endpoint
+existed. Exposure stays limited to `health,info`; neither
+`application-prod.yml` nor `application-test.yml` widens it, so no management
+endpoint beyond those two is reachable.
+
+Both wait loops now also capture the HTTP status and report it on timeout, so a
+served-but-missing endpoint is distinguishable from a connection refusal. The
+docker loop additionally checks whether the container is still running and
+fails immediately with logs if it is not, rather than waiting out the timeout.
+
+**Guarded against recurrence.**
+`backend/src/test/java/com/campusvibe/actuator/ActuatorHealthEndpointTest.java`
+asserts `/actuator/health` returns 200 with `status: UP` for an unauthenticated
+request. It is a `*Test`, not a `*IT`, so surefire runs it in the **fast tier**
+and it fails on the push that breaks the contract rather than on the pull
+request. It covers all three ways this can break — dependency dropped, `health`
+removed from the exposure list, `/actuator/**` permit removed — none of which
+produce a compile error.
+
+A second assertion checks `/actuator/env` does **not** return 200. Because
+`/actuator/**` is permitAll, anything added to
+`management.endpoints.web.exposure.include` becomes publicly readable, and
+`env` would leak datasource configuration. Widening that list must break a test.
+
+**The guard was verified by breaking the code**, not just by passing: with the
+dependency commented out, the test fails with
+`Status expected:<200> but was:<500>` — the identical symptom CI hit — in 5.8 s
+rather than a 3-minute timeout. The dependency was then restored and the full
+fast tier re-run at 16/16.
+
+**Put to use, not merely tested.** `docker/docker-compose.yml` now gives the
+backend a `healthcheck` (busybox `wget`, already present in
+`eclipse-temurin:25-jdk-alpine`; `start_period: 45s` so a normal slow boot never
+counts as a failure), and `frontend.depends_on.backend` became
+`condition: service_healthy` instead of a bare `depends_on` that waited only for
+container start. Verified against an isolated compose project: the first probe
+exited 1 inside the start period without counting, the second exited 0, and the
+container reached `healthy`.
+
+The dev trade-off is recorded inline in the compose file: a backend that cannot
+start now blocks the frontend as well, and the escape hatch for frontend-only
+work is `docker compose up db frontend`.
+
+**Verified locally** against `pgvector/pgvector:pg15`, reproducing both jobs:
+
+| Check | Result |
+|---|---|
+| First boot, empty schema | UP in ~6 s, 8 migrations applied |
+| Migration history | 8 files, 8 applied, 0 failed |
+| Second boot, migrated schema | UP, no re-apply, checksums valid |
+| Containerised backend via `backend/Dockerfile` | UP in ~15 s |
+| `GET /api/v1/clubs` | 8 clubs |
+| `GET /api/v1/clubs/my-club` unauthenticated | 403 |
+| Compose backend `healthcheck` | `healthy`, probes 1→0 |
+| `./mvnw test` | 16/16 pass |
+| Same, dependency removed | 1 failure, `expected:<200> but was:<500>` |
+
+**Affected files:** `backend/pom.xml`,
+`backend/src/test/java/com/campusvibe/actuator/ActuatorHealthEndpointTest.java`,
+`docker/docker-compose.yml`,
+`.github/workflows/_database.yml`, `.github/workflows/_docker.yml`
+
+---
+
+### BUG-008
+**`.ci/build-publish.sh` is empty; frontend CD is hard-disabled** · Low · FIXED 2026-08-05
+
+**Found:** 2026-07-30, auditing the deployment path.
+
+**Symptom:** `.ci/build-publish.sh` was a **0-byte file**. `frontend-cd.yml:14`
+set `if: false` on the deploy job, and its only remaining step generated a build
+number string that no other step read — there was no Vercel or AWS deploy action.
+Worse, its `workflow_run` trigger carried no branch guard, so it fired after
+frontend CI passed on *any* branch. The README's claim of a CI/CD pipeline was
+aspirational; nothing deployed.
+
+**Fix:** both were **deleted** rather than implemented. CD was scoped out of the
+`ci/github-actions` work deliberately — there is no AWS account, no OIDC role, no
+registry, and `Dockerrun.aws.json` still carries the literal
+`<your-backend-image>:latest` placeholder. A stub that lies about deploying is
+worse than no stub: it makes the pipeline look finished. The prerequisites for
+real CD are tracked in [`todo.md`](../TODO/todo.md) instead.
+
+This closes the defect (dead code claiming to deploy). "Nothing deploys yet" is
+not a bug — it is planned work.
+
+**Affected files:** `.ci/build-publish.sh` (deleted),
+`.github/workflows/frontend-cd.yml` (deleted)
+
+---
+
+### BUG-009
+**Duplicate methods from merge `8f81d82` broke compilation** · Blocker · FIXED 2026-07-30
+
+**Symptom:** the backend did not compile. `EventService` defined `delete(Long)`
+and `addImages(Long, List)` twice each; `ClubService` defined
+`update(String, ClubUpdateRequest)` twice. Merge artifacts from
+`8f81d82 "pulling changes from feature/search and feature/authentication"`.
+
+Undetected because backend CI runs `-DskipTests package` on the wrong JDK
+([BUG-002](bugs.md#bug-002)) — the build was never actually green.
+
+**Fix:** removed the duplicates. The two `ClubService.update` copies *differed*:
+one called `searchIndexService.indexClub(club)` and one did not. The indexing
+version was kept.
+
+**Affected files:** `event/EventService.java`, `club/ClubService.java`
+
+---
+
+### BUG-010
+**Committed JWT fallback secret** · High · FIXED 2026-07-30
+
+**Symptom:** `application.yml:66` shipped a working default,
+`campusvibe-dev-secret-0123456789-…`. Any environment that forgot to override it
+signed tokens with a publicly readable key — forgeable by anyone who has seen the
+repo. `docker-compose.yml` never passed `JWT_SECRET`, so the Docker stack always
+used it. This failed **open**, unlike a missing OpenAI key which fails safe.
+
+**Fix:** default removed (`secret: ${JWT_SECRET}`); `JWTUtil` now throws on a
+blank or <32-byte secret; compose uses `${JWT_SECRET:?…}`. Verified: the app
+refuses to start on both a blank and a short secret.
+
+**Affected files:** `application.yml:64-67`, `jwt/JWTUtil.java`,
+`docker/docker-compose.yml`, `docker/.env.example`
+
+---
+
+### BUG-011
+**Plaintext DB password in `Dockerrun.aws.json`** · High · FIXED 2026-07-30
+
+**Symptom:** `Dockerrun.aws.json:15` committed
+`{"name": "SPRING_DATASOURCE_PASSWORD", "value": "password"}`.
+
+**Root cause worth remembering:** the file declared `AWSEBDockerrunVersion: 2`
+(multi-container/ECS), a platform where **EB environment properties are not
+injected into containers** — values must be hardcoded in `containerDefinitions`.
+The hardcoded secret was a consequence of the platform choice, not carelessness.
+That platform is also retired.
+
+**Fix:** converted to Dockerrun **v1** (single-container), where EB environment
+properties arrive as real OS environment variables and Spring reads them
+natively. All hardcoded values removed. Documented in `docker/EB-DEPLOYMENT.md`.
+
+**Affected files:** `docker/Dockerrun.aws.json`, `docker/EB-DEPLOYMENT.md`,
+`backend/src/main/resources/application-prod.yml`
+
+---
+
+### BUG-012
+**Compose bind-mounts shadowed the app in both containers** · High · FIXED 2026-07-30
+
+**Symptom:** the backend container could not start at all. `backend/Dockerfile:6`
+copies the jar to `/app/app.jar`, but compose mounted `../backend:/app` over it,
+hiding the jar (`Unable to access jarfile app.jar`). The frontend had the same
+problem: `../frontend:/app` hid the built `.next` and `node_modules`. Neither
+mount provided hot reload, since both images run production builds.
+
+Also fixed alongside: the backend's `ports` and `depends_on` were commented out,
+so the backend was unreachable from the host.
+
+**Fix:** both bind-mounts removed; ports and the `depends_on` healthcheck
+condition restored. Verified: backend boots and serves
+`/api/v1/clubs/search?q=coding`.
+
+**Affected files:** `docker/docker-compose.yml`
+
+**Follow-up:** the observation above — *"neither mount provided hot reload, since
+both images run production builds"* — went unaddressed, and the later
+`develop.watch` attempt hit exactly that wall. See [BUG-013](#bug-013).
+
+---
+
+### BUG-013
+**`compose watch` synced into a production image, so edits never appeared** · Medium · FIXED 2026-08-03
+
+**Symptom:** editing `frontend/app/(main)/page.tsx` produced no change at
+`localhost:3000`, despite a `develop.watch` block on the `frontend` service.
+
+**Three independent causes, each sufficient on its own:**
+
+1. **Nothing was compiling.** `frontend/Dockerfile` ran `npm start`
+   (`next start`) under `NODE_ENV=production`, which serves the pre-built
+   `.next` output. A sync into that container changes nothing, because no
+   compiler is watching. The runner stage does not even contain the source tree
+   — it copies only `.next`, `public`, `package.json` and `node_modules`, so the
+   synced files landed in a directory Next never reads. **This is the primary
+   cause**, and it is the unaddressed follow-up from [BUG-012](#bug-012).
+2. **Wrong sync target.** `path: ../frontend/app` → `target: /app` maps
+   `frontend/app/(main)/page.tsx` onto `/app/(main)/page.tsx`. WORKDIR is `/app`
+   and the router lives at `/app/app`, so every file arrived one directory too
+   high.
+3. **Wrong rebuild path.** Watch paths resolve relative to the **compose file**,
+   not the build context, so `path: package.json` pointed at
+   `docker/package.json`, which does not exist. That rule could never fire.
+
+**Not a cause:** `develop.watch` is already per-service, so a frontend rule was
+never able to restart the backend container.
+
+**Fix:** added a `dev` stage to `frontend/Dockerfile` running `next dev`, plus a
+shared `deps` stage so dev and production install once; `runner` stays last and
+therefore remains the default build target. Compose selects it with
+`build.target: dev`. Rewrote the watch rules and gave `backend` and `db` their
+own.
+
+Backend uses `sync+restart` on `backend/target/*.jar` rather than `rebuild`,
+because `build.context` is the repo root with no `.dockerignore` — a rebuild
+would re-send `node_modules`, `target/` and `.git` on every change. Flyway
+migrations ship inside the jar, so they ride along with it.
+
+**Verified:** dev image builds; `next dev` boots (`✓ Ready in 746ms`) and serves
+HTTP 200; a file copied into the running container triggers
+`✓ Compiled in 108ms`, which confirms inotify fires for compose-synced writes and
+that no polling env vars are needed. `docker compose config` resolves all six
+watch rules to real absolute paths.
+
+**Affected files:** `frontend/Dockerfile`, `docker/docker-compose.yml`
+
+---
+
+### BUG-014
+**Google sign-in passed `client_id: undefined`, hidden by `(window as any)`** · Medium · FIXED 2026-08-05
+
+**Found:** 2026-08-05, while fixing the 5 eslint errors so lint could gate merges
+(CI plan step 5). Not found by reading the file — found by `tsc` the moment the
+`any` was removed.
+
+**Symptom:** `OAuthButtons.tsx` reached the Google Identity Services library
+through `(window as any).google`, so every argument to `initialize()` and
+`renderButton()` was unchecked. `client_id` was passed
+`process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID`, typed `string | undefined`. The
+effect does guard with `if (!clientId) return;`, but that narrowing does not
+reach the nested `init()` closure, so the value TypeScript saw there was still
+possibly `undefined`.
+
+This is worse than a normal type hole because **GIS silently ignores keys it does
+not recognise and options it cannot use** — there is no exception and no console
+error. The failure mode is a sign-in button that simply never renders, which
+looks identical to the "Google sign-in not configured" path the component already
+has for a missing client id.
+
+**Fix:** added `frontend/app/types/google-identity.d.ts` declaring only the GIS
+surface this app actually calls (`initialize`, `renderButton`, the credential
+response) plus a `Window.google?: GoogleIdentityServices` augmentation — optional,
+because the global exists only after the remote script loads. Replaced both
+`(window as any)` casts and the `callback: (response: any)` parameter, which now
+infers. Re-bound `clientId` to a local `const` after the guard so `init()` sees a
+`string`.
+
+Value beyond the lint fix: a typo in any GIS option name is now a compile error
+rather than a silent no-op.
+
+**Affected files:** `frontend/app/components/auth-components/OAuthButtons.tsx`,
+`frontend/app/types/google-identity.d.ts` *(new)*
+
+---
+
+## Authentication review, 2026-08-15
+
+Four findings from the review that produced [`authentication.md`](../architecture/authentication.md). All four are fixed and covered by `AuthProviderIT` except where noted.
+
+### BUG-028
+**A malformed Google ID token returns 500 instead of 401** · Medium · FIXED
+
+**Found:** 2026-08-15, probing `POST /api/v1/auth/google` against the Docker
+stack while rewriting [`authentication.md`](../architecture/authentication.md).
+
+**Reproduce:**
+
+```
+curl -X POST http://localhost:8080/api/v1/auth/google \
+  -H 'Content-Type: application/json' -d '{"idToken":"not-a-real-token"}'
+```
+
+Observed: `{"path":"/api/v1/auth/google","message":null,"statusCode":500}`.
+Expected: 401, the same as every other bad token.
+
+**Cause.** The split is *parse* versus *verify*. `GoogleTokenVerifier.verify`
+(`GoogleTokenVerifier.java:34`) catches only `GeneralSecurityException` and
+`IOException`, but Google's `GoogleIdToken.parse` signals a structurally
+malformed token with an unchecked `IllegalArgumentException` — thrown by a
+`Preconditions.checkArgument` with no message, which is why the response body
+carries `message: null`. It escapes to the catch-all handler
+(`DefaultExceptionHandler.java:149`), which maps anything unmapped to 500.
+
+Confirmed by contrast: `aaa.bbb.ccc` has the dots the parser needs, reaches
+verification, and correctly returns 401 `Invalid Google token`.
+
+**Fix:** catch `IllegalArgumentException` alongside the other two in
+`GoogleTokenVerifier.verify` and return `null`, so the existing
+`BadCredentialsException` path produces the 401.
+
+**No test covers the Google endpoint at all**, which is why this survived —
+`AuthenticationFlowIT` has 11 cases and none of them are Google. Add one with
+the fix.
+
+**FIXED 2026-08-15.** `GoogleTokenVerifier.verify` catches
+`IllegalArgumentException` alongside the checked exceptions and returns null, so
+a structurally malformed token takes the same 401 path as any other bad one.
+Covered by `AuthProviderIT.malformedGoogleTokenIsRejectedWith401NotServerError`,
+which uses the exact `not-a-real-token` input from the report.
+
+### BUG-029
+**`GoogleSignInRequest` is unvalidated; a null `idToken` returns 500 and leaks a
+JVM message** · Medium · FIXED
+
+**Found:** 2026-08-15, same probe session as BUG-028.
+
+**Reproduce:**
+
+```
+curl -X POST http://localhost:8080/api/v1/auth/google \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+Observed: 500 with
+`message: Cannot invoke "String.indexOf(int)" because "tokenString" is null`.
+
+**Cause.** `AuthenticationController.google` (`AuthenticationController.java:38-39`)
+is the only one of the three auth endpoints without `@Valid`, and
+`GoogleSignInRequest` carries no constraints — unlike `AuthenticationRequest`
+and `RegisterRequest`, which both use `@NotBlank`. The null reaches Google's
+parser and the resulting helpful-NPE message is echoed to the caller by the
+catch-all handler.
+
+**Two fixes, both wanted:**
+1. `@NotBlank String idToken` on the record, `@Valid` on the parameter — makes
+   it a 400 like every other malformed request.
+2. Stop the catch-all echoing `e.getMessage()` for unmapped exceptions
+   (`DefaultExceptionHandler.java:149`). Any unmapped exception is currently a
+   potential internal-detail disclosure; this one just makes it visible.
+
+**FIXED 2026-08-15**, both halves.
+
+1. `GoogleSignInRequest.idToken` is `@NotBlank` and the controller parameter is
+   `@Valid`, so a missing or blank token is a 400.
+2. The catch-all in `DefaultExceptionHandler` no longer echoes `e.getMessage()`
+   to the caller: it logs the exception at ERROR and returns a fixed
+   `Something went wrong. Please try again.` No unmapped exception can disclose
+   internals now.
+
+A third fix came out of writing the test: `@RequestParam` constraints raise
+`ConstraintViolationException`, which nothing handled, so a malformed
+`?email=` on the new `email-status` endpoint answered **500**. That now maps to
+400. Covered by `missingGoogleTokenIsA400NotA500`, `blankGoogleTokenIsA400` and
+`emailStatusRejectsAMalformedAddress`.
+
+### BUG-030
+**A blank `GOOGLE_CLIENT_ID` accepts a Google ID token issued to any
+application** · High · FIXED
+
+**Found:** 2026-08-15, reading `GoogleTokenVerifier` while rewriting
+[`authentication.md`](../architecture/authentication.md).
+
+**Latent, not live** — the client id is set in this environment. It becomes live
+in any environment that ships without it, which the blank-is-supported
+convention across `docker/.env.example` makes easy to do by accident.
+
+`GoogleTokenVerifier.java:26`:
+
+```java
+.setAudience(clientId == null || clientId.isBlank() ? null : Collections.singletonList(clientId))
+```
+
+A `null` audience makes the underlying `IdTokenVerifier` **skip the audience
+check entirely** rather than reject everything. Signature, issuer and expiry
+still pass, so any valid Google-issued ID token — from any OAuth client
+anywhere — verifies. `POST /api/v1/auth/google` is `permitAll`
+(`SecurityFilterChainConfig.java:43`) and `AuthenticationService.googleSignIn`
+auto-creates a user from the token's email, so the caller is authenticated as
+whatever email their token carries.
+
+**Fix:** fail closed. Reject Google sign-in with 503 or 401 when the client id
+is unconfigured, rather than verifying without an audience. Not yet filed as a
+todo item pending Arpan's decision on priority.
+
+**FIXED 2026-08-15.** `GoogleTokenVerifier` now builds no verifier at all when
+`google.clientId` is blank, logs a startup warning naming the consequence, and
+rejects every token. Fail closed rather than fail open. Covered by
+`AuthProviderIT` (the whole class runs with no client id configured, so every
+Google-endpoint case there is also a regression test for this).
+
+### BUG-031
+**Google sign-in never checks `email_verified`** · High · FIXED
+
+**Found:** 2026-08-15, same review as BUG-030.
+
+`AuthenticationService.java:73-74` reads `email` and `name` from the Google
+payload and nothing else. Line 75 then does
+`userRepository.findByEmail(email).orElseGet(...)`, so a Google sign-in for an
+address that already has an email/password account **logs into that account**.
+
+Together those two facts mean an ID token carrying an *unverified* email that
+matches an existing CampusVibe user authenticates as that user. Google's
+integration guidance is explicit that `email_verified` must be checked before
+trusting the address. Severity is High rather than Critical because obtaining
+such a token requires control of an OAuth client and an unverified Google
+account for the target address.
+
+**Fix:** reject the sign-in when `email_verified` is not true. One condition,
+next to the existing payload reads.
+
+---
+
+**FIXED 2026-08-15.** `AuthenticationService.googleSignIn` rejects the token
+with `BadCredentialsException` unless `payload.getEmailVerified()` is true, and
+does so *before* the find-or-create lookup that matches on email. **Not covered
+by an automated test**: asserting it needs a genuinely signed Google token,
+which cannot be minted in a test. Verified by reading, and by manual sign-in
+continuing to work for a verified account.
+
+---
+
+### BUG-005
+**Unauthenticated search can drive unbounded OpenAI spend** · Medium · FIXED
+
+**Found:** 2026-07-30, during the LLM API key management design review.
+
+**Symptom:** `GET /api/v1/events/search` and `/api/v1/clubs/search` are public and
+issue **one OpenAI embedding call per request** (`SearchService.java:66`). The
+only throttle is a 300 ms client-side debounce
+(`frontend/app/components/SearchBar.tsx:10-11`), trivially bypassed by calling
+the API directly. There is no server-side rate limit, no query-length cap, and no
+cache of query embeddings.
+
+Document embeddings are persisted in pgvector
+(`db/migrations/V8__search_embeddings.sql:8-9`), but **query** embeddings are
+recomputed on every request, including identical repeat queries.
+
+Keeping search public is a deliberate product decision (unauthenticated users must
+be able to browse and search), which is exactly why the compensating controls are
+required rather than optional. See `.claude/skills/llm-integration/SKILL.md`
+("Rate Limiting and Quotas").
+
+**Mitigated so far:** connect/read timeouts and bounded retries were added in
+`ai/client/OpenAiEmbeddingClient.java`, and per-call token usage is now logged, so
+spend is at least observable. The rate limit and cache are still missing.
+
+**Affected files**
+- `backend/src/main/java/com/campusvibe/search/SearchService.java:44-52, 65-67`
+- `backend/src/main/java/com/campusvibe/event/EventController.java:42`, `club/ClubController.java:45`
+- `backend/src/main/java/com/campusvibe/ai/client/OpenAiEmbeddingClient.java`
+
+**Affected tests:** none yet. Needs a rate-limit rejection test (expect `429`).
+
+---
+
+**FIXED 2026-08-15.** Three controls, because none of them is sufficient alone —
+a rate limit still lets a slow steady caller spend indefinitely, a cache does
+nothing against distinct queries, and a length cap does nothing against volume.
+
+1. **Per-IP budget** on `/api/v1/events/search` and `/api/v1/clubs/search`
+   (`SearchRateLimitFilter`, 30/min default). A filter, so a refused request
+   never reaches the provider — a limiter applied after the embedding call would
+   bound the response rate and leave the bill unchanged. Its own budget,
+   separate from the auth limiter: different reason, different numbers, and
+   neither may consume the other's allowance.
+2. **Query length cap** at 200 characters (`SearchLimits.MAX_QUERY_LENGTH`),
+   rejected with 400 rather than truncated. Truncating still pays for the work
+   and silently answers a different question than the one asked.
+3. **Query-embedding cache** (`QueryEmbeddingCache`). Document embeddings
+   already persisted in pgvector; query embeddings were recomputed every
+   request, including the identical repeats a search box produces constantly.
+   Keyed case- and whitespace-insensitively. An **empty** answer is deliberately
+   not cached: caching it would pin search into keyword-only mode for the whole
+   TTL after one provider blip.
+
+**Tests:** `QueryEmbeddingCacheTest` (7 unit, counts provider calls through a
+`CountingEmbeddingService` — the real service returns empty with no API key, so
+a test that cannot see the call count could not tell a working cache from a
+broken one) and `SearchRateLimitIT` (7, Testcontainers + pgvector, because the
+search SQL returns 500 on H2).
+
+**One thing this uncovered:** `SearchIT` does not use the `test` profile, so it
+did not inherit the profile's rate-limit switch and would have begun throttling
+itself as the suite grew. It now disables the search limiter explicitly.
+
+**Still open, deliberately:** there is no global spend ceiling. The per-IP budget
+bounds one caller, not the sum of all of them. The honest control for that is a
+hard monthly cap on the OpenAI project itself, which is tracked separately in
+`todo.md` under AI & Search.

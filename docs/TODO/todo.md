@@ -1,0 +1,446 @@
+# CampusVibe — TODO
+
+Last updated: **2026-09-17** · Branch: `style/event-card-and-page-ui`
+
+**This is the full queue, not the orientation file.** Do not read it to find out
+where the project is — [`../STATUS.md`](../STATUS.md) answers that in forty
+lines and arrives at the start of every session. Come here to pick up an item,
+add one, or grep for whether something is already queued.
+
+Project knowledge — what the code does and why — lives in
+[`docs/`](../README.md). Read that index before changing a
+subsystem; this file is work, not reasoning.
+
+**Finished work lives in [`tasks-completed.md`](tasks-completed.md)** — it is
+not gone, it is filed. Check there before building something that sounds like
+it may already exist.
+
+Priorities: **P0** blocking / broken · **P1** next up · **P2** planned · **P3** backlog
+Bug references point at [`bugs.md`](../bugs/bugs.md) (open) and
+[`fixed_bugs.md`](../bugs/fixed_bugs.md) (resolved).
+
+---
+
+## Next up
+
+**[`../STATUS.md`](../STATUS.md) holds the ordered short list** — what is being
+worked on now, the open blocking bugs, and the traps to watch. It is printed at
+the start of every session, so orient from there and come here for the full
+queue. Every item that was in this section is filed under its topic below.
+
+- [ ] **P1** **Resolve the `/refresh-docs` spec** ([draft](../specs/2026-11-16-refresh-docs-command.md), 2026-11-16) — a command that ranks stale docs by the commits that touched their mapped code, then updates the ones Arpan picks. **Arpan answers its three open questions first:** whether the hooks' text report changes too, or the new `--json` mode is additive only (blocks the `check-docs.mjs` change); how old an `Account read` date must be to flag a runbook (proposed 30 days); and whether a doc with no relevant commits but an old stamp shows in the table (proposed: yes, at the bottom, verdict *re-stamp*). Then approve the spec and build it: `check-docs.mjs --json` with per-doc relevant commits and `product.md` / `docs/README.md` in scope, five new `docs-map.json` entries (not blocked by the questions), and `.claude/commands/refresh-docs.md`.
+
+---
+
+## P0 — Blocking
+
+- [ ] **Put the planner's daily limit back to 15 after the demo — and redeploy.** Added 2026-10-01. `PlannerLimits.DAILY_MESSAGES` is 1000 for the 2026-09-30 demo (`63d657f`, the line marked `TEMP`). It is a compiled constant, so the revert takes a new `package-eb.mjs` bundle on Elastic Beanstalk, not a setting. `PlannerConversationIT:59` asserts the constant now, so no test changes with it ([`ai-planner.md`](../architecture/ai-planner.md)).
+- [ ] **Backend CI cannot pass — fix written, never executed.** `backend-ci.yml` set up JDK 17 while the project needs Java 25, and ran `-DskipTests`, so no backend test had ever run in CI — which is why a non-compiling merge and a failing search test both slipped through. **The workflow was rewritten** (`_backend.yml`: JDK 25, `./mvnw -B verify`, never `-DskipTests`). **Left open deliberately: no workflow in this repo has run on GitHub yet**, so the fix is unverified and [BUG-002](../bugs/bugs.md#bug-002) is still OPEN. Close both on a green run, not on the diff.
+- [ ] **Semantic search returned nothing for meaning-only matches — root cause found and fixed 2026-09-14.** The weights were formatted into the SQL with `%f`, and under this machine's `fr_CA` FORMAT locale `0.7` became `0,700000`, which Postgres read as separate columns. They are now bound as parameters, a regression test forces `fr_CA`, and the test and runtime JVMs are pinned to en_US/UTC. **Open only until a green GitHub full-tier run**, per the bug's own rule. ([BUG-001](../bugs/bugs.md#bug-001))
+
+---
+
+## Backend / Features
+
+- [ ] **P1** Finish the authentication workflow (listed as *In Progress* in `claude.md`): passwordless email-code login, persistent login.
+- [ ] **P1** Apply the `User.java` collection pattern to `Club.images` and `Event.images` — unmodifiable view plus an `addImages` mutator — and add the tests neither path has. **Do not accept Copilot Autofix on CodeQL alerts 14 and 15**: it returns a copy, which detaches `getImages().addAll(keys)` from Hibernate and loses every uploaded logo and banner silently. That exact fix already broke saving events for a day ([BUG-022](../bugs/fixed_bugs.md#bug-022)). ([BUG-044](../bugs/bugs.md#bug-044))
+- [ ] **P1** **Event lifecycle status — `DRAFT` / `PUBLISHED` / `ARCHIVED`.** `events` has no status column today (`Event.java`), so the club dashboard can only split by `date_time` into upcoming and past, and there is no way to draft an event before announcing it or to retire one without deleting it. Deliberately kept out of the club-governance work on 2026-08-17 so that feature stayed scoped; it is the next thing the club dashboard's Events tab needs.
+
+  **The work:** migration adding `events.status TEXT NOT NULL DEFAULT 'PUBLISHED' CHECK (status IN ('DRAFT','PUBLISHED','ARCHIVED'))` (default `PUBLISHED` so every existing row stays visible), an `EventStatus` enum on `Event`, a publish/unpublish/archive action on `EventService`, and status tabs on `/manage/[clubId]/events`.
+
+  **The trap that makes this P1 rather than P2:** *every* public read path must filter to `PUBLISHED`, or drafts leak onto the homepage, the club page, and search. That means `EventRepository` list queries, `SearchRepository.hybridSearchEventIds`, and `SearchIndexService` (a draft should not be indexed at all, and archiving should evict it). Getting the column in without covering all four is worse than not having it. The update path it needed exists since 2026-09-15 (`PUT /api/v1/events/{id}`, [BUG-006](../bugs/fixed_bugs.md#bug-006)), so the status can be set through it.
+- [ ] **P2** Admin Dashboard API: ~~create clubs~~, manage users, moderate events. *(Creating clubs shipped 2026-09-09 — `POST /api/v1/clubs` is admin-only and makes the creator the owner, and the club-proposal queue approves the other path. Assigning the first club owner was already done. Setting `official_email` shipped in the same unit.)* What is left is **managing users** — there is still no way to grant or revoke `ROLE_ADMIN` through the product — and **moderating events**.
+- [ ] **P2** **Nothing can change an account's email address.** `/profile/edit/account` renders the field and its Save commits locally. Needs a confirm-the-new-address round trip, not a straight update — `auth_tokens` (V11) already carries the machinery and would gain an `EMAIL_CHANGE` purpose, and the address is the login identifier, so an unverified change locks the account out. *(The other half of that screen now works: `PATCH /api/v1/users/me` renames an account, 2026-08-20. Only the email is still local.)*
+- [ ] **P2** **Account closure has no endpoint.** The confirmation panel on `/profile/edit/account` is built and its destructive button is deliberately `disabled` with a note, because the nearest wired action is sign-out and that would tell someone their data was gone while every row of it remained. Overlaps the GDPR item under Security. An owner cannot leave a club without handing it on, so closure has to refuse or force a transfer first.
+- [ ] **P2** **Make `Club` implement `Persistable` so `save()` stops silently merging.** `Club.id` is an assigned slug with no `@GeneratedValue`, so Spring Data's `isNew()` answers false for a brand-new club and `SimpleJpaRepository.save` takes the `em.merge()` branch — which returns a *different* managed instance and leaves the caller holding a detached copy. That has now cost two bugs in the same method: [BUG-034](../bugs/fixed_bugs.md#bug-034) (when the INSERT ran) and [BUG-037](../bugs/fixed_bugs.md#bug-037) (which object you are holding). Both were fixed at the call site; the trap is still armed for the next caller. `Persistable` with a `@Transient` new-flag makes `save()` take `persist()` and hand the same instance back. P2 rather than P1 because it changes the write path for every club, so it wants its own commit and its own test — not a rider on a fix. The three options are written up in [ADR-002](../decisions/ADR-002-club-id-is-an-assigned-slug.md), which recommends this one and is waiting on approval.
+- [ ] **P2** **Nothing can delete, archive or deactivate a club** (CEM-04, from the [2026-09-10 review](../reviews/2026-09-10-club-and-event-management.md)). There is no club delete at any level, platform admin included, so a duplicate approved by mistake or a club that folded stays public and in search. Blocked on **D-4** — who may, and what happens to its events, followers and audit log; §22 forbids deleting audit history, which points at archive rather than delete. Likely an ADR.
+- [ ] **P3** Notifications.
+- [ ] **P3** Ticket purchasing flow.
+- [ ] **P3** Move `application-test.yml` from `src/main/resources` to `src/test/resources` so test config stops shipping in the production jar. ([BUG-007](../bugs/bugs.md#bug-007))
+
+## Club governance
+
+Spec: [`club_admin_governance.md`](../architecture/club_admin_governance.md)
+(15 MVP items) · As-built:
+[`club-administration.md`](../architecture/club-administration.md)
+
+**Items 1–4 shipped 2026-08-17**, **items 5, 7, 8, 9 and 10 shipped
+2026-08-18** — assignment table, the two club roles, the one-owner invariant,
+administrator listing, the `/manage/[clubId]` dashboard,
+invite/accept/decline/remove, ownership transfer, and the append-only activity
+log. The rest, in the spec's order:
+
+- [ ] **P3** **`InterestPicker` has no tests of its own.** It is used by both
+  the profile editor and the create-club form, and `CreateClubForm.test.tsx`
+  stubs it deliberately — the stub proves the *wiring* (a chosen slug reaches
+  the payload) and nothing about the picker's own behaviour. Worth covering:
+  a chosen pill leaves the lower grid rather than greying out in place; the
+  `max` cap disables adding without hiding anything; `capChoices` scrolls the
+  grid without changing which pills exist; and the four distinct empty states
+  it already distinguishes in code — still loading, failed to load, nothing
+  matched the filter, everything already added. The catalogue fetch needs
+  mocking, which is why this is its own unit rather than a rider.
+
+- [ ] **P1** *(item 6, half done)* **The official-email verification round
+  trip.** The **admin write shipped 2026-09-09** — `PATCH
+  /clubs/{clubId}/official-email` plus an editable panel on `/manage/[clubId]`
+  for platform admins — so the column is no longer unwritable. What is left is
+  the half that makes *verified* mean anything: setting an address always leaves
+  `official_email_verified_at` NULL by design
+  ([ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md)),
+  and only redeeming a link mailed to that address may stamp it. **Blocked on
+  AWS SES** — see the item under Security, which carries the
+  `club_email_verifications` table shape so it is not re-derived. Until it
+  lands, every club reads as unverified, which is accurate, and the §17 security
+  notices and the §6 invite-verification step stay unbuilt.
+
+  **This is [ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md)'s
+  first revisit trigger, and it is the only one that is real work.** SES landing
+  is the point at which that ADR's deferral is spent. Two things it forecloses,
+  and they are what the impatience will reach for: there is **no administrative
+  *mark as verified* control**, and **no bulk marking** to unblock the §17
+  notices — both are the rejected option under another name. If a club genuinely
+  cannot complete the round trip (a shared inbox nobody can open, an address that
+  bounces), the answer is a recovery procedure with an audit trail, not an
+  override switch. Also note the round trip is testable locally without SES once
+  built: `LoggingMailSender` puts the link in `docker compose logs backend`, the
+  way password reset is already tested.
+- [ ] **P3** **If waiting for a human becomes the complaint, the answer is
+  auto-approval under a trust signal — not open creation.**
+  [ADR-004](../decisions/ADR-004-two-paths-create-a-club.md)'s first two
+  revisit triggers, recorded here because they are the ones most likely to be
+  solved the wrong way: a student waiting on review, or one admin becoming the
+  bottleneck as volume grows. That ADR rejected letting any signed-in user
+  create a club outright, because a club page carries an implied claim to
+  represent a real student organisation and curating after the fact is the wrong
+  way round. A verified university address, or some comparable signal, is the
+  shape of the fix. Neither trigger has fired — there is no volume yet — so this
+  is a marker, not work.
+
+- [ ] **P2** *(item 5, follow-up)* **Expire stale invitations.** `EXPIRED` is in
+  `AssignmentStatus` and nothing sets it. A PENDING row grants nothing, so this
+  is tidiness rather than exposure — but it holds the
+  `one_live_invite_per_club_email` slot, so an owner who mistypes an address has
+  to cancel before re-inviting. Wants a TTL and a sweep; natural to pair with
+  the audit log, which is where the sweep should be recorded.
+- [ ] **P2** *(item 8, follow-up)* **Expire stale handovers**, alongside the
+  invitation expiry below. An offer nobody answers sits PENDING forever and
+  holds the club's one transfer slot; the owner can withdraw it, but nothing
+  does so on its own.
+- [ ] **P2** *(items 9–10, follow-up)* **Log club-page edits and event changes.**
+  The audit log covers administration and ownership only, so a club with a stable
+  team has an empty Activity tab — and §21's own UI example shows exactly the
+  entries that are missing. `ClubAuditService.record` and the `CLUB` / `EVENT`
+  entity types already exist. **The write paths all exist since 2026-09-15** and
+  none records anything: `ClubService.update`, the logo and photo uploads,
+  `EventService.update`, `removeImage`, `makeBanner` and event delete (CEM-06,
+  left out of that unit by Arpan's scope).
+- [ ] **P3** *(items 11–13)* **Notification separation.** Club-operational mail
+  to the official club email, personal mail to the user, optional personal
+  copies for admins, and the §17 security notices that cannot be opted out of.
+  Blocked on the notification system generally, which does not exist.
+- [ ] **P3** *(item 14)* **Annual administrator review.** Prompt only — never
+  auto-remove anyone on a date (§43).
+- [ ] **P3** *(item 15)* **Platform-admin ownership recovery.** Needs
+  `official_email` to be real first, and needs an admin account to exist.
+
+## Frontend / Features
+
+- [ ] **P2** **Two more hover-only controls are invisible on touch devices.** `ManageClubPill.tsx:44` and `ConversationSidebar.tsx:135` use `opacity-0 group-hover:opacity-100`, which never shows on a phone or tablet because Tailwind v4 gates `group-hover` behind `@media (hover: hover)` — and the invisible control is still tappable. Same fix as `EventCard.tsx:49`: `opacity-100 [@media(hover:hover)]:opacity-0 group-hover:opacity-100` plus `focus-within:opacity-100` (keep `ManageClubPill`'s `focus-visible`). Noted out of scope on 2026-09-17 with [BUG-062](../bugs/fixed_bugs.md#bug-062); the rule is in `rules/frontend.md`.
+- [ ] **P3** **My events still groups by the browser's calendar day.** Event times are shown and entered in Montreal's zone since 2026-09-16 (`lib/event-zone.ts`), but `startOfDay`, the Today and Tomorrow labels, the date filter anchors and the `EventDateFilter` month grid in `lib/my-events.ts` use the browser's local day. They agree for anyone in Montreal; a viewer elsewhere sees an evening event under the next day. Needs zone-aware day arithmetic through the date filter. Trigger: a user outside the zone, or the planner showing My events data.
+- [ ] **P2** **A requester cannot see their own pending club proposal.** They
+      submit, get a confirmation, and then have no way to check on it —
+      deliberately, for now: Arpan, 2026-09-09, it belongs in the notifications
+      tab rather than getting a screen of its own. `GET
+      /api/v1/club-creation-requests` is admin-only, so this needs either a
+      me-scoped endpoint or a filter. **Fold into the notifications work under
+      Backend / Features**, and note that nothing tells the requester when a
+      proposal is approved or rejected either.
+      **This is [ADR-004](../decisions/ADR-004-two-paths-create-a-club.md)'s
+      third revisit trigger.** That ADR accepted *nothing tells the requester* as
+      a cost of putting club creation behind review, on the explicit condition
+      that it stops being a consequence and becomes a **bug** the day
+      notifications exist. Whoever builds notifications owns this.
+- [ ] **P2** **Nothing can display an uploaded profile avatar** — the half of
+      [BUG-042](../bugs/bugs.md#bug-042) left after events got their read path
+      on 2026-09-12. There is no avatar upload or column yet either (see the
+      profile photo item). When it is built, serve it through
+      `s3/StoredImageResponses` and the `/media/**` rewrite like clubs and
+      events; do not invent a third shape.
+- [ ] **P3** **A club proposal never expires**, so an unreviewed one holds its
+      slug reservation forever and that name is unavailable to everyone. Same
+      shape as the stale-invitation and stale-handover sweeps under Club
+      governance, and wants the same one. Named as a standing consequence in
+      [ADR-005](../decisions/ADR-005-club-proposal-is-its-own-table.md) —
+      the reservation is what makes two students proposing `robotics` collide at
+      submission rather than at approval, and holding it forever is the price.
+
+- [ ] **P3** **A reviewer cannot see a proposed club as a club page**, because
+      there is no `clubs` row to render — which is the whole point of
+      [ADR-005](../decisions/ADR-005-club-proposal-is-its-own-table.md) and
+      is named there as **the first requirement this shape makes genuinely
+      awkward**. The queue shows name, slug, description, message, interests and
+      the contact links, which has been enough so far. If it stops being enough,
+      build the preview **from the proposal** — a route that renders the club
+      page shape from `ClubCreationRequestDTO` — rather than relaxing the rule
+      that no row exists before approval. Recorded so the awkwardness is
+      recognised as predicted rather than as evidence the decision was wrong.
+
+
+
+**The homepage feature request — queued 2026-09-12 by Arpan, reshaped 2026-09-15.** An event's banner is now its first photo, chosen by the club and shown on the event page at once ([ADR-015](../decisions/ADR-015-event-banner-is-the-first-photo.md)); the former fourth item, *an approved banner is the event page's hero*, is superseded by that. What still goes through the platform owner is **featuring an event on the homepage**. Three items, in dependency order:
+
+- [ ] **P2** **A club requests a homepage feature for its event.** A club owner or club admin submits one of an event's photos to the platform owner — one live request per event. Backend: the request record, create and withdraw behind `canManageEvent`, and a platform-admin approve and reject. **Its data shape wants a Proposed ADR at its `/start`:** a request table in the ADR-005 mould versus the unused `Event.promoted` flag and `findByPromotedTrue`. **It must not reuse position 0** — the club can change its banner at any time — and needs a pointer of its own that survives a photo being removed, since photos are addressed by index. Nothing notifies the requester of the outcome; that joins the notifications work.
+- [ ] **P2** **The platform owner's feature queue.** Pending requests beside the club proposals in the admin dashboard: the event, the chosen photo rendered through `/media/events/**`, the requesting club, approve and reject.
+- [ ] **P2** **The homepage carousel shows approved features.** `BannerCarouselMainPage.tsx` renders four hard-coded slides from `public/`; replace them with approved event photos, each linking to its event, with an empty state when there are none. Placement chosen by Arpan 2026-09-12.
+
+- [ ] **P2** **Club banner images are rendered nowhere.** `POST /clubs/{id}/images` stores them, `GET /clubs/{id}/images/{index}` serves them, `adapters.ts` maps them, and since 2026-09-15 the club editor uploads them — but no public page draws `club.images`, so what a club uploads shows only in its own editor. Queued 2026-09-12 alongside the banner work; kept `clubs/{id}/images/`, no rename.
+- [ ] **P2** **A club photo cannot be removed.** Event photos gained `DELETE /events/{id}/images/{index}` on 2026-09-15; club photos stayed add-only by Arpan's call that day, so a wrong upload stays for good. Same shape as the event one: row first, object after the commit, only under `clubs/{id}/`. `club_images` also has no order column, which matters the day club photo order means anything ([ADR-015](../decisions/ADR-015-event-banner-is-the-first-photo.md)).
+- [ ] **P1** **A club cannot see who is coming to its own event** (CEM-12, from the [2026-09-10 review](../reviews/2026-09-10-club-and-event-management.md)). `user_event_rsvps` and its `idx_user_event_rsvps_event` index exist; no endpoint reads that direction. **D-9 answered by Arpan 2026-09-15: the club team sees names only, never email addresses.** Also `Event.registered` is served as `EventDTO.registered` and never incremented, so the event page's *spots left* always shows the full capacity.
+- [ ] **P2** **The platform admin has no club directory** (CEM-25). `/admin` is the pending-requests queue and a Create a club button; there is no list of clubs, no view of the ownerless ones, and no route to a club's dashboard except its URL. Partly waits on D-11. Arpan kept it out of the 2026-09-15 demo scope.
+- [ ] **P3** **The dashboard Overview answers almost nothing** (CEM-23): three tiles, the next four events, the official-email panel. Worth building once attendance numbers exist (CEM-12).
+- [ ] **P3** **No recurring events, and no way to duplicate one** (CEM-18, CEM-20). A weekly club meeting is created by hand every week. Duplicating is the cheap substitute, and it is small now that the edit form exists.
+
+### Taxonomy — built, and almost entirely unread
+
+Audited 2026-08-21. The three vocabularies are seeded, foreign-keyed, served and
+writable, and both authoring forms set them. **Almost nothing reads them back.**
+Today the only consumer of a club's category or tags is the text handed to the
+embedder, and BUG-001 means the semantic leg does not work — so in practice the
+taxonomy is currently write-only. Ordered by how visible the gap is.
+
+- [ ] **P3** **A club page shows its tags but not its category.** The tags half
+      shipped 2026-09-16 with the club page redesign — `getInterests` + `labelFor`
+      turn the stored slugs into `Chip`s. The category is **implemented and
+      commented out**: `page.tsx` builds `categoryLabel` from `getClubCategories`
+      and the line that renders it is commented, by Arpan, at the same sitting.
+      So this is now a display decision, not missing code — uncomment it, or
+      decide the category is not worth a line and delete both. Leaving it as-is
+      keeps an unused local that lint will eventually object to.
+- [ ] **P2** **A club's social link keys are covered by no contract test.** `ClubDTO.socialLinks` is one opaque `String`, so `ApiContractTest`'s Jackson introspection never looks inside it and `api-dto-fields.json` pins only the field name. Renaming `instagram` to `insta` across `ClubSocialLinks.java` and the TS `ClubSocialLinks` would leave **both** suites green and the club page blank — exactly the failure the contract exists to prevent. `ProfileSocialLinksDTO` gets its own row precisely because it is a real nested Jackson bean; the club's blob never did. Four edits to close: a row in `api-dto-fields.json`, `CONTRACTED.put("ClubSocialLinks", ClubSocialLinks.class)` (it is already a record Jackson can introspect), a `Record<keyof ClubSocialLinks, true>` mirror and a `MIRRORS` entry. Raised 2026-09-16 when `linkedin` and `linktree` were added and deliberately left undone — it is scope Arpan has not agreed. Held meanwhile by [`rules/contracts.md`](../../.claude/rules/contracts.md).
+- [ ] **P1** **Nothing browses by category or by tag.** `GET /api/v1/clubs` takes
+      no category parameter, `(main)/clubs/page.tsx` is a flat grid with no
+      filter, and `/events` filters only on free-text `?q=`. D6 deleted the
+      homepage tiles on the explicit promise that *browsing by club category or
+      by event tag is a real filter against a real foreign key, and it belongs on
+      `/events` and `/clubs`* — the replacement was never built, so the delete
+      removed a bad filter and left none.
+- [ ] **P2** **A profile never shows its own interests.** `/profile/edit/interests`
+      writes them; `ProfileAboutCard` renders degree, faculty and subjects and
+      stops. So `showInterests` — the toggle at `profile/edit/page.tsx:164` — is
+      a boolean with **no reader on either side of the wire**, as is
+      `showSocialLinks`. Both were built for a public profile view that does not
+      exist yet, which is a defensible reason to have written them and not a
+      reason to leave them unread without a note.
+- [ ] **P2** **Every seeded club is unclassified and every seeded event
+      untagged.** V6 inserted **eight** mock clubs (not sixteen — corrected
+      2026-09-09; it is the first of its two INSERT statements), all with
+      `category_slug` null
+      and zero `club_interests` rows, and no migration seeds a topic or format
+      assignment. Whatever gets built above will render empty against dev data,
+      and so will any eyeball check of it. Classifying the sixteen is one seed
+      migration and is the cheapest of these by a distance — do it first, or the
+      others cannot be looked at.
+
+
+- [ ] **P1** Fix route protection — `proxy.tsx` is never executed by Next.js (wrong filename *and* wrong export name), and it reads a cookie while the JWT lives in localStorage. Decide the token transport first; a half-wired guard is worse than none. ([BUG-003](../bugs/bugs.md#bug-003))
+- [ ] **P2** Fix `NEXT_PUBLIC_*` in the **production** Docker build — values are inlined at build time, so the deployed frontend ships them empty. Needs `ARG`/`ENV` before `npm run build` plus compose `build.args`. No longer affects local dev, which now builds the `dev` stage and reads them at runtime. ([BUG-004](../bugs/bugs.md#bug-004))
+- [x] **P0** ~~Build password reset, or take the screen down~~ — **built 2026-08-15**, see Security.
+- [ ] **P3** Point the remaining `/login` links at the auth modal. The Footer's Sign up / Log in and `ProtectedRoute`'s redirect still navigate to the `/login` page, so the app has two different-looking ways to sign in. The navbar and the save-event heart already open the modal.
+- [ ] **P1** Add an "I'm going" control so users can actually RSVP. `POST`/`DELETE /api/v1/users/me/rsvps` are live and tested, but nothing in the UI calls them yet, so the Going tab can only be populated through the API. Natural home is the event detail page, beside the existing save heart.
+- [ ] **P1** **Users must not be able to follow (RSVP to) an event that has already ended.** Queued by Arpan 2026-11-16. `MyEventService.rsvp` (`MyEventService.java:83`) checks only that the event exists, so `POST /api/v1/users/me/rsvps` accepts an ended event ([ADR-020](../decisions/ADR-020-event-attendable-until-its-end-time.md): attendable only while `end_time > now()`). To begin with, **remove the follow control and refuse the follow endpoint for ended events**: hide the button on an ended event, and answer the endpoint with a 4xx. `saveEvent` (`:72`) has the same existence-only check; whether the save heart is included is Arpan's call. The planner agent already refuses ended events in its own tool executor ([ADR-023](../decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)) and keeps calling the unchanged `rsvp()`.
+- [ ] **P2** Refresh the My events list after the heart is toggled. `EventLikeButton` updates its own state optimistically, so un-saving on the Saved tab leaves the card visible until reload.
+- [ ] **P3** Whole-list calendar export ("Add to calendar" for a full tab). Needs an .ics feed — a Google template link carries exactly one event, which is why that control lives on each card rather than in the page header.
+- [ ] **P2** Category filtering on the events listing.
+- [ ] **P2** Wire Club Dashboard UI to the backend once those endpoints exist.
+- [ ] **P2** Wire the rest of the Admin Dashboard UI to the backend. *(The club-creation half shipped 2026-09-09: a Create a club control, and one merged Pending requests list reading both the club-admin-request and club-creation-request queues. User management and event moderation have no endpoints to wire yet.)*
+- [ ] **P2** Bookmark UI. `EventLikeButton` posts to `/saved-events` but starts from `initiallySaved={false}` unless the caller knows better, so a saved event still shows an empty heart on the events listing. Same fix as the follow button: a provider holding the saved ids, filled from `GET /api/v1/users/me/events`.
+- [ ] **P3** Show the live follower count on club cards and the club page. `Club.followers` is accurate now that follows move it, but `ClubCard` has its count commented out and the club page's number never refreshes after a follow — the provider only tracks ids.
+- [ ] **P2** **Profile photo upload.** `ProfileAvatar` draws the first initial and `/profile/edit` says in words that uploads are not available, rather than showing a disabled button. There is no avatar column on `users` or on `user_profiles` to fall back from. S3 is already wired for club logos and event banners, so this is the same path with a different owner.
+- [ ] **P2** **The public profile view does not exist.** `showInterests` and `showSocialLinks` persist as of 2026-08-20 and govern how a profile looks *to other people* — but `/profile` only ever shows you your own, where you always see everything. **Both switches therefore still control nothing.** Decide the route (`/users/[id]`?), what a visitor may see, and add the public read endpoint. Note that its `permitAll` matcher has to sit *above* the broad public-GET block in `SecurityFilterChainConfig`, the way `/api/v1/interests` does — first match wins.
+- [ ] **P2** **Build the club and event taxonomies.** Fully specified as of 2026-08-20 in [ADR-001](../decisions/ADR-001-three-taxonomy-vocabularies.md) — seven decisions, **no open questions**, content settled down to the word lists. **Read it before starting**; the summary below is not enough to build from.
+
+  **Three vocabularies, and only three.** `interest_catalogue` plus its groups is the shared topic vocabulary — students pick interests from it, clubs are tagged from it, and events are tagged from it. `club_categories` is 13 organisation types, one per club. `event_formats` is 22 words (*Workshop*, *Panel*, *Screening*) that are genuinely events-only. **There is no event category and no separate event-topic list.**
+
+  **The rule that keeps it honest:** every event topic is an interest or an interest group, so an event needing a topic the catalogue lacks *adds it as an interest*. That is why there is no mapping between what a student likes and what an event is about — it is the same row. The draft needs **22 new interests** adding (Careers, Business, Finance, Dance, Politics, Travel…), three of which are really group work rather than new leaves.
+
+  **Do the group layer first.** Tagging an event *Music* means pointing at a group, and `interest_catalogue.category` is a text column nothing can foreign-key to. The self-referencing `parent_slug` the doc recommends is cheap **only while V19 and V20 are uncommitted**.
+
+  **Two traps.** `EventDTO.categories` is replaced by **two** fields, `topics` and `formats` — six coordinated contract edits each, since one merged array would put `workshop` beside `robotics` with nothing saying which is which. And `event_categories` (V3) is applied, so it is dropped by a new migration and never by editing V3 — the same supersede route V22 took.
+
+- [ ] **P3** Custom header style in `layout.tsx`. *(from `frontend/README.md`)*
+- [ ] **P3** Apply `EventCard`'s stretched-link pattern to `MyEventCard`. Only its stub content links to the event, so the image and padding are still dead. Same fix: `relative` root, `after:absolute after:inset-0` on the title `<Link>`, and the heart/calendar controls lifted above it — they cannot be nested inside the `<a>`.
+- [ ] **P3** Stop event cards overlapping in the event section. *(from `frontend/README.md`)*
+- [ ] **P3** Restrict club title input to alphanumeric + spaces on create. *(from `frontend/README.md`)*
+- [ ] **P3** `images` and `categories` are still N+1 on the events list — two statements per event, from the `@ElementCollection` copies in `EventMapper`. Pre-dates the `organizerName` work and is the whole remaining per-event cost (2 of the 13 statements above, times the event count). A batch size or a second entity graph would flatten it.
+- [ ] **P3** Event detail page still shows a static "Save your spot" button and no recurrence. RSVP wiring is tracked above; recurrence has no field in the model at all, so the old hardcoded "Every week on Sunday" line was dropped rather than faked.
+
+## AI & Search
+
+Architecture reference: [`docs/architecture/llm-api-key-management.md`](../architecture/llm-api-key-management.md) · [`.claude/skills/llm-integration/SKILL.md`](../../.claude/skills/llm-integration/SKILL.md)
+
+- [ ] **P2** *(Step 6)* **Separate OpenAI projects per environment.** The other half of the budget-cap item, which Arpan closed 2026-11-16 (in [`tasks-completed.md`](tasks-completed.md) under AI & Search): whether production and development already use different projects was not confirmed. One project means a leaked development key spends production's budget, and one cap covers both.
+- [ ] **P2** *(Step 6)* Add a `gitleaks` pre-commit hook and enable GitHub secret-scanning push protection.
+- [ ] **P2** **Index a club's interest tags into its embedding.** `SearchableText.forClub` builds the text that gets embedded from **name and description only** — while `forEvent` beside it already folds in the event's categories. So once clubs carry interest tags ([ADR-001](../decisions/ADR-001-three-taxonomy-vocabularies.md) D7), a search for *tech* will still miss a departmental society whose description never happens to use the word, even though it is tagged `web-development` and `ai-machine-learning`.
+
+  **The change is one line** — join the tag *labels*, not the slugs, since `ai-machine-learning` embeds badly and *AI & machine learning* embeds well. Do the same for event tags when they land.
+
+  **Two things that make it more than one line.** Tag labels have to be loaded inside the indexing transaction, and `SearchIndexService.indexClub` is called on the write path, so tagging a club has to re-index it — otherwise the embedding describes the club as it was before anyone tagged it. And every already-indexed club needs a backfill, which is what `POST /api/v1/search/reindex` exists for.
+
+  Blocked on D7 being built. Treat the tag join as the load-bearing path and the embedding as the bonus, given [BUG-001](../bugs/bugs.md#bug-001).
+- [ ] **P2** **Look at the planner in a browser at 390px, and at the states only tests have seen** — the 15-of-15 eviction notice, a 429, a provider failure, the homepage card hand-off. Seen on 2026-09-16 against the real backend and key, at desktop width: an events answer, a clubs answer, both follow-up chip kinds, a reload and a declined prompt injection. Natural moment: the first run on the deployed site.
+- [ ] **P3** **Fix [BUG-065](../bugs/bugs.md#bug-065): the agent's fallback summary is appended to a partly streamed intro.** Rare (an action ran, some intro streamed, then the answer failed) and cosmetic: the stored message is right and a reload shows it. Two fix shapes in the bug, a replacing frame or `content` on the `done` frame; Arpan picks. Add a `PlannerAgentIT` case that streams a fragment before failing.
+- [ ] **P3** **An evaluation set for the planner's retrieval and prompt.** `PlannerRanker`'s weights are hand-set and the first live answer's intro promised two workshops over one card. A dozen prompts with the events a person would expect, run against a seeded database, before tuning weights or rewording `planner-system.txt`.
+- [ ] **P3** **Propose a chat surfaces section for `design-guidelines.md`** — sidebar tint `mist-100`, user bubble `lavender-100`, the `.card-row` scrollbar, the message box. The planner page follows the approved design artifact; the guidelines say nothing about chat. Arpan approves the wording.
+- [ ] **P3** Candidate generative features once the layer exists: event summarisation, event description generation, recommendations, moderation assistance.
+- [ ] **P3** Multi-provider support (`AnthropicLlmClient`, etc.) — do not add before a feature requires it.
+
+## Database Lifecycle & Seeding
+
+Reference: [`.claude/skills/database-lifecycle/PLAN.md`](../../.claude/skills/database-lifecycle/PLAN.md) (audit + implementation sequence) · [`SKILL.md`](../../.claude/skills/database-lifecycle/SKILL.md) (rules)
+
+Ordered — each task unblocks the ones below it. *(Step N)* maps to PLAN.md's
+Implementation Sequence.
+
+- [ ] **P2** **Tests for the bootstrap and the seeder.** Steps 1–4 shipped 2026-08-16 but their verification was manual (a throwaway account promoted, restarted, and deleted). Automate: migrations apply from an empty schema; bootstrap is idempotent across two runs, promotes an existing non-admin, refuses to create a password-less account, and never revokes; the seeder creates no duplicates and does not run under `test` or `prod`.
+- [ ] **P2** **Warn when an index write matches no row.** `SearchIndexService.indexClub/indexEvent` discard the count `JdbcTemplate.update` returns, which is exactly how [BUG-034](../bugs/fixed_bugs.md#bug-034) stayed invisible — the embedding UPDATE hit zero rows and reported nothing. Logging a warning on `0` turns the whole class of "indexed something that wasn't there yet" into a visible event. Deliberately not bundled into the BUG-034 fix: it changes shared indexing behaviour and deserves its own commit.
+- [x] **P1** ~~Integration tests ran on H2, so entity/migration drift was never caught~~ — **done 2026-08-17.** Every `*IT` now runs against real PostgreSQL + pgvector via `PostgresTestContainer`, with Flyway on and `ddl-auto: validate`. Plain `*Test` unit suites stay on H2 and need no Docker.
+- [ ] **P2** **`docker compose up` can silently run a stale backend jar.** `backend/Dockerfile` does `COPY backend/target/campusvibe-0.0.1-SNAPSHOT.jar`, and the `develop.watch` rule syncs that jar in — but **only while `docker compose watch` is actually running**. Recreate the container any other way and it falls back to whatever jar was baked into the image, with no warning. On 2026-08-17 that produced `Schema-validation: missing column [club_admin_id] in table [clubs]`: an image jar from three days earlier meeting a database the newer jar had already migrated. Nothing about the error names the real cause.
+
+  **Options:** build the jar inside the Dockerfile (multi-stage, slower but self-consistent); or stamp the jar's build time into `/actuator/info` and have the healthcheck or a compose profile compare it; or, cheapest, document `docker compose build backend` as a required step after any `mvn package` and say so in the README. The failure is confusing enough — and now reachable on every migration — to be worth more than a docs line.
+
+- [ ] **P1** **Backfill club embeddings.** All 8 clubs have `embedding IS NULL`, so the semantic half of club search cannot match anything — only the keyword path works today. A single `POST /api/v1/search/reindex` once an admin exists. Distinct from [BUG-001](../bugs/bugs.md#bug-001) (events, repository-level) but the symptoms look identical, so confirm embeddings are non-null *before* debugging ranking.
+- [ ] **P2** *(Step 3)* **Dev seeder** (`seed/DevDataSeeder.java`). `@Profile("dev")`, idempotent — skip when clubs already exist. Port the 8 clubs out of V6 and create them **through the service layer** so `SearchIndexService` populates `clubs.embedding` on write; that is precisely why a programmatic seeder is mandated over seed SQL. Verify with `docker compose down -v && docker compose up -d`, then `count(embedding) = count(*)` on `clubs`.
+- [ ] **P2** *(Step 4)* **Retire `V6__insert_mock_clubs.sql`.** Only after the seeder reproduces the same data. Do **not** delete the file — Flyway aborts with `Detected applied migration not resolved locally: 6` and the app will not boot. Supersede it with `V9__remove_mock_club_seed_data.sql`. Locally `docker compose down -v` is cleaner; ship V9 only if V6 ever reached another environment.
+- [ ] **P2** **Tests** — migrations apply from an empty schema; the seeder creates no duplicates and does not run under `test` or `prod`. *(The bootstrap half is done: `AdminBootstrapRunnerIT` covers idempotency across two runs, promoting an existing non-admin, refusing to create a password-less account, and never revoking.)*
+- [ ] **P3** **Keep reference data out of schema migrations.** `V7__multi_role_rbac.sql` creates the RBAC tables *and* inserts the three role rows. It is applied, so leave it alone — but split the two concerns in every migration from here on.
+
+## Infrastructure & CI/CD
+
+- [ ] **P1** **Prove the teammate PR workflow on GitHub** ([spec](../specs/2026-11-23-teammate-pr-workflow.md), verification 1–5). From a throwaway branch with a PR into `develop`: `CI` runs the full gate; `PR checks` warns on a bad title, an empty template and an oversized diff and still succeeds; the review's step 2 posts one comment (outside-the-spec list, suggested title, drafted body with *How I tested* a TODO); a `contracts/` change requests `@ArpanSaha07`; the teammate cannot merge unapproved and Arpan can through the bypass. Needs the unit on `develop` first (CODEOWNERS is read from the base), and the template only appears once it is on `main`.
+- [ ] **P0** **Merge PR #71 to `main`** — the live Vercel site serves `next` 16.3.8, with two unauthenticated RCEs, until it does. **PR #71 is green:** run `42442088359` proved [ADR-022](../decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)'s exception (the two Spring CVEs gone from the backend report, the seven HIGHs still listed, Trivy 0.74.0 matching the versioned `purl`), and run `42439638257` proved `next` 16.4.5 ([BUG-064](../bugs/fixed_bugs.md#bug-064), fixed). Arpan's to merge.
+- [ ] **P3** **Watch for a flaky Jest run in `verify.mjs`.** On 2026-11-16 one run reported its `test` step failed; the output had been piped through `tail`, so the failing test was lost, and the next three runs (including `--full`) passed with 357 of 357. **Not a bug yet: there is nothing to reproduce.** If the `test` step fails again, locally or in CI, keep the whole log (`node scripts/verify.mjs > verify.log 2>&1`, or the CI job log), then open a bug naming the test and its error. Suspects, none confirmed: the planner suites' timing (`PlannerChat.test.tsx` waits on streamed state), or load from a parallel Maven build.
+- [ ] **P1** **Prove `trivy-weekly.yml` on GitHub** ([spec](../specs/2026-11-07-weekly-trivy-scan.md)). Built 2026-11-07; no Trivy or `actionlint` locally, so unproven. **On the PR that adds it:** the workflow runs on its own `paths` trigger; `trivy-backend` lists the seven known backend HIGHs and `trivy-eb` at least those; every gate is green; four categories (`trivy-backend`, `trivy-frontend`, `trivy-eb`, `trivy-fs`) appear in Security → Code scanning. The same PR's Docker job proves `setup-trivy` left the gate unchanged. **After it reaches `main`:** `gh workflow run trivy-weekly.yml`; the log shows `develop`'s commit, not `main`'s, and the alerts appear under the `develop` branch filter. Then the first Monday run, under `gh run list --workflow trivy-weekly.yml`.
+- [ ] **P1** **Migrate the backend to Spring Boot 4 before 2026-12-31**, when ADR-022's exception expires and the gate goes red by itself. Spring Framework 7.0.10 fixes both CVEs; the migration deletes both `.trivyignore.yaml` entries. Dependabot `#17` failed both CI tiers on 2026-09-03, so start from its failures. Its own unit through `/start`. Also removes ADR-003's `<tomcat.version>` and ADR-008's `<netty.version>` overrides if Boot 4's BOM manages fixed versions.
+- [ ] **P3** **`verify.mjs` with no flag ignores uncommitted work.** It chooses components from `git diff origin/main...HEAD`, so on 2026-09-16 it ran the frontend alone over a working tree holding V35 and nine changed ITs. Right for the pre-push hook, misleading before a commit. Either add `git diff --name-only HEAD` and untracked files to the set, or print a warning when the tree is dirty. Held meanwhile by a line in `rules/ci-and-build.md`: run `--all` before committing.
+- [ ] **P1** **Re-run the full tier and get it green past the Trivy gate.** Ran 2026-08-07: the **frontend image scanned clean**, confirming BUG-016 on GitHub, and the gate then failed on the **backend** — four fixable CRITICALs in `app/app.jar`, all from `spring-boot-starter-parent` 3.5.5 ([BUG-019](../bugs/fixed_bugs.md#bug-019)). Parent bumped to 3.5.16, which is the first 3.5.x carrying both fixes. **Replayed end-to-end locally 2026-08-08** once Docker Desktop was up — fail-fast secret guard, `compose build`/`up`, all three health waits, the API smoke tests, the production frontend image on :3001, and the Trivy gate itself with the same Trivy 0.73.0: **both images 0 fixable CRITICAL, exit 0**. So the gate was no longer the open question — **until 2026-09-03, when a clean Ubuntu runner did finally reach it on [PR #39](https://github.com/ArpanSaha07/campus-vibe/pull/39) and it failed again**, on three newly published Tomcat CRITICALs rather than anything this repo changed ([BUG-035](../bugs/fixed_bugs.md#bug-035), now fixed and re-verified against the gate). The standing lesson is that a green gate has a shelf life: it measures the advisory database on the day it ran, so “the gate passed” is never a property of the commit. Note the old prediction that it would then **fail on [BUG-001](../bugs/bugs.md#bug-001) no longer holds** — the full suite ran **42/42** here, `SearchIT` included, and that bug no longer reproduces on this machine. It is deliberately still open, because nothing explains why it stopped; this run is the arbiter.
+- [ ] **P1** **Triage the nine red dependency PRs.** Nothing tracked them until 2026-08-07. Three fail the **fast** tier and so are genuine breaking majors: `#22` eslint-config-next 16, `#21` eslint 10, `#20` lucide-react 1.28 (`frontend`). Two fail both tiers: `#17` Spring Boot 4.1.0, `#15` maven-minor-patch (`backend`). Four fail only the full tier — `#19`, `#18`, `#16`, `#14` — and are probably BUG-001 rather than the bumps (`devops` to confirm). This is Dependabot's ungrouped-majors design working exactly as intended. **Note `#15` now overlaps [BUG-019](../bugs/fixed_bugs.md#bug-019):** the Spring Boot parent went to 3.5.16 by hand to clear the Trivy gate, so `#15` will rebase down to its remaining six updates — the hard-pinned, BOM-free block (`awssdk:s3`, `commons-io`, `jjwt`, the Google clients) that is the actual reason the maven entry exists.
+- [ ] **P0** **BLOCKER — possibly lifted, and that needs confirming before anything is built on it.** Branch protection went on 2026-08-07 and `CI` is a required check, so a single red test makes every PR unmergeable, the nine Dependabot ones included. The measurement on record (2026-08-05, **40 tests, 39 pass**) had `SearchIT.semanticSearchMatchesMeaningWithoutSharedKeywords:163` as the one failure. **Re-measured 2026-08-08: `./mvnw -B verify` is 42/42 green** — 16 unit (the 2 actuator cases included) + 26 integration, nothing red anywhere in the full tier. [BUG-001](../bugs/bugs.md#bug-001) no longer reproduces, and a Boot 3.5.5 control run in a worktree rules out the [BUG-019](../bugs/fixed_bugs.md#bug-019) bump as the cause; **why it stopped failing is unknown**. So: do **not** apply the `@Disabled("BUG-001: …")` quarantine that was the fallback plan — it would disable a passing test and destroy the evidence. Push and read the full tier instead. If it is green there too, this item and BUG-001 both close; if it is red on Ubuntu, that difference is itself the diagnosis.
+- [ ] **P2** **Tighten the Trivy gate** in `_docker.yml` once *both* base-image baselines are known. It reports fixable HIGH+CRITICAL and fails only on fixable CRITICAL. **Re-measured 2026-09-03 with Trivy 0.74.0 ([BUG-035](../bugs/fixed_bugs.md#bug-035)), and the answer is still that the gate cannot move.** Frontend prod: **0 fixable HIGH, 0 CRITICAL**. Backend: **0 CRITICAL but 12 fixable HIGH** — up from ten, and the composition shifted: `p11-kit`/`p11-kit-trust` are gone, `libcrypto3`/`libssl3`/`openssl` (CVE-2026-14456) are new, and `libexpat` now carries two — all from `eclipse-temurin:25-jdk-alpine` (`os-pkgs`). The jar half is **unchanged since BUG-019**: `commons-io` 2.11.0 → 2.14.0 (**our own hard pin**, CVE-2024-47554), `org.postgresql` 42.7.11 → 42.7.12, and five netty artifacts all needing 4.1.136.Final. Full table in [BUG-035](../bugs/fixed_bugs.md#bug-035). That the `os-pkgs` half churns every few weeks while the jar half sits still is itself the argument for doing (a) and (b) before touching the gate — tightening to HIGH would hand the base image a veto over every merge. Three things to do before the gate tightens, in this order: **(a)** establish whether the S3 client in use is synchronous — `dependency:tree` shows every netty artifact entering via `awssdk:s3` → `netty-nio-client`, the *async* transport, so if nothing calls it an `<exclusion>` deletes five of the twelve findings rather than chasing versions; **(b)** ~~bump `commons-io`~~ — **done 2026-09-12 by removing it**: its only consumer was the deleted S3 stub ([ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md)), so CVE-2024-47554 leaves the jar with it; **(c)** re-measure, then decide whether the base-image HIGHs have a published fix. Only then flip `--severity CRITICAL` to `HIGH`.
+- [ ] **P2** **Build and scan the production image in the PR gate.** `_docker.yml` builds and Trivy-scans `backend/Dockerfile` (JDK base) and the frontend `runner` stage, but never `deploy/eb/Dockerfile` (`eclipse-temurin:25-jre-alpine`, `deploy/eb/Dockerfile:18`) — the image Elastic Beanstalk actually runs. Only `trivy-weekly.yml` (target `trivy-eb`) scans it, Mondays only. Since 2026-11-08 Dependabot watches `/deploy/eb` and will open base-image PRs for it, and each of those passes `CI` with that image never built or scanned; a broken or vulnerable bump surfaces at the next weekly run or at the deploy. The fix: in `_docker.yml`, after the jar build, stage the jar as `app.jar` beside `deploy/eb/Dockerfile` (the bundle shape `scripts/package-eb.mjs` produces), `docker build` it, optionally boot it and wait for `/actuator/health` with the job's throwaway env, and add it to the Trivy report, gate and class-list loops with `--ignorefile`. Options to weigh at `/start`: reuse `package-eb.mjs --skip-build` so CI builds from the real bundle rather than a hand copy of its shape; and whether to boot it at all (BUG-063 kept the stack down until the S3Mock swap of 2026-11-25). Keep `verify.mjs` and [`ci-cd-pipeline.md`](../architecture/ci-cd-pipeline.md) in step. Found 2026-11-08 while adding the Dependabot entry.
+- [ ] **P1** **Record and decide on the Vercel deployment ([BUG-018](../bugs/bugs.md#bug-018)).** Discovered 2026-08-07 only because a preview build failed. Three things, in order: write a `vercel.json` so the root directory and build command are in version control rather than the dashboard; list which `NEXT_PUBLIC_*` keys are set in which Vercel environments (**key names in the docs, never values**); and decide whether the Vercel check should be a required status check on `main` alongside `CI` — if a failed deploy should block a merge, requiring it is the only thing that makes that true. Also worth asking whether preview deployments should exist yet at all: they build against no backend, so a preview is a frontend shell pointed at nothing.
+- [ ] **P1** **Fix [BUG-004](../bugs/bugs.md#bug-004) — `NEXT_PUBLIC_*` build args.** Note this is now a **Docker-only** bug: on Vercel these come from project environment variables and are probably correct, so fixing one does nothing for the other ([BUG-018](../bugs/bugs.md#bug-018)). Promoted from P2 on 2026-08-07: `_docker.yml` now builds *and boots* the production image on every full-tier run, so CI is actively producing an artifact with an empty API URL and an empty Google client id. The smoke test only asks for HTTP 200 on `/`, which an empty API URL still returns, so nothing catches it. Two `ARG`/`ENV` lines before `npm run build` in the `builder` stage plus matching `build.args` in compose. BUG-016 rewrote the `runner` stage and deliberately left `builder` alone.
+- [ ] **P2** Extend `_database.yml` once the dev seeder lands: assert `DevDataSeeder` does **not** run under the `prod` profile, and that `count(embedding) = count(*)`.
+- [ ] **P2** **Make a missing required property fail before a pull request.** Queued 2026-09-14 from [BUG-052](../bugs/fixed_bugs.md#bug-052): `_database.yml`'s `migrate` job is the only check that boots the packaged jar with no profile, the push loop skips it (`run-migrate: false`), and `verify.mjs` never boots, so a property that lost its default failed only on PR #51, three days late. Options to weigh at `/start`: a `verify.mjs --full` step that boots the jar against the compose database with the job's `env`, or a cheap context-start test that runs with no profile. The rule in `rules/ci-and-build.md` holds the line until then.
+- [ ] **P3** Consider **build-once / promote-one-artifact**. `_docker.yml` builds its own jar rather than consuming `_backend.yml`'s artifact, because `needs: backend` would serialise the jobs and break on a frontend-only PR. The clean fix needs a registry, so it belongs with CD.
+- [ ] **P3** **Docker layer caching in `_docker.yml`** — considered on 2026-08-16 and deliberately skipped, recorded so it is not re-derived from scratch. Every run builds cold. The `--target runner` frontend build is the slow part and is the one worth caching, but doing it properly means `docker/setup-buildx-action` plus `build-push-action` with `cache-to: type=gha` (the raw CLI cannot see `ACTIONS_RUNTIME_TOKEN` from a `run:` step). Caching the *compose* build additionally needs `cache_from: [type=gha]` entries in `docker-compose.yml` — a CI-only concern leaking into the file developers run locally, where `type=gha` does nothing but warn. Judgement: the trigger rework already cut this job's frequency by roughly half, so ~1 minute more for two new actions and a new failure mode is not the best next move. Revisit if the docker job becomes the thing people wait on.
+- [ ] **P3** **Re-audit the 2026-08-07 banner at the top of [`ci-cd-pipeline.md`](../architecture/ci-cd-pipeline.md).** A dated note now marks it as partly overtaken — `main` is no longer unmergeable, BUG-016/017 are confirmed on GitHub, and the tiering it describes is gone — but it was not re-read line by line during the 2026-08-16 trigger rework. Either fold the still-true parts into the body or date-stamp it as history.
+- [ ] **P1** **CD prerequisites — none of these exist yet, which is why CD was scoped out** ([BUG-008](../bugs/fixed_bugs.md#bug-008) closed by deleting the stub rather than filling it in). All four are needed before a deploy workflow is worth writing:
+  1. ~~An AWS account and an Elastic Beanstalk environment~~ — **exist, and the first manual deploy ran 2026-09-15.** `docker/Dockerrun.aws.json` is still an unused v1 template carrying `<your-backend-image>:latest`; the deploy used the `deploy/eb/` bundle.
+  2. A GitHub OIDC role + trust policy — see the next item.
+  3. A registry decision: GHCR or ECR.
+  4. A Vercel project + deploy token, if the frontend goes there rather than to EB.
+- [ ] **P1** Use **GitHub OIDC** (`aws-actions/configure-aws-credentials` with `role-to-assume`) for AWS auth in CI. Do not add long-lived `AWS_ACCESS_KEY_ID` repo secrets. No LLM key should ever enter CI.
+- [ ] **P2** Attach an IAM instance role granting S3 access, so the default credential chain resolves in production (`s3/S3Config.java` already expects this). **The grant already matches the decided topology** ([ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md), 2026-09-12): `CampusVibe-ElasticBeanstalk-EC2Role` carries an inline `GetObject`/`PutObject`/`DeleteObject` on `campusvibe-prod-media/*` — exactly one bucket and the three verbs `S3Service` calls. **`s3:ListBucket` on the bucket itself was added 2026-09-12** (statement `CampusVibeMediaBucketList`): without it S3 answers an absent key with 403 AccessDenied rather than NoSuchKey, which `S3Service` does not catch, so a missing object would have been a 500 in production and a 404 against MinIO. **What is left:** it has never been exercised, so it is unverified until the first upload through the deployed environment ([BUG-051](../bugs/fixed_bugs.md#bug-051)); and a customer-managed policy `CampusVibeProdMediaS3Access` duplicates it and is attached to nothing — delete it or attach it, which is Arpan's under `aws-handling.md`.
+- [ ] **P2** **Account cleanup — one item left.** Detach `AWSElasticBeanstalkWorkerTier` and `AWSElasticBeanstalkMulticontainerDocker` from the instance role (IAM, Arpan's). **Done 2026-09-14:** the personal `/32` rule on `campusvibe-database-sg` revoked, the environment capped at one instance. **Withdrawn, do not do it:** *release the two unattached Elastic IPs* — `3.96.239.88` and `15.175.46.76` are the load balancer's own public addresses (`nslookup` of the environment CNAME returns exactly those two). Releasing them was never possible and would have been wrong. [`connecting-elastic-beanstalk.md`](../architecture/connecting-elastic-beanstalk.md) §0.
+- [ ] **P2** **A Session Manager path into the private database** — `AmazonSSMManagedInstanceCore` on the instance role and port forwarding through the EB instance. Arpan's (IAM). Needed for the pgvector check, the Flyway check, and the dedicated application user. [`connecting-rds.md`](../architecture/connecting-rds.md) §3.
+- [ ] **P2** **Move the repository's PostgreSQL pins from 15 to 18** — decided 2026-09-12 to match RDS 18.3; five files, plus recreating the local volume. Code unit. [`connecting-rds.md`](../architecture/connecting-rds.md) §6.
+- [ ] **P2** **SES on the AWS and DNS side, started early** — domain identity with Easy DKIM, MAIL FROM on `bounce.` (not `mail.`, which Private Email uses), DMARC, and the production-access request, which is the slow part. Arpan's. [`connecting-ses.md`](../architecture/connecting-ses.md) §1–§6.
+- [ ] **P2** **Reconcile [`aws-deployment.md`](../architecture/aws-deployment.md) with the account that now exists.** It states *Phases 2–6 are not started. No RDS instance, no S3 bucket, no EB* — as of 2026-09-08 there is a `CampusVibe-Backend-Prod` environment (Ready/Green), a `campusvibe-prod-media` bucket and a database host in the environment properties. The doc is the first thing a session reads before touching deployment, so it is currently misleading about the one thing it exists to describe. Reading the live account is the work; nothing is written down to copy from. **The S3 half is now recorded, 2026-09-12:** one bucket, its variable and its region are in [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) and [`rules/aws-handling.md`](../../.claude/rules/aws-handling.md), and `aws-deployment.md` carries a dated pointer to them. **RDS and EB were read 2026-09-14 and the first deploy is recorded as a dated section at the top of `aws-deployment.md` (2026-09-15).** What is still owed is the body: it describes the 2026-08-18 plan — single instance, Cloudflare, PostgreSQL 15 — and has not been rewritten.
+- [ ] **P1** **AWS rollout — Phase 1 is done, Phases 2–6 are not.** Packaging landed 2026-08-18: `deploy/eb/Dockerfile` + `node scripts/package-eb.mjs` produce the EB source bundle, and the production image was verified booting under `SPRING_PROFILES_ACTIVE=prod` against a real PostgreSQL — health 200, Flyway at V12, seeder correctly silent. Reasoning and the full verification table in [`aws-deployment.md`](../architecture/aws-deployment.md); the phase checklists are guide §23. Remaining: **Phase 2** RDS PostgreSQL 15.x in `ca-central-1`, private, encrypted, Single-AZ · **Phase 3** S3 — **decided and wired 2026-09-12**: one bucket that already exists and a grant that already fits ([ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md)); the environment properties above are what is left · **Phase 4** the EB application and environment · **Phase 5** Vercel + TLS on `campusvibe-mcgill.com` (ACM on the existing ALB, decided 2026-09-12) · **Phase 6** GitHub OIDC deploy job.
+- [ ] **P2** **Move the application off the RDS master user.** Flyway V8 runs `CREATE EXTENSION IF NOT EXISTS vector`, which needs `rds_superuser`, so the first cold start has to be master. Once the extension exists the statement is a no-op that never checks privileges, so a least-privilege application user works from then on. Blocked on `psql` reachability to a private RDS — needs a bastion or an SSM session, which is why it is not done in the same pass.
+- [ ] **P3** **PostgreSQL 15 reaches end of life in November 2027.** **Superseded 2026-09-12:** RDS runs 18.3 and the repository moves to 18 — see the P2 pin item above. Production will be pinned to 15.x to match `pgvector/pgvector:pg15` in Compose, both Testcontainers suites and `_database.yml`. Moving majors means all four pins plus an RDS upgrade plus a local volume rebuild — schedule it, do not discover it.
+- [ ] **P2** **Run the forged `X-Forwarded-For` rate-limit test through CloudFront** — the one ADR-017 check not run at the 2026-11-07 cutover. On the next resume: 21 `POST https://api.campusvibe-mcgill.com/api/v1/auth/login` within a minute, each with a different forged `X-Forwarded-For` and a different nonexistent `@example.invalid` email (so the per-account lockout stays out of it); the 21st must answer 429 (`ip-requests-per-window: 20`, `application.yml`). Anything else means `trusted-proxy-hops: 2` does not match CloudFront plus nginx and a forged header buys a fresh login budget. Side effects: 21 failed logins in the log, and the tester's own IP blocked from login for a minute. [spec](../specs/2026-09-22-cloudfront-single-instance.md).
+- [ ] **P3** Migrate secrets from EB environment properties to **AWS Secrets Manager** as the app grows. Reachable via `spring-cloud-aws-starter-secrets-manager` + `spring.config.import` with **no feature-code changes** — that is the point of routing everything through `OpenAiProperties` and placeholders now.
+- [ ] **P3** **`verify.mjs` scopes itself from commits, not from the working tree.** It diffs `origin/main...HEAD`, so a hand run on uncommitted backend work on 2026-09-12 reported *hooks* only and skipped the backend. Correct for the pre-push hook, which only carries commits; misleading from a terminal. Either fold in the worktree's changed files when run by hand, or print a line naming the uncommitted files it did not consider. `--all` is the workaround.
+- [ ] **P2** **An unmapped URL answers 500 and logs an ERROR stack trace** ([BUG-053](../bugs/bugs.md#bug-053)). Found on the deployed backend 2026-09-15: `/actuator/env`, `/actuator/metrics` and any path with no handler reach the catch-all in `DefaultExceptionHandler`. Leaks nothing — the body is the fixed string — but every scanner probe writes a stack trace to CloudWatch, and a real 500 is hidden among them. A `NoResourceFoundException` handler returning 404, and tighten `ActuatorHealthEndpointTest`, which asserts only *not 200* and so passes on the 500.
+- [ ] **P2** **`scripts/package-eb.mjs` cannot run Maven from Git Bash.** 2026-09-15: `'mvnw.cmd' is not recognized` — it spawns `mvnw.cmd` with `shell: true` from `backend/`, which worked from PowerShell on 2026-09-12. The first production bundle was packaged with `--skip-build` from a jar `verify.mjs` had just tested. **Diagnosed 2026-10-01:** the Claude Code shell sets `NoDefaultCurrentDirectoryInExePath=1`, which stops `cmd.exe` finding a bare `mvnw.cmd` in its working directory. `env -u NoDefaultCurrentDirectoryInExePath node scripts/package-eb.mjs` built a bundle. A full path, `join(BACKEND, 'mvnw.cmd')` as `verify.mjs:326` builds it, does not depend on that lookup; untested, not yet made.
+- [ ] **P3** **Flyway warns it has not been tested against PostgreSQL 18.** The first production boot logged *PostgreSQL 18.3 is newer than this version of Flyway … latest supported version of PostgreSQL is 17*. All 33 migrations applied cleanly. Re-check on the next Spring Boot parent bump, and together with the P2 PostgreSQL 18 pin item above, which is when every test also meets 18.
+- [ ] **P3** **Consider Vitest in place of Jest for the frontend.** Raised by Arpan 2026-11-16; not decided. Today the frontend runs Jest 30 (`frontend/package.json`, `jest.config.mjs`, `jest.setup.ts`) with React Testing Library and `@testing-library/jest-dom`. Choosing means a **Proposed ADR** at its `/start`: what each runner costs in config, speed and Next.js support, and what a migration of the existing suites and the frontend half of the contract test touches. CI runs the frontend tests through `verify.mjs` and the reusable workflows, so those change with it.
+- [ ] **P2** **End-to-end tests with Playwright.** Decided by Arpan 2026-11-16: Playwright is the end-to-end tool. Nothing exists yet — no dependency, config or test. Open at its `/start`: which journeys come first, whether it runs against `docker compose` or the production frontend image, and where it sits in CI now that CI starts the stack again (the S3Mock swap, 2026-11-25, [BUG-063](../bugs/bugs.md#bug-063)). When it lands, the root `README.md` may list Playwright again — it was removed 2026-08-14 for claiming it before it existed (see Docs).
+
+## Security
+
+- [ ] **P2** **Rate-limit the Google Places suggestion endpoint.** Queued 2026-09-17, deferred by Arpan from the [event location spec](../specs/2026-09-17-event-location-autocomplete.md): the endpoint ships behind `canManageClub` only, with no per-IP cap. Every debounced keystroke is a billed Autocomplete Request (10,000 free a month, then $2.83 per 1,000), so the cap is what bounds a runaway client or a compromised club account. Shape: its own properties beside `campusvibe.search.rate-limit` (`application.yml:178-184`) and a filter following `SearchRateLimitFilter`, starting from search's numbers, with a 429 the `LocationField` treats as no suggestions. Pair it with the daily quota and budget alert on the Google Cloud key. Blocked on the location feature shipping.
+- [ ] **Commit the secrets-management work.** Steps 1-5 are complete and verified; see [Completed work log](tasks-completed.md#completed-work-log). Nothing is left to build — the work simply has not been committed.
+
+**Every item below came out of the 2026-08-15 authentication review. Full
+reasoning, measured endpoint behaviour and the complete gap list are in
+[`authentication.md`](../architecture/authentication.md) — read that before
+picking one up. It was not reviewed by `security`; these are one engineer's
+findings.**
+
+- [ ] **P1** **Rate-limit `/api/v1/auth/forgot-password` — do this BEFORE SES, not after.** `AuthRateLimitFilter.LIMITED_PATHS` covers `/login`, `/register`, `/google` and `/email-status`. It does **not** cover `/forgot-password`, which is `permitAll` and sends one email per call. With the logging sender that is harmless, which is why it was never noticed. Point it at SES and the same endpoint becomes unbounded outbound mail to any address anyone names: your bill, your sending quota, and — because a stranger can have their inbox filled on demand — your SES reputation, which is the thing AWS suspends you over. Add the path to `LIMITED_PATHS`; the per-IP budget already exists and needs no new machinery. Consider a per-address budget too, since the per-IP one does not stop a distributed flood at one victim. Note `/resend-verification` is authenticated so it is a smaller problem, but it is the same shape.
+
+- [ ] **P2** **Wire up AWS SES.** Decided 2026-08-16 (matches the planned Elastic Beanstalk deploy). **Transport decided 2026-09-12: SMTP credentials** ([ADR-013](../decisions/ADR-013-ses-mail-over-smtp-credentials.md), Proposed); runbook [`connecting-ses.md`](../architecture/connecting-ses.md). `SmtpMailSender` and `MailConfig` already do the right thing when `spring.mail.host` is set, so the SMTP interface needs **no application code** — `email-smtp.<region>.amazonaws.com:587` plus SES SMTP credentials (which are *derived* in the SES console, not your AWS access keys) into the `SPRING_MAIL_*` env vars that `docker-compose.yml:74-77` already passes through. What actually needs doing:
+
+  - **AWS side.** Verify a sender identity — a domain with Easy DKIM (3 CNAMEs) + SPF if you have one, otherwise a single email identity, accepting that From: shows a personal address and unaligned SPF/DKIM sends a good share to spam. Then **request production access**: every new account is sandboxed to *verified recipients only*, 200/day. That request is the long pole (~24h, and can come back asking for detail), so start it first. Set up bounce/complaint notifications to SNS — SES suspends sending above 5% bounces or 0.1% complaints, and password-reset mail to mistyped addresses guarantees bounces.
+  - **`MAIL_FROM`** defaults to `no-reply@campusvibe.local`, a non-routable domain. Must become the verified identity or nothing sends.
+  - **`APP_BASE_URL`** must be the public frontend URL. Wrong value produces mail that looks perfect and links to `localhost:3000`.
+  - **Move the send out of the transaction.** `AuthenticationService.register` (`:119`) and `requestPasswordReset` (`:191`) are `@Transactional` and call `mailSender.send` inside. Today that is a no-op write to a log; with SES it pins a database connection across a network round trip on the signup path. `register` is worse: the send happens *before* `respondWithToken`, so anything that rolls the transaction back leaves a live verification link for a user that no longer exists. Move to an `AFTER_COMMIT` transaction listener.
+  - **Give the swallowed exception a voice.** `SmtpMailSender` catches everything and logs — correct for forgot-password, since throwing would leak whether an address exists and 500 the caller. But it means a misconfigured SES is invisible outside the log, and during the sandbox period *every* send to a real user fails that way. Add a counter or a health signal so silent total failure is detectable.
+  - **Leave `management.health.mail.enabled: false` off.** Tempting to switch on now that mail is real; do not. It makes `/actuator/health` depend on SES reachability, so an SES incident pulls the app out of the load balancer — punishing an outage that is not ours with one that is.
+  - **Then build the official-email verification round trip** (governance item 6,
+    half done above). Recorded here so the shape is not re-derived: a **new
+    `club_email_verifications` table** — `club_id`, the `address` the link was
+    sent to, `token_hash`, `expires_at`, `used_at` — rather than extending
+    `auth_tokens`, whose `user_id` is `NOT NULL` (`V11:10`), whose `purpose`
+    CHECK constrains the enum, and whose `issue()` deletes previous tokens per
+    *user*. A club inbox is not a user and may have no account at all. Recording
+    the address on the row is what lets a later change of address invalidate the
+    old proof instead of carrying it over. The redeem endpoint is `permitAll`
+    and **its matcher must sit above the broad public-GET block** in
+    `SecurityFilterChainConfig` — first match wins. Testable locally without
+    SES: `LoggingMailSender` puts the link in `docker compose logs backend`,
+    which is how password reset is already tested.
+  - **Optional follow-up:** switch to the SES v2 API via the AWS SDK (already a dependency for S3, `pom.xml:157`). Buys IAM-role auth on EB instead of static SMTP credentials in env, plus a message id and a real error surface. Not needed to make it work. *Rejected for the first deployment by ADR-013; its revisit triggers say when to reconsider.*
+
+- [ ] **P3** **Decide whether to turn on `AUTH_REQUIRE_VERIFIED_EMAIL`.** Blocked on SES above: switching it on before mail actually sends would lock every new user out of their own account.
+
+- [ ] **P1** **Nothing can be revoked, and the token sits in `localStorage`.** *(Step 4 of the 2026-08-15 sequence — written down here rather than built, at Arpan's direction.)* Three facts that only make sense together: `auth-context.logout` clears `localStorage` and nothing else, so the JWT stays valid for the rest of its **15 days**; there is no refresh token, so shortening that lifetime would just log everyone out more often; and the token is readable by any script on the page, with no CSP to narrow that. Deleting the user is currently the only revocation, and it works only because `JWTAuthenticationFilter` re-reads the user from the database on every request. **Do the three as one piece of work, not separately** — the storage decision ([BUG-003](../bugs/bugs.md#bug-003)) determines whether a refresh token can live in an httpOnly cookie, which determines whether CSRF has to come back on (it is disabled today, correctly, for a bearer-token API). Sketch: short access token (15-30 min), refresh token in an httpOnly + Secure + SameSite cookie, a `refresh_tokens` table keyed by a hash so logout and 'sign out everywhere' can revoke, rotation on use with reuse detection. Trigger: before any real-user launch, or immediately if a token is ever suspected leaked.
+- [ ] **P3** **Facebook / Meta sign-in.** Requested 2026-08-15. Low priority, and deliberately sequenced *after* the `auth_provider` migration above — adding a third identity provider while the schema still cannot tell providers apart would make the identity model worse, not better.
+- [ ] **P3** Auth event audit log (sign-in, failure, reset, role change). Cheap to add; most valuable once there is traffic worth reading.
+- [ ] **P3** Account deletion and data export. Needed before any real-user launch under GDPR-like rules; no legal deadline yet.
+- [ ] **P3** **Two more `java/internal-representation-exposure` alerts, not yet dealt with.** Found triaging [PR #45](https://github.com/ArpanSaha07/campus-vibe/pull/45) on 2026-09-11, after the standing set was dismissed (see [`tasks-completed.md`](tasks-completed.md) under Security). **Alert 23**, `User.followedClubIds` (`User.java:147`): `MyClubService.java:72,90` adds and removes through the getter on purpose, so it works today, but it is the one collection in `User` without the wrapper pattern the other three already use (`User.java:59-139`) — **apply the pattern rather than dismiss**, since the file already shows how. **Alert 52**, `ClubCreationRequest.getInterestSlugs` (`ClubCreationRequest.java:71`, new with the proposal table): `ClubCreationRequestService.java:77` calls `.addAll` on it, the same shape as group (d) was — dismiss as *Won't fix* with the same comment once it lands on `main`, or give it the wrapper too. **Never accept Copilot Autofix on either** ([BUG-044](../bugs/bugs.md#bug-044)). Also still open on `main` and never queued: **9** (CSRF off — deliberate, reverses with [BUG-003](../bugs/bugs.md#bug-003)) and **37** (missing `@Override` on a Lombok getter), both *Won't fix*; and **47**, **49–51**, unused values in `clubs/[clubId]/page.tsx:41` and `scripts/check-docs.mjs`, which are genuine small cleanups.
+- [ ] **P2** **Media objects outlive their rows** (`reference.md` §19–§21). Carried over from the presigned-upload ADR item, which closed on 2026-09-12 without them: banner images — club and event — have no delete endpoint, and deleting a club or an event deletes none of its objects, so each becomes an orphan in `campusvibe-prod-media`. The keys are already in Postgres, so §20's *never list the bucket to find them* is achievable. Delete after the row commits, as `ClubController` already does for a replaced logo.
+- [ ] **P3** **The dev backend container runs as root.** `backend/Dockerfile`
+      sets no `USER` (the EB image does, `deploy/eb/Dockerfile:25`). It is what
+      made BUG-039's traversal a write anywhere in the container. Dev only, but
+      the dev image is also what CI's Docker job scans and smoke-tests.
+- [ ] **P3** **Club slugs are not shape-checked.** The id is client-chosen and
+      only lowercased (`ClubCreationRequestService.normaliseSlug`); nothing
+      refuses a slash, a dot segment or a space. Unreachable as a path variable
+      today, and `MediaKeys` refuses such an id for a key, but a slug pattern on
+      both create paths is the real control.
+- [ ] **P3** **Triage the standing CodeQL alerts that are not defects.** Eight new alerts on [PR #31](https://github.com/ArpanSaha07/campus-vibe/pull/31) were fixed in code on 2026-08-16 ([BUG-032](../bugs/fixed_bugs.md#bug-032), [BUG-033](../bugs/fixed_bugs.md#bug-033)); what remains is the set that is *correct as written* and needs dismissing with a reason, so the queue stops hiding real findings behind noise. Four groups: **(a)** `java/sensitive-log` **and** `java/log-injection`, both on `LoggingMailSender` (alerts 33 and 34) — dismiss them together, same bean, same reason. It logs reset links on purpose, which is the entire reason the bean exists, and `Logs.safeBlock` deliberately preserves newlines because the body is printed as a block; a barrier that keeps `\n` cannot satisfy a newline-sanitiser query, so no rewrite clears 34 without destroying the feature. The per-line `| ` prefix is the real mitigation and static analysis cannot see it. **(b)** `js/empty-password-in-configuration-file` on `application-test.yml` — H2 in-memory, user `sa`, no password, which is the standard for it. **(c)** `java/internal-representation-exposure` on `Club.images` / `Event.images` — accepting the offered autofix here **breaks every write**, which is already logged as [BUG-023](../bugs/fixed_bugs.md#bug-023); dismiss it explicitly so nobody accepts it later. **(d)** `java/internal-representation-exposure` again, on `Club.getInterestSlugs` (alert 44), `Event.getTopicSlugs` (45) and `Event.getFormatSlugs` (46) — raised as inline review comments on [PR #41](https://github.com/ArpanSaha07/campus-vibe/pull/41) on 2026-09-08. Same shape as (c) and the same answer: these are Lombok `@Getter`s on JPA collections and callers mutate what they return on purpose, relying on Hibernate dirty-checking inside the transaction — `ClubService.java:69,98,99` (`.addAll`, `.clear`) and `EventController.java:90,92` (`.addAll`). A defensive copy would silently stop persisting club interests and event taxonomy, which is [BUG-037](../bugs/fixed_bugs.md#bug-037) all over again. Dismiss with (c), same reason, same commit. Dismissal is a repo-level action on the Security tab, so it is Arpan's call rather than something to do unasked.
+- [ ] **P2** Authorisation review for the Club Dashboard and Admin Dashboard endpoints as they are built — enforce server-side, never rely on UI restrictions.
+- [ ] **P2** Rotate the local dev `JWT_SECRET` before any real deployment, and use a *different* value in production.
+
+## Docs
+
+- [ ] **P3** **The local checkers have no self-coverage, and that is accepted for now.** No workflow runs `scripts/verify.mjs`, `check-docs.mjs` or `check-links.mjs` — `ci.yml:126-132` excludes `.claude/**` from the `code` filter on purpose, and `check-docs.mjs:16-21` refuses to block because a blocking doc check teaches you to reach for `--no-verify`, which also skips the tests. **Already covered:** a checker that *crashes* now says so (`pre-push` reports instead of swallowing with `|| true`, 2026-09-07), and a `verify.mjs` that crashes already aborts the push (`pre-push:83`). **Still uncovered:** a checker that runs cleanly and silently reports nothing — the shape the stamp parser had for weeks — and a `verify.mjs` that fails *open* by scoping itself to no components. Catching either needs fixture-based self-tests with a golden output, which is new test infrastructure. **Not urgent:** CI runs the real jobs independently, and `scripts/**` is inside the `code` filter, so none of this can ship a product bug — the cost is the fast local loop, not correctness.
+
+- [x] **P2** ~~Make doc staleness visible instead of relying on memory~~ — **done 2026-08-14.** `scripts/docs-map.json` maps code paths to architecture docs; `scripts/check-docs.mjs` reports any area that changed without its doc changing, plus how many commits each doc's `**Code as of:**` stamp is behind. Wired into `.githooks/pre-push` as a **notice, never a block** — a stale doc does not break the build, and a blocking check would only teach us to reach for `--no-verify`, which also skips the tests. The four docs that have never been reconciled with the code are stamped `never` rather than given a sha, so the report stays signal.
+- [x] **P3** ~~Root `README.md` claims infrastructure that does not exist~~ — **done 2026-08-14.** It listed Playwright, Prettier and Webpack (none in the manifests) and a live Vercel + Elastic Beanstalk deployment (CI deploys nothing). Split into **Built and working** and **Planned**, with a status line saying nothing is deployed yet. It is the public pitch, a different audience from `docs/` — conflating the two is why it drifted.
+- [ ] **P3** **Reconsider a client query library (TanStack Query or similar) after the cookie migration.** **Decided 2026-08-15: not now**, reasoning in [`api-and-caching.md`](../architecture/api-and-caching.md). Not for clubs/events/search — those are Server Components on Next's data cache already, so a query library there would move rendering off the server to get a cache that exists. The real case is the client surface: `followed-clubs-context.tsx` hand-rolls ~200 lines of `useQuery` + optimistic `useMutation`, four client pages repeat `useState`/`useEffect`/error-flag, and a **second** bespoke provider is queued below for saved events. Deferred because the `localStorage` JWT is *why* those pages are client-rendered at all — fix [BUG-003](../bugs/bugs.md#bug-003) first and several become Server Components, changing what is left to serve. **Trigger:** the cookie migration landing, or a third hand-rolled client cache being about to be written.
+- [ ] **P2** **Call `revalidateTag` from the write paths.** The tags already exist, so this is small. Today, creating an event does not evict the events list — it stays stale for up to five minutes. Trigger: the first real club admin, or the first complaint that a new event does not appear.
+- [x] **P2** ~~Write the user-profile implementation doc~~ — **done 2026-08-20.** [`user-profiles.md`](../architecture/user-profiles.md), with its row in `docs/README.md` and an entry in `scripts/docs-map.json`, which previously mapped `com/campusvibe/user/` to no doc at all. Written alongside the backend rather than after it, so what it keeps is the reasoning that shaped the code: why the profile is its own table, why the write is a full-replace PUT and what that demands of the frontend, why interests get a foreign key and subjects do not, and why a social link is checked in two places. Carries seven known gaps.
+- [ ] **P3** **Check the McGill faculty list and the interest catalogue.** Twelve faculties and schools remain in `frontend/app/lib/profile-options.ts`, transcribed from the university's own listing rather than fetched — and faculties do get renamed, Dentistry having become *Dental Medicine and Oral Health Sciences* recently. The interest catalogue **moved to the database on 2026-08-20** (76 entries, 12 categories, `V20__insert_interest_catalogue.sql`) and still has had no product review at all. Revising it is now a migration rather than an edit to a constant — cheap, because `user_interests` keys on the slug and not the label, so renaming what people read moves nobody's choices.
+- [ ] **P2** **Look at `/profile` and `/profile/edit` in a browser, at both breakpoints.** Still never rendered, now across three commits, every one shipped on a green `verify` — which proves they compile, not that they work. Raised from P3 because these screens now write to a database. The checks that matter most: that editing the bio in one section and the degree in another loses neither (the whole reason `ProfileProvider` exists), that the picker populates from `GET /api/v1/interests`, and that a refused save shows the server's own sentence. Then the layout — the two-column split at `lg`, the sticky identity card, the mobile rail that scrolls sideways, and the interests grid at 76 pills.
+- [x] **P1** ~~Re-verify [`user-roles.md`](../architecture/user-roles.md) against the code and split it into a spec and an as-built description~~ — **done 2026-08-18.** Rewritten from the code to the [`implementation-docs`](../../.claude/skills/implementation-docs/SKILL.md) standard: two platform roles in the JWT, two club roles in `club_admin_assignments`, why they are stored and checked differently, and the platform-admin bypass. The split happened by *dropping* the spec half rather than moving it — roughly half the old file was a product specification for unbuilt dashboards, which `club_admin_governance.md` and this queue already cover better. `docs-map.json` said it covered *three roles*; corrected. Still open below: `security` has not reviewed it.
+- [ ] **P2** **Have `security` review [`user-roles.md`](../architecture/user-roles.md).** Rewritten from the code on 2026-08-18 by the agent that also wrote most of the authorisation it describes, which is the same conflict flagged for `authentication.md` below. The claims most worth an independent read: that platform roles are safe to keep in the JWT while club roles are not, and that the four `authenticated()` matchers above the `permitAll` block cover every club sub-path that must not be public.
+- [ ] **P2** **Have `security` review [`authentication.md`](../architecture/authentication.md).** It was rewritten from the code on 2026-08-15 and carries 14 known gaps including four security findings, but the agent that wrote it also wrote the code it describes. A finding list that has not been read by anyone else is a first draft.
+- [ ] **P2** **Rewrite [`authentication.md`](../architecture/authentication.md)** to the [`implementation-docs`](../../.claude/skills/implementation-docs/SKILL.md) standard. It currently describes endpoints as *Required* rather than existing, so it reads as a plan. Blocked in part on [BUG-003](../bugs/bugs.md#bug-003) — the JWT transport decision should be an ADR first, then the doc describes what shipped.
+- [ ] **P2** **Rewrite [`search.md`](../architecture/search.md)** against `com.campusvibe.search`. Keep the existing design note as the rejected-alternatives record. Best done *after* [BUG-001](../bugs/bugs.md#bug-001) is fixed, so the doc describes working behaviour rather than a bug. **Unblocked 2026-09-14:** BUG-001's root cause is fixed. The banner already names what shipped: the past-event filter, `min-score` 0.25 and ADR-014.
+- [ ] **P2** **Write the Docker development environment doc** — `docs/architecture/docker-environment.md`. Nothing records why the frontend image has a `dev` stage, why backend watch uses `sync+restart` on the jar rather than `rebuild`, or why the `db` watch rule is near-inert. That reasoning currently survives only in [BUG-013](../bugs/fixed_bugs.md#bug-013) and in compose comments.
+- [ ] **P3** **Verify [`llm-api-key-management.md`](../architecture/llm-api-key-management.md)** against the shipped `com.campusvibe.ai` package and add the standard sections.
+- [ ] **P3** Update the root `README.md` — it claims a Vercel + Elastic Beanstalk CI/CD pipeline that does not exist yet.
+
+---
+
+## Recently shipped
+
+The rolling digest of the last ten items lives in
+[`../STATUS.md`](../STATUS.md), so *what just shipped* is answerable without
+opening anything. Full write-ups, and everything older, are in
+[`tasks-completed.md`](tasks-completed.md).

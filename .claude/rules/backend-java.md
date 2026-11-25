@@ -36,9 +36,10 @@ Kept deliberately short: this loads on every backend Java read.
   the caller wrote — go through `s3/MediaKeys`.** A filename of `../../x` used
   to be a file write anywhere the backend could reach, because the local stand-in
   for S3 joined the key onto a directory. **That stand-in is gone** — MinIO
-  replaced it 2026-09-12 (ADR-011) and would have shrugged at the traversal, as
-  real S3 always would. So the guard is ours alone now: `MediaKeys.assertSafeKey`,
-  enforced on every `S3Service` put, get and delete. Do not remove it on the
+  replaced it 2026-09-12 (ADR-011), S3Mock replaced MinIO 2026-11-25 (ADR-026),
+  and both shrug at the traversal, as real S3 always would. S3Mock stores
+  objects on its own filesystem, so the guard matters as much as ever. So the
+  guard is ours alone now: `MediaKeys.assertSafeKey`, enforced on every `S3Service` put, get and delete. Do not remove it on the
   grounds that the store no longer needs it — that is precisely why it is here.
   (BUG-039)
 - **Every Spring context needs `aws.s3.bucket` set.** `MediaBucket` is a
@@ -65,14 +66,14 @@ Kept deliberately short: this loads on every backend Java read.
   **MockMvc does not show this**; only a real port does, as `PlannerStreamIT`
   proves by failing when the line is removed. Set an explicit emitter timeout
   too: Tomcat's default async timeout is 30 seconds.
-  ([`ai-planner.md`](../docs/architecture/ai-planner.md))
+  ([`ai-planner.md`](../../docs/architecture/ai-planner.md))
 - **No view rendering in the backend while ADR-022's exception stands** —
   no `ViewResolver`, `XsltView`, `ModelAndView`, template engine, or SSE
   carrying view fragments. Two `spring-webmvc` 6.2.19 CRITICALs are excepted
   in `.trivyignore.yaml` only because none of those exists; adding one voids
   the exception, so delete both entries and fix the version first (Spring
   Boot 4). The planner's `SseEmitter` must keep sending JSON data.
-  (BUG-064, [ADR-022](../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md))
+  (BUG-064, [ADR-022](../../docs/decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md))
 - **The planner agent's permissions live in `PlannerToolExecutor`, never in
   the prompt.** The user is the JWT principal; an id must be one of this turn's
   candidates or the student's own; an ended event is refused before the
@@ -80,6 +81,6 @@ Kept deliberately short: this loads on every backend Java read.
   cannot be undone, costs money or reaches another person, or if the loop needs
   more than `MAX_TOOL_ROUNDS` (4), the provider loses streamed tool calls, or a
   prompt-injected action is seen in production.
-  ([ADR-023](../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md),
-  [`ai-planner.md`](../docs/architecture/ai-planner.md))
+  ([ADR-023](../../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md),
+  [`ai-planner.md`](../../docs/architecture/ai-planner.md))
 - **The IT suites need Testcontainers:** `node scripts/verify.mjs --full`.

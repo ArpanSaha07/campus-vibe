@@ -38,7 +38,7 @@ test("an empty body warns on all three", () => {
 
 test("a filled template passes", () => {
   const body = template
-    .replace(/^Spec:.*$/m, "Spec: .claude/specs/2026-11-24-pinned-events.md")
+    .replace(/^Spec:.*$/m, "Spec: docs/specs/2026-11-24-pinned-events.md")
     .replace("## What and why", "## What and why\n\nClub owners can pin one event to the top of their page.")
     .replace("- [ ] `node scripts/verify.mjs` passes", "- [x] `node scripts/verify.mjs` passes");
   assert.deepEqual(checkTemplate(body), []);

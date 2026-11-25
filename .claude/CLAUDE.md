@@ -6,12 +6,12 @@ schedule. Clubs run their own page and their events from a dashboard. Platform a
 create clubs and hand them to their owners. Built for university students and student
 clubs, McGill first.
 
-Where the project is right now: [`STATUS.md`](STATUS.md), printed at the start of every
-session. Product scope by area, shipped versus planned: [`docs/product.md`](docs/product.md).
+Where the project is right now: [`STATUS.md`](../docs/STATUS.md), printed at the start of every
+session. Product scope by area, shipped versus planned: [`docs/product.md`](../docs/product.md).
 
 **Roles.** `ROLE_USER` in the JWT is everyone. Club owner and club admin are *per club*,
 in `club_admin_assignments`, never in the token; platform `ROLE_ADMIN` bypasses the
-club-scoped checks — [`docs/architecture/user-roles.md`](docs/architecture/user-roles.md).
+club-scoped checks — [`docs/architecture/user-roles.md`](../docs/architecture/user-roles.md).
 
 ## The stack, and the choices with consequences
 
@@ -22,7 +22,8 @@ club-scoped checks — [`docs/architecture/user-roles.md`](docs/architecture/use
   that extension is why the compose image is not stock `postgres`.
 - **One DTO contract, asserted twice** — `contracts/api-dto-fields.json` lists the JSON field
   names; a test on each side checks it, or a rename goes green on both suites and broken live.
-- **Local is `docker compose`** (frontend, backend, db); production is Vercel plus Elastic
+- **Local is `docker compose`** (frontend, backend, db, s3mock), started with one command,
+  `node scripts/dev.mjs` — see the map below; production is Vercel plus Elastic
   Beanstalk (Docker), RDS and S3 — none of it live yet.
 - **Tests:** Jest + React Testing Library, JUnit + Testcontainers ITs, the contract pair.
 ## Where the code lives
@@ -34,17 +35,20 @@ campusvibe/
 ├── contracts/     # The API contract: one list of JSON field names per DTO, asserted
 │                  #   by a test on EACH side
 ├── docker/        # Compose, and where PostgreSQL is configured — the pgvector image
-├── scripts/       # verify.mjs (runs what CI runs, locally) · check-docs.mjs + docs-map.json
+├── scripts/       # dev.mjs (starts the local stack) · verify.mjs (runs what CI runs, locally) ·
+│                  #   check-docs.mjs + docs-map.json
 ├── .githooks/     # pre-push runs verify.mjs. Per clone: git config core.hooksPath .githooks
 ├── .github/       # ci.yml gates merges; branch-checks.yml is the push loop; _*.yml reusable
-└── .claude/       # This file and the knowledge base it maps to: STATUS.md · rules/ ·
-                   #   docs/ · TODO/ · bugs/ · skills/ · specs/
+├── docs/          # The knowledge base: STATUS.md · product.md · architecture/ · decisions/ ·
+│                  #   reviews/ · specs/ · TODO/ · bugs/ · design-guidelines.md
+└── .claude/       # This file and the Claude Code wiring: rules/ (path-scoped, auto-loaded) ·
+                   #   skills/ · commands/ · settings.json (hooks)
 ```
 
 ## How context reaches you
 
 - **This file**, every session — the only one loaded unconditionally.
-- **[`STATUS.md`](STATUS.md)** — a `SessionStart` hook prints it with the last commits and
+- **[`STATUS.md`](../docs/STATUS.md)** — a `SessionStart` hook prints it with the last commits and
   the working tree. If it did not arrive, read it. Either way, do not open `todo.md` to orient.
 - **[`rules/`](rules/)** — seven short path-scoped files (`backend-clubs`, `backend-java`,
   `db-migrations`, `contracts`, `frontend`, `ci-and-build`, `aws-handling`) that load *when
@@ -58,14 +62,15 @@ campusvibe/
 
 | About to… | Read |
 |---|---|
-| Change how a subsystem works | [`docs/README.md`](docs/README.md) — the index, then the one doc it names |
-| Change architecture, or pick between options | [`docs/decisions/README.md`](docs/decisions/README.md) — so a settled choice is not quietly remade |
-| Ask what the product is meant to do | [`docs/product.md`](docs/product.md) |
-| Pick up work, or check it was not already built | [`TODO/todo.md`](TODO/todo.md) is the queue — grep it, orient from `STATUS.md`; finished work is in [`TODO/tasks-completed.md`](TODO/tasks-completed.md) |
-| Fix or report a defect | [`bugs/bugs.md`](bugs/bugs.md) (open) · [`bugs/fixed_bugs.md`](bugs/fixed_bugs.md) (resolved, with the reasoning) — grep, never read whole |
+| Change how a subsystem works | [`docs/README.md`](../docs/README.md) — the index, then the one doc it names |
+| Change architecture, or pick between options | [`docs/decisions/README.md`](../docs/decisions/README.md) — so a settled choice is not quietly remade |
+| Ask what the product is meant to do | [`docs/product.md`](../docs/product.md) |
+| Pick up work, or check it was not already built | [`TODO/todo.md`](../docs/TODO/todo.md) is the queue — grep it, orient from `STATUS.md`; finished work is in [`TODO/tasks-completed.md`](../docs/TODO/tasks-completed.md) |
+| Fix or report a defect | [`bugs/bugs.md`](../docs/bugs/bugs.md) (open) · [`bugs/fixed_bugs.md`](../docs/bugs/fixed_bugs.md) (resolved, with the reasoning) — grep, never read whole |
 | Touch a migration, seed or role grant | [`skills/database-lifecycle/SKILL.md`](skills/database-lifecycle/SKILL.md) — **mandatory** |
-| Build or restyle UI | [`design-guidelines.md`](design-guidelines.md) — binding on all UI work |
-| Know what this unit of work agreed to | [`specs/`](specs/README.md) — one spec per feature, written by `/start` |
+| Build or restyle UI | [`design-guidelines.md`](../docs/design-guidelines.md) — binding on all UI work |
+| Know what this unit of work agreed to | [`specs/`](../docs/specs/README.md) — one spec per feature, written by `/start` |
+| Run the app locally, or stop it | `node scripts/dev.mjs` (`--stop`, `--down`, `--jar` after Java changes) — [`docs/architecture/dev-script.md`](../docs/architecture/dev-script.md) says what each step does and what to do when one fails |
 | Onboard a teammate, or open a PR into `develop` | [`CONTRIBUTING.md`](../CONTRIBUTING.md) — the flow, the checks, the rules; `/open-pr` drafts the title and description |
 | Find the doc for code you touched | [`scripts/docs-map.json`](../scripts/docs-map.json); `node scripts/check-docs.mjs` reports what drifted |
 
@@ -87,16 +92,16 @@ campusvibe/
 ## Before a unit of work ends
 
 `/wrap-up` walks this in order, which is why you run it rather than remember it: shipped
-line and stamp into [`STATUS.md`](STATUS.md) · the item into
-[`TODO/tasks-completed.md`](TODO/tasks-completed.md) · bugs into [`bugs/`](bugs/bugs.md) ·
-a choice into [`docs/decisions/`](docs/decisions/README.md) · a trap into [`rules/`](rules/)
-· the reasoning into [`docs/architecture/`](docs/README.md) per `implementation-docs` · the
+line and stamp into [`STATUS.md`](../docs/STATUS.md) · the item into
+[`TODO/tasks-completed.md`](../docs/TODO/tasks-completed.md) · bugs into [`bugs/`](../docs/bugs/bugs.md) ·
+a choice into [`docs/decisions/`](../docs/decisions/README.md) · a trap into [`rules/`](rules/)
+· the reasoning into [`docs/architecture/`](../docs/README.md) per `implementation-docs` · the
 spec marked shipped.
 
 ## Conventions
 
 - Commit subjects are `type(scope): summary`, enforced by a `commit-msg` hook;
   `/generate-commit-message` writes one.
-- No double quotes in `.claude/` prose; claims cite `file:line`.
+- No double quotes in `.claude/` or `docs/` prose; claims cite `file:line`.
 - DTO renames go through `contracts/api-dto-fields.json` and both contract tests.
 - Reuse before adding: shared components, existing services, typed DTOs on both sides.

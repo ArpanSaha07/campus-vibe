@@ -111,7 +111,7 @@ jobs:
       # and rejects blank, so the context refuses to start without it (ADR-012,
       # BUG-051). Nothing in this job touches S3 — the S3Client is built but
       # never called, and AWS_REGION already defaults — so a throwaway name is
-      # enough; no MinIO service is needed.
+      # enough; no S3Mock service is needed.
       AWS_S3_BUCKET: campusvibe-ci
       OPENAI_API_KEY: ''
       PGPASSWORD: ci-only-password

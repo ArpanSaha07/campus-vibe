@@ -339,7 +339,7 @@ without rewriting stored database data.
 # 9. Presigned Upload Flow
 
 > **DECIDED AGAINST, 2026-09-12 — see
-> [ADR-010](../../docs/decisions/ADR-010-uploads-stream-through-the-api.md).**
+> [ADR-010](../../../docs/decisions/ADR-010-uploads-stream-through-the-api.md).**
 > Everything in this section describes a model this codebase evaluated and
 > rejected. Uploads stream through the API instead, because a presigned PUT
 > hands S3 whatever the browser sends and the content sniffing that is the whole

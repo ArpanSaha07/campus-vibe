@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* CampusVibe "Ticket stock" tokens — see .claude/design-guidelines.md */
+/* CampusVibe "Ticket stock" tokens — see docs/design-guidelines.md */
 @theme {
   /* Brand: both colors come from the logo (lavender script, berry outline) */
   --color-lavender-50: #f6f2fe;

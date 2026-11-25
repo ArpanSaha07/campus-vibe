@@ -5,8 +5,8 @@ paths:
   - "backend/src/main/resources/application-prod.yml"
   - "docker/Dockerrun.aws.json"
   - "docker/EB-DEPLOYMENT.md"
-  - ".claude/docs/architecture/aws-deployment.md"
-  - ".claude/docs/architecture/CampusVibe_AWS_Deployment_Guide.md"
+  - "docs/architecture/aws-deployment.md"
+  - "docs/architecture/CampusVibe_AWS_Deployment_Guide.md"
 ---
 
 # AWS
@@ -14,8 +14,10 @@ paths:
 ## Getting in
 
 Profile `campusvibe-admin`, region `ca-central-1`, IAM Identity Center SSO with
-temporary credentials, pinned as `env.AWS_PROFILE` in
-[`settings.json`](../settings.json) so every tool call carries it. Do not rely
+temporary credentials, pinned as `env.AWS_PROFILE` in Arpan's gitignored
+`.claude/settings.local.json` so every tool call carries it. A clone without
+that file has no pin, so `guard-aws.mjs` refuses any `aws` call that names no
+profile. Do not rely
 on a profile exported in a terminal — that does not reach a tool shell — and
 never fall back to `default`, which holds a dead static key and fails
 `InvalidClientTokenId`. Confirm with `aws sts get-caller-identity` before the
@@ -24,7 +26,7 @@ first write of a session.
 Never request, create, display, store or commit AWS access keys.
 
 **One named exception —
-[ADR-013](../docs/decisions/ADR-013-ses-mail-over-smtp-credentials.md):** the
+[ADR-013](../../docs/decisions/ADR-013-ses-mail-over-smtp-credentials.md):** the
 SES SMTP credentials production mail is sent with. Arpan creates them in the SES
 console, never a session; the IAM user may only `ses:SendRawEmail` on the
 `campusvibe-mcgill.com` identity; the values live in two Elastic Beanstalk
@@ -45,7 +47,7 @@ Everything below binds to both.
   `CampusVibe-Scheduler-StopRDS`, stop-only) stops it again at 03:00 Toronto
   daily. **Disable that schedule before resuming**, or it stops the live
   database. Resume, re-stop and checks:
-  [`pausing-production.md`](../docs/architecture/pausing-production.md).
+  [`pausing-production.md`](../../docs/architecture/pausing-production.md).
 - **`campusvibe-prod-media`** — the media bucket, currently empty. Public access
   blocked on all four, `BucketOwnerEnforced`, SSE-S3 with bucket keys, no
   bucket policy, and **no CORS rule** — the `GET,PUT` one was deleted
@@ -61,8 +63,8 @@ Everything below binds to both.
   `ListBucket` on the bucket itself, and nothing wider. **`ListBucket` is
   load-bearing even though no code lists:** without it S3 answers a missing
   key with 403 AccessDenied rather than NoSuchKey, `S3Service.getObject`
-  catches only `NoSuchKeyException`, and the read becomes a 500. MinIO's root
-  credentials always list, so no test shows it. Added 2026-09-12. An unattached
+  catches only `NoSuchKeyException`, and the read becomes a 500. S3Mock checks
+  no permissions, so no test shows it. Added 2026-09-12. An unattached
   duplicate, `CampusVibeProdMediaS3Access`, still exists; deleting it is
   Arpan's. The environment proxies through **nginx**, whose 1 MB default body
   limit sits under the 5 MB upload cap. `deploy/eb/.platform/nginx/conf.d/`
@@ -75,7 +77,7 @@ Everything below binds to both.
   never-read `S3_BUCKET_NAME` is gone. The first deployed upload landed
   2026-09-15, which closed BUG-051.
 - **Outside production nothing talks to AWS at all.** `AWS_S3_ENDPOINT` points
-  the same real `S3Client` at MinIO locally and in CI (ADR-011); production
+  the same real `S3Client` at S3Mock locally and in CI (ADR-026); production
   leaves it unset and resolves the instance role. There is no mock flag any
   more.
 - **`campusvibe-prod-db`** — PostgreSQL **18.3**, private, TLS forced,
@@ -85,7 +87,7 @@ Everything below binds to both.
   only the environment's instance group; the personal `/32` was revoked the same
   day.
 - **The Elastic Beanstalk environment is a single instance behind CloudFront
-  since 2026-11-07** ([ADR-017](../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md));
+  since 2026-11-07** ([ADR-017](../../docs/decisions/ADR-017-api-https-through-cloudfront-not-a-load-balancer.md));
   the load balancer is gone. `https://api.campusvibe-mcgill.com` is a CNAME at
   Namecheap to distribution `E2T616L10NJZG8` (`d3rljfrq954zy0.cloudfront.net`):
   the `us-east-1` ACM certificate, HTTP redirected to HTTPS at the edge, caching
@@ -124,10 +126,10 @@ Everything below binds to both.
   The guard hook refuses `logs tail`; set `MSYS_NO_PATHCONV=1` in Git Bash.
 - **SES is in the sandbox** with no verified identity.
 - **What is left to connect, service by service:**
-  [`connecting-rds.md`](../docs/architecture/connecting-rds.md),
-  [`connecting-elastic-beanstalk.md`](../docs/architecture/connecting-elastic-beanstalk.md),
-  [`connecting-s3.md`](../docs/architecture/connecting-s3.md),
-  [`connecting-ses.md`](../docs/architecture/connecting-ses.md).
+  [`connecting-rds.md`](../../docs/architecture/connecting-rds.md),
+  [`connecting-elastic-beanstalk.md`](../../docs/architecture/connecting-elastic-beanstalk.md),
+  [`connecting-s3.md`](../../docs/architecture/connecting-s3.md),
+  [`connecting-ses.md`](../../docs/architecture/connecting-ses.md).
 
 ## Free — no approval
 
@@ -167,8 +169,8 @@ or flagging spend that is not earning its keep, is welcome unprompted.
 
 - Disable a security control to make a deployment work.
 - Make RDS publicly accessible unless explicitly told to.
-- Print a secret value into chat, into a file under `.claude/`, or into a
-  commit. This repository is public and `.claude/` is committed.
+- Print a secret value into chat, into a file under `.claude/` or `docs/`,
+  or into a commit. This repository is public and both folders are committed.
 
 ## Enforced, not just written
 
@@ -184,8 +186,9 @@ nothing. For a one-off approved write, hand Arpan the exact command to run with
 **The S3 carve-out covers creating and configuring, not deleting:** every
 `delete-*` is refused, `delete-bucket-cors` included, which matches *deleting
 is still Arpan's* above.
-`AWS_PROFILE` is pinned for every tool call in `.claude/settings.json`.
+`AWS_PROFILE` is pinned for every tool call in `.claude/settings.local.json`,
+which is gitignored and exists only on Arpan's machine.
 
 An infrastructure change is recorded in
-[`docs/architecture/aws-deployment.md`](../docs/architecture/aws-deployment.md).
+[`docs/architecture/aws-deployment.md`](../../docs/architecture/aws-deployment.md).
 The bucket is tagged `ManagedBy=Manual`; nothing else tracks the drift.

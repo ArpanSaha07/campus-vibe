@@ -97,7 +97,7 @@ public final class MediaKeys {
      * <p>The filesystem stub that stood in for S3 until 2026-09-12 carried this
      * check, because it joined the key onto a directory where {@code ..} climbs
      * — a vulnerability the stub had and S3 does not, which was BUG-039. MinIO
-     * replaced it (ADR-011), and a real store treats a key as an opaque string,
+     * replaced it (ADR-011), then S3Mock replaced MinIO (ADR-026), and an S3 store treats a key as an opaque string,
      * so nothing downstream checks this any more. The guard moved here rather
      * than being deleted with the stub: it is the second line of defence behind
      * server-generated keys, and one that existed only inside the thing being

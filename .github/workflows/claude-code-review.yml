@@ -3,7 +3,7 @@ name: Claude Code Review
 on:
   pull_request:
     # develop since 2026-11-23: a teammate's PRs target it, and develop-to-main
-    # is Arpan's release PR (.claude/specs/2026-11-23-teammate-pr-workflow.md).
+    # is Arpan's release PR (docs/specs/2026-11-23-teammate-pr-workflow.md).
     branches: [main, develop]
     # `synchronize` is deliberately absent: it fires on every push to an open
     # PR, so a branch worked on through the day spent a full agent run per
@@ -79,7 +79,7 @@ jobs:
 
             PART 1 — SPEC SCOPE
             The body has a line starting `Spec:` naming a file under
-            `.claude/specs/`. Read that file. Its Goal, Decisions taken and
+            `docs/specs/`. Read that file. Its Goal, Decisions taken and
             Files expected to change say what this PR may do; its Out of scope
             says what it must not.
             - If there is no Spec line, it says n/a, or the file does not

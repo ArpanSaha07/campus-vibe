@@ -46,7 +46,7 @@ name: CI
 # WHY develop IS HERE
 #
 # A teammate's PRs target develop, and develop-to-main is Arpan's release PR
-# (.claude/specs/2026-11-23-teammate-pr-workflow.md). Without develop here, a
+# (docs/specs/2026-11-23-teammate-pr-workflow.md). Without develop here, a
 # PR into develop got only branch-checks.yml — no integration tier, no Flyway
 # migration, no Docker stack — and the first full run of that code was the
 # release PR, after it had already merged.

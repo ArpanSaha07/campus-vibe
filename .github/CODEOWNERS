@@ -7,7 +7,7 @@
 #
 # Anything not listed still needs one approval; these paths make sure the
 # review lands on the parts that are hardest to undo.
-# Spec: .claude/specs/2026-11-23-teammate-pr-workflow.md
+# Spec: docs/specs/2026-11-23-teammate-pr-workflow.md
 
 # The API contract: a rename here breaks the frontend and backend together.
 /contracts/                                        @ArpanSaha07
@@ -20,7 +20,7 @@
 
 # The rules every Claude session follows, and the settled decisions.
 /.claude/rules/                                    @ArpanSaha07
-/.claude/docs/decisions/                           @ArpanSaha07
+/docs/decisions/                           @ArpanSaha07
 
 # What the product is meant to be.
-/.claude/docs/product.md                           @ArpanSaha07
+/docs/product.md                           @ArpanSaha07

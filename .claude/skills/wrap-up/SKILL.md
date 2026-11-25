@@ -44,14 +44,14 @@ belongs in a doc.
 
 ## 3. The queue
 
-Move the finished item out of [`todo.md`](../../TODO/todo.md) into
-[`tasks-completed.md`](../../TODO/tasks-completed.md), **under its original topic
+Move the finished item out of [`todo.md`](../../../docs/TODO/todo.md) into
+[`tasks-completed.md`](../../../docs/TODO/tasks-completed.md), **under its original topic
 heading**, keeping the date and the write-up. The queue only stays useful if
 finished work leaves it. Add anything new the work uncovered.
 
 ## 4. STATUS.md
 
-[`STATUS.md`](../../STATUS.md) is what the next session orients from, so it is
+[`STATUS.md`](../../../docs/STATUS.md) is what the next session orients from, so it is
 the one file that must be right:
 
 - a *Recently shipped* line, newest first, capped at ten
@@ -62,9 +62,9 @@ the one file that must be right:
 
 ## 5. Bugs and traps
 
-Fixed a bug → move it to [`fixed_bugs.md`](../../bugs/fixed_bugs.md) with the
+Fixed a bug → move it to [`fixed_bugs.md`](../../../docs/bugs/fixed_bugs.md) with the
 reasoning, and refresh the moved-list line at the top of
-[`bugs.md`](../../bugs/bugs.md). Found one → open it in `bugs.md`.
+[`bugs.md`](../../../docs/bugs/bugs.md). Found one → open it in `bugs.md`.
 
 Either way, if the code can trap the *next* caller, add a line to the matching
 file in [`.claude/rules/`](../../rules/) citing the bug id. That is the step
@@ -73,12 +73,12 @@ whose absence let one JPA trap fire twice in the same method.
 ## 6. Decisions
 
 Chose between real alternatives? Write a **Proposed** ADR in
-[`docs/decisions/`](../../docs/decisions/README.md) and add its row to the index.
+[`docs/decisions/`](../../../docs/decisions/README.md) and add its row to the index.
 Only Arpan flips a Status to Accepted — proposing is yours, deciding is not.
 
 ## 7. The spec
 
-Mark the `.claude/specs/` file `Status: shipped`. If the work drifted from what
+Mark the `docs/specs/` file `Status: shipped`. If the work drifted from what
 the spec agreed, say so in your report — that is a fact Arpan needs, not a
 failure to hide.
 

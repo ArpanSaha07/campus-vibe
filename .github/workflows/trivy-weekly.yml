@@ -24,7 +24,7 @@ name: Trivy weekly
 # from the default branch, so this file lives on main and checks develop out
 # explicitly. A green run says nothing about main while a fix sits unmerged.
 #
-# Spec: .claude/specs/2026-11-07-weekly-trivy-scan.md
+# Spec: docs/specs/2026-11-07-weekly-trivy-scan.md
 
 on:
   schedule:

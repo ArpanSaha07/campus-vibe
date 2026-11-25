@@ -131,8 +131,8 @@ public class ClubController {
      * <p>Serving the bytes through the API rather than handing out a presigned
      * or public S3 URL keeps the bucket private, and is the same decision that
      * governs writes (ADR-007 for reads, ADR-010 for uploads). It works
-     * identically against MinIO locally and real S3 in production, because both
-     * are reached by the same client through the same calls (ADR-011).
+     * identically against S3Mock locally and real S3 in production, because both
+     * are reached by the same client through the same calls (ADR-011, ADR-026).
      *
      * <p>Unauthenticated, like the club page it appears on. It falls under the
      * {@code GET /api/v1/clubs/**} permitAll matcher and needs no entry of its
