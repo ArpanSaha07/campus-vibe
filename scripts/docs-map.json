@@ -25,6 +25,17 @@
   ],
 
   "docs": {
+    "instagram-import.md": {
+      "covers": "The Instagram auto-import: fetch, Claude extraction, publish rules, duplicates, club linking, source links and posters",
+      "paths": [
+        "backend/src/main/java/com/campusvibe/instagram/",
+        "backend/src/main/resources/db/migrations/V38__create_instagram_import_tables.sql",
+        "backend/src/main/resources/db/migrations/V39__add_event_source_link.sql",
+        "backend/src/main/resources/instagram/",
+        "frontend/app/components/event/EventPoster.tsx",
+        "frontend/app/components/main-page/LiveEventSection.tsx"
+      ]
+    },
     "connecting-rds.md": {
       "covers": "Runbook for connecting RDS: credentials, TLS, the admin path, pgvector, and the PostgreSQL version every pin must match",
       "paths": [

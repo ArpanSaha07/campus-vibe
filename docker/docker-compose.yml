@@ -123,6 +123,15 @@ services:
       OPENAI_MAX_OUTPUT_TOKENS: ${OPENAI_MAX_OUTPUT_TOKENS:-1200}
       OPENAI_CHAT_TIMEOUT: ${OPENAI_CHAT_TIMEOUT:-60s}
 
+      # Instagram auto-import (docs/architecture/instagram-import.md). Without
+      # the Anthropic key or the fetcher URL a run does nothing. Off unless
+      # IMPORT_ENABLED.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      INSTAGRAM_IMPORT_ENABLED: ${INSTAGRAM_IMPORT_ENABLED:-false}
+      INSTAGRAM_FETCHER_URL: ${INSTAGRAM_FETCHER_URL:-}
+      INSTAGRAM_FETCHER_API_KEY: ${INSTAGRAM_FETCHER_API_KEY:-}
+      INSTAGRAM_IMPORT_MAX_ACCOUNTS: ${INSTAGRAM_IMPORT_MAX_ACCOUNTS:-200}
+
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
 
       # Mail. Unset SPRING_MAIL_HOST means the backend logs messages instead of

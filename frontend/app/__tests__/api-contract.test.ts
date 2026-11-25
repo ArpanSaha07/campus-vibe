@@ -84,6 +84,7 @@ const eventFields: Record<keyof ApiEvent, true> = {
   registered: true,
   topics: true,
   formats: true,
+  sourceUrl: true,
 };
 
 const clubFields: Record<keyof ApiClub, true> = {

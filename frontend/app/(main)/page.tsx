@@ -1,10 +1,8 @@
 import { Suspense, type CSSProperties } from "react";
 import BannerCarousel from "@/app/components/main-page/BannerCarouselMainPage";
-import EventSection from "@/app/components/main-page/EventSectionMainPage";
 import DiscoverClubs from "@/app/components/main-page/DiscoverClubsMainPage";
 import PlannerCard from "@/app/components/main-page/PlannerCardMainPage";
-
-import { popularEvents } from "@/app/data/data";
+import LiveEventSection from "@/app/components/main-page/LiveEventSection";
 
 function reveal(index: number): CSSProperties {
   return { "--reveal-index": index } as CSSProperties;
@@ -17,16 +15,22 @@ export default function Home() {
         <BannerCarousel />
       </div>
       <div className="fade-up" style={reveal(2)}>
-        <EventSection title="Popular this weekend" events={popularEvents} />
+        <Suspense fallback={null}>
+          <LiveEventSection row="popular" />
+        </Suspense>
       </div>
       <div className="fade-up" style={reveal(3)}>
         <PlannerCard />
       </div>
       <div className="fade-up" style={reveal(4)}>
-        <EventSection title="Workshops" events={popularEvents} />
+        <Suspense fallback={null}>
+          <LiveEventSection row="workshops" />
+        </Suspense>
       </div>
       <div className="fade-up" style={reveal(5)}>
-        <EventSection title="Outdoors" events={popularEvents} />
+        <Suspense fallback={null}>
+          <LiveEventSection row="outdoors" />
+        </Suspense>
       </div>
       <div className="fade-up" style={reveal(6)}>
         {/* Fetches live clubs itself; no fallback, since it renders nothing

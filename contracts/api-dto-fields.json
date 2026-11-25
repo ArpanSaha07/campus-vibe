@@ -24,7 +24,8 @@
   "EventDTO": [
     "id", "title", "description", "dateTime", "endTime", "createdAt", "location", "price",
     "organizerId", "organizerName", "followers", "images", "promoted",
-    "capacity", "registered", "topics", "formats"
+    "capacity", "registered", "topics", "formats",
+    "sourceUrl"
   ],
 
   "ClubDTO": [

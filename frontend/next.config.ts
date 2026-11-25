@@ -74,6 +74,9 @@ const nextConfig: NextConfig = {
   output: isVercel ? undefined : "standalone",
 
   images: {
+    // 75 is Next 16's only default. 90 is for imported Instagram posters
+    // (EventPoster), whose small text blurs at 75; any other value is coerced.
+    qualities: [75, 90],
     // Only Unsplash, which the demo clubs' photos come from. Uploaded images
     // are served from this origin through the /media rewrite below, so they are
     // local as far as next/image is concerned and need no entry here.

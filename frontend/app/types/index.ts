@@ -33,6 +33,11 @@ export type EventInstance = {
   topics: string[];
   /** event_formats slugs. Labels come from `GET /api/v1/event-formats`. */
   formats: string[];
+  /**
+   * Set when the event was imported from Instagram: clicking the card opens
+   * this link (the post, the story while it is up, or the club's profile).
+   */
+  sourceUrl?: string | null;
   // recurrence?
 };
 
@@ -395,6 +400,8 @@ export interface ApiEvent {
   registered: number;
   topics: string[];
   formats: string[];
+  /** Instagram link for an imported event (post, live story or profile); null otherwise. */
+  sourceUrl: string | null;
 }
 
 export interface ApiMyEvent {

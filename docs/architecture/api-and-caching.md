@@ -5,7 +5,13 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `0ff0759` plus the uncommitted planner agent unit — re-read
+**Code as of:** `54d14b2` plus the Instagram auto-import unit (branch Gabriel) —
+re-read 2026-11-25: `EventDTO` gained `sourceUrl`, in `api-dto-fields.json` and
+both contract tests; `GET /api/v1/events?upcoming=true` now also feeds the
+homepage rows through `listUpcomingEvents`, under the same `events` cache policy;
+`toEventInstance` maps `sourceUrl` and leaves the price empty rather than `Free`
+for an imported event with no price. No cache policy or data path moved. Before
+that, `0ff0759` plus the uncommitted planner agent unit — re-read
 2026-11-16: `PlannerActionDTO` joined `api-dto-fields.json` and both contract
 tests, and `actions` joined `PlannerMessageDTO` and `PlannerReplyDoneDTO`.
 **Nothing this document describes moved**: the planner is still fetched in the
