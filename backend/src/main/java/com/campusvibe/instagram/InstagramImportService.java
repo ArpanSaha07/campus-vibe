@@ -39,7 +39,8 @@ public class InstagramImportService {
 
     private static final Logger log = LoggerFactory.getLogger(InstagramImportService.class);
     private static final int MAX_ATTEMPTS = 3;
-    private static final int MAX_EVENTS_PER_STORY = 5;
+    /** A schedule post (a week of games, a day of workshops) lists many events. */
+    private static final int MAX_EVENTS_PER_STORY = 12;
 
     private final InstagramProperties props;
     private final InstagramSourceRepository sources;
@@ -485,10 +486,11 @@ public class InstagramImportService {
 
     private void markDuplicate(InstagramEventCandidate c) {
         if (c.getDateTime() == null) return;
-        Instant from = c.getDateTime().minus(Duration.ofHours(12));
-        Instant to = c.getDateTime().plus(Duration.ofHours(12));
+        boolean dayOnly = !Boolean.TRUE.equals(c.getStartTimeKnown());
+        Instant from = c.getDateTime().minus(Duration.ofHours(24));
+        Instant to = c.getDateTime().plus(Duration.ofHours(24));
         for (Event ev : eventRepository.findByDateTimeBetween(from, to)) {
-            if (CandidateRules.sameEvent(c.getTitle(), c.getDateTime(), ev.getTitle(), ev.getDateTime())
+            if (CandidateRules.sameEvent(c.getTitle(), c.getDateTime(), ev.getTitle(), ev.getDateTime(), dayOnly)
                     || CandidateRules.sameSlot(c.getDateTime(), c.getLocation(), ev.getDateTime(), ev.getLocation())) {
                 c.setStatus(InstagramEventCandidate.Status.DUPLICATE);
                 c.setDuplicateOfEventId(ev.getId());
@@ -499,9 +501,15 @@ public class InstagramImportService {
         for (InstagramEventCandidate other : candidates.findLiveBetween(from, to)) {
             String otherPost = other.getStory().getFeedPostUrl() != null
                     ? other.getStory().getFeedPostUrl() : other.getStory().getPermalink();
-            boolean samePost = reshared != null && reshared.equals(otherPost);
+            // Two reshares of one post are one event only if they also agree on the time and
+            // roughly the name: one post can list a whole week of events.
+            boolean samePost = reshared != null && reshared.equals(otherPost)
+                    && !other.getStory().getId().equals(c.getStory().getId())
+                    && Math.abs(Duration.between(c.getDateTime(), other.getDateTime()).toMinutes()) <= 30
+                    && CandidateRules.titleSimilarity(c.getTitle(), other.getTitle()) >= 0.34;
             if (samePost
-                    || CandidateRules.sameEvent(c.getTitle(), c.getDateTime(), other.getTitle(), other.getDateTime())
+                    || CandidateRules.sameEvent(c.getTitle(), c.getDateTime(), other.getTitle(), other.getDateTime(),
+                            dayOnly || !Boolean.TRUE.equals(other.getStartTimeKnown()))
                     || CandidateRules.sameSlot(c.getDateTime(), c.getLocation(), other.getDateTime(), other.getLocation())) {
                 c.setStatus(InstagramEventCandidate.Status.DUPLICATE);
                 c.setDuplicateOfCandidateId(other.getId());

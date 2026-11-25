@@ -176,4 +176,23 @@ class CandidateRulesTest {
         assertThat(CandidateRules.sameSlot(t, "Lev Bukham (Room 203)", t.plusSeconds(7200), "Lev Bukham (Room 203)")).isFalse();
         assertThat(CandidateRules.sameSlot(t, "Gerts Bar", t, "Trottier 3120")).isFalse();
     }
+
+    @Test
+    void aReminderWithoutATimeMatchesTheShowThatEvening() {
+        Instant midnight = Instant.parse("2026-11-25T05:00:00Z");
+        Instant show = Instant.parse("2026-11-26T01:00:00Z");
+
+        assertThat(CandidateRules.sameEvent("Last Stop comedy show", midnight, "Last Stop: A MSCC Comedy Show", show)).isFalse();
+        assertThat(CandidateRules.sameEvent("Last Stop comedy show", midnight, "Last Stop: A MSCC Comedy Show", show, true)).isTrue();
+    }
+
+    @Test
+    void twoGamesAgainstTheSameTeamHoursApartAreTwoEvents() {
+        Instant six = Instant.parse("2026-11-26T23:00:00Z");
+        Instant eight = Instant.parse("2026-11-27T01:00:00Z");
+
+        assertThat(CandidateRules.sameEvent("Martlets Basketball vs Concordia Stingers", six,
+                "Redbirds Basketball vs Concordia Stingers", eight)).isFalse();
+        assertThat(CandidateRules.sameEvent("MCHAM Mystery Book Sale", six, "Mcham book sale", eight)).isTrue();
+    }
 }

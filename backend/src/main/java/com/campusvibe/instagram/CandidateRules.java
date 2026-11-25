@@ -134,10 +134,23 @@ final class CandidateRules {
     }
 
     static boolean sameEvent(String titleA, Instant startA, String titleB, Instant startB) {
+        return sameEvent(titleA, startA, titleB, startB, false);
+    }
+
+    /**
+     * {@code dayOnly} when either side has a date but no time: it starts at
+     * midnight, so a "TONIGHT" reminder sits 20 hours from the 8 pm show it is
+     * about. The window widens to the whole day.
+     */
+    static boolean sameEvent(String titleA, Instant startA, String titleB, Instant startB, boolean dayOnly) {
         if (startA == null || startB == null) return false;
-        long hours = Math.abs(Duration.between(startA, startB).toHours());
-        if (hours > 12) return false;
-        return titleSimilarity(titleA, titleB) >= 0.5;
+        long minutes = Math.abs(Duration.between(startA, startB).toMinutes());
+        double similarity = titleSimilarity(titleA, titleB);
+        if (dayOnly) return minutes <= 24 * 60 && similarity >= 0.5;
+        // At the same time, similar titles are one event. Hours apart, only near-identical
+        // ones are: "Redbirds Basketball vs Concordia" at 8 is not the 6 pm Martlets game.
+        if (minutes <= 30) return similarity >= 0.5;
+        return minutes <= 12 * 60 && similarity >= 0.8;
     }
 
     /**
