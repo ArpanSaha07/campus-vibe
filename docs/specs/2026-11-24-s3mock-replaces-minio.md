@@ -1,6 +1,6 @@
 # S3Mock replaces MinIO, and the ITs run in CI again
 
-**Status:** draft · **Date:** 2026-11-24
+**Status:** approved 2026-11-24 (Arpan) · **Date:** 2026-11-24
 
 ## Goal
 
