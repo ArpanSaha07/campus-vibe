@@ -51,9 +51,24 @@ that were not events.
 ## Duplicates and enrichment
 
 The same event arrives many times: a story and a post, a reminder, four clubs
-resharing one poster. `markDuplicate` treats two as one when the titles match
-within 12 hours, when they share a time slot (30 minutes) and venue, or when a
-story reshares the post the other came from. A duplicate of a published event is
+resharing one poster. `markDuplicate` treats two as one when:
+
+- they start within 30 minutes and their titles are similar
+  (`CandidateRules.titleSimilarity` at least 0.5);
+- they start hours apart (up to 12) and their titles are near identical (0.8).
+  Two games against the same team at 6 and 8 pm are two events;
+- one has a date but no time and the titles are similar on the same day, so a
+  TONIGHT reminder matches the 8 pm show it is about;
+- they share a time slot (30 minutes) and a venue (`sameSlot`);
+- they come from two reshares of one post and also agree on the time and roughly
+  the name. A reshared post can list a whole week of events, so the shared post
+  alone is never enough.
+
+One story or post yields at most 12 events, enough for a schedule.
+
+These rules came from a preview run on 2026-11-25 (20 accounts, 105 stories and
+posts, 42 events published), which showed a reshared week calendar collapsing
+into one event and a six-game schedule losing its last game. A duplicate of a published event is
 not wasted: `InstagramPublishService.enrich` fills what the event lacked (venue,
 price, capacity, banner) and appends highlights it did not have. It never
 overwrites.
