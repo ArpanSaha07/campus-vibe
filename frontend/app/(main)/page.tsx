@@ -1,5 +1,6 @@
 import { Suspense, type CSSProperties } from "react";
 import BannerCarousel from "@/app/components/main-page/BannerCarouselMainPage";
+import CategoriesSection from "@/app/components/main-page/CategoriesSectionMainPage";
 import DiscoverClubs from "@/app/components/main-page/DiscoverClubsMainPage";
 import PlannerCard from "@/app/components/main-page/PlannerCardMainPage";
 import LiveEventSection from "@/app/components/main-page/LiveEventSection";
@@ -22,6 +23,9 @@ export default function Home() {
       <div className="fade-up" style={reveal(3)}>
         <PlannerCard />
       </div>
+      <div className="fade-up" style={reveal(1)}>
+        <CategoriesSection />
+      </div>
       <div className="fade-up" style={reveal(4)}>
         <Suspense fallback={null}>
           <LiveEventSection row="workshops" />
@@ -29,7 +33,7 @@ export default function Home() {
       </div>
       <div className="fade-up" style={reveal(5)}>
         <Suspense fallback={null}>
-          <LiveEventSection row="outdoors" />
+          <LiveEventSection row="personal" />
         </Suspense>
       </div>
       <div className="fade-up" style={reveal(6)}>

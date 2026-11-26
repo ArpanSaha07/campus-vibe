@@ -17,7 +17,7 @@ export default function BannerCarousel() {
   // link renders the slide without an anchor rather than linking to itself.
   const banners = [
     {
-      img: "/claude-workshop.webp",
+      img: "/claude-workshop.jpeg",
       link: "",
       alt: "Build AI agents workshop with Mark Pyvovarov",
       eyebrow: "Learn how to build",

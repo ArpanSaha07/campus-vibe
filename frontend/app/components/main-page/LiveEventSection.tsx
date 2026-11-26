@@ -2,12 +2,13 @@ import { connection } from "next/server";
 import { listUpcomingEvents } from "@/app/lib/event";
 import { formatEventWeekday } from "@/app/lib/event-zone";
 import EventSection from "@/app/components/main-page/EventSectionMainPage";
+import PersonalisedEventSection from "@/app/components/main-page/PersonalisedEventSection";
 import SectionHeading from "@/app/components/ui/SectionHeading";
 import type { EventInstance } from "@/app/types";
 
 /**
- * One of the homepage's event rows — the same three the site has always had —
- * filled with real upcoming events: the ones clubs create and the ones read
+ * One of the homepage's three event rows — Popular this week, Workshops and
+ * Personalised for you — filled with real upcoming events: the ones clubs create and the ones read
  * from club Instagram accounts. They used to show the demo list.
  *
  * Fetches for itself inside the homepage's Suspense, like FeaturedClubs: a
@@ -19,15 +20,14 @@ const WEEKEND = ["Fri", "Sat", "Sun"];
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const WORKSHOP = ["workshop", "info-session", "study-session"];
-const OUTDOORS = ["outdoors", "hiking", "camping", "canoeing", "birdwatching", "gardening", "cycling", "running",
-  "ski-snowboard", "climbing", "trip"];
 
-type Row = "popular" | "workshops" | "outdoors";
+// `personal` replaced the Outdoors row (Arpan, 2026-11-26). It is filtered in
+// the browser by PersonalisedEventSection, which can read the student's profile.
+type Row = "popular" | "workshops" | "personal";
 
-const TITLES: Record<Row, string> = {
-  popular: "Popular this weekend",
+const TITLES: Record<Exclude<Row, "personal">, string> = {
+  popular: "Popular this week",
   workshops: "Workshops",
-  outdoors: "Outdoors",
 };
 
 export function tagged(event: EventInstance, slugs: string[]) {
@@ -54,10 +54,12 @@ export default async function LiveEventSection({ row }: { row: Row }) {
     return null;
   }
 
+  if (row === "personal") return <PersonalisedEventSection events={events} />;
+
   const shown =
     row === "popular"
       ? popular(events, Date.now())
-      : events.filter((e) => tagged(e, row === "workshops" ? WORKSHOP : OUTDOORS)).slice(0, ROW_SIZE);
+      : events.filter((e) => tagged(e, WORKSHOP)).slice(0, ROW_SIZE);
 
   if (shown.length === 0) {
     return (
