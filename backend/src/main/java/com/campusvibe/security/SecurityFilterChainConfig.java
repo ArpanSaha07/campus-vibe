@@ -85,7 +85,9 @@ public class SecurityFilterChainConfig {
                                 "/api/v1/clubs/*/audit-logs",
                                 // Carries officialEmail, which must never
                                 // reach a public club page.
-                                "/api/v1/clubs/*/managed").authenticated()
+                                "/api/v1/clubs/*/managed",
+                                // The club's import state, for its dashboard only.
+                                "/api/v1/clubs/*/instagram").authenticated()
                         // Proposals for clubs that do not exist yet. Stated
                         // rather than left to anyRequest(): the queue names its
                         // requester and their address, and the path sits one

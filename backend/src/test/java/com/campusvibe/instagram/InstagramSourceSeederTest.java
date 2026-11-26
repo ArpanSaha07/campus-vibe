@@ -17,10 +17,10 @@ class InstagramSourceSeederTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void enablesOnlyTheFirstMaxAccountsAndStoresEachHandleOnce() throws Exception {
+    void enablesEveryAccountAndStoresEachHandleOnce() throws Exception {
+        // How many a run checks is the admin's account count, not a flag on the row.
         InstagramProperties props = mock(InstagramProperties.class);
         when(props.seedSources()).thenReturn(true);
-        when(props.maxAccounts()).thenReturn(2);
         InstagramSourceRepository sources = mock(InstagramSourceRepository.class);
         when(sources.count()).thenReturn(0L);
 
@@ -31,12 +31,12 @@ class InstagramSourceSeederTest {
         List<InstagramSource> rows = saved.getValue();
 
         assertThat(rows).hasSizeGreaterThan(2);
-        assertThat(rows).filteredOn(s -> Boolean.TRUE.equals(s.getEnabled())).hasSize(2);
+        assertThat(rows).allMatch(s -> Boolean.TRUE.equals(s.getEnabled()));
         assertThat(rows).extracting(InstagramSource::getHandle).doesNotHaveDuplicates();
     }
 
     @Test
-    void doesNothingWhenAccountsAreAlreadyStored() throws Exception {
+    void onAStoredListOnlyRestoresRowsTheOldCapSwitchedOff() throws Exception {
         InstagramProperties props = mock(InstagramProperties.class);
         when(props.seedSources()).thenReturn(true);
         InstagramSourceRepository sources = mock(InstagramSourceRepository.class);
@@ -45,5 +45,6 @@ class InstagramSourceSeederTest {
         new InstagramSourceSeeder(props, sources).run(null);
 
         verify(sources, never()).saveAll(any());
+        verify(sources).enableUnclaimedDisabled();
     }
 }

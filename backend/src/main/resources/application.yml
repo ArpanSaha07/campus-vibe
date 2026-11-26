@@ -202,15 +202,18 @@ jwt:
   issuer: campusvibe
 
 # Instagram story auto-import (package com.campusvibe.instagram). Twice a day it
-# asks the story fetcher for the stories of the top enabled accounts, reads each
-# story image with Claude, and turns event announcements into candidates.
-# Events publish on their own; clicking one opens it on Instagram.
+# asks the story fetcher for the stories of the first N ranked accounts (plus
+# any a club opted in), reads each story image with Claude, and turns event
+# announcements into candidates. Events publish on their own, each with its own
+# event page.
 campusvibe.instagram:
-  # The schedule only. The admin page's "Run now" works either way.
+  # The schedule only. Import now, on the admin dashboard and on a club's
+  # dashboard, works either way.
   enabled: ${INSTAGRAM_IMPORT_ENABLED:false}
   # Stories live 24h, so two runs 12h apart see every story at least once.
   cron: ${INSTAGRAM_IMPORT_CRON:0 0 9,21 * * *}
   zone: ${INSTAGRAM_IMPORT_ZONE:America/Toronto}
+  # N until a platform admin sets one on the admin dashboard (instagram_import_settings).
   max-accounts: ${INSTAGRAM_IMPORT_MAX_ACCOUNTS:200}
   lock-lease: ${INSTAGRAM_IMPORT_LOCK_LEASE:2h}
   fetcher:

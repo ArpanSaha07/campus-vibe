@@ -38,7 +38,7 @@ public class InstagramImportScheduler {
     @EventListener(ApplicationReadyEvent.class)
     public void catchUpOnStartup() {
         if (!props.enabled() || !props.runOnStartup()) return;
-        boolean stale = runs.findFirstByOrderByStartedAtDesc()
+        boolean stale = runs.findFirstBySourceIdIsNullOrderByStartedAtDesc()
                 .map(r -> r.getStartedAt().isBefore(Instant.now().minus(props.startupStaleAfter())))
                 .orElse(true);
         if (stale) importService.startBackgroundRun();

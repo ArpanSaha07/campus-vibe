@@ -26,14 +26,21 @@
 
   "docs": {
     "instagram-import.md": {
-      "covers": "The Instagram auto-import: fetch, Claude extraction, publish rules, duplicates, club linking, source links and posters",
+      "covers": "The Instagram auto-import: fetch, Claude extraction, publish rules, duplicates, club linking, source links and posters, the admin's N and Import now, a club's own connection and Import now",
       "paths": [
         "backend/src/main/java/com/campusvibe/instagram/",
         "backend/src/main/resources/db/migrations/V38__create_instagram_import_tables.sql",
         "backend/src/main/resources/db/migrations/V39__add_event_source_link.sql",
+        "backend/src/main/resources/db/migrations/V40__add_instagram_source_club_opt_in.sql",
+        "backend/src/main/resources/db/migrations/V41__add_instagram_import_run_source.sql",
+        "backend/src/main/resources/db/migrations/V42__create_instagram_import_settings.sql",
         "backend/src/main/resources/instagram/",
         "frontend/app/components/event/EventPoster.tsx",
-        "frontend/app/components/main-page/LiveEventSection.tsx"
+        "frontend/app/components/main-page/LiveEventSection.tsx",
+        "frontend/app/components/manage/ClubInstagramPanel.tsx",
+        "frontend/app/components/admin/AdminInstagramImport.tsx",
+        "frontend/app/lib/club-instagram.ts",
+        "frontend/app/lib/admin-instagram.ts"
       ]
     },
     "connecting-rds.md": {

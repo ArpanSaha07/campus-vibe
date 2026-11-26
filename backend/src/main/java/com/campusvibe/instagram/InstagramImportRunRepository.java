@@ -19,5 +19,11 @@ public interface InstagramImportRunRepository extends JpaRepository<InstagramImp
 
     Optional<InstagramImportRun> findFirstByOrderByStartedAtDesc();
 
+    /** The latest run over the whole watch list; a club's single-account run is not one. */
+    Optional<InstagramImportRun> findFirstBySourceIdIsNullOrderByStartedAtDesc();
+
+    /** The latest Import now run for one account. */
+    Optional<InstagramImportRun> findFirstBySourceIdOrderByStartedAtDesc(Long sourceId);
+
     Optional<InstagramImportRun> findFirstByIncludedPostsTrueAndStatusNotOrderByStartedAtDesc(InstagramImportRun.Status status);
 }

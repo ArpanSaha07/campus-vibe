@@ -28,14 +28,23 @@ their poster as banner and an Instagram link, and 6 clubs were created for the a
 **Broken or missing, seen by Arpan (to be fixed by Arpan after the demo):**
 
 - [ ] **P0** **The UI is broken** around imported events. Not yet itemised: write down each
-  broken screen after the demo, before fixing.
+  broken screen after the demo, before fixing. Two fixed 2026-11-26: the card now opens
+  the event page instead of Instagram, and a poster fills 80% of the card's width
+  instead of a third ([`instagram-import.md`](../architecture/instagram-import.md)).
 - [ ] **P0** **Events are created for clubs that do not exist as real club pages, while an
   event page can only exist for an existing club.** The workflows disagree:
   `InstagramPublishService.clubFor` makes a placeholder club owned by the platform admin
   (`InstagramPublishService.java:222-240`), which the rest of the product does not treat as a
   real club. Decide the owner question from the spec first (platform admin or the claim flow).
-- [ ] **P1** **No extraction controls in the admin or club-admin dashboard.** No way to run an
-  import, see runs, or review held candidates from the UI; see also the Run now item below.
+  **Now also blocks clubs connecting their own account** (2026-11-26): a handle linked to a
+  placeholder club is refused with a 409 on the club dashboard's Instagram page, so a real
+  club whose account was imported first cannot connect it.
+- [x] **P1** **Import controls in the admin and club-admin dashboards** — done 2026-11-26,
+  except reviewing held candidates. Admin: N, Import now, the last ten runs. Club: connect
+  the handle, auto-import, Import now for that account alone. See
+  [`tasks-completed.md`](tasks-completed.md).
+- [ ] **P2** **No way to review held candidates** (`PENDING_REVIEW`) from the UI. They stay
+  in the table, unpublished; the last two local runs held four.
 
 **Needed to run it at all (a fresh machine or environment):**
 
@@ -112,11 +121,9 @@ their poster as banner and an Instagram link, and 6 clubs were created for the a
   **Fix:** retry candidates whose only reasons are publish failures on the next run, or fail
   the run early when no platform admin exists.
 
-- [ ] **No way to trigger an import by hand.** The `application.yml` comment on
-  `campusvibe.instagram.enabled` mentions an admin page with Run now, but no controller
-  exists and the spec rules one out. The only triggers are the cron and the startup run,
-  which skips whenever the last run is under 11 hours old (`InstagramImportScheduler.java:41`).
-  Either build the endpoint (overlaps with Arpan's dashboard work) or correct the comment.
+- [x] **No way to trigger an import by hand.** Done 2026-11-26: Import now on the admin
+  dashboard (`POST /api/v1/admin/instagram/import`) and on a club's dashboard for its own
+  account. The `application.yml` comment is true again.
 
 - [ ] **The fetcher URL is not written down anywhere in the repo.** The backend reads only
   `${INSTAGRAM_FETCHER_URL:}`, empty by default, and nothing names Gabriel's gateway, so a

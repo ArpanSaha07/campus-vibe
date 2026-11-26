@@ -42,6 +42,14 @@ public class InstagramSource {
     @Column(nullable = false)
     private Boolean enabled = true;
 
+    /**
+     * Set by a club admin's auto-import toggle (V40). Opted-in sources are
+     * fetched on every scheduled run even when they fall outside the
+     * {@code max-accounts} cap that bounds the seeded list.
+     */
+    @Column(name = "club_opted_in", nullable = false)
+    private Boolean clubOptedIn = false;
+
     @Column(name = "last_fetch_at")
     private Instant lastFetchAt;
 

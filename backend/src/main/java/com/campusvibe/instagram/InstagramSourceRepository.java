@@ -20,6 +20,35 @@ public interface InstagramSourceRepository extends JpaRepository<InstagramSource
     @EntityGraph(attributePaths = "club")
     List<InstagramSource> findByEnabledTrueOrderByPriorityAsc(Limit limit);
 
+    /**
+     * The ranked account list in CSV order, minus accounts whose club turned
+     * auto-import off (enabled false on a club-linked source). A run takes the
+     * first N of these, N being the admin's account count.
+     */
+    @EntityGraph(attributePaths = "club")
+    @Query("SELECT s FROM InstagramSource s WHERE NOT (s.enabled = false AND s.club IS NOT NULL) ORDER BY s.priority ASC")
+    List<InstagramSource> findRanked(Limit limit);
+
+    /** How many ranked accounts sit ahead of this priority; under N means it is checked. */
+    @Query("SELECT COUNT(s) FROM InstagramSource s WHERE s.priority < :priority AND NOT (s.enabled = false AND s.club IS NOT NULL)")
+    long countRankedAhead(@Param("priority") int priority);
+
+    /** Switches back on every account that is off but linked to no club: see InstagramSourceSeeder. */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE InstagramSource s SET s.enabled = true WHERE s.enabled = false AND s.club IS NULL")
+    int enableUnclaimedDisabled();
+
+    /** Sources a club admin opted in from the dashboard; fetched on top of the cap. */
+    @EntityGraph(attributePaths = "club")
+    List<InstagramSource> findByEnabledTrueAndClubOptedInTrue();
+
+    /** The source a club connected from its dashboard, if any. */
+    @EntityGraph(attributePaths = "club")
+    Optional<InstagramSource> findFirstByClubId(String clubId);
+
+    @Query("SELECT COALESCE(MAX(s.priority), 0) FROM InstagramSource s")
+    int maxPriority();
+
     @EntityGraph(attributePaths = "club")
     List<InstagramSource> findAllByOrderByPriorityAsc();
 

@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ExternalLink,
   History,
+  Instagram,
   LayoutDashboard,
   Pencil,
   Users,
@@ -30,6 +31,8 @@ const sections = [
   // and admins alike: everyone who can reach this dashboard edits the club.
   { segment: "club", label: "Edit Club page", icon: Pencil },
   { segment: "events", label: "Edit Events", icon: CalendarDays },
+  // Below Edit Events because what it does is fill that list for you.
+  { segment: "instagram", label: "Instagram", icon: Instagram },
   { segment: "admins", label: "Administrators", icon: Users },
   // Last on purpose: it is a record of what already happened, so it is where
   // you go after noticing something, not where you start.

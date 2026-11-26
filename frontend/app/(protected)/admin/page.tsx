@@ -23,7 +23,8 @@ import SectionHeading from "@/app/components/ui/SectionHeading";
 import StatTile from "@/app/components/ui/StatTile";
 import EmptyState from "@/app/components/ui/EmptyState";
 import Button from "@/app/components/ui/Button";
-import Link from "next/link"; 
+import AdminInstagramImport from "@/app/components/admin/AdminInstagramImport";
+import Link from "next/link";
 
 /**
  * One row of the merged Pending requests list.
@@ -258,6 +259,9 @@ export default function AdminDashboardPage() {
         )}
       </section>
 
+      {/* Mounted only once the user is known to be an admin: it calls admin
+          endpoints on mount, and the page itself renders while auth loads. */}
+      {user && isAdmin(user) && <AdminInstagramImport />}
     </main>
   );
 }

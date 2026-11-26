@@ -96,6 +96,22 @@
     "officialEmailVerified"
   ],
 
+  "ClubInstagramDTO": [
+    "handle", "autoImport", "importAvailable", "running", "lastImportedAt",
+    "nextImportAllowedAt", "eventsFound", "lastRunStatus", "lastRunPublished"
+  ],
+
+  "AdminInstagramDTO": [
+    "accountCount", "totalAccounts", "clubOptIns", "importAvailable", "running",
+    "recentRuns"
+  ],
+
+  "InstagramImportRunDTO": [
+    "id", "trigger", "status", "startedAt", "finishedAt", "accountsRequested",
+    "storiesFetched", "postsFetched", "eventsFound", "eventsPublished", "failures",
+    "handle", "error"
+  ],
+
   "PlannerPickDTO": ["kind", "id", "reason"],
 
   "PlannerUsageDTO": ["used", "limit", "resetsAt"],

@@ -23,9 +23,10 @@ export default function EventCard({ event }: { event: EventInstance }) {
   // events on a Montreal evening and a morning event all day after it ended.
   const ongoing = isOngoing(event);
   const almostFull = event.capacity > 0 && event.registered / event.capacity >= 0.75;
-  // Imported from Instagram: the card opens the post or story there, and the
-  // poster is shown whole rather than cropped to the frame.
-  const instagramUrl = normaliseWebLink(event.sourceUrl);
+  // Imported from Instagram: the poster fills a centred box 80% of the card's
+  // width, cropped top and bottom (EventPoster's card fit). The card still opens
+  // the event's own page, like every other card (Arpan, 2026-11-26).
+  const imported = normaliseWebLink(event.sourceUrl) !== null;
   const linkClass =
     "after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lavender-600";
 
@@ -38,11 +39,12 @@ export default function EventCard({ event }: { event: EventInstance }) {
         {/* Image */}
         <div className="block overflow-hidden h-40">
           <div className="relative w-full h-full">
-            {instagramUrl ? (
+            {imported ? (
               <EventPoster
                 src={event.images[0] || FALLBACK_EVENT_IMAGE}
                 alt={event.title}
-                sizes="(max-width: 768px) 100vw, 400px"
+                sizes="(max-width: 768px) 80vw, 320px"
+                fit="card"
               />
             ) : (
               <Image
@@ -89,22 +91,16 @@ export default function EventCard({ event }: { event: EventInstance }) {
 
       {/* Stub content */}
       <div className="px-4 pt-3 pb-4">
-        {instagramUrl ? (
-          <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
-            <CardStub event={event} instagram />
-          </a>
-        ) : (
-          <Link href={`/events/${event.eventId}`} className={linkClass}>
-            <CardStub event={event} />
-          </Link>
-        )}
+        <Link href={`/events/${event.eventId}`} className={linkClass}>
+          <CardStub event={event} />
+        </Link>
       </div>
     </div>
   );
 }
 
 /** The printed half of the card: title, date, price, place, club. */
-function CardStub({ event, instagram = false }: { event: EventInstance; instagram?: boolean }) {
+function CardStub({ event }: { event: EventInstance }) {
   return (
     <>
       <h3 className="font-semibold text-[15px] leading-snug line-clamp-2 text-ink-900 group-hover:text-lavender-800">
@@ -126,9 +122,6 @@ function CardStub({ event, instagram = false }: { event: EventInstance; instagra
 
       {event.promoted && (
         <p className="ticket-label text-ink-600/70 pt-2">Promoted</p>
-      )}
-      {instagram && (
-        <p className="mt-2 text-xs font-semibold text-ink-600">View on Instagram ↗</p>
       )}
     </>
   );

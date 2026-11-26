@@ -87,6 +87,12 @@ paths:
   does not cover it; the push loop skips it (`run-migrate: false`) and
   `verify.mjs` never boots, so a miss fails only on a pull request. `806a1d0`
   dropped the `AWS_S3_BUCKET` default and blocked PR #51 this way. (BUG-052)
+- **`verify.mjs`'s dead-port probe (59999 down to 59950) fails on Windows with
+  Hyper-V**, which reserves those ports, so the script throws before the build and
+  never reaches the backend. Run `--backend --full` and `--hooks` on their own, and
+  build the frontend by hand with `API_INTERNAL_URL` on a port outside
+  `netsh interface ipv4 show excludedportrange protocol=tcp`. A crash there is not
+  a red check. (BUG-069)
 - **The `hooks` component is the one deliberate exception to that mirror.**
   `guard-aws.test.mjs` asserts a `PreToolUse` hook, which only ever runs in a
   session on a developer's machine; a runner has none, so there is nothing for

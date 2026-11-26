@@ -61,6 +61,10 @@ public class InstagramImportRun {
     @Column(name = "posts_fetched", nullable = false)
     private Integer postsFetched = 0;
 
+    /** The one account a club's Import now run covered (V41); null for a scheduled run. */
+    @Column(name = "source_id")
+    private Long sourceId;
+
     @Column(name = "fetch_cost_usd")
     private Double fetchCostUsd;
 

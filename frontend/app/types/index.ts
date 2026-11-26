@@ -34,8 +34,9 @@ export type EventInstance = {
   /** event_formats slugs. Labels come from `GET /api/v1/event-formats`. */
   formats: string[];
   /**
-   * Set when the event was imported from Instagram: clicking the card opens
-   * this link (the post, the story while it is up, or the club's profile).
+   * Set when the event was imported from Instagram: the post, the story while
+   * it is up, or the club's profile. The card still opens the event page; this
+   * link is offered there, as View on Instagram.
    */
   sourceUrl?: string | null;
   // recurrence?
@@ -439,6 +440,59 @@ export interface ManagedClub {
   /** Null until a platform admin sets one — club admins cannot change it. */
   officialEmail: string | null;
   officialEmailVerified: boolean;
+}
+
+/** A club's Instagram connection on its dashboard. Mirrors ClubInstagramDTO. */
+export interface ClubInstagram {
+  /** The handle on the club's contact links, without @, or null. */
+  handle: string | null;
+  /** Whether the twice-daily scheduled runs import this account. */
+  autoImport: boolean;
+  /** False when the server has no fetcher or Claude key; Import now would do nothing. */
+  importAvailable: boolean;
+  /** This club's own Import now run is under way. A scheduled run over other accounts never sets it. */
+  running: boolean;
+  /** ISO instant this account was last fetched, by any run. */
+  lastImportedAt: string | null;
+  /** ISO instant Import now opens again after the cooldown, or null. */
+  nextImportAllowedAt: string | null;
+  eventsFound: number;
+  /** The club's latest Import now run; null if it never pressed the button. */
+  lastRunStatus: "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED" | null;
+  /** Events that run published; null while it runs or if there was none. */
+  lastRunPublished: number | null;
+}
+
+/** One import run on the admin dashboard. Mirrors InstagramImportRunDTO. */
+export interface InstagramImportRun {
+  id: number;
+  /** SCHEDULED, or MANUAL for an admin's or a club's Import now. */
+  trigger: "SCHEDULED" | "MANUAL";
+  status: "RUNNING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
+  startedAt: string;
+  finishedAt: string | null;
+  accountsRequested: number;
+  storiesFetched: number;
+  postsFetched: number;
+  eventsFound: number;
+  eventsPublished: number;
+  failures: number;
+  /** The one account a club's Import now covered; null for a run over the list. */
+  handle: string | null;
+  error: string | null;
+}
+
+/** The admin dashboard's Instagram import section. Mirrors AdminInstagramDTO. */
+export interface AdminInstagram {
+  /** N: runs check the first N accounts of the ranked list. */
+  accountCount: number;
+  totalAccounts: number;
+  /** Accounts clubs turned auto-import on for, checked on top of N. */
+  clubOptIns: number;
+  importAvailable: boolean;
+  /** A run over the list is going; Import now waits for it. */
+  running: boolean;
+  recentRuns: InstagramImportRun[];
 }
 
 /** One member of a club's management team. Mirrors ClubAdminDTO. */

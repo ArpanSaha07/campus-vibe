@@ -7,10 +7,11 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 
 **Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-063 (2026-11-26, fixed 2026-11-25 by S3Mock) · BUG-066, opened and fixed the same day (2026-11-17, CodeQL triage) · BUG-064 (2026-11-07, Trivy gate) · BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16) · BUG-062, opened and fixed the same day (2026-09-17, event card actions on touch)
 
-**Highest id issued: BUG-068.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-069.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-069](#bug-069) | Low | `verify.mjs` cannot run its frontend build on a Windows machine with Hyper-V: every port it probes for a dead API URL is reserved, so it throws before the build |
 | [BUG-067](#bug-067) | Medium | A club-admin invitation can be claimed by whoever registers its address first: the email-confirmation check is switched off by default since `20b39bd` |
 | [BUG-068](#bug-068) | Low | A profile accepts at most 76 interests, but the picker offers 92 and sets no limit, so picking more than 76 fails on save with a 400 |
 | [BUG-065](#bug-065) | Low | A planner reply that fails after its agent acted, and after some intro already streamed, shows the fallback summary glued onto the partial intro until a reload |
@@ -55,6 +56,34 @@ a user can ask for a fresh confirmation link: today nothing in the UI calls
 `resendVerification` ([`authentication.md`](../architecture/authentication.md),
 known gap 5c). `InvitationRequiresVerifiedEmailIT` already covers the rule
 with the switch on. Queued in [`todo.md`](../TODO/todo.md) under *Security*.
+
+---
+
+### BUG-069
+**`verify.mjs` cannot run its frontend build on a Windows machine with Hyper-V** · Low · OPEN
+
+**Found:** 2026-11-26, on Arpan's machine, wrapping up the Instagram dashboard unit.
+Reproduced twice, inside and outside the sandbox.
+
+**Cause.** `findClosedPort` (`scripts/verify.mjs:156-167`) tries to bind ports
+59999 down to 59950 and takes the first that binds. Hyper-V (WSL 2 and Docker
+Desktop) reserves TCP ranges in blocks of 100, and on this machine
+`netsh interface ipv4 show excludedportrange protocol=tcp` lists 59849-59948 and
+59949-60048, so every candidate is excluded and none binds.
+
+**Symptom.** `node scripts/verify.mjs` passes lint, type-check and tests, then
+throws *could not find a closed port to point the build at* and exits before the
+build step and before the backend. No summary is printed.
+
+**Workaround.** `verify.mjs --backend --full` and `--hooks` run fine. Run the
+frontend build by hand as the script would, with `API_INTERNAL_URL` on a port
+outside the reserved ranges, `NEXT_PUBLIC_API_URL=http://localhost:8080` and an
+empty `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+
+**Fix.** Ask the OS for a port instead of guessing a range: `listen(0)`, read
+`server.address().port`, close. The point of the probe holds, since nothing listens
+on the port once it is closed. Held meanwhile by
+[`rules/ci-and-build.md`](../../.claude/rules/ci-and-build.md).
 
 ---
 

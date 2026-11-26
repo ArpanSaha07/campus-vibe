@@ -57,12 +57,24 @@ public class InstagramImportService {
     private final MediaBucket mediaBucket;
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final InstagramImportSettingsService settings;
 
     private final ExecutorService manualRunner = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "instagram-import");
         t.setDaemon(true);
         return t;
     });
+    /**
+     * Club Import now runs. Separate from {@link #manualRunner} so a club's
+     * run never queues behind a startup run over the whole watch list.
+     */
+    private final ExecutorService clubRunner = Executors.newFixedThreadPool(2, r -> {
+        Thread t = new Thread(r, "instagram-club-import");
+        t.setDaemon(true);
+        return t;
+    });
+    /** A club run older than this with no finish is a crashed one, not a running one. */
+    private static final Duration CLUB_RUN_STALE_AFTER = Duration.ofMinutes(30);
     /** Candidate creation is serialized so two stories of one event cannot both slip past de-duplication. */
     private final Object candidateLock = new Object();
 
@@ -80,7 +92,8 @@ public class InstagramImportService {
                                   S3Service s3Service,
                                   MediaBucket mediaBucket,
                                   JdbcTemplate jdbc,
-                                  ObjectMapper mapper) {
+                                  ObjectMapper mapper,
+                                  InstagramImportSettingsService settings) {
         this.props = props;
         this.sources = sources;
         this.stories = stories;
@@ -96,19 +109,114 @@ public class InstagramImportService {
         this.mediaBucket = mediaBucket;
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.settings = settings;
     }
 
     // ------------------------------------------------------------------ entry points
 
     /** Starts a run in the background (used at startup) and returns it at once. */
     public InstagramImportRun startBackgroundRun() {
+        return startFullRun(InstagramImportRun.Trigger.SCHEDULED);
+    }
+
+    /**
+     * A platform admin's Import now: the same run as the scheduled one, over
+     * the same first N accounts, started at once. Null when a run holds the lease.
+     */
+    public InstagramImportRun startAdminRun() {
+        return startFullRun(InstagramImportRun.Trigger.MANUAL);
+    }
+
+    /** The latest runs of every kind, newest first, for the admin dashboard. */
+    public List<InstagramImportRun> recentRuns(int limit) {
+        return runs.findAllByOrderByStartedAtDesc(Limit.of(limit));
+    }
+
+    private InstagramImportRun startFullRun(InstagramImportRun.Trigger trigger) {
         String token = UUID.randomUUID().toString();
         if (!tryAcquireLease(token)) {
             return null;
         }
-        InstagramImportRun run = newRun(InstagramImportRun.Trigger.SCHEDULED);
-        manualRunner.submit(() -> runWithLease(run, token));
+        InstagramImportRun run = newRun(trigger);
+        manualRunner.submit(() -> runWithLease(run, token, null));
         return run;
+    }
+
+    /**
+     * Imports one club's account now, in the background, from the club
+     * dashboard's Import now button. Fetches that one handle and nothing else.
+     *
+     * <p><strong>Not behind the run lease.</strong> The lease keeps two runs
+     * over the whole watch list apart; a single account does not need it, and
+     * holding it made a club wait out a scheduled run over every other account
+     * (Arpan, 2026-11-26). Overlapping a scheduled run that fetches the same
+     * handle is safe: a story is unique per (source, external id), and
+     * candidate creation is serialized by {@code candidateLock}.
+     *
+     * <p><strong>The cooldown is the claim.</strong> One conditional UPDATE
+     * stamps {@code last_fetch_at} only when the last fetch is older than
+     * {@code cooldown}, so two clicks, or two instances, cannot both start a run.
+     * A run that fails outright hands the cooldown back.
+     *
+     * <p>Posts are always fetched for this one account, but the run is not
+     * marked {@code includedPosts}: that flag tells {@link #postsDue()} the
+     * whole watched list had its posts read, and one account is not that.
+     *
+     * @return the started run, or null when the account was fetched within the cooldown
+     */
+    public InstagramImportRun startSourceRun(long sourceId, Duration cooldown) {
+        Instant previousFetch = sources.findById(sourceId).map(InstagramSource::getLastFetchAt).orElse(null);
+        int claimed = jdbc.update("""
+                UPDATE instagram_sources SET last_fetch_at = now()
+                WHERE id = ? AND (last_fetch_at IS NULL OR last_fetch_at < now() - (? * interval '1 second'))
+                """, sourceId, cooldown.toSeconds());
+        if (claimed != 1) {
+            return null;
+        }
+        InstagramImportRun run = new InstagramImportRun();
+        run.setTrigger(InstagramImportRun.Trigger.MANUAL);
+        run.setSourceId(sourceId);
+        InstagramImportRun saved = runs.save(run);
+        clubRunner.submit(() -> runForSource(saved, sourceId, previousFetch));
+        return saved;
+    }
+
+    /** True while this account's own Import now run is under way. Scheduled runs do not count. */
+    public boolean isSourceRunning(long sourceId) {
+        return runs.findFirstBySourceIdOrderByStartedAtDesc(sourceId)
+                .filter(r -> r.getStatus() == InstagramImportRun.Status.RUNNING)
+                .filter(r -> r.getStartedAt().isAfter(Instant.now().minus(CLUB_RUN_STALE_AFTER)))
+                .isPresent();
+    }
+
+    /** The latest Import now run for this account, finished or not. */
+    public Optional<InstagramImportRun> lastSourceRun(long sourceId) {
+        return runs.findFirstBySourceIdOrderByStartedAtDesc(sourceId);
+    }
+
+    private void runForSource(InstagramImportRun run, long sourceId, Instant previousFetch) {
+        try {
+            execute(run, sourceId);
+            if (run.getFailures() > 0 && run.getStoriesFetched() == 0 && run.getPostsFetched() == 0) {
+                // One account, and every fetch of it failed: nothing was read.
+                throw new IllegalStateException("Instagram did not answer for this account");
+            }
+        } catch (RuntimeException e) {
+            log.error("Instagram import run {} for source {} failed", run.getId(), sourceId, e);
+            run.setStatus(InstagramImportRun.Status.FAILED);
+            run.setError(truncate(e.getMessage(), 1000));
+            // Nothing was imported, so the club may try again at once.
+            jdbc.update("UPDATE instagram_sources SET last_fetch_at = ? WHERE id = ?",
+                    previousFetch == null ? null : java.sql.Timestamp.from(previousFetch), sourceId);
+        } finally {
+            run.setFinishedAt(Instant.now());
+            runs.save(run);
+        }
+    }
+
+    /** True when both the fetcher and Claude are configured, so a run can do anything. */
+    public boolean isConfigured() {
+        return fetcher.isConfigured() && extractor.isConfigured();
     }
 
     /** Runs synchronously on the scheduler thread; skips quietly if another run holds the lease. */
@@ -118,7 +226,7 @@ public class InstagramImportService {
             log.info("Instagram import skipped: another run holds the lease");
             return;
         }
-        runWithLease(newRun(InstagramImportRun.Trigger.SCHEDULED), token);
+        runWithLease(newRun(InstagramImportRun.Trigger.SCHEDULED), token, null);
     }
 
     public boolean isRunning() {
@@ -135,9 +243,10 @@ public class InstagramImportService {
         return runs.save(run);
     }
 
-    private void runWithLease(InstagramImportRun run, String token) {
+    /** @param onlySourceId one account to import, or null for the scheduled watch list */
+    private void runWithLease(InstagramImportRun run, String token, Long onlySourceId) {
         try {
-            execute(run);
+            execute(run, onlySourceId);
         } catch (RuntimeException e) {
             log.error("Instagram import run {} failed", run.getId(), e);
             run.setStatus(InstagramImportRun.Status.FAILED);
@@ -149,7 +258,7 @@ public class InstagramImportService {
         }
     }
 
-    private void execute(InstagramImportRun run) {
+    private void execute(InstagramImportRun run, Long onlySourceId) {
         if (!fetcher.isConfigured()) {
             throw new IllegalStateException("No story fetcher is configured (INSTAGRAM_FETCHER_URL)");
         }
@@ -157,7 +266,10 @@ public class InstagramImportService {
         if (!extractor.isConfigured()) {
             throw new IllegalStateException("ANTHROPIC_API_KEY is not set: nothing fetched, nothing published");
         }
-        List<InstagramSource> watched = sources.findByEnabledTrueOrderByPriorityAsc(Limit.of(props.maxAccounts()));
+        boolean single = onlySourceId != null;
+        List<InstagramSource> watched = single
+                ? sources.findWithClubById(onlySourceId).map(List::of).orElse(List.of())
+                : scheduledSources();
         run.setAccountsRequested(watched.size());
         runs.save(run);
         Double usedBefore = fetcher.health().map(StoryFetcherClient.Health::usedUsd).orElse(null);
@@ -169,14 +281,20 @@ public class InstagramImportService {
 
         List<String> handles = new ArrayList<>(byHandle.keySet());
         failures += fetchAll(handles, byHandle, run, work, false);
-        if (postsDue()) {
+        if (single) {
+            // Deliberately not setIncludedPosts: see startSourceRun.
+            failures += fetchAll(handles, byHandle, run, work, true);
+        } else if (postsDue()) {
             run.setIncludedPosts(true);
             failures += fetchAll(handles, byHandle, run, work, true);
         }
         run.setStoriesNew(work.size());
 
         // Earlier stories that were stored but not read (extraction was down, a timeout).
-        for (InstagramStory s : stories.findRetryable(MAX_ATTEMPTS, Instant.now().minus(Duration.ofHours(24)), Limit.of(500))) {
+        // A single-account run leaves them to the scheduled run, which owns the backlog.
+        List<InstagramStory> retryable = single ? List.of()
+                : stories.findRetryable(MAX_ATTEMPTS, Instant.now().minus(Duration.ofHours(24)), Limit.of(500));
+        for (InstagramStory s : retryable) {
             if (work.stream().noneMatch(w -> w.storyId().equals(s.getId()))) {
                 work.add(new Work(s.getId(), s.getSource().getId(), null));
             }
@@ -281,6 +399,22 @@ public class InstagramImportService {
             sources.saveAll(batch.stream().map(byHandle::get).toList());
         }
         return failures;
+    }
+
+    /**
+     * The first N accounts of the ranked list (N set by a platform admin),
+     * skipping any whose club turned auto-import off, plus every account a club
+     * turned it on for, which N never drops (Arpan, 2026-11-26: clubs override N).
+     */
+    private List<InstagramSource> scheduledSources() {
+        Map<Long, InstagramSource> byId = new LinkedHashMap<>();
+        for (InstagramSource s : sources.findRanked(Limit.of(settings.accountCount()))) {
+            byId.put(s.getId(), s);
+        }
+        for (InstagramSource s : sources.findByEnabledTrueAndClubOptedInTrue()) {
+            byId.putIfAbsent(s.getId(), s);
+        }
+        return new ArrayList<>(byId.values());
     }
 
     /** Posts do not expire, so they are fetched once per {@code posts.min-interval}. */

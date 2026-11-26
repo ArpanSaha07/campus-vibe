@@ -24,6 +24,9 @@ import type {
   EventFormat,
   Interest,
   ManagedClub,
+  ClubInstagram,
+  AdminInstagram,
+  InstagramImportRun,
   NotificationPreferences,
   OwnershipTransfer,
   ProfileSocialLinks,
@@ -210,6 +213,43 @@ const managedClubFields: Record<keyof ManagedClub, true> = {
   officialEmailVerified: true,
 };
 
+const clubInstagramFields: Record<keyof ClubInstagram, true> = {
+  handle: true,
+  autoImport: true,
+  importAvailable: true,
+  running: true,
+  lastImportedAt: true,
+  nextImportAllowedAt: true,
+  eventsFound: true,
+  lastRunStatus: true,
+  lastRunPublished: true,
+};
+
+const adminInstagramFields: Record<keyof AdminInstagram, true> = {
+  accountCount: true,
+  totalAccounts: true,
+  clubOptIns: true,
+  importAvailable: true,
+  running: true,
+  recentRuns: true,
+};
+
+const instagramImportRunFields: Record<keyof InstagramImportRun, true> = {
+  id: true,
+  trigger: true,
+  status: true,
+  startedAt: true,
+  finishedAt: true,
+  accountsRequested: true,
+  storiesFetched: true,
+  postsFetched: true,
+  eventsFound: true,
+  eventsPublished: true,
+  failures: true,
+  handle: true,
+  error: true,
+};
+
 const userProfileFields: Record<keyof UserProfile, true> = {
   bio: true,
   faculty: true,
@@ -339,6 +379,9 @@ const MIRRORS: Record<string, Record<string, true>> = {
   OwnershipTransferDTO: ownershipTransferFields,
   ClubAuditLogDTO: clubAuditLogFields,
   ManagedClubDTO: managedClubFields,
+  ClubInstagramDTO: clubInstagramFields,
+  AdminInstagramDTO: adminInstagramFields,
+  InstagramImportRunDTO: instagramImportRunFields,
   UserProfileDTO: userProfileFields,
   ProfileSocialLinksDTO: profileSocialLinksFields,
   NotificationPreferencesDTO: notificationPreferencesFields,

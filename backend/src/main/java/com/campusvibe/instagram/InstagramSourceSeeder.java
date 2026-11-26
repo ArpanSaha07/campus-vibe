@@ -19,9 +19,17 @@ import java.util.Set;
 
 /**
  * Loads the McGill Instagram accounts the import watches, once, when none are
- * stored yet: {@code instagram/mcgill-accounts.csv}, <b>in file order</b>, the
- * first {@code max-accounts} enabled. Runs in every profile, because without it
- * the import has nothing to read; {@code INSTAGRAM_SEED_SOURCES=false} turns it off.
+ * stored yet: {@code instagram/mcgill-accounts.csv}, <b>in file order</b>, all
+ * enabled. How many of them a run checks is the admin's account count
+ * ({@link InstagramImportSettingsService}), not a flag on the row. Runs in every
+ * profile, because without it the import has nothing to read;
+ * {@code INSTAGRAM_SEED_SOURCES=false} turns it off.
+ *
+ * <p><strong>{@code enabled = false} means one thing: the account's club turned
+ * auto-import off.</strong> Rows seeded before 2026-11-26 were switched off past
+ * the old {@code max-accounts} cap instead; on a list already loaded, those rows
+ * (off, and linked to no club) are switched back on, so a run reaching them once
+ * the admin raises N does not mistake them for a club's choice.
  *
  * <p>The CSV is ranked by hand (Arpan, 2026-11-25): its row order is the
  * priority, so a wrong rank is fixed by moving the row. {@link InstagramAccountRanker}
@@ -45,14 +53,20 @@ public class InstagramSourceSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) throws Exception {
-        if (!props.seedSources() || sources.count() > 0) return;
+        if (!props.seedSources()) return;
+        if (sources.count() > 0) {
+            int restored = sources.enableUnclaimedDisabled();
+            if (restored > 0) {
+                log.info("Instagram import: {} accounts switched off by the old cap are back in the ranked list", restored);
+            }
+            return;
+        }
         ClassPathResource resource = new ClassPathResource(CSV);
         if (!resource.exists()) {
             log.warn("Instagram account list {} is missing; nothing to watch", CSV);
             return;
         }
         List<InstagramSource> rows = new ArrayList<>();
-        int enabled = 0;
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
             String header = reader.readLine();
@@ -79,14 +93,12 @@ public class InstagramSourceSeeder implements ApplicationRunner {
                 String foundOn = cell(cells, foundCol);
                 s.setFoundOn(foundOn == null || foundOn.isEmpty() ? null
                         : foundOn.length() > 500 ? foundOn.substring(0, 500) : foundOn);
-                boolean on = rows.size() < props.maxAccounts();
-                s.setEnabled(on);
-                if (on) enabled++;
+                s.setEnabled(true);
                 rows.add(s);
             }
         }
         sources.saveAll(rows);
-        log.info("Instagram import: loaded {} accounts in file order, watching the first {}", rows.size(), enabled);
+        log.info("Instagram import: loaded {} accounts in file order; runs check the first N, set by an admin", rows.size());
     }
 
     private static final java.util.regex.Pattern HANDLE = java.util.regex.Pattern.compile("[a-z0-9._]{1,30}");
