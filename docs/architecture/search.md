@@ -34,6 +34,12 @@ code. See the banner above; do not read a distance into this.
 >   vector for keyword-only ranking, return scores, and window events to a start
 >   within 30 days. `SearchIndexService.toVectorLiteral` became public for them.
 >   See [`ai-planner.md`](ai-planner.md).
+> - since 2026-11-26 the planner's event query no longer shares the box's text
+>   or gate: it weights title and tags over description over organizer name,
+>   takes a filler-free prompt, needs a raw keyword rank of 0.1 rather than any
+>   hit, and is bounded by a from and to bound from Java instead of `now()`
+>   ([spec](../specs/2026-11-26-planner-topic-and-date-retrieval.md)). The search
+>   box's queries are unchanged.
 >
 > Rewriting this as a real implementation doc is tracked in
 > [`todo.md`](../TODO/todo.md).

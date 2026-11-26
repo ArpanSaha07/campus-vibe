@@ -41,6 +41,7 @@ const apiEvent: ApiEvent = {
   registered: 0,
   topics: ["Games"],
   formats: [],
+  sourceUrl: null,
 };
 
 describe("editing an event", () => {

@@ -73,6 +73,28 @@ public class Event {
     @Column(nullable = false)
     private Integer registered = 0;
 
+    /**
+     * Where an imported event came from (V40): the permanent Instagram link,
+     * plus a story's own link and when it stops working. Null for events typed
+     * into CampusVibe. Read through {@link #currentSourceUrl()}.
+     */
+    @Column(name = "source_url")
+    private String sourceUrl;
+
+    @Column(name = "source_story_url")
+    private String sourceStoryUrl;
+
+    @Column(name = "source_story_expires_at")
+    private Instant sourceStoryExpiresAt;
+
+    /** The story while it is still up, otherwise the permanent link. */
+    public String currentSourceUrl() {
+        if (sourceStoryUrl != null && sourceStoryExpiresAt != null && Instant.now().isBefore(sourceStoryExpiresAt)) {
+            return sourceStoryUrl;
+        }
+        return sourceUrl;
+    }
+
     /*
      * Two axes, two vocabularies, and no event category -- see V28 and
      * decisions D2 and D3 in interests_and_categories.md.

@@ -29,6 +29,7 @@ the start of every session, so orient from there and come here for the full
 queue. Every item that was in this section is filed under its topic below.
 
 - [ ] **P1** **Resolve the `/refresh-docs` spec** ([draft](../specs/2026-11-16-refresh-docs-command.md), 2026-11-16) — a command that ranks stale docs by the commits that touched their mapped code, then updates the ones Arpan picks. **Arpan answers its three open questions first:** whether the hooks' text report changes too, or the new `--json` mode is additive only (blocks the `check-docs.mjs` change); how old an `Account read` date must be to flag a runbook (proposed 30 days); and whether a doc with no relevant commits but an old stamp shows in the table (proposed: yes, at the bottom, verdict *re-stamp*). Then approve the spec and build it: `check-docs.mjs --json` with per-doc relevant commits and `product.md` / `docs/README.md` in scope, five new `docs-map.json` entries (not blocked by the questions), and `.claude/commands/refresh-docs.md`.
+- [ ] **P0** **Clean up the Instagram import before it reaches `develop`** (added 2026-11-25, branch `arpan/feature/instagram-ingestion`, Gabriel's work merged as `0c43fe4`) — the full checklist is [`todo-instagram-ingestion-cleanup.md`](todo-instagram-ingestion-cleanup.md): four correctness and security findings from `/code-review`, publishes that never retry, roughly 1,500 lines that can be cut while V38 is still editable, and the ADR, spec and docs it left open. Its *Demo state* section also lists what Arpan saw broken at the 2026-11-26 showcase: the UI, events on clubs that are not real club pages, and no dashboard import controls.
 
 ---
 
@@ -225,7 +226,10 @@ taxonomy is currently write-only. Ordered by how visible the gap is.
       homepage tiles on the explicit promise that *browsing by club category or
       by event tag is a real filter against a real foreign key, and it belongs on
       `/events` and `/clubs`* — the replacement was never built, so the delete
-      removed a bad filter and left none.
+      removed a bad filter and left none. **Since 2026-11-26 the homepage has
+      intent cards again** (`CategoriesSectionMainPage.tsx`), linking to
+      `/events?q=` by Arpan's choice with no superseding ADR; point each at the
+      tag filter once it exists.
 - [ ] **P2** **A profile never shows its own interests.** `/profile/edit/interests`
       writes them; `ProfileAboutCard` renders degree, faculty and subjects and
       stops. So `showInterests` — the toggle at `profile/edit/page.tsx:164` — is
@@ -291,7 +295,7 @@ Architecture reference: [`docs/architecture/llm-api-key-management.md`](../archi
   Blocked on D7 being built. Treat the tag join as the load-bearing path and the embedding as the bonus, given [BUG-001](../bugs/bugs.md#bug-001).
 - [ ] **P2** **Look at the planner in a browser at 390px, and at the states only tests have seen** — the 15-of-15 eviction notice, a 429, a provider failure, the homepage card hand-off. Seen on 2026-09-16 against the real backend and key, at desktop width: an events answer, a clubs answer, both follow-up chip kinds, a reload and a declined prompt injection. Natural moment: the first run on the deployed site.
 - [ ] **P3** **Fix [BUG-065](../bugs/bugs.md#bug-065): the agent's fallback summary is appended to a partly streamed intro.** Rare (an action ran, some intro streamed, then the answer failed) and cosmetic: the stored message is right and a reload shows it. Two fix shapes in the bug, a replacing frame or `content` on the `done` frame; Arpan picks. Add a `PlannerAgentIT` case that streams a fragment before failing.
-- [ ] **P3** **An evaluation set for the planner's retrieval and prompt.** `PlannerRanker`'s weights are hand-set and the first live answer's intro promised two workshops over one card. A dozen prompts with the events a person would expect, run against a seeded database, before tuning weights or rewording `planner-system.txt`.
+- [ ] **P2** **Try the planner's topic and day retrieval on `/planner` with the real model, then widen it.** Added 2026-11-26 after [BUG-070](../bugs/fixed_bugs.md#bug-070). `PlannerRetrievalEvalIT` asserts candidates only: check *suggest tech events happening today* end to end on the local stack (`node scripts/dev.mjs --jar`), and that the model says so when a named day is empty. Then the next phrases for `PlannerIntent.rangeIn` (named weekdays, *this week*) and order assertions in the evaluation set before tuning `PlannerRanker`'s weights ([`ai-planner.md`](../architecture/ai-planner.md)).
 - [ ] **P3** **Propose a chat surfaces section for `design-guidelines.md`** — sidebar tint `mist-100`, user bubble `lavender-100`, the `.card-row` scrollbar, the message box. The planner page follows the approved design artifact; the guidelines say nothing about chat. Arpan approves the wording.
 - [ ] **P3** Candidate generative features once the layer exists: event summarisation, event description generation, recommendations, moderation assistance.
 - [ ] **P3** Multi-provider support (`AnthropicLlmClient`, etc.) — do not add before a feature requires it.

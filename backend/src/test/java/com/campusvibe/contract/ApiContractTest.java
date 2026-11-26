@@ -18,6 +18,9 @@ import com.campusvibe.clubadmin.OwnershipTransferDTO;
 import com.campusvibe.clubadmin.ClubAdminRequestDTO;
 import com.campusvibe.clubadmin.ClubCreationRequestDTO;
 import com.campusvibe.clubadmin.ManagedClubDTO;
+import com.campusvibe.instagram.AdminInstagramDTO;
+import com.campusvibe.instagram.ClubInstagramDTO;
+import com.campusvibe.instagram.InstagramImportRunDTO;
 import com.campusvibe.event.EventDTO;
 import com.campusvibe.user.MyEventDTO;
 import com.campusvibe.user.UserDTO;
@@ -86,6 +89,9 @@ class ApiContractTest {
         CONTRACTED.put("OwnershipTransferDTO", OwnershipTransferDTO.class);
         CONTRACTED.put("ClubAuditLogDTO", ClubAuditLogDTO.class);
         CONTRACTED.put("ManagedClubDTO", ManagedClubDTO.class);
+        CONTRACTED.put("ClubInstagramDTO", ClubInstagramDTO.class);
+        CONTRACTED.put("AdminInstagramDTO", AdminInstagramDTO.class);
+        CONTRACTED.put("InstagramImportRunDTO", InstagramImportRunDTO.class);
         CONTRACTED.put("UserProfileDTO", UserProfileDTO.class);
         // Contracted in its own right because the contract records a
         // nested object as a single field name -- UserProfileDTO

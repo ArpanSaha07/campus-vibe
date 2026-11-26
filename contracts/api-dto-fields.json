@@ -24,7 +24,8 @@
   "EventDTO": [
     "id", "title", "description", "dateTime", "endTime", "createdAt", "location", "price",
     "organizerId", "organizerName", "followers", "images", "promoted",
-    "capacity", "registered", "topics", "formats"
+    "capacity", "registered", "topics", "formats",
+    "sourceUrl"
   ],
 
   "ClubDTO": [
@@ -93,6 +94,22 @@
   "ManagedClubDTO": [
     "clubId", "clubName", "logo", "followers", "role", "officialEmail",
     "officialEmailVerified"
+  ],
+
+  "ClubInstagramDTO": [
+    "handle", "autoImport", "importAvailable", "running", "lastImportedAt",
+    "nextImportAllowedAt", "eventsFound", "lastRunStatus", "lastRunPublished"
+  ],
+
+  "AdminInstagramDTO": [
+    "accountCount", "totalAccounts", "clubOptIns", "importAvailable", "running",
+    "recentRuns"
+  ],
+
+  "InstagramImportRunDTO": [
+    "id", "trigger", "status", "startedAt", "finishedAt", "accountsRequested",
+    "storiesFetched", "postsFetched", "eventsFound", "eventsPublished", "failures",
+    "handle", "error"
   ],
 
   "PlannerPickDTO": ["kind", "id", "reason"],

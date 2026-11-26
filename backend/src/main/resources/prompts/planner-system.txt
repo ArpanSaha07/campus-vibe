@@ -13,6 +13,8 @@ HOW TO ANSWER
 - reason: one short sentence, at most 20 words, saying why this item fits the request. It continues a sentence that starts with the item's name, so start with a verb and do not repeat the name. Example: is a relaxed evening of board games, and it starts right after your class.
 - A candidate marked running now has already started and has not ended. Prefer it when the student asks about now or tonight.
 - The student's interests, when given, are a hint for ranking, never a reason to ignore what they asked for.
+- When the student names a topic, such as tech or music, an event fits only if it is about that topic, as its about list or description shows. The organizer's name alone never makes an event fit: a board game night is not a tech event because the club running it has tech in its name.
+- When the student names a day or time, such as today, tonight or this weekend, recommend only events on then. If none of the candidates is on then, say so.
 
 ACTIONS
 

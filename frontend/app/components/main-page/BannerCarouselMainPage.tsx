@@ -13,44 +13,36 @@ import "swiper/css/pagination";
 import "swiper/css/navigation";
 
 export default function BannerCarousel() {
-  // Example banner data (replace with your own)
+  // `link` is left empty until each event has a page to point at; an empty
+  // link renders the slide without an anchor rather than linking to itself.
   const banners = [
     {
-      img: "/mcgill-find-clubs.jpg",
-      link: "https://www.campusvibe-mcgill.com/events/3",
-      alt: "Activities Night",
-      eyebrow: "Find your people in",
-      title: "Activities Night",
+      img: "/claude-workshop.jpeg",
+      link: "",
+      alt: "Build AI agents workshop with Mark Pyvovarov",
+      eyebrow: "Learn how to build",
+      title: "Your own Jarvis",
       description:
-        "From debate to dragon boating, there is a club for whatever you are into. Browse and follow the clubs you like on our platform and never miss what they host.",
+        "Build AI agents with guest speaker Mark Pyvovarov in this Claude Builder Club Workshop, and see what our community has been building lately.",
     },
     {
-      img: "/tech-fair.png",
-      link: "https://www.campusvibe-mcgill.com/events/2",
-      alt: "Tech Fair 2026",
-      eyebrow: "Supercharge your career at",
-      title: "Tech Fair 2026",
+      img: "/gdg.webp",
+      link: "",
+      alt: "Building AI Voice Agents, a DevPro x GDG McGill workshop",
+      eyebrow: "DevPro x GDG McGill",
+      title: "Building AI Voice Agents",
       description:
-        "Looking for a job or internship? Meet top employers and network with industry professionals. Sept 30 and Oct 1. Click here for more info.",
+        "Learn to design and build interactive AI voice agents, with live code examples from the DevPro team.",
     },
     {
-      img: "/birds.jpeg",
-      link: "https://www.facebook.com/events/george-%C3%A9tienne-cartier-monument/bird-walk-at-mcgill-biodiversityfestival/1746273696674952/",
-      alt: "Event 2",
-      eyebrow: "Join us for a Bird Walk",
-      title: "at McGill Biodiversity Festival",
+      img: "/hackathon.jpg",
+      link: "",
+      alt: "McHacks 14 hackathon",
+      eyebrow: "Coder applications are open for",
+      title: "McHacks 14",
       description:
-        "The McGill Students' Birding Club is offering a guided birdwatching walk on Mont-Royal the morning of on Tuesday September 22. Click here to view details.",
+        "Don't miss your chance to team up and build something exciting (please, not another Jarvis). Hackathon on Jan 16-17.",
     },
-    {
-      img: "/party.jpg",
-      link: "/events",
-      alt: "All events",
-      eyebrow: "Plans for",
-      title: "This weekend",
-      description:
-        "Parties, shows and late nights around campus and downtown. See what is on, bookmark what you like and add it straight to your calendar.",
-    }
   ];
 
   return (
@@ -69,15 +61,15 @@ export default function BannerCarousel() {
         modules={[Autoplay, Pagination, Navigation]}
         className="sm:rounded-xl overflow-hidden"
       >
-        {banners.map((banner, index) => (
-          <SwiperSlide key={index}>
-            <Link href={banner.link} className="relative block">
+        {banners.map((banner, index) => {
+          const content = (
+            <>
               <Image
                 src={banner.img}
                 alt={banner.alt}
                 width={1600}
                 height={500}
-                className="w-full h-[300px] lg:h-[400px] object-cover cursor-pointer"
+                className={`w-full h-[300px] lg:h-[400px] object-cover${banner.link ? " cursor-pointer" : ""}`}
                 priority={index === 0}
               />
               <BannerShadow />
@@ -86,9 +78,20 @@ export default function BannerCarousel() {
                 title={banner.title}
                 description={banner.description}
               />
-            </Link>
-          </SwiperSlide>
-        ))}
+            </>
+          );
+          return (
+            <SwiperSlide key={index}>
+              {banner.link ? (
+                <Link href={banner.link} className="relative block">
+                  {content}
+                </Link>
+              ) : (
+                <div className="relative block">{content}</div>
+              )}
+            </SwiperSlide>
+          );
+        })}
       </Swiper>
     </div>
   );

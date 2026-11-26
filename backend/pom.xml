@@ -209,6 +209,17 @@
             <version>2.20.26</version>
         </dependency>
         <!--
+          Claude, for reading Instagram story images (OCR + event extraction)
+          in the instagram package. Optional at runtime: with no
+          ANTHROPIC_API_KEY the import runs fetch and store stories but
+          extract nothing.
+        -->
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>3.3.0</version>
+        </dependency>
+        <!--
           commons-io was removed on 2026-09-12. It had one consumer in the whole
           backend, s3/FakeS3.java, which ADR-011 deleted when MinIO replaced it.
           The pin was also the last of the hard-pinned, BOM-free block flagged by

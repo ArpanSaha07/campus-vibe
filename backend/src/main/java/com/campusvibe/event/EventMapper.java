@@ -33,7 +33,8 @@ public class EventMapper implements Function<Event, EventDTO> {
                 // Sorted so two reads of one row cannot disagree about the
                 // order -- Hibernate hands these back as a HashSet.
                 event.getTopicSlugs().stream().sorted().toList(),
-                event.getFormatSlugs().stream().sorted().toList()
+                event.getFormatSlugs().stream().sorted().toList(),
+                event.currentSourceUrl()
         );
     }
 }

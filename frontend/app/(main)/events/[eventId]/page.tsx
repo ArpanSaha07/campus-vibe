@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import EventPoster from "@/app/components/event/EventPoster";
+import { normaliseWebLink } from "@/app/lib/links";
 import Link from "next/link";
 import { CalendarPlus } from "lucide-react";
 import type { EventPageProps } from "@/app/types";
@@ -72,6 +74,8 @@ export default async function EventPage({ params }: EventPageProps) {
   ];
 
   const banner = event.images[0] ?? FALLBACK_EVENT_IMAGE;
+  // Set when the event was imported from Instagram.
+  const instagramUrl = normaliseWebLink(event.sourceUrl);
   // At render time. The event data may be up to five minutes old, but the
   // clock is not, so the badge is right whenever the page is rendered.
   const ongoing = isOngoing(event);
@@ -101,7 +105,7 @@ export default async function EventPage({ params }: EventPageProps) {
             <p className="text-xs text-ink-600">{event.location.address}</p>
           )}
         </div>
-        {event.price != "Free" && (
+        {event.price && event.price != "Free" && (
           <div>
             <p className="ticket-label text-ink-600">Price</p>
             <p className="font-mono text-sm font-medium text-berry-600 mt-1">{event.price}</p>
@@ -120,7 +124,12 @@ export default async function EventPage({ params }: EventPageProps) {
       {/* A prefilled Google Calendar form in a new tab, the same link My events
           uses: no OAuth and no backend, and the student confirms in Google.
           Shown on ended events too, by Arpan's choice (2026-09-17). */}
-      <div className="px-5 py-4">
+      <div className="px-5 py-4 space-y-3">
+        {instagramUrl && (
+          <Button size="lg" variant="secondary" className="w-full" href={instagramUrl} external>
+            View on Instagram ↗
+          </Button>
+        )}
         <Button
           size="lg"
           className="w-full"
@@ -143,13 +152,17 @@ export default async function EventPage({ params }: EventPageProps) {
     <div className="w-full max-w-6xl mx-auto my-10 px-4 sm:px-6">
       {/* Banner */}
       <div className="w-full h-72 md:h-96 relative">
-        <Image
-          src={banner}
-          alt={event.title}
-          fill
-          className="object-cover rounded-2xl"
-          priority
-        />
+        {instagramUrl ? (
+          <EventPoster src={banner} alt={event.title} sizes="(max-width: 1152px) 100vw, 1152px" priority rounded="rounded-2xl" />
+        ) : (
+          <Image
+            src={banner}
+            alt={event.title}
+            fill
+            className="object-cover rounded-2xl"
+            priority
+          />
+        )}
       </div>
 
       {ongoing && (
@@ -177,7 +190,7 @@ export default async function EventPage({ params }: EventPageProps) {
                 <EventShareButton eventId={event.eventId} />
               </div>
             </div>
-            <p className="text-ink-600 pt-2 leading-relaxed">
+            <p className="text-ink-600 pt-2 leading-relaxed whitespace-pre-line">
               {event.details || "No description yet."}
             </p>
           </section>

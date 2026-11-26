@@ -8,8 +8,13 @@ picks the right tool from a student's wording is unproven. Arpan reported the
 backend carrying the agent deployed to Elastic Beanstalk on 2026-11-23
 (`STATUS.md`), not checked here; the planner itself was first seen working on
 the local stack on 2026-09-16.
+**Uncommitted on `bd07440`: retrieval honours the topic and the day a prompt
+names** ([spec](../specs/2026-11-26-planner-topic-and-date-retrieval.md)) —
+`PlannerIntent`, the window on every source, the weighted keyword leg, two
+prompt rules and the first evaluation set; `verify.mjs --backend --full` green,
+not yet tried on `/planner` by hand.
 **Authors:** main session.
-**Code as of:** `0f4e1df` — re-read against `git diff 0ff0759..0f4e1df` (`927f5f5`, `8c41f59`) over `ai/feature/planner/`, `resources/prompts/`, `lib/planner.ts`, `lib/planner-api.ts`, `components/planner/` and `app/(planner)/`, with every `file:line` cited here checked, including those in `ai/client/`, `adapters.ts`, `types/index.ts`, `followed-clubs-context.tsx` and the other files outside those paths, as a scheduled refresh on 2026-11-26.
+**Code as of:** `bd07440` plus the uncommitted retrieval unit for the retrieval section, the search leg and Tests, re-read 2026-11-26. Everything else: `0f4e1df` — re-read against `git diff 0ff0759..0f4e1df` (`927f5f5`, `8c41f59`) over `ai/feature/planner/`, `resources/prompts/`, `lib/planner.ts`, `lib/planner-api.ts`, `components/planner/` and `app/(planner)/`, with every `file:line` cited here checked, including those in `ai/client/`, `adapters.ts`, `types/index.ts`, `followed-clubs-context.tsx` and the other files outside those paths, as a scheduled refresh on 2026-11-26.
 **Specs:** [`2026-09-16-planner-chat-ui.md`](../specs/2026-09-16-planner-chat-ui.md)
 (frontend) · [`2026-09-16-planner-backend.md`](../specs/2026-09-16-planner-backend.md)
 (backend) · [`2026-11-16-planner-agent.md`](../specs/2026-11-16-planner-agent.md)
@@ -55,7 +60,8 @@ planner is unavailable*.
   would erase the record of a write that happened.
 - **The model is not trusted with ids.** `PlannerAnswers.keep`
   (`PlannerAnswers.java:81`) keeps only picks that were this message's
-  candidates. Every retrieval source filters `end_time > now()`
+  candidates. Every retrieval source filters `end_time >` a window start that
+  is never before now
   ([ADR-020](../decisions/ADR-020-event-attendable-until-its-end-time.md)).
   Remove either and an ended or invented event can reach the page.
 - **The stream's async dispatch is permitted in security**
@@ -187,24 +193,72 @@ cannot both pass. 429 carries `Retry-After` through the existing
 
 ### `PlannerRetrievalService.java` · `PlannerCandidateRepository.java` · `SearchRepository` (planner part)
 
-`retrieve` (`:96`) pools up to 30 ids from each source, all windowed to
-`end_time > now()` and a start within 30 days:
+`retrieve` (`:106`) first reads what the prompt names, through
+`PlannerIntent.parse` (`:108`), then pools up to 30 ids from each source, all
+inside one `PlannerIntent.Window`: still running at a start that is never before
+now (ADR-020), and starting before an end at most 30 days away
+(`PlannerCandidateRepository.IN_WINDOW`, `:27`). The bounds are bound from the
+`now` the reply was given, not the database's `now()`, which is what lets
+`PlannerRetrievalEvalIT` pin a calendar a week ahead.
 
 - hybrid search on the prompt plus the previous prompt, one embedding through
-  `QueryEmbeddingCache` (`:102`), keyword-only when it returns nothing;
+  `QueryEmbeddingCache` (`:118`), keyword-only when it returns nothing;
 - saved and going events; events of followed clubs;
+- events tagged with a topic the prompt names (`withTopics`, `:143`);
 - the previous answer's items: after clubs, their events; after events, their
-  organizers (`:141`);
-- the soonest-starting events (`:122`), the only source that can answer *what's
+  organizers (`:161`);
+- the soonest-starting events (`:138`), the only source that can answer *what's
   on now?*, which names nothing search could match.
 
-The search leg (`SearchRepository.java:183`, `:215`) matches **any** word of the
-prompt (`ANY_WORD_QUERY`, `:172`), rewriting the `&` of Postgres's own
-`plainto_tsquery` output to `|`. The search box's all-words query matches
-nothing for a sentence. The vector is bound as a typed null when absent.
+**A named topic filters** (`:152`): when at least one pooled event carries a
+named topic, every event that carries none is dropped. With none, it is moot and
+the normal ranking runs (Arpan, 2026-11-26: filter whenever one matches).
+**A named day filters too**, through the window, so a day with nothing on
+offers the model no events at all and it answers kind none. Clubs are never
+filtered by either.
 
-The agent's fence reads two more queries here, `goingEventIds` (`:86`) and
-`savedEventIds` (`:92`), **unwindowed**: undoing is allowed on an event that has
+### `PlannerIntent.java`
+
+Pure, unit-tested (`PlannerIntentTest`), and deliberately not a model call.
+
+- **Topics** come from the `interest_catalogue` labels, each side of an
+  ampersand in a label, and the slug as words, plus `SYNONYMS` (`:52`) for the
+  words students use that no label contains (*coding*, *AI*, *dev*). A group
+  expands to its children, which is the whole fix for *tech*: the five tech
+  events of 2026-11-26 were tagged `software-development`,
+  `ai-machine-learning`, `web-development`, never with a word *tech* stems to.
+  Whole words only, with or without a final s. `AMBIGUOUS` (`:71`) keeps
+  *running* from naming the sport in *what's running now*.
+- **Ranges** (`rangeIn`, `:187`), Montreal days through `PlannerDay.ZONE`:
+  *today* now to midnight; *tonight* 17:00 or now to 04:00; *tomorrow* the next
+  day; *this weekend* Friday 17:00 to Monday, from now when already in it;
+  *next week* next Monday to the Monday after. *Tomorrow* is checked first, so
+  *tomorrow night* is tomorrow.
+- **Follow-ups**: topic and range are each taken from the current prompt, else
+  the previous one (`:94`), so *what about tomorrow?* stays on tech.
+- **`keywordText`** (`:122`) drops `FILLER` (`:78`) before the keyword leg sees
+  the prompt; the embedding still gets the whole text.
+
+### The search leg
+
+`SearchRepository.plannerEventCandidates` (`:207`) and `plannerClubCandidates`
+(`:244`) match **any** word of the prompt (`ANY_WORD_QUERY`, `:175`), rewriting
+the `&` of Postgres's own `plainto_tsquery` output to `|`. The search box's
+all-words query matches nothing for a sentence. That is also why filler had to
+go: on 2026-11-26 *suggest tech events happening today* matched 18 of 30 events
+on *event*, *happen* and *today*. The vector, and a prompt left blank by the
+filler list, are bound as typed nulls.
+
+The event text is **weighted** (`PLANNER_EVENT_DOC`, `:184`): title and topic
+labels A, description B, organizer name D. Unweighted, every Women in Tech
+event matched *tech* as strongly as a tech workshop. A keyword hit now qualifies
+without the semantic gate only at a raw `ts_rank` of
+`PLANNER_MIN_KEYWORD_RANK` (`:195`), 0.1, measured on the local seed: an
+organizer-name hit alone ranks 0.06, a description word 0.24, a title or tag
+0.3 and up. The club leg keeps `kw > 0`; a club's name is what it is about.
+
+The agent's fence reads two more queries, `goingEventIds` (`:91`) and
+`savedEventIds` (`:97`), **unwindowed**: undoing is allowed on an event that has
 ended, and an ended saved event must still reach the executor to be refused as
 ended rather than as unknown.
 
@@ -214,6 +268,8 @@ Pure scoring, unit-tested. Weights (`:25`–`:37`): previous-answer context 0.35
 saved or going 0.25, followed organizer 0.15, shared interest 0.10, running now
 when the prompt says now or tonight 0.30, soonest up to 0.05, and for a club,
 running one of the kept events 0.10, plus the hybrid search score. Hand-set, not measured. Ranks decide what the model is *shown*.
+The topic filter runs before it, so the spec's fallback boost was not needed:
+with a threshold of one matching event there is nothing left to boost.
 
 ### `PlannerPromptBuilder.java` · `prompts/planner-system.txt` · `ai/prompt/PromptTemplateService.java`
 
@@ -469,7 +525,13 @@ which exist only in the browser. `ApiPlannerAction` (`:139`) and
 
 ### Tests
 
+- **The evaluation set:** `PlannerRetrievalEvalIT`, eleven prompts against a
+  seeded Thursday a week ahead mirroring 2026-11-26, each asserting the exact
+  events retrieval offers (not what the model picks). No embedding key, so it
+  runs on keywords; the topic and day filtering do not depend on embeddings.
+  Never run against the pre-change code.
 - **Backend unit:** `IntroStreamReaderTest`, `PlannerAnswersTest`,
+  `PlannerIntentTest` (every phrase, synonyms, follow-ups, the 25-hour day),
   `PlannerRankerTest`, `PlannerDayTest` (including the 25-hour day),
   `PlannerPromptBuilderTest` (under a `fr_CA` format locale),
   `OpenAiChatStreamTest`, and `ApiContractTest`.
@@ -572,7 +634,14 @@ which exist only in the browser. `ApiPlannerAction` (`:139`) and
 - **The first live answer's intro said *a couple of workshops* over one card.**
   Whether the model named a second event that validation dropped is unknown: the
   pick-count log line was added after that reply.
-- **Ranker weights are guesses.** No evaluation set exists.
+- **Ranker weights are guesses.** The evaluation set pins what retrieval offers
+  for eleven prompts, not the order, so the weights are still untuned.
+- **Topic and day detection are word lists.** A topic named in other words than
+  a label or a synonym (*LLMs*, *startups*) is missed and the prompt falls back
+  to search; a date phrase not in the list (*Friday*, *this week*, *in two
+  days*) narrows nothing.
+- **Not seen with the real model or on `/planner`** since the retrieval change;
+  the evaluation set asserts candidates only.
 - **Retrieval costs about a dozen queries per message**, plus the element
   collections `EventMapper` loads per candidate event and three uncached
   taxonomy `findAll()` calls in the prompt builder.
@@ -592,8 +661,9 @@ which exist only in the browser. `ApiPlannerAction` (`:139`) and
    the agent spec's manual checks — the only way to see the proxy behaviour and
    whether the real model chooses the right tool.
 2. **Fix BUG-065** — either fix shape in the bug.
-3. **A small evaluation set of prompts** with expected picks, before touching
-   the ranker weights or the prompt.
+3. **Grow the evaluation set** to assert order, and the model's picks against
+   the real key, before touching the ranker weights. Next phrases for
+   `PlannerIntent.rangeIn`: named weekdays and *this week*.
 4. **Cache the taxonomy labels** — when a profile shows retrieval or prompt
    building in the reply's latency.
 5. **A chat surfaces section in `design-guidelines.md`** — waiting on Arpan's

@@ -31,6 +31,7 @@ const apiEvent = (id: number, title: string): ApiEvent => ({
   registered: 0,
   topics: [],
   formats: [],
+  sourceUrl: null,
 });
 
 const apiClub = (id: string, name: string): ApiClub => ({
