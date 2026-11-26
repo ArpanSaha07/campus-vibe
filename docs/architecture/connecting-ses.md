@@ -1,6 +1,6 @@
 # Connecting SES
 
-**Code as of:** 806a1d0 · **Account read:** 2026-09-12, read-only
+**Code as of:** `0f4e1df` (scheduled refresh 2026-11-26: re-read `806a1d0..0f4e1df` of `mail/` and `security/ratelimit/`; `mail/` is unchanged and the right-to-left `X-Forwarded-For` read in `ClientIpResolver` is already described below, citations checked) · **Account read:** 2026-09-12, read-only
 **Order:** 4 of 4 to wire up — but **start §1 and §5 on day one**: DNS verification and the production-access review are the slow parts.
 **Decision:** send over SMTP with SES SMTP credentials — [ADR-013](../decisions/ADR-013-ses-mail-over-smtp-credentials.md) (Proposed)
 **Related:** the SES item in [`todo.md`](../TODO/todo.md) · [ADR-006](../decisions/ADR-006-official-email-verified-only-by-round-trip.md), whose round trip waits on this

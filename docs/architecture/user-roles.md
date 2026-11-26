@@ -5,7 +5,7 @@
 **Status:** ✅ Live — every rule described here is enforced by code that runs,
 and the club half was exercised against the running stack.
 
-**Code as of:** `f7a4399`, re-stamped 2026-09-16: the club social links unit
+**Code as of:** `0f4e1df` — scheduled refresh 2026-11-26: re-read `f7a4399..0f4e1df` of `security/`, `clubadmin/` and `ProtectedRoute.tsx`; `security/` changed only in `ratelimit/` (the right-to-left `X-Forwarded-For` read), the social-links comments and `@Size` in `clubadmin/` are as below, and the invitation email-confirmation switch (`20b39bd`) is club-half behaviour, documented in [`club-administration.md`](club-administration.md); no role, grant or endpoint guard moved. Before that, `f7a4399`, re-stamped 2026-09-16: the club social links unit
 touched `ClubCreationRequest*` for two extra JSON keys and a raised `@Size`, and
 changes no role, no club-scoped check and no endpoint guard — nothing this
 document covers moved. Before that, `95418a1` plus the uncommitted planner backend unit — re-read on

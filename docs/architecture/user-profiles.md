@@ -1,32 +1,29 @@
 # User profiles
 
-**Code as of:** `b2695c6` — the profile-backend work of 2026-08-20. Every
-claim below was read from the code, and the endpoint behaviours are covered by
-`UserProfileIT`, `NotificationPreferencesIT`, `InterestCatalogueIT` and
+**Code as of:** `0f4e1df` — the whole document was re-read against
+`git diff b2695c6..0f4e1df` over `user/profile/`, `taxonomy/`,
+`app/(protected)/profile/`, `components/profile/` and `lib/profile*`, as a
+scheduled refresh on 2026-11-26. The endpoint behaviours are covered by
+`UserProfileIT`, `NotificationPreferencesIT`, `taxonomy/InterestCatalogueIT` and
 `MyAccountIT`, all of which run against real PostgreSQL with
 `ddl-auto: validate`.
 
-**The stamp is deliberately not advanced, and that is still true after
-2026-09-10.** The link rule moved out of this package that day — `ProfileLinks`
-became `common/WebLinks`, `normaliseProfileLink` became `normaliseWebLink` in
-`app/lib/links.ts`, and Instagram became a handle the server turns into a URL —
-and **the sections describing it below were re-read and rewritten against the
-code**. Nothing else was, so the sha stays where it is; moving it would claim
-the whole document had been reconciled.
-
-`InterestPicker` gained a
-`capChoices` prop on 2026-09-09 for the create-club form, which scrolls the
-unchosen grid inside a fixed height. **It defaults to false and this page does
-not pass it**, so nothing described below changes — that one prop was re-read
-against this document and nothing else was. Moving the sha would claim the
-whole document had been reconciled with every commit since `b2695c6`, which is
-not true and is exactly the false-clean the checker exists to prevent.
+Two changes since the original write-up are worth knowing before reading on.
+The link rule moved out of this package on 2026-09-10 — `ProfileLinks` became
+`common/WebLinks`, `normaliseProfileLink` became `normaliseWebLink` in
+`app/lib/links.ts`, and Instagram became a handle the server turns into a URL.
+And the interest catalogue moved out of `user/profile` into the `taxonomy`
+package with the club and event vocabularies (`d1d915f`), gaining its twelve
+groups as real rows (V26) and sixteen new interests (V27). `InterestPicker` is
+now shared with the club and event forms; its `title`, `description`, `max` and
+`capChoices` props exist for them, and **this page passes none of them**
+(`app/(protected)/profile/edit/interests/page.tsx:39-42`).
 
 **State:** live. Profile content and email preferences persist end to end.
-**Three things are deliberately still missing** and are written up in
+**Two things are deliberately still missing** and are written up in
 *Known gaps*: nobody can view anybody else's profile, so the two visibility
-toggles govern nothing yet; there is no photo upload; and interests are stored
-but nothing reads them.
+toggles govern nothing yet; and there is no photo upload. Interests are now
+read, but only by the AI planner.
 
 ---
 
@@ -160,17 +157,40 @@ by the `database-lifecycle` rule for system lookups: it must exist identically
 in every environment, it changes rarely, and no user action creates or destroys
 a row. The schema (`V19`) and the rows (`V20`) are separate files so that
 revising the list later is a new migration rather than an edit to an applied
-one.
+one — which is exactly how it has since been revised.
 
-**Keyed on `slug`, not `label`.** The 76 entries were invented for a campus
+**Two levels, in one table.** V26 replaced the free-text `category` column with
+a self-referencing `parent_slug`
+(`V26__add_interest_groups.sql:23-33`), turning the twelve picker groups into
+rows of their own so an event can be tagged with a group, and dropped the old
+column. A group has a null parent; an interest names its group. V27 added
+sixteen interests the event vocabulary exposed as missing. The table now holds
+104 rows: V20's 76, the twelve groups and V27's sixteen
+(`InterestCatalogueIT.java:77`). The profile picker offers only the leaves —
+groups are headings and filter options there
+(`InterestPicker.tsx:71`, `InterestPicker.tsx:84`) — but the server does not
+refuse a group slug on a profile; `requireKnownInterests` checks only that the
+slug exists.
+
+**It is no longer profile code.** The entity, repository and `InterestDTO` live
+in `com.campusvibe.taxonomy`, beside `club_categories` and `event_formats`, and
+the same list backs club tags and event topics as
+[ADR-001](../decisions/ADR-001-three-taxonomy-vocabularies.md) proposes. The
+profile reaches it only through `TaxonomyService`.
+
+**Keyed on `slug`, not `label`.** The 76 original entries were invented for a campus
 audience and have had no product review, so renames are likely. With a label
 key, renaming `LGBTQ+` would have to rewrite every `user_interests` row that
 referenced it inside the same migration, or orphan them. With a slug it is an
 `UPDATE` of one column in one row and nobody's selections move.
 
-**`GET /api/v1/interests` is public**, and the frontend fetches it rather than
-holding a copy. It previously held the only copy, as `INTEREST_CATEGORIES` in
-`lib/profile-options.ts`. That constant is gone: two vocabularies that must
+**`GET /api/v1/interests` is public**, served by `TaxonomyController`
+(`taxonomy/TaxonomyController.java:34-37`), and the frontend fetches it rather
+than holding a copy — through `getInterests` in `lib/taxonomy.ts:27-29`, which
+replaced the one that sat in `lib/profile.ts`, behind the
+`useInterestCatalogue` hook the picker calls. It answers both levels in picker
+order (`TaxonomyService.java:52-58`). It previously held the only copy, as
+`INTEREST_CATEGORIES` in `lib/profile-options.ts`. That constant is gone: two vocabularies that must
 agree with nothing checking that they do is precisely the failure
 `contracts/api-dto-fields.json` exists to prevent, and it should not be
 reintroduced one directory over. `DEGREES` and `MCGILL_FACULTIES` stayed in that
@@ -187,7 +207,15 @@ somebody makes on purpose.
 The service still checks slugs against the catalogue before writing, so an
 unknown one is a 400 naming the slug rather than a constraint violation
 surfacing as a 500. The key is what makes the guarantee true; the check only
-decides what the caller is told.
+decides what the caller is told. The check is no longer the profile's own:
+`UserProfileService` calls `TaxonomyService.requireKnownInterests`
+(`UserProfileService.java:94-95`), the one validator every slug-accepting write
+path shares (`TaxonomyService.java:111-116`, `:133-158`). It also deduplicates,
+drops blanks and enforces a cap; the profile passes `MAX_INTERESTS = 76`
+(`UserProfileService.java:36-43`), whose comment says a profile has no cap.
+**That number predates V27 and is now smaller than the 92 pickable interests**,
+so a profile choosing more than 76 is refused with *interest takes at most 76
+values* while the picker, given no `max`, lets it be chosen.
 
 ---
 
@@ -308,7 +336,9 @@ unchanged will fail again.
 
 Four DTOs were added to `contracts/api-dto-fields.json` and to both asserting
 tests: `UserProfileDTO`, `ProfileSocialLinksDTO`, `NotificationPreferencesDTO`,
-`InterestDTO`.
+`InterestDTO`. `InterestDTO` has since moved to `com.campusvibe.taxonomy`, and
+its third field is now `parentSlug` where it was `category`
+(`contracts/api-dto-fields.json:87`), the wire side of V26.
 
 **`ProfileSocialLinksDTO` is contracted in its own right, and that is not
 redundant.** The contract records a nested object as a *single field name* —
@@ -333,12 +363,14 @@ than quietly stopping checking something.
 | `GET` | `/api/v1/users/me/notification-preferences` | required | Defaults when no row exists |
 | `PUT` | `/api/v1/users/me/notification-preferences` | required | Full replace |
 | `PATCH` | `/api/v1/users/me` | required | `{ name }` only; answers with `UserDTO` |
-| `GET` | `/api/v1/interests` | **public** | The catalogue, already in order |
+| `GET` | `/api/v1/interests` | **public** | The catalogue, both levels, already in order — `TaxonomyController` |
 
 Everything under `/api/v1/users/me` needed **no** `SecurityFilterChainConfig`
 entry — it is in no `permitAll` list and falls through to
-`.anyRequest().authenticated()`. `GET /api/v1/interests` needed one, and it was
-added inside the existing public-GET block; matchers are evaluated in order and
+`.anyRequest().authenticated()`. `GET /api/v1/interests` needed one, and it sits
+inside the existing public-GET block beside its two sibling vocabularies,
+`/api/v1/club-categories` and `/api/v1/event-formats`
+(`SecurityFilterChainConfig.java:111-113`); matchers are evaluated in order and
 the first match wins, which is why the narrower `.authenticated()` matchers above
 it must stay above it.
 
@@ -361,9 +393,12 @@ through `DefaultExceptionHandler`, not something specific to these routes.
    see everything. **Both switches currently control nothing.** Closing this
    needs a route, a decision about what a visitor may see, and a public read
    endpoint; the visibility flags are already in place for it.
-2. **Interests are stored and never read.** Nothing suggests clubs or events
-   from them, and the picker's own copy says *we'll use these to suggest clubs
-   and events worth your time*, which is a promise the system does not yet keep.
+2. **Interests are read only by the AI planner.** `PlannerCandidateRepository`
+   loads them and `PlannerRetrievalService.java:105` feeds them to the ranker
+   ([`ai-planner.md`](ai-planner.md)). Nothing else uses them yet — there is no
+   *clubs you might like* or interest-ranked feed — so the picker's own copy,
+   *we'll use these to suggest clubs and events worth your time*, is kept only
+   inside the planner.
 3. **No photo upload.** `ProfileAvatar` draws the first initial, and the editor
    says so in words rather than showing a disabled button. There is no avatar
    column on `users` or on the profile. S3 is already wired for club logos and
@@ -378,22 +413,20 @@ through `DefaultExceptionHandler`, not something specific to these routes.
    nearest wired action is sign-out and that would tell somebody their data was
    gone while every row of it remained. A club owner cannot simply leave, so
    closure has to refuse or force a transfer first.
-6. **The catalogue and the faculty list have had no product review.** 76
-   interests invented for a campus audience, and 12 faculties transcribed by hand
-   — and faculties do get renamed.
-7. **The catalogue serves only profiles so far — clubs are meant to share it.**
-   [ADR-001](../decisions/ADR-001-three-taxonomy-vocabularies.md)
-   decides that clubs carry tags drawn from this same `interest_catalogue`,
-   which is what will make *clubs you might like* a direct join on shared slugs
-   rather than a mapping. Events get their **own** vocabulary, because they also
-   need format words such as *Workshop* and must exclude interest words such as
-   *Make friends*. Until that work lands, clubs have no classification at all
-   and `event_categories` (V3) is still free text with no key.
-   `user_preferred_categories` was dropped in V22.
+6. **The catalogue and the faculty list have had no product review.** 92
+   interests in twelve groups, invented for a campus audience, and 12 faculties
+   transcribed by hand — and faculties do get renamed.
+7. **The catalogue is shared now, while its ADR is still Proposed.**
+   [ADR-001](../decisions/ADR-001-three-taxonomy-vocabularies.md) says clubs
+   carry tags drawn from this same `interest_catalogue` and events take their
+   topics from it too, with a separate events-only format list. That is what
+   `d1d915f` built: `club_categories` (V23, V24), `club_interests` (V25, capped
+   at eight per club), `event_topic_assignments` and `event_format_assignments`
+   (V28) and `event_formats` (V29), with `event_categories` dropped in V30 and
+   `user_preferred_categories` in V22. ADR-001 itself still reads *Proposed —
+   awaiting Arpan* in the decisions index, so the code is ahead of the decision.
 
-   Two things there touch this table directly. The catalogue will need entries
-   it currently lacks once clubs use it — there is no `engineering`, for one.
-   And `interest_catalogue.category`, the twelve picker groups, becomes the last
-   overloaded use of the word *category* once `club_categories` exists; renaming
-   it `group_label` is free while V19 and V20 are uncommitted and costs a
-   migration afterwards.
+   For this table the consequences are settled: the missing entries (such as
+   `engineering`) arrived in V27, and the overloaded `category` column the
+   original write-up worried about is gone — V26 replaced it with `parent_slug`
+   rather than renaming it.

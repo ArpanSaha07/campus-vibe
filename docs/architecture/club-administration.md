@@ -5,9 +5,7 @@
 **Status:** ✅ Live — migrations applied against real PostgreSQL, endpoints and
 dashboard verified in the running stack.
 
-**Code as of:** `f7a4399` plus the uncommitted club social links unit — re-read
-2026-09-16: the club editor and the proposal form both collect LinkedIn and
-Linktree, and the admin review queue renders them. Before that, `95418a1`, re-stamped 2026-09-16: that commit is the event end time unit this document was already updated for, and the planner backend touches nothing it covers. Before that, `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
+**Code as of:** `0f4e1df` — scheduled refresh 2026-11-26: re-read `f7a4399..0f4e1df` of the mapped paths; the social links unit is as described, and the invitation email-confirmation rule is now behind a switch that defaults off (`20b39bd`), which the invariants bullet and the decisions table now say. Before that, `f7a4399` plus the uncommitted club social links unit, re-read 2026-09-16. Before that, `95418a1`, re-stamped 2026-09-16: that commit is the event end time unit this document was already updated for, and the planner backend touches nothing it covers. Before that, `70336d2` plus the uncommitted event end time unit, 2026-09-16 —
 the overview and Events tab split upcoming from past on each event's end, and
 the event form requires an end. Before that, `12afebf` plus the uncommitted
 club and event management unit,
@@ -86,13 +84,22 @@ a club's `official_email`, which had been unwritable since the column landed.
   moment when two rows may both be owners. Measured: removing the flushes still
   passes today, because Hibernate happens to emit the updates in the order they
   were dirtied. That is not a guarantee. Do not "simplify" them away.
-- **The security boundary of the invitation flow is one `if`.**
-  `ClubAdminService.claimableBy` refuses to let an account with an unconfirmed
-  address answer an invitation. Sign-up does not require confirming an address
+- **The security boundary of the invitation flow is one `if`, and it is
+  currently switched off.** `ClubAdminService.claimableBy` refuses to let an
+  account with an unconfirmed address answer an invitation
+  (`ClubAdminService.java:489`). Sign-up does not require confirming an address
   (`campusvibe.auth.require-verified-email` is off by default), so without that
   line, registering the invitee's address first is enough to steal their
-  invitation. Covered by
-  `anUnconfirmedAccountCannotClaimAnInvitationToItsAddress`.
+  invitation. Since `20b39bd` the check runs only when
+  `campusvibe.auth.require-verified-email-for-invitations`
+  (`AUTH_REQUIRE_VERIFIED_EMAIL_FOR_INVITATIONS`, `application.yml:119`) is
+  true, and it defaults to **false**, because confirmation mail is not reliably
+  delivered yet and the rule was refusing real invitees
+  (`ClubAdminService.java:461-465`). While it is off the attack above is open
+  to email and password accounts; Google accounts are confirmed by Google. The
+  `/invitations` page no longer shows its confirm-your-address banner
+  (`invitations/page.tsx:53-58`). Covered, with the switch on, by
+  `InvitationRequiresVerifiedEmailIT.anUnconfirmedAccountCannotClaimAnInvitationToItsAddress`.
 - **Integration tests need Docker.** `*IT` runs on real PostgreSQL + pgvector
   (`PostgresTestContainer`) with `ddl-auto: validate`, so an entity that drifts
   from a migration fails a test instead of a container boot. `*Test` unit suites
@@ -409,7 +416,7 @@ hidden from them.
 | `official_email` is admin-only, enforced by omission from `ClubUpdateRequest` | The recovery channel must not be capturable by whoever controls the club | A runtime role check inside the update path | One forgotten check exposes it; with no field, there is no path to forget |
 | Invitations are PENDING rows in `club_admin_assignments`, not a second table | An invitation and an assignment differ by one field; acceptance is a status change rather than a copy between tables that could half-fail | The separate `club_admin_invitations` table §23.4 offers | Two tables to keep in step, and a window where a row exists in both or neither |
 | An invitation may name an address with no account | The incoming treasurer is frequently not on CampusVibe in August; a user picker can only offer accounts that already exist | Existing accounts only | The owner is told to go and chase a signup before they can do the thing they came to do |
-| Claiming an invitation requires a confirmed address | Sign-up does not require confirming one, so the address on an account proves nothing by itself | Matching the account's email string alone | Registering someone's address first is enough to steal their invitation |
+| Claiming an invitation requires a confirmed address (behind `require-verified-email-for-invitations`, off by default since `20b39bd`) | Sign-up does not require confirming one, so the address on an account proves nothing by itself | Matching the account's email string alone | Registering someone's address first is enough to steal their invitation — the state while the switch is off |
 | The dashboard asks `GET /clubs/{id}/managed` instead of searching the managed-clubs list | The list is built from assignments; a platform admin manages every club and holds none, so the search missed for the only account that can administer anything | Returning every club from `/users/me/managed-clubs` for an admin | The eagerly-loaded provider carries the whole platform on every page, and 'clubs you manage' stops distinguishing clubs you run from clubs you may touch |
 | `ManagedClubDTO.role` is nullable rather than gaining a `PLATFORM_ADMIN` value | A platform admin's authority is a property of their account, not a relationship with the club | Adding `PLATFORM_ADMIN` to `ClubRole` | Every `role == CLUB_OWNER` check in the codebase quietly disagrees about whether it counts |
 | The audit log is append-only by database trigger | §22 requires that a club admin cannot delete the entry recording what they did | Repository discipline — expose no delete | The guarantee lives in code review, and the person likeliest to add a delete is the one the rule constrains |

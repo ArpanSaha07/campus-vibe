@@ -2,10 +2,11 @@
 
 Resolved issues, kept for history. Open issues live in [`bugs.md`](bugs.md).
 
-Last updated: **2026-11-17**
+Last updated: **2026-11-26**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-063](#bug-063) | High | 2026-11-25 | From 2026-09-30 to 2026-11-25 CI ran no integration tests and never started the stack: quay.io stopped serving MinIO's images without a login. S3Mock replaced MinIO ([ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md)) |
 | [BUG-066](#bug-066) | Medium | 2026-11-17 | The CodeQL triage read `refs/heads/<branch>`, a stale analysis, instead of the PR's merge ref: on PR #74 it triaged nine old alerts and missed alert 73, the only new one |
 | [BUG-064](#bug-064) | High | 2026-11-07 | The Trivy gate failed on two `next` 16.3.8 RCEs and two `spring-webmvc` 6.2.19 CVEs that no free release fixes: `next` 16.4.5 in the lockfile, and a scoped, expiring exception for Spring ([ADR-022](../decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)) |
 | [BUG-062](#bug-062) | Low | 2026-09-17 | An event card's Like and Share buttons were invisible on every phone and tablet, yet still tappable: Tailwind v4 only applies `group-hover` where the device can hover |
@@ -55,6 +56,57 @@ Last updated: **2026-11-17**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-063
+**MinIO's images can no longer be pulled, so CI runs no integration tests and never starts the stack** · High · FIXED 2026-11-25
+
+**Found:** 2026-09-30, on PR #68 (`develop`), run `36810797005`.
+
+**Symptom.** `Backend / Build and test`: 164 unit tests pass, then 314 of 332
+ITs error in under a second each with `Failed to load ApplicationContext`,
+caused by `ContainerFetchException: Can't get Docker image:
+quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`. `Docker / Build images and
+run the stack` fails at `docker compose up` with `minio-init Error
+unauthorized: access to the requested resource is not authorized`.
+
+**Cause.** Not code. quay.io now answers 401 for `minio/minio` and `minio/mc`
+without credentials (`curl https://quay.io/api/v1/repository/minio/mc` →
+`invalid_token`), and Docker Hub has no public copy of either tag (404). Every
+IT starts `MinioTestContainer` through `AbstractIntegrationTest`
+(`MinioTestContainer.java:52`), and the compose backend waits on `minio-init`
+(`docker/docker-compose.yml:183`), so both jobs die on the pull.
+
+**Stopgap, 2026-09-30, at Arpan's instruction** — commented out in CI only,
+each block marked `TEMP 2026-09-30`:
+- `.github/workflows/_backend.yml`: the `run-integration-tests` branch, so
+  every run is `./mvnw -B verify -DskipITs`. **The Postgres-only ITs are off
+  too** — they share the base class.
+- `.github/workflows/_docker.yml`: *Start the stack* through *Smoke test the
+  API*. Images are still built; Trivy now names `campusvibe-backend` instead of
+  reading it from a running container.
+
+Arpan was offered a registry login in CI and a replacement store, and chose
+the stopgap. `MinioTestContainer`, compose and `verify.mjs --full` are unchanged, so
+**locally the ITs still need a MinIO image already in the Docker cache**.
+
+**Fix, 2026-11-25, on `fix/integration-tests`.** Adobe S3Mock
+(`adobe/s3mock:5.2.3`, Docker Hub) replaces MinIO, per
+[ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md), accepted by Arpan
+2026-11-24, which supersedes ADR-011
+([spec](../specs/2026-11-24-s3mock-replaces-minio.md)).
+`MinioTestContainer` became `S3MockTestContainer`, compose's `minio` and
+`minio-init` became one `s3mock` service, and both `TEMP 2026-09-30` blocks
+are restored. Verified locally: the image pulled with no login; all 340 ITs
+passed with S3Mock in the log and no MinIO; the stack came up healthy, a club
+logo uploaded and read back byte-identical and survived `compose down`; the
+CI smoke checks passed against it.
+
+**Closed 2026-11-26.** PR #85 merged the fix into `develop` as `0f4e1df`, and
+its `CI` run on GitHub was green on 2026-11-25: `Backend / Build and test` ran
+all 340 ITs with no failures (run `45701896286`) and `Docker / Build images and run the stack` passed its smoke test.
+PR #86 took it to `main`. Rule: `rules/ci-and-build.md`.
 
 ---
 

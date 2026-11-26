@@ -1,18 +1,19 @@
 # CampusVibe — Bug Log
 
-Last updated: **2026-11-25** · Branch: `develop`
+Last updated: **2026-11-26** · Branch: `develop`
 
 Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 (BUG-005, BUG-008 … BUG-017, BUG-019 … BUG-037 — everything not in the table below). Bug ids are never reused.
 
-**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-066, opened and fixed the same day (2026-11-17, CodeQL triage) · BUG-064 (2026-11-07, Trivy gate) · BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16) · BUG-062, opened and fixed the same day (2026-09-17, event card actions on touch)
+**Moved to [`fixed_bugs.md`](fixed_bugs.md):** BUG-063 (2026-11-26, fixed 2026-11-25 by S3Mock) · BUG-066, opened and fixed the same day (2026-11-17, CodeQL triage) · BUG-064 (2026-11-07, Trivy gate) · BUG-060, opened and fixed the same day (2026-09-16, club page media) · BUG-005, BUG-028 … BUG-031 (2026-08-15) · BUG-032 … BUG-034 (2026-08-16) · BUG-035 (2026-09-03) · BUG-036, BUG-037 (2026-09-05) · BUG-038 (2026-09-08) · BUG-040, BUG-041, BUG-045 … BUG-047 (2026-09-09) · BUG-048, BUG-049 (2026-09-10) · BUG-039, BUG-050 (2026-09-11) · BUG-052, opened and fixed the same day (2026-09-14) · BUG-051, and BUG-054 opened and fixed the same day (2026-09-15) · BUG-006, BUG-043, and BUG-055 and BUG-056 opened and fixed the same day (2026-09-15, club and event management) · BUG-057, opened and fixed the same day (2026-09-15, Google sign-in). · BUG-058, BUG-059 (2026-09-16) · BUG-062, opened and fixed the same day (2026-09-17, event card actions on touch)
 
-**Highest id issued: BUG-066.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
+**Highest id issued: BUG-068.** Grep *both* files before taking the next one — ids have collided three times. BUG-038 was issued twice, and so was BUG-040: the open production-bucket bug was renumbered BUG-051 on 2026-09-12, since the club-logo crash already holds `fixed_bugs.md#bug-040`.
 
 | ID | Severity | Summary |
 |---|---|---|
+| [BUG-067](#bug-067) | Medium | A club-admin invitation can be claimed by whoever registers its address first: the email-confirmation check is switched off by default since `20b39bd` |
+| [BUG-068](#bug-068) | Low | A profile accepts at most 76 interests, but the picker offers 92 and sets no limit, so picking more than 76 fails on save with a 400 |
 | [BUG-065](#bug-065) | Low | A planner reply that fails after its agent acted, and after some intro already streamed, shows the fallback summary glued onto the partial intro until a reload |
-| [BUG-063](#bug-063) | High | MinIO's images need a login on quay.io now, so CI runs no ITs and never starts the stack — **fixed 2026-11-25 on `fix/integration-tests` (S3Mock, ADR-026); open until a green PR run** |
 | [BUG-061](#bug-061) | Low | The navbar logo is broken on every page — `Navbar.tsx` points at `/new-campusvibe-logo.png`, which is not in `public/` |
 | [BUG-044](#bug-044) | High | `Club.images` and `Event.images` lose every write if the CodeQL autofix is accepted on them |
 | [BUG-042](#bug-042) | Low | Profile avatars have no read path — the events half was fixed 2026-09-12 |
@@ -26,53 +27,58 @@ Open issues only. Resolved ones move to [`fixed_bugs.md`](fixed_bugs.md)
 
 ---
 
-### BUG-063
-**MinIO's images can no longer be pulled, so CI runs no integration tests and never starts the stack** · High · OPEN — fixed 2026-11-25 on `fix/integration-tests`, awaiting a green PR run
+### BUG-067
+**A club-admin invitation can be claimed by whoever registers its address first** · Medium · OPEN
 
-**Found:** 2026-09-30, on PR #68 (`develop`), run `36810797005`.
+**Found:** 2026-11-26, in the scheduled docs refresh (PR #87), reading
+`20b39bd` (2026-09-17) against
+[`club-administration.md`](../architecture/club-administration.md).
 
-**Symptom.** `Backend / Build and test`: 164 unit tests pass, then 314 of 332
-ITs error in under a second each with `Failed to load ApplicationContext`,
-caused by `ContainerFetchException: Can't get Docker image:
-quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`. `Docker / Build images and
-run the stack` fails at `docker compose up` with `minio-init Error
-unauthorized: access to the requested resource is not authorized`.
+**Cause.** `ClubAdminService.claimableBy` refuses an account with an
+unconfirmed address only when
+`campusvibe.auth.require-verified-email-for-invitations` is true
+(`ClubAdminService.java:489`), and that property defaults to false
+(`application.yml:119`, `AUTH_REQUIRE_VERIFIED_EMAIL_FOR_INVITATIONS`). It was
+switched off on purpose, because confirmation mail is not reliably delivered
+yet and the rule was refusing real invitees (`ClubAdminService.java:461-465`).
+Sign-up does not require confirming an address either
+(`campusvibe.auth.require-verified-email` is off by default).
 
-**Cause.** Not code. quay.io now answers 401 for `minio/minio` and `minio/mc`
-without credentials (`curl https://quay.io/api/v1/repository/minio/mc` →
-`invalid_token`), and Docker Hub has no public copy of either tag (404). Every
-IT starts `MinioTestContainer` through `AbstractIntegrationTest`
-(`MinioTestContainer.java:52`), and the compose backend waits on `minio-init`
-(`docker/docker-compose.yml:183`), so both jobs die on the pull.
+**Effect.** An invitation names an address that may have no account yet.
+Anyone who registers that address with email and password first can accept the
+invitation and becomes a club admin. Google accounts are not affected, since
+Google confirms the address. The `/invitations` page no longer warns about
+confirming an address (`invitations/page.tsx:53-58`).
 
-**Stopgap, 2026-09-30, at Arpan's instruction** — commented out in CI only,
-each block marked `TEMP 2026-09-30`:
-- `.github/workflows/_backend.yml`: the `run-integration-tests` branch, so
-  every run is `./mvnw -B verify -DskipITs`. **The Postgres-only ITs are off
-  too** — they share the base class.
-- `.github/workflows/_docker.yml`: *Start the stack* through *Smoke test the
-  API*. Images are still built; Trivy now names `campusvibe-backend` instead of
-  reading it from a running container.
+**Fix.** Turn the switch back on once confirmation mail is delivered (SES) and
+a user can ask for a fresh confirmation link: today nothing in the UI calls
+`resendVerification` ([`authentication.md`](../architecture/authentication.md),
+known gap 5c). `InvitationRequiresVerifiedEmailIT` already covers the rule
+with the switch on. Queued in [`todo.md`](../TODO/todo.md) under *Security*.
 
-Arpan was offered a registry login in CI and a replacement store, and chose
-the stopgap. `MinioTestContainer`, compose and `verify.mjs --full` are unchanged, so
-**locally the ITs still need a MinIO image already in the Docker cache**.
+---
 
-**Fix, 2026-11-25, on `fix/integration-tests`.** Adobe S3Mock
-(`adobe/s3mock:5.2.3`, Docker Hub) replaces MinIO, per
-[ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md), accepted by Arpan
-2026-11-24, which supersedes ADR-011
-([spec](../specs/2026-11-24-s3mock-replaces-minio.md)).
-`MinioTestContainer` became `S3MockTestContainer`, compose's `minio` and
-`minio-init` became one `s3mock` service, and both `TEMP 2026-09-30` blocks
-are restored. Verified locally: the image pulled with no login; all 340 ITs
-passed with S3Mock in the log and no MinIO; the stack came up healthy, a club
-logo uploaded and read back byte-identical and survived `compose down`; the
-CI smoke checks passed against it.
+### BUG-068
+**A profile accepts at most 76 interests, but the picker offers 92** · Low · OPEN
 
-**Close on** a green PR run with `Backend / Build and test` running the ITs and
-`Docker / Build images and run the stack` passing the smoke test. Then move
-this entry to `fixed_bugs.md`.
+**Found:** 2026-11-26, in the scheduled docs refresh (PR #87), reading the code.
+Not reproduced in a browser or a test.
+
+**Cause.** `UserProfileService.MAX_INTERESTS` is `76`
+(`UserProfileService.java:43`), the size of the catalogue V20 seeded. Its own
+javadoc says a person's interests have no cap, so 76 stood for every interest
+there was. V27 added sixteen interests, and the catalogue now offers 92 to pick
+from (104 rows including the twelve groups, `InterestCatalogueIT.java:77`).
+The profile page passes no `max` to `InterestPicker`
+(`interests/page.tsx:39-42`), so the picker never stops the student.
+
+**Symptom.** A student who picks more than 76 interests gets a 400, *interest
+takes at most 76 values*, from `TaxonomyService.checked` when saving
+(`TaxonomyService.java:146-149`).
+
+**Fix.** Raise the cap to match the catalogue, or derive it from the catalogue
+size, so the javadoc stays true. Queued in [`todo.md`](../TODO/todo.md) under
+*Backend / Features*.
 
 ---
 

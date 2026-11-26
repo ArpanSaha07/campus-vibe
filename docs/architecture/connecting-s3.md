@@ -1,6 +1,6 @@
 # Connecting S3
 
-**Code as of:** `bb49c9e` plus the S3Mock swap (2026-11-25, [ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md): comments in `s3/` and the local store only; no bucket, grant or property change). Before that, `12afebf` plus the uncommitted event photo delete (`MediaKeys.belongsToEvent`, 2026-09-15; no bucket, grant or property change) · **Account read:** 2026-09-15 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan · **Verified:** 2026-09-15 — §5's upload, in production
+**Code as of:** `0f4e1df` (scheduled refresh 2026-11-26: re-read `bb49c9e..0f4e1df` of `s3/`; the only changes are the MinIO-to-S3Mock comments in `MediaKeys`, `S3Config` and `S3Service` that the S3Mock note below already records; no bucket, grant or property change) · **Account read:** 2026-09-15 · **Changed:** 2026-09-12 — CORS deleted, `s3:ListBucket` granted, `AWS_S3_BUCKET` set, all run by Arpan · **Verified:** 2026-09-15 — §5's upload, in production
 **Order:** 3 of 4 — the property goes in the same pass as [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md) §4; verification needs its §5 deploy.
 **Related:** [ADR-010](../decisions/ADR-010-uploads-stream-through-the-api.md) · [ADR-011](../decisions/ADR-011-minio-replaces-fakes3.md) · [ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md) · [ADR-012](../decisions/ADR-012-one-media-bucket-with-prefixes.md) · [`s3-media/SKILL.md`](../../.claude/skills/s3-media/SKILL.md) · [BUG-051](../bugs/fixed_bugs.md#bug-051)
 
