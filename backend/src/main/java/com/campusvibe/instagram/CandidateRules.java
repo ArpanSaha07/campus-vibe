@@ -154,8 +154,12 @@ final class CandidateRules {
         if (s == null) return null;
         String digits = s.replaceAll("[^0-9]", "");
         if (digits.isEmpty() || digits.length() > 6) return null;
-        int n = Integer.parseInt(digits);
-        return n > 0 ? n : null;
+        try {
+            int n = Integer.parseInt(digits);
+            return n > 0 ? n : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** "" and whitespace to null, everything else trimmed and length-capped. */
