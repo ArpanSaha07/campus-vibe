@@ -1,17 +1,15 @@
 # AI planner — Implementation & Design Decisions
 
-**Status:** 2026-11-16 · branch `develop` · **the planner agent unit is
-uncommitted on top of `0ff0759`.** Tested only against `ScriptedLlmClient`:
-`verify.mjs --full` green, 8 new `PlannerAgentIT` cases. **Never run against
-the real model**, so whether it picks the right tool from a student's wording
-is unproven. Production runs the 2026-10-01 version, which predates the agent;
-the planner itself was first seen working on the local stack on 2026-09-16.
+**Status:** 2026-11-26 · **the planner agent unit is committed as `927f5f5`**
+(2026-11-17), with one behaviour-neutral refactor since (`8c41f59`). Tested
+only against `ScriptedLlmClient`: `verify.mjs --full` green, 8 new
+`PlannerAgentIT` cases. **Never run against the real model**, so whether it
+picks the right tool from a student's wording is unproven. Arpan reported the
+backend carrying the agent deployed to Elastic Beanstalk on 2026-11-23
+(`STATUS.md`), not checked here; the planner itself was first seen working on
+the local stack on 2026-09-16.
 **Authors:** main session.
-**Code as of:** `0ff0759` plus the uncommitted planner agent unit, read
-2026-11-16: everything under `backend/src/main/java/com/campusvibe/ai/`, V37,
-`prompts/planner-system.txt`, and the frontend planner files, `planner-api.ts`,
-`planner.ts`, `adapters.ts`, `types/index.ts` and `followed-clubs-context.tsx`.
-Frontend sections not named in the agent unit were last re-read at `70336d2`.
+**Code as of:** `0f4e1df` — re-read against `git diff 0ff0759..0f4e1df` (`927f5f5`, `8c41f59`) over `ai/feature/planner/`, `resources/prompts/`, `lib/planner.ts`, `lib/planner-api.ts`, `components/planner/` and `app/(planner)/`, with every `file:line` cited here checked, including those in `ai/client/`, `adapters.ts`, `types/index.ts`, `followed-clubs-context.tsx` and the other files outside those paths, as a scheduled refresh on 2026-11-26.
 **Specs:** [`2026-09-16-planner-chat-ui.md`](../specs/2026-09-16-planner-chat-ui.md)
 (frontend) · [`2026-09-16-planner-backend.md`](../specs/2026-09-16-planner-backend.md)
 (backend) · [`2026-11-16-planner-agent.md`](../specs/2026-11-16-planner-agent.md)
@@ -42,12 +40,12 @@ planner is unavailable*.
   produced by **one streamed call with a strict JSON schema**
   ([ADR-021](../decisions/ADR-021-planner-streams-its-intro-out-of-strict-json.md),
   Proposed). `intro` must stay the schema's first property
-  (`PlannerAnswers.java:42`), or nothing streams.
+  (`PlannerAnswers.java:54`), or nothing streams.
 - **The model may act, but the server decides what it may act on**
   ([ADR-023](../decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)).
   `PlannerToolExecutor` (`:77`) takes the user from the JWT, refuses an id
   outside this turn's candidates and the student's own follows, saves and RSVPs
-  (`:119`, `:166`), and refuses an ended event (`:169`) before the unchanged
+  (`:119`, `:167`), and refuses an ended event (`:170`) before the unchanged
   `MyEventService.rsvp`, which checks only that the event exists. Move any of
   those checks into the prompt and a club's description can aim an action at
   any club.
@@ -72,7 +70,7 @@ planner is unavailable*.
   in one conditional upsert (`PlannerUsageRepository.java:28`). Deleting a chat
   never returns a message.
 - **Frontend state lives in `PlannerProvider`, not in the pages**
-  (`components/planner/PlannerProvider.tsx:92`). The first message of a new chat
+  (`components/planner/PlannerProvider.tsx:93`). The first message of a new chat
   moves the URL to `/planner/{id}` while the reply is still streaming; the page
   remounts on that move and the layout does not.
 - **The streamed reply goes through `apiFetchResponse`** (`lib/api.tsx:154`).
@@ -104,17 +102,18 @@ show and owns its draft.
 skill asks: `PlannerController` → feature services → `LlmClient` → OpenAI. A
 message goes through two phases.
 
-1. **On the request thread** (`PlannerReplyService.start`, `:110`): refuse an
+1. **On the request thread** (`PlannerReplyService.start`, `:122`): refuse an
    empty or over-1,000-character message (400), a chat that is not the caller's
    (404), a missing key (503); answer a chat already holding 40 messages with an
-   `error` frame, uncounted (`:128`); then spend today's message, or 429
-   (`:134`). Only now does a stream exist.
+   `error` frame, uncounted (`:140`); then spend today's message, or 429
+   (`:146`). Only now does a stream exist.
 2. **On a virtual thread** (`reply`): read the last 10 messages, retrieve
    candidates, build the prompt, then run the agent loop (`:185`): each round
    offers the seven tools; a round that calls them gets a `status` frame per
    call (`:202`), the executor's result goes back to the model, and the next
-   round runs. Round 5 forbids tools (`tool_choice: none`), so a turn makes at
-   most 5 calls. The round that answers streams its JSON through
+   round runs. After `MAX_TOOL_ROUNDS` (4, `PlannerLimits.java:38`) rounds the
+   next one forbids tools (`tool_choice: none`, `:186`), so a turn makes at
+   most four tool rounds and five model calls. The round that answers streams its JSON through
    `IntroStreamReader` as `delta` frames; the answer is parsed and validated,
    both messages and the actions are stored in one transaction, and `done`
    carries freshly hydrated cards and the actions.
@@ -169,20 +168,20 @@ A signed-out caller gets 403, as every other signed-in route here does.
   recently active chats while 15 exist, then inserts. Tested with eight
   simultaneous creates.
 - `get` reads every message and hydrates all their picks in one pass through
-  `cardsFor` (`:164`), which drops events that have ended (`:177`) or been
+  `cardsFor` (`:169`), which drops events that have ended (`:182`) or been
   deleted.
-- `recordExchange` (`:127`) is the only write a reply makes: set the title if
+- `recordExchange` (`:129`) is the only write a reply makes: set the title if
   unset, move `last_active_at`, insert both messages. Empty when the chat was
   deleted mid-reply.
-- `titleFrom` (`:141`) cuts at 60 code points, never mid-character.
-- A malformed chat id is a 404 (`:194`), because the page treats both the same.
+- `titleFrom` (`:146`) cuts at 60 code points, never mid-character.
+- A malformed chat id is a 404 (`:229`), because the page treats both the same.
 
 ### `PlannerUsageService.java` · `PlannerUsageRepository.java` · `PlannerDay.java`
 
 The day is `America/Toronto`'s. `spend` returns the day it counted against, so a
 refund after midnight hands back the right day's message. `trySpend` is one
 `INSERT … ON CONFLICT DO UPDATE … WHERE message_count < ?`, bound to
-`DAILY_MESSAGES`,, so two sends at 14
+`DAILY_MESSAGES`, so two sends at 14
 cannot both pass. 429 carries `Retry-After` through the existing
 `TooManyAttemptsException` handler.
 
@@ -213,8 +212,8 @@ ended rather than as unknown.
 
 Pure scoring, unit-tested. Weights (`:25`–`:37`): previous-answer context 0.35,
 saved or going 0.25, followed organizer 0.15, shared interest 0.10, running now
-when the prompt says now or tonight 0.30, soonest up to 0.05, plus the hybrid
-search score. Hand-set, not measured. Ranks decide what the model is *shown*.
+when the prompt says now or tonight 0.30, soonest up to 0.05, and for a club,
+running one of the kept events 0.10, plus the hybrid search score. Hand-set, not measured. Ranks decide what the model is *shown*.
 
 ### `PlannerPromptBuilder.java` · `prompts/planner-system.txt` · `ai/prompt/PromptTemplateService.java`
 
@@ -238,7 +237,7 @@ cuts reasons at 300 characters, and keeps at most 6. `IntroStreamReader`
 decodes the intro string out of partial JSON: it holds an incomplete escape,
 never hands out a lone high surrogate (`:54`), and gives up quietly if the
 answer does not open with its intro property (`:26`); `reply` then sends whatever of
-the parsed intro was not streamed (`PlannerReplyService.java:189`).
+the parsed intro was not streamed (`PlannerReplyService.java:222`).
 
 ### `PlannerTools.java` · `PlannerToolExecutor.java` · `PlannerAction.java` · `PlannerActionDTO.java`
 
@@ -276,15 +275,16 @@ and null once that event has ended, which drops the link and keeps the line.
 ### `PlannerReplyService.java` · `PlannerReplySink.java` · `SseReplySink.java`
 
 The sink interface exists so a test can play a client that leaves. `SseReplySink`
-synchronises every write (`:89`), because the keep-alive scheduler (a comment
-every 15 s, `PlannerReplyService.java:70`, under the ALB's 60 s idle timeout)
+synchronises every write (`:94`), because the keep-alive scheduler (a comment
+every 15 s, `PlannerReplyService.java:79`, under the ALB's 60 s idle timeout)
 writes too, and marks itself gone on a failed write, a container error or a
 timeout (`:27`). A gone sink throws from `delta` and `status`, which aborts the
 provider stream or the loop. `fail` (`:280`) and `keepActions` (`:296`) split
 a failure: refunded with an `error` frame when nothing changed the account,
-stored and counted with a fallback `delta` and `done` when something did. The emitter's own timeout is 3 minutes (`:67`), set explicitly because
+stored and counted with a fallback `delta` and `done` when something did. The emitter's own timeout is 3 minutes (`:76`), set explicitly because
 Tomcat's default async timeout is 30 seconds. One log line per answer records
-counts only: kind, picked, kept, candidates (`:182`).
+counts only: kind, picked, kept, candidates, actions and how many changed the
+account (`:214`).
 
 ### `ai/client/` — `LlmClient`, `OpenAiLlmClient`, `OpenAiChatStream`, `LlmRequest`, `LlmException`
 
@@ -295,10 +295,10 @@ tools. `OpenAiLlmClient` posts Chat Completions with `stream: true`,
 it adds them as strict functions, `tool_choice` `auto` or `none` (`:193`), and
 `parallel_tool_calls: false` (`:196`), since strict argument schemas are not
 guaranteed for parallel calls. Assistant tool-call and `tool` result messages
-are serialised by `message` (`:206`). `OpenAiChatStream` assembles tool calls
-from their fragments by `index` (`:80`) and never passes them to `onText`. Retries 429, 5xx and network failures **only before the first
-fragment** (`:116`, `:130`). A watchdog closes a stream that outlives
-`chatTimeout` (`:146`), because the JDK client's read timeout only covers the
+are serialised by `message` (`:201`). `OpenAiChatStream` assembles tool calls
+from their fragments by `index` (`OpenAiChatStream.java:81`) and never passes them to `onText`. `OpenAiLlmClient` retries 429, 5xx and network failures **only before the first
+fragment** (`OpenAiLlmClient.java:117`, `:131`). A watchdog closes a stream that outlives
+`chatTimeout` (`:149`), because the JDK client's read timeout only covers the
 headers. `OpenAiChatStream` turns `finish_reason: length` into `TRUNCATED`, a
 refusal or content filter into `REFUSED`, and a stream without `[DONE]` into
 `FAILED`; a provider error object is reduced to its type, since its message can
@@ -313,9 +313,7 @@ quote the prompt.
 
 ## Frontend: file-by-file breakdown
 
-Line numbers read at `70336d2`, except the files the agent unit changed,
-re-read 2026-11-16: `PlannerProvider.tsx`, `AssistantMessage.tsx`,
-`planner-api.ts`, `planner.ts`, `adapters.ts`, `types/index.ts`.
+Line numbers re-read at `0f4e1df` (2026-11-26).
 
 ### `frontend/app/(planner)/layout.tsx`
 
@@ -338,17 +336,17 @@ draft.
 
 - Status machine: `loading` while auth resolves or the list loads, `guest`,
   `ready`, or `unavailable` when `listConversations` fails for any reason
-  (`:110-135`).
-- `send` (`:229`): creates the chat first when there is no id, adopts its
-  summary, drops an evicted chat, then `router.replace`s to its URL (`:255`)
+  (`:112-136`).
+- `send` (`:242`): creates the chat first when there is no id, adopts its
+  summary, drops an evicted chat, then `router.replace`s to its URL (`:268`)
   and starts `streamReply`. Returns false, and sets `newChatError`, when the
   create fails, so the page can put the text back.
-- `streamReply` (`:178`): appends the user message and an empty `streaming`
+- `streamReply` (`:180`): appends the user message and an empty `streaming`
   reply with local ids, bumps the chat to the top, counts the message
   optimistically, then applies each delta. On `done` it swaps in the server id
   and picks and takes the server's usage. On failure the reply becomes `failed`
   with a sentence from `plannerErrorMessage`, or `stopped` on abort, and usage
-  is re-read (`:218`) because the server refunds a failed message.
+  is re-read (`:227`) because the server refunds a failed message.
 - `onStatus` (`:202`) puts the agent's current step on the pending reply as
   `activity`; `done` adds the actions and clears it.
 - After a reply whose actions followed or unfollowed a club, it calls the
@@ -358,7 +356,7 @@ draft.
 - One reply at a time: `abortRef` is the lock.
 - `retry` removes the failed pair and resends the same text. The server stored
   nothing for the failure, so the chat never holds the question twice.
-- `remove` deletes, then leaves the chat's URL if it was open (`:293`).
+- `remove` deletes, then leaves the chat's URL if it was open (`:306`).
 
 ### `frontend/app/components/planner/PlannerShell.tsx`
 
@@ -426,10 +424,10 @@ starter chips, which fill the box rather than send.
 
 ### `frontend/app/lib/planner-api.ts`
 
-The six endpoint calls, and the stream reader. `createSseParser` (`:113`) holds
+The six endpoint calls, and the stream reader. `createSseParser` (`:116`) holds
 text until a blank line closes a frame, normalises CRLF, skips `:` comments
 (the server's keep-alives) and joins multi-line `data`. `sendPlannerMessage`
-(`:157`) rejects with `ApiError` when the request is refused,
+(`:161`) rejects with `ApiError` when the request is refused,
 `PlannerReplyError` on an `error` frame, whose message the page shows
 as written, and `INCOMPLETE_STREAM` when the body ends without `done`. A
 `status` frame goes to the optional `onStatus` (`:192`).
@@ -439,15 +437,15 @@ as written, and `INCOMPLETE_STREAM` when the body ends without `done`. A
 
 What needs no server: the prompt stash key, the 15-chat cap, the 1,000
 character limit, the starter and follow-up chip lists, day grouping, the chat
-an eviction would remove (`:63`), a provisional title, and the row label using
-`formatEventDateRange` from `lib/event-zone.ts` (`:79`), and `actionSentence`
+an eviction would remove (`:64`), a provisional title, and the row label using
+`formatEventDateRange` from `lib/event-zone.ts` (`:80`), and `actionSentence`
 (`:95`), the words of one action line.
 
 ### `frontend/app/lib/adapters.ts` (planner part)
 
-`toPlannerPicks` (`:205`) joins picks to the hydrated rows, **drops a pick with
+`toPlannerPicks` (`:208`) joins picks to the hydrated rows, **drops a pick with
 no row** (deleted or ended since), and keeps only the first pick's kind
-(`:215`), so no answer can render two rows even if a reply mixes them.
+(`:213`), so no answer can render two rows even if a reply mixes them.
 `toPlannerActions` (`:231`) adapts an offered calendar action's event like any
 card, and treats a missing `actions` as empty, so the page works against a
 backend older than the agent.
@@ -455,7 +453,7 @@ backend older than the agent.
 ### `frontend/app/types/index.ts` (planner part)
 
 `Api*` shapes mirroring the `Planner*DTO` records, and the adapted `Planner*`
-view types, from `:80`. `PlannerMessage.status` adds `streaming` and `stopped`,
+view types, from `:84`. `PlannerMessage.status` adds `streaming` and `stopped`,
 which exist only in the browser. `ApiPlannerAction` (`:139`) and
 `PlannerAction` (`:184`) are the agent's actions.
 
@@ -551,9 +549,11 @@ which exist only in the browser. `ApiPlannerAction` (`:139`) and
 
 ## Known deviations, gaps and blockers
 
-- **The agent is not deployed and has never run against the real model.**
-  Production runs `campusvibe-backend-20261001-035703-63d657f`; V37 applies on
-  the next deploy. Either side may ship first: the old page ignores `status`
+- **The agent is deployed but has never been checked against the real model.**
+  Arpan reported the backend deployed on 2026-11-23, replacing
+  `campusvibe-backend-20261001-035703-63d657f`, with V37 applied on start
+  (`STATUS.md`); the live manual checks are not run and the Vercel build
+  carrying the agent UI is unconfirmed. Either side may ship first: the old page ignores `status`
   and `actions`, and the new page treats a missing `actions` as empty.
 - **[BUG-065](../bugs/bugs.md#bug-065):** a reply that fails after an action
   *and* after some intro streamed shows the fallback line glued onto the partial
@@ -588,7 +588,7 @@ which exist only in the browser. `ApiPlannerAction` (`:139`) and
 
 ## Possible improvements
 
-1. **Deploy, then run the browser checks above against production**, including
+1. **Run the browser checks above against production**, including
    the agent spec's manual checks — the only way to see the proxy behaviour and
    whether the real model chooses the right tool.
 2. **Fix BUG-065** — either fix shape in the bug.

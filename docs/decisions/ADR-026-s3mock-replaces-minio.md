@@ -12,7 +12,7 @@
 [ADR-011](ADR-011-minio-replaces-fakes3.md) made MinIO the object store for
 local, CI and the media ITs. MinIO can no longer be pulled: quay.io answers
 401 for `minio/minio` and `minio/mc` without credentials, and Docker Hub has
-no copy ([BUG-063](../bugs/bugs.md#bug-063)). Upstream stopped publishing
+no copy ([BUG-063](../bugs/fixed_bugs.md#bug-063)). Upstream stopped publishing
 community images in October 2025 and has since archived the repository, so
 this will not come back.
 

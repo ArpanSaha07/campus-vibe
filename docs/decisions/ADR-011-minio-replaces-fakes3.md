@@ -1,7 +1,7 @@
 # ADR-011 — MinIO replaces `FakeS3` as the local and CI object store
 
 **Status:** ⛔ Superseded by [ADR-026](ADR-026-s3mock-replaces-minio.md) (accepted by Arpan 2026-11-24; built 2026-11-25). Accepted 2026-09-12.
-What survives: the client is always a real `S3Client`, only its endpoint varies, and the stub and `aws.s3.mock` stay deleted. What changed: the store is S3Mock, because MinIO's images stopped pulling ([BUG-063](../bugs/bugs.md#bug-063)).
+What survives: the client is always a real `S3Client`, only its endpoint varies, and the stub and `aws.s3.mock` stay deleted. What changed: the store is S3Mock, because MinIO's images stopped pulling ([BUG-063](../bugs/fixed_bugs.md#bug-063)).
 **Date:** 2026-09-12
 **Raised by:** the same unit as [ADR-010](ADR-010-uploads-stream-through-the-api.md).
 Once uploads were settled, *what stands in for S3 locally* was the remaining
