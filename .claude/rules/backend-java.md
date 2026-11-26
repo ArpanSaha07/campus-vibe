@@ -83,4 +83,11 @@ Kept deliberately short: this loads on every backend Java read.
   prompt-injected action is seen in production.
   ([ADR-023](../../docs/decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md),
   [`ai-planner.md`](../../docs/architecture/ai-planner.md))
+- **A topic is matched through the catalogue, never through keyword search.**
+  Postgres stems *tech* to `tech` and *Technology* to `technolog`, so a tag
+  label never matches the word a student types; `PlannerIntent` maps words to
+  slugs and expands a group to its children. And an any-word tsquery over a
+  sentence matches on its filler: run planner text through
+  `PlannerIntent.keywordText` first. Change either, then run
+  `PlannerRetrievalEvalIT`. (BUG-070)
 - **The IT suites need Testcontainers:** `node scripts/verify.mjs --full`.

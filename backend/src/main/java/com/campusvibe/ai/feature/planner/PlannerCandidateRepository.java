@@ -5,6 +5,9 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
 
@@ -12,15 +15,17 @@ import java.util.List;
  * The planner's retrieval sources other than search: what this user saved,
  * is going to and follows, and what is simply on soonest.
  *
- * <p>Every event query here applies the same window as the search leg,
- * {@code end_time > now()} (ADR-020) and a start within {@code windowDays}, so
- * no source can offer the model an event that has ended.
+ * <p>Every event query here applies the same {@link PlannerIntent.Window} as
+ * the search leg: still running at its start, which is never before now
+ * (ADR-020's {@code end_time > now()}), and starting before its end. So no
+ * source can offer an event that has ended, and when the prompt names a day,
+ * none can offer another day's (spec 2026-11-26-planner-topic-and-date-retrieval).
  */
 @Repository
 public class PlannerCandidateRepository {
 
     private static final String IN_WINDOW =
-            "e.end_time > now() AND e.date_time < now() + make_interval(days => :windowDays)";
+            "e.end_time > :windowFrom AND e.date_time < :windowTo";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -29,7 +34,7 @@ public class PlannerCandidateRepository {
     }
 
     /** Events this user saved or said they are going to. */
-    public List<Long> savedOrGoing(long userId, int windowDays) {
+    public List<Long> savedOrGoing(long userId, PlannerIntent.Window window) {
         return jdbc.queryForList("""
                 SELECT e.id FROM events e
                 WHERE e.id IN (SELECT event_id FROM user_saved_events WHERE user_id = :userId
@@ -38,11 +43,11 @@ public class PlannerCandidateRepository {
                   AND %s
                 ORDER BY e.date_time
                 """.formatted(IN_WINDOW),
-                params(windowDays).addValue("userId", userId), Long.class);
+                params(window).addValue("userId", userId), Long.class);
     }
 
     /** Events run by the clubs this user follows, soonest first. */
-    public List<Long> fromFollowedClubs(long userId, int windowDays, int limit) {
+    public List<Long> fromFollowedClubs(long userId, PlannerIntent.Window window, int limit) {
         return jdbc.queryForList("""
                 SELECT e.id FROM events e
                 JOIN user_followed_clubs f ON f.club_id = e.organizer_id
@@ -50,11 +55,11 @@ public class PlannerCandidateRepository {
                 ORDER BY e.date_time
                 LIMIT :limit
                 """.formatted(IN_WINDOW),
-                params(windowDays).addValue("userId", userId).addValue("limit", limit), Long.class);
+                params(window).addValue("userId", userId).addValue("limit", limit), Long.class);
     }
 
     /** Events run by these clubs, soonest first: the follow-up to a clubs answer. */
-    public List<Long> fromClubs(Collection<String> clubIds, int windowDays, int limit) {
+    public List<Long> fromClubs(Collection<String> clubIds, PlannerIntent.Window window, int limit) {
         if (clubIds.isEmpty()) {
             return List.of();
         }
@@ -64,7 +69,7 @@ public class PlannerCandidateRepository {
                 ORDER BY e.date_time
                 LIMIT :limit
                 """.formatted(IN_WINDOW),
-                params(windowDays).addValue("clubIds", clubIds).addValue("limit", limit), Long.class);
+                params(window).addValue("clubIds", clubIds).addValue("limit", limit), Long.class);
     }
 
     /**
@@ -72,14 +77,14 @@ public class PlannerCandidateRepository {
      * source that can answer a prompt like <em>what's on right now?</em>, which
      * names nothing search could match.
      */
-    public List<Long> soonest(int windowDays, int limit) {
+    public List<Long> soonest(PlannerIntent.Window window, int limit) {
         return jdbc.queryForList("""
                 SELECT e.id FROM events e
                 WHERE %s
                 ORDER BY e.date_time
                 LIMIT :limit
                 """.formatted(IN_WINDOW),
-                params(windowDays).addValue("limit", limit), Long.class);
+                params(window).addValue("limit", limit), Long.class);
     }
 
     /** Every event this user is going to, ended or not: what the agent may cancel (ADR-023). */
@@ -105,7 +110,26 @@ public class PlannerCandidateRepository {
                 new MapSqlParameterSource("userId", userId), String.class);
     }
 
-    private static MapSqlParameterSource params(int windowDays) {
-        return new MapSqlParameterSource("windowDays", windowDays);
+    /** Events tagged with any of these topics, soonest first: the source a named topic filters to. */
+    public List<Long> withTopics(Collection<String> topics, PlannerIntent.Window window, int limit) {
+        if (topics.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.queryForList("""
+                SELECT e.id FROM events e
+                WHERE e.id IN (SELECT event_id FROM event_topic_assignments WHERE interest_slug IN (:topics))
+                  AND %s
+                ORDER BY e.date_time
+                LIMIT :limit
+                """.formatted(IN_WINDOW),
+                params(window).addValue("topics", topics).addValue("limit", limit), Long.class);
+    }
+
+    private static MapSqlParameterSource params(PlannerIntent.Window window) {
+        return new MapSqlParameterSource("windowFrom", utc(window.from())).addValue("windowTo", utc(window.to()));
+    }
+
+    static OffsetDateTime utc(Instant instant) {
+        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }

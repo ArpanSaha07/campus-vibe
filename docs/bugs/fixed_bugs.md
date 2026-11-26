@@ -6,6 +6,7 @@ Last updated: **2026-11-26**
 
 | ID | Severity | Fixed | Summary |
 |---|---|---|---|
+| [BUG-070](#bug-070) | Medium | 2026-11-26 | Asked for tech events today, the planner offered a bake sale and Women in Tech's game night and missed the GDG workshop: filler words matched every event, *tech* never matched a tag, and *today* narrowed nothing |
 | [BUG-063](#bug-063) | High | 2026-11-25 | From 2026-09-30 to 2026-11-25 CI ran no integration tests and never started the stack: quay.io stopped serving MinIO's images without a login. S3Mock replaced MinIO ([ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md)) |
 | [BUG-066](#bug-066) | Medium | 2026-11-17 | The CodeQL triage read `refs/heads/<branch>`, a stale analysis, instead of the PR's merge ref: on PR #74 it triaged nine old alerts and missed alert 73, the only new one |
 | [BUG-064](#bug-064) | High | 2026-11-07 | The Trivy gate failed on two `next` 16.3.8 RCEs and two `spring-webmvc` 6.2.19 CVEs that no free release fixes: `next` 16.4.5 in the lockfile, and a scoped, expiring exception for Spring ([ADR-022](../decisions/ADR-022-spring-webmvc-cves-excepted-until-boot-4.md)) |
@@ -56,6 +57,35 @@ Last updated: **2026-11-26**
 | [BUG-011](#bug-011) | High | 2026-07-30 | Plaintext DB password in `Dockerrun.aws.json` |
 | [BUG-012](#bug-012) | High | 2026-07-30 | Compose bind-mounts shadowed the app in both containers |
 | [BUG-013](#bug-013) | Medium | 2026-08-02 | `compose watch` synced into a production image, so edits never appeared |
+
+---
+
+### BUG-070
+**The planner offered non-tech events for tech events today and missed real ones** · Medium · FIXED 2026-11-26, uncommitted
+
+**Found:** 2026-11-26, by Arpan on the local stack: *suggest tech events
+happening today* recommended unrelated events and missed the GDG McGill
+workshop *Building AI Voice Agents*, tagged `software-development` and
+`ai-machine-learning`.
+
+**Cause.** Measured against the local seed, five faults compounding:
+the planner's any-word keyword query matched *event*, *happen* and *today* in
+18 of 30 events, and any keyword hit skipped `min-score`; *tech* stems to
+`tech` and *Technology* to `technolog`, so every real tech event scored keyword
+0; the organizer name sat in the event text unweighted, so every Women in Tech
+event matched *tech*; *today* never narrowed retrieval, so 30 days competed for
+15 slots; and nothing used the topic the prompt named, only the student's
+profile interests.
+
+**Fix.** [Spec](../specs/2026-11-26-planner-topic-and-date-retrieval.md).
+`PlannerIntent` reads named topics (catalogue labels, synonyms, a group
+expanding to its children) and a Montreal range; `PlannerRetrievalService`
+windows every source to the range and keeps only topic-matching events when
+one exists; `SearchRepository.plannerEventCandidates` drops filler, weights
+the organizer name D and needs a raw rank of 0.1; two rules in
+`planner-system.txt`. `PlannerRetrievalEvalIT` pins eleven prompts. Reasoning
+in [`ai-planner.md`](../architecture/ai-planner.md). Rule:
+`rules/backend-java.md`.
 
 ---
 

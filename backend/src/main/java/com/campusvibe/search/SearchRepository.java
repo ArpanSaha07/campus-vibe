@@ -6,6 +6,9 @@ import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Types;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -173,14 +176,36 @@ public class SearchRepository {
             "replace(plainto_tsquery('english', ?)::text, '&', '|')::tsquery";
 
     /**
-     * The planner's search leg over events: not ended, starting within
-     * {@code windowDays}, matching any word of the prompt or close to it in
-     * meaning.
+     * The planner's event text, weighted so that where a word appears counts:
+     * title and topic labels A, description B, organizer name D. Unweighted,
+     * every event a club called Women in Tech runs matched <em>tech</em> as
+     * well as a tech workshop did (spec 2026-11-26-planner-topic-and-date-retrieval).
+     */
+    private static final String PLANNER_EVENT_DOC =
+            "setweight(to_tsvector('english', e.title || ' ' || COALESCE(tags.tag_text, '')), 'A')"
+                    + " || setweight(to_tsvector('english', COALESCE(e.description, '')), 'B')"
+                    + " || setweight(to_tsvector('english', COALESCE(c.name, '')), 'D')";
+
+    /**
+     * The least raw {@code ts_rank} a keyword hit needs to qualify for the
+     * planner without the semantic gate. Measured 2026-11-26 on the local seed
+     * with {@link #PLANNER_EVENT_DOC}: a hit on the organizer name alone ranks
+     * 0.06, one word in a description 0.24, a title or tag 0.3 and up.
+     */
+    static final double PLANNER_MIN_KEYWORD_RANK = 0.1;
+
+    /**
+     * The planner's search leg over events: overlapping the window, so still
+     * attendable when {@code from} is now or later (ADR-020), and matching a
+     * word of the prompt well enough or close to it in meaning.
      *
      * @param vectorLiteral the prompt's embedding, or null to rank by keywords
      *                      alone when no embedding could be had
+     * @param keywords      the prompt with its filler words removed; blank
+     *                      matches nothing by keyword
      */
-    public List<Scored<Long>> plannerEventCandidates(String vectorLiteral, String prompt, int windowDays, int limit) {
+    public List<Scored<Long>> plannerEventCandidates(String vectorLiteral, String keywords,
+                                                     Instant from, Instant to, int limit) {
         String sql = """
                 SELECT id, score FROM (
                     SELECT e.id,
@@ -191,27 +216,31 @@ public class SearchRepository {
                     JOIN clubs c ON c.id = e.organizer_id
                     %s
                     CROSS JOIN LATERAL (
-                        SELECT to_tsvector('english', %s) AS doc, %s AS query
+                        SELECT %s AS doc, %s AS query
                     ) fts
                     CROSS JOIN LATERAL (
                         SELECT CASE WHEN fts.doc @@ fts.query
                                     THEN ts_rank(fts.doc, fts.query) ELSE 0 END AS rank
                     ) kw
-                    -- Still attendable (ADR-020), and not months away.
-                    WHERE e.end_time > now()
-                      AND e.date_time < now() + make_interval(days => ?)
+                    WHERE e.end_time > ?
+                      AND e.date_time < ?
                 ) ranked
-                WHERE score >= ? OR kw > 0
+                WHERE score >= ? OR kw >= ?
                 ORDER BY score DESC
                 LIMIT ?
-                """.formatted(EVENT_TAGS_JOIN, EVENT_TEXT, ANY_WORD_QUERY);
+                """.formatted(EVENT_TAGS_JOIN, PLANNER_EVENT_DOC, ANY_WORD_QUERY);
         return jdbcTemplate.query(sql,
                 (rs, n) -> new Scored<>(rs.getLong("id"), rs.getDouble("score")),
-                semanticWeight, new SqlParameterValue(Types.VARCHAR, vectorLiteral), keywordWeight, prompt,
-                windowDays, minScore, limit);
+                semanticWeight, new SqlParameterValue(Types.VARCHAR, vectorLiteral), keywordWeight,
+                new SqlParameterValue(Types.VARCHAR, keywords == null || keywords.isBlank() ? null : keywords),
+                OffsetDateTime.ofInstant(from, ZoneOffset.UTC), OffsetDateTime.ofInstant(to, ZoneOffset.UTC),
+                minScore, PLANNER_MIN_KEYWORD_RANK, limit);
     }
 
-    /** The planner's search leg over clubs; {@code vectorLiteral} may be null as above. */
+    /**
+     * The planner's search leg over clubs; {@code vectorLiteral} may be null as
+     * above, and {@code prompt} is the filler-free text the event leg gets.
+     */
     public List<Scored<String>> plannerClubCandidates(String vectorLiteral, String prompt, int limit) {
         String sql = """
                 SELECT id, score FROM (
@@ -235,7 +264,8 @@ public class SearchRepository {
                 """.formatted(CLUB_TAGS_JOIN, CLUB_TEXT, ANY_WORD_QUERY);
         return jdbcTemplate.query(sql,
                 (rs, n) -> new Scored<>(rs.getString("id"), rs.getDouble("score")),
-                semanticWeight, new SqlParameterValue(Types.VARCHAR, vectorLiteral), keywordWeight, prompt,
+                semanticWeight, new SqlParameterValue(Types.VARCHAR, vectorLiteral), keywordWeight,
+                new SqlParameterValue(Types.VARCHAR, prompt == null || prompt.isBlank() ? null : prompt),
                 minScore, limit);
     }
 

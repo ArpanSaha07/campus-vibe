@@ -11,6 +11,7 @@ import com.campusvibe.event.EventRepository;
 import com.campusvibe.search.QueryEmbeddingCache;
 import com.campusvibe.search.SearchIndexService;
 import com.campusvibe.search.SearchRepository;
+import com.campusvibe.taxonomy.InterestCatalogueRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +42,13 @@ import java.util.stream.Collectors;
  *       events; after an events answer, their organizers, so a follow-up chip
  *       has something to point at</li>
  *   <li>the soonest events, so a prompt about now has candidates</li>
+ *   <li>the events tagged with a topic the prompt names</li>
  * </ul>
+ *
+ * <p>What the prompt names narrows the events ({@link PlannerIntent}): a day
+ * keeps every source inside it, so a day with nothing on offers no events; a
+ * topic keeps only events tagged with it or one of its children, whenever at
+ * least one exists (spec 2026-11-26-planner-topic-and-date-retrieval).
  *
  * <p>The model sees nothing else, and {@link PlannerAnswers} drops any pick
  * that is not one of these.
@@ -59,6 +66,7 @@ public class PlannerRetrievalService {
     private final ClubRepository clubRepository;
     private final EventMapper eventMapper;
     private final ClubMapper clubMapper;
+    private final InterestCatalogueRepository interestRepository;
 
     public PlannerRetrievalService(QueryEmbeddingCache queryEmbeddingCache,
                                    SearchRepository searchRepository,
@@ -66,7 +74,8 @@ public class PlannerRetrievalService {
                                    EventRepository eventRepository,
                                    ClubRepository clubRepository,
                                    EventMapper eventMapper,
-                                   ClubMapper clubMapper) {
+                                   ClubMapper clubMapper,
+                                   InterestCatalogueRepository interestRepository) {
         this.queryEmbeddingCache = queryEmbeddingCache;
         this.searchRepository = searchRepository;
         this.candidateRepository = candidateRepository;
@@ -74,6 +83,7 @@ public class PlannerRetrievalService {
         this.clubRepository = clubRepository;
         this.eventMapper = eventMapper;
         this.clubMapper = clubMapper;
+        this.interestRepository = interestRepository;
     }
 
     /** What the model is offered, best first, with what it needs to describe them. */
@@ -95,8 +105,14 @@ public class PlannerRetrievalService {
     @Transactional(readOnly = true)
     public Candidates retrieve(long userId, String prompt, String previousPrompt,
                                List<PlannerPickDTO> previousPicks, Instant now) {
-        int windowDays = (int) PlannerLimits.WINDOW.toDays();
+        PlannerIntent intent = PlannerIntent.parse(prompt, previousPrompt,
+                interestRepository.findAll().stream()
+                        .map(entry -> new PlannerIntent.Topic(entry.getSlug(), entry.getLabel(), entry.getParentSlug()))
+                        .toList(),
+                now);
+        PlannerIntent.Window window = intent.window(now);
         String searchText = previousPrompt == null ? prompt : prompt + "\n" + previousPrompt;
+        String keywords = PlannerIntent.keywordText(searchText);
         // Empty when the key is unset or the provider failed: search ranks by
         // keywords alone and the reply still runs.
         String vector = queryEmbeddingCache.embed(searchText).map(SearchIndexService::toVectorLiteral).orElse(null);
@@ -113,26 +129,30 @@ public class PlannerRetrievalService {
                 contextClubs.add(pick.id());
             }
         }
-        contextEvents.addAll(candidateRepository.fromClubs(contextClubs, windowDays, POOL));
+        contextEvents.addAll(candidateRepository.fromClubs(contextClubs, window, POOL));
 
         Map<Long, Double> eventScores = searchRepository
-                .plannerEventCandidates(vector, searchText, windowDays, POOL).stream()
+                .plannerEventCandidates(vector, keywords, window.from(), window.to(), POOL).stream()
                 .collect(Collectors.toMap(SearchRepository.Scored::id, SearchRepository.Scored::score, Math::max));
-        Set<Long> savedOrGoing = new LinkedHashSet<>(candidateRepository.savedOrGoing(userId, windowDays));
-        List<Long> soonest = candidateRepository.soonest(windowDays, POOL);
+        Set<Long> savedOrGoing = new LinkedHashSet<>(candidateRepository.savedOrGoing(userId, window));
+        List<Long> soonest = candidateRepository.soonest(window, POOL);
 
         Set<Long> eventIds = new LinkedHashSet<>(eventScores.keySet());
         eventIds.addAll(savedOrGoing);
-        eventIds.addAll(candidateRepository.fromFollowedClubs(userId, windowDays, POOL));
+        eventIds.addAll(candidateRepository.fromFollowedClubs(userId, window, POOL));
+        eventIds.addAll(candidateRepository.withTopics(intent.topics(), window, POOL));
         eventIds.addAll(contextEvents);
         eventIds.addAll(soonest);
 
-        Instant windowEnd = now.plus(PlannerLimits.WINDOW);
         // The previous answer's own events come in by id, so the window is
         // applied again here; every other source already applied it in SQL.
         Map<Long, Event> events = eventRepository.findAllById(eventIds).stream()
-                .filter(event -> event.getEndTime().isAfter(now) && event.getDateTime().isBefore(windowEnd))
-                .collect(Collectors.toMap(Event::getId, Function.identity()));
+                .filter(event -> event.getEndTime().isAfter(window.from()) && event.getDateTime().isBefore(window.to()))
+                .collect(Collectors.toMap(Event::getId, Function.identity(), (a, b) -> a, HashMap::new));
+        // A named topic filters whenever one event has it; with none, it is moot.
+        if (events.values().stream().anyMatch(event -> about(event, intent.topics()))) {
+            events.values().removeIf(event -> !about(event, intent.topics()));
+        }
 
         // After an events answer, the clubs that run those events.
         for (Long id : contextEvents) {
@@ -152,7 +172,7 @@ public class PlannerRetrievalService {
 
         List<String> organizers = rankedEvents.stream().map(PlannerRanker.EventFacts::organizerId).distinct().toList();
         Map<String, Double> clubScores = searchRepository
-                .plannerClubCandidates(vector, searchText, POOL).stream()
+                .plannerClubCandidates(vector, keywords, POOL).stream()
                 .collect(Collectors.toMap(SearchRepository.Scored::id, SearchRepository.Scored::score, Math::max));
 
         Set<String> clubIds = new LinkedHashSet<>(clubScores.keySet());
@@ -199,6 +219,10 @@ public class PlannerRetrievalService {
                     .forEach(club -> names.put(PlannerPickDTO.CLUB + ":" + club.getId(), club.getName()));
         }
         return names;
+    }
+
+    private static boolean about(Event event, Set<String> topics) {
+        return event.getTopicSlugs().stream().anyMatch(topics::contains);
     }
 
     private static boolean previousPicksInclude(List<PlannerPickDTO> picks, String kind, String id) {
