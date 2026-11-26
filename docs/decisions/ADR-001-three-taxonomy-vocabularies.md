@@ -1,8 +1,8 @@
 # ADR-001 — Interests, club categories and event tags
 
-**Status:** Proposed — only Arpan moves this to Accepted
+**Status:** Accepted
 **Date:** 2026-08-20
-**Approved by:** — (pending)
+**Approved by:** Arpan
 **Implemented in:** [`user-profiles.md`](../architecture/user-profiles.md) covers
 the interests half, which is built. The club and event halves are unbuilt; add
 their doc link when they land.

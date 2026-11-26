@@ -42,7 +42,7 @@ unreviewed since 2026-08-16.
 > **Resolved 2026-11-25 on `fix/integration-tests`, merged to `develop` by PR #85 — kept as a record.** From 2026-09-30
 > quay.io stopped serving `minio/minio` and `minio/mc` without a login, every
 > IT started MinIO, and the PR run lost 314 of 332 ITs while the stack job died
-> at `compose up` ([BUG-063](../bugs/bugs.md#bug-063)). Both were commented out
+> at `compose up` ([BUG-063](../bugs/fixed_bugs.md#bug-063)). Both were commented out
 > as `TEMP 2026-09-30`. The S3Mock swap
 > ([ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md)) restored both
 > blocks together: `_backend.yml` honours `run-integration-tests` again, and

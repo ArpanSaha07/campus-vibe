@@ -20,7 +20,7 @@
 
 CI runs the integration tests and starts the compose stack again, both of
 which have been off since 2026-09-30 because MinIO's images stopped pulling
-([BUG-063](../bugs/bugs.md#bug-063)). After this ships, the IT container and
+([BUG-063](../bugs/fixed_bugs.md#bug-063)). After this ships, the IT container and
 local compose run `adobe/s3mock`, both pull without a login, and a green PR
 again proves the ITs pass, not just the unit tests. BUG-063 closes on that
 green run.
@@ -115,7 +115,7 @@ smoke test — both green.
 
 - ADR-026 `Implemented in:`; ADR-011's status to *Superseded by ADR-026*,
   and its rows in `docs/decisions/README.md` and `docs/README.md`
-- [BUG-063](../bugs/bugs.md#bug-063) to `fixed_bugs.md`, citing the green run
+- [BUG-063](../bugs/fixed_bugs.md#bug-063) to `fixed_bugs.md`, citing the green run
 - `rules/ci-and-build.md`, `rules/backend-java.md`, `rules/aws-handling.md`
 - `ci-cd-pipeline.md`, `connecting-s3.md`, `s3-media/SKILL.md`
 - The `todo.md` item at line 38 to `tasks-completed.md`
