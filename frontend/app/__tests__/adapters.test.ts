@@ -25,6 +25,7 @@ const apiEvent: ApiEvent = {
   registered: 0,
   topics: ["Games"],
   formats: [],
+  sourceUrl: null,
 };
 
 const apiClub: ApiClub = {

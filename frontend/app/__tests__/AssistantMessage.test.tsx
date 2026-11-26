@@ -34,6 +34,7 @@ const event = (id: number, title: string, dateTime: string) =>
     registered: 0,
     topics: [],
     formats: [],
+    sourceUrl: null,
   } satisfies ApiEvent);
 
 const club = (id: string, name: string) =>

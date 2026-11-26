@@ -69,6 +69,7 @@ const hackNight = toEventInstance({
   registered: 0,
   topics: [],
   formats: [],
+  sourceUrl: null,
 });
 
 function renderNewChat(initialPrompt = "") {

@@ -139,7 +139,9 @@ export function toEventInstance(api: ApiEvent): EventInstance {
       address: "",
       mapUrl: "",
     },
-    price: api.price ?? "Free",
+    // An imported event with no price says nothing rather than "Free": the
+    // story simply did not mention one, which is not the same as free.
+    price: api.price ?? (api.sourceUrl ? "" : "Free"),
     organizer: api.organizerId,
     organizerName: api.organizerName,
     followers: api.followers,
@@ -149,6 +151,7 @@ export function toEventInstance(api: ApiEvent): EventInstance {
     registered: api.registered,
     topics: api.topics,
     formats: api.formats,
+    sourceUrl: api.sourceUrl ?? null,
   };
 }
 

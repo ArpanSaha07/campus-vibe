@@ -33,6 +33,7 @@ const chessEvent = toEventInstance({
   registered: 5,
   topics: [],
   formats: [],
+  sourceUrl: null,
 });
 
 const chessClub = toClub({

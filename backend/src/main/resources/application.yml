@@ -200,3 +200,56 @@ jwt:
   # Minimum 32 bytes for HS256; generate with: openssl rand -hex 32
   secret: ${JWT_SECRET}
   issuer: campusvibe
+
+# Instagram story auto-import (package com.campusvibe.instagram). Twice a day it
+# asks the story fetcher for the stories of the top enabled accounts, reads each
+# story image with Claude, and turns event announcements into candidates.
+# Events publish on their own; clicking one opens it on Instagram.
+campusvibe.instagram:
+  # The schedule only. The admin page's "Run now" works either way.
+  enabled: ${INSTAGRAM_IMPORT_ENABLED:false}
+  # Stories live 24h, so two runs 12h apart see every story at least once.
+  cron: ${INSTAGRAM_IMPORT_CRON:0 0 9,21 * * *}
+  zone: ${INSTAGRAM_IMPORT_ZONE:America/Toronto}
+  max-accounts: ${INSTAGRAM_IMPORT_MAX_ACCOUNTS:200}
+  lock-lease: ${INSTAGRAM_IMPORT_LOCK_LEASE:2h}
+  fetcher:
+    # Blank disables fetching. POST {base-url}/stories {"usernames": [...]}.
+    base-url: ${INSTAGRAM_FETCHER_URL:}
+    # Sent as x-api-key when set.
+    api-key: ${INSTAGRAM_FETCHER_API_KEY:}
+    batch-size: ${INSTAGRAM_FETCHER_BATCH_SIZE:20}
+    timeout: ${INSTAGRAM_FETCHER_TIMEOUT:5m}
+  extraction:
+    # Required for events to appear: Claude reads every story and post and
+    # decides what is an event. Blank means runs stop before fetching (no
+    # credit spent) and nothing is published.
+    api-key: ${ANTHROPIC_API_KEY:}
+    # Blank is Anthropic's API. Only for a proxy.
+    base-url: ${ANTHROPIC_BASE_URL:}
+    model: ${INSTAGRAM_EXTRACTION_MODEL:claude-haiku-5-5}
+    concurrency: ${INSTAGRAM_EXTRACTION_CONCURRENCY:4}
+    # Videos: send up to this many frames (needs ffmpeg) besides the thumbnail.
+    video-frames: ${INSTAGRAM_VIDEO_FRAMES:4}
+    ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+  auto-publish:
+    enabled: ${INSTAGRAM_AUTO_PUBLISH:true}
+    # Below this Claude was unsure it is a real upcoming event; it is kept but not shown.
+    min-confidence: ${INSTAGRAM_AUTO_PUBLISH_MIN_CONFIDENCE:0.7}
+  posts:
+    enabled: ${INSTAGRAM_POSTS_ENABLED:true}
+    # Newest posts per account per fetch. Each post costs fetcher credit.
+    limit: ${INSTAGRAM_POSTS_LIMIT:3}
+    # Posts do not expire: once a day is enough.
+    min-interval: ${INSTAGRAM_POSTS_MIN_INTERVAL:20h}
+    max-age: ${INSTAGRAM_POSTS_MAX_AGE:21d}
+  # Run once at startup when the last run is older than half a day, so a fresh
+  # deploy shows events without waiting for 9:00 or 21:00.
+  run-on-startup: ${INSTAGRAM_RUN_ON_STARTUP:true}
+  startup-stale-after: ${INSTAGRAM_STARTUP_STALE_AFTER:11h}
+  # Load the bundled McGill account list (instagram/mcgill-accounts.csv) when
+  # no accounts are stored yet.
+  seed-sources: ${INSTAGRAM_SEED_SOURCES:true}
+  # Stories rarely give an end time; an estimated one is start + this, and the
+  # event description says so.
+  default-duration: ${INSTAGRAM_DEFAULT_EVENT_DURATION:2h}

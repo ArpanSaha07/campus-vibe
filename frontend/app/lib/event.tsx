@@ -9,6 +9,15 @@ export async function listEvents(): Promise<EventInstance[]> {
 }
 
 /**
+ * Events that have not ended yet, soonest first — typed in by clubs or
+ * imported from their Instagram. What the homepage rows are built from.
+ */
+export async function listUpcomingEvents(): Promise<EventInstance[]> {
+	const events = await apiFetch<ApiEvent[]>(`/api/v1/events?upcoming=true`, PUBLIC_READ_CACHE.events);
+	return events.map(toEventInstance);
+}
+
+/**
  * One club's events, filtered by the backend.
  *
  * The club dashboard used to fetch every event in the system and filter it in

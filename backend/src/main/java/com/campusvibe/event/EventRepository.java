@@ -55,4 +55,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      */
     @EntityGraph(attributePaths = "organizer")
     List<Event> findByEndTimeAfterOrderByDateTimeAsc(Instant now);
+
+    /** Events starting in a window; the Instagram import checks these for duplicates. */
+    @EntityGraph(attributePaths = "organizer")
+    List<Event> findByDateTimeBetween(Instant from, Instant to);
 }

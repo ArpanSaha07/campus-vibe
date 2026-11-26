@@ -1,0 +1,203 @@
+{
+ "ok": true,
+ "account": {
+  "id": "pool-1"
+ },
+ "run": {
+  "id": "fixture",
+  "status": "SUCCEEDED",
+  "usageUsd": 0.0005
+ },
+ "count": 7,
+ "items": [
+  {
+   "id": "4037594621613434468",
+   "media_type": 1,
+   "taken_at": 1795538807,
+   "expiring_at": 1795625207,
+   "story_permalink": "https://www.instagram.com/stories/buss.mcgill/4037594621613434468/",
+   "image_versions": {
+    "items": [
+     {
+      "url": "https://scontent-yyz1-1.cdninstagram.com/v/fixture/0.jpg?sig=x",
+      "width": 1080,
+      "height": 1920
+     }
+    ]
+   },
+   "owner": {
+    "username": "buss.mcgill"
+   },
+   "creator_username": "buss.mcgill",
+   "creator_full_name": "Fixture Club",
+   "story_countdowns": [
+    {
+     "countdown_sticker": {
+      "text": "BEST DAY EVER \ud83c\udf1f\ud83c\udf1f",
+      "end_ts": 1795653001
+     }
+    }
+   ],
+   "story_feed_media": [
+    {
+     "media_code": "Dfh6fhNy9Gs",
+     "product_type": "feed"
+    }
+   ],
+   "story_link_url": null,
+   "caption_text": null,
+   "is_video": false
+  },
+  {
+   "id": "4037594959825141673",
+   "media_type": 1,
+   "taken_at": 1795538848,
+   "expiring_at": 1795625248,
+   "story_permalink": "https://www.instagram.com/stories/buss.mcgill/4037594959825141673/",
+   "image_versions": {
+    "items": [
+     {
+      "url": "https://scontent-yyz1-1.cdninstagram.com/v/fixture/1.jpg?sig=x",
+      "width": 1080,
+      "height": 1920
+     }
+    ]
+   },
+   "owner": {
+    "username": "buss.mcgill"
+   },
+   "creator_username": "buss.mcgill",
+   "creator_full_name": "Fixture Club",
+   "story_feed_media": [
+    {
+     "media_code": "DgIaEC9SU1B",
+     "product_type": "feed"
+    }
+   ],
+   "story_link_url": null,
+   "caption_text": null,
+   "is_video": false
+  },
+  {
+   "id": "4037887816161625644",
+   "media_type": 1,
+   "taken_at": 1795573759,
+   "expiring_at": 1795660159,
+   "story_permalink": "https://www.instagram.com/stories/buss.mcgill/4037887816161625644/",
+   "image_versions": {
+    "items": [
+     {
+      "url": "https://scontent-yyz1-1.cdninstagram.com/v/fixture/2.jpg?sig=x",
+      "width": 1080,
+      "height": 1920
+     }
+    ]
+   },
+   "owner": {
+    "username": "buss.mcgill"
+   },
+   "creator_username": "buss.mcgill",
+   "creator_full_name": "Fixture Club",
+   "story_feed_media": [
+    {
+     "media_code": "Df4tGB_xmRE",
+     "product_type": "feed"
+    }
+   ],
+   "story_link_url": null,
+   "caption_text": null,
+   "is_video": false
+  },
+  {
+   "id": "4037887940900282575",
+   "media_type": 2,
+   "taken_at": 1795573773,
+   "expiring_at": 1795660173,
+   "story_permalink": "https://www.instagram.com/stories/buss.mcgill/4037887940900282575/",
+   "image_versions": {
+    "items": [
+     {
+      "url": "https://scontent-yyz1-1.cdninstagram.com/v/fixture/3.jpg?sig=x",
+      "width": 1080,
+      "height": 1920
+     }
+    ]
+   },
+   "video_versions": [
+    {
+     "url": "https://scontent-yyz1-1.cdninstagram.com/o1/fixture/3.mp4",
+     "type": 101
+    }
+   ],
+   "owner": {
+    "username": "buss.mcgill"
+   },
+   "creator_username": "buss.mcgill",
+   "creator_full_name": "Fixture Club",
+   "story_feed_media": [
+    {
+     "media_code": "DgJIG3yJSAV",
+     "product_type": "feed"
+    }
+   ],
+   "story_link_url": null,
+   "caption_text": null,
+   "is_video": true
+  },
+  {
+   "id": "4037888009879853127",
+   "media_type": 1,
+   "taken_at": 1795573782,
+   "expiring_at": 1795660182,
+   "story_permalink": "https://www.instagram.com/stories/buss.mcgill/4037888009879853127/",
+   "image_versions": {
+    "items": [
+     {
+      "url": "https://scontent-yyz1-1.cdninstagram.com/v/fixture/4.jpg?sig=x",
+      "width": 1080,
+      "height": 1920
+     }
+    ]
+   },
+   "owner": {
+    "username": "buss.mcgill"
+   },
+   "creator_username": "buss.mcgill",
+   "creator_full_name": "Fixture Club",
+   "story_feed_media": [
+    {
+     "media_code": "DgJZPe-NqXS",
+     "product_type": "feed"
+    }
+   ],
+   "story_link_url": null,
+   "caption_text": null,
+   "is_video": false
+  },
+  {
+   "username": "ssmu_aeum",
+   "status": "user_not_found",
+   "stories_count": 0
+  },
+  {
+   "username": "mcgillaus",
+   "status": "user_not_found",
+   "stories_count": 0
+  },
+  {
+   "id": "999_1",
+   "media_type": 1,
+   "taken_at": 1795538807,
+   "owner": {
+    "username": "someone_else"
+   },
+   "image_versions": {
+    "items": [
+     {
+      "url": "https://scontent.cdninstagram.com/x.jpg"
+     }
+    ]
+   }
+  }
+ ]
+}

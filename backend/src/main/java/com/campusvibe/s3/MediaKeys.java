@@ -59,6 +59,25 @@ public final class MediaKeys {
      * segments are resolved. True for a key written before 2026-09-11 in the
      * old {@code logo-{filename}} shape, which is still this club's object.
      */
+    /**
+     * A story frame staged by the Instagram import, before (and independent of)
+     * any event. Served only to admins; an approved event gets its own copy
+     * under {@link #eventImage}.
+     */
+    public static String instagramStory(String handle, String storyId, byte[] bytes) {
+        if (handle == null || !handle.matches("[a-z0-9._]{1,30}") || handle.matches("\\.+")) {
+            throw new IllegalArgumentException("Not a usable Instagram handle for a media key");
+        }
+        if (storyId == null || !storyId.matches("[0-9]{1,40}")) {
+            throw new IllegalArgumentException("Not a usable story id for a media key");
+        }
+        return key("instagram-imports/" + handle + "/" + storyId, bytes);
+    }
+
+    public static boolean isInstagramStory(String key) {
+        return belongsUnder(key, "instagram-imports/");
+    }
+
     public static boolean belongsToClub(String key, String clubId) {
         return belongsUnder(key, "clubs/" + clubId + "/");
     }

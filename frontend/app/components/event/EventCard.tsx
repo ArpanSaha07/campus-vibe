@@ -4,6 +4,8 @@ import { EventInstance } from "@/app/types";
 import { FALLBACK_EVENT_IMAGE } from "@/app/lib/adapters";
 import { isOngoing } from "@/app/lib/event-time";
 import { formatEventDateShort } from "@/app/lib/event-zone";
+import { normaliseWebLink } from "@/app/lib/links";
+import EventPoster from "@/app/components/event/EventPoster";
 import EventLikeButton from "@/app/components/event/EventLikeButton";
 import EventShareButton from "@/app/components/event/EventShareButton";
 
@@ -21,6 +23,11 @@ export default function EventCard({ event }: { event: EventInstance }) {
   // events on a Montreal evening and a morning event all day after it ended.
   const ongoing = isOngoing(event);
   const almostFull = event.capacity > 0 && event.registered / event.capacity >= 0.75;
+  // Imported from Instagram: the card opens the post or story there, and the
+  // poster is shown whole rather than cropped to the frame.
+  const instagramUrl = normaliseWebLink(event.sourceUrl);
+  const linkClass =
+    "after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lavender-600";
 
   return (
     <div
@@ -31,13 +38,21 @@ export default function EventCard({ event }: { event: EventInstance }) {
         {/* Image */}
         <div className="block overflow-hidden h-40">
           <div className="relative w-full h-full">
-            <Image
-              src={event.images[0] || FALLBACK_EVENT_IMAGE}
-              alt={event.title}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              className="object-cover"
-            />
+            {instagramUrl ? (
+              <EventPoster
+                src={event.images[0] || FALLBACK_EVENT_IMAGE}
+                alt={event.title}
+                sizes="(max-width: 768px) 100vw, 400px"
+              />
+            ) : (
+              <Image
+                src={event.images[0] || FALLBACK_EVENT_IMAGE}
+                alt={event.title}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className="object-cover"
+              />
+            )}
           </div>
         </div>
 
@@ -74,32 +89,47 @@ export default function EventCard({ event }: { event: EventInstance }) {
 
       {/* Stub content */}
       <div className="px-4 pt-3 pb-4">
-        <Link
-          href={`/events/${event.eventId}`}
-          className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lavender-600"
-        >
-          <h3 className="font-semibold text-[15px] leading-snug line-clamp-2 text-ink-900 group-hover:text-lavender-800">
-            {event.title}
-          </h3>
-
-          <div className="mt-2 flex items-baseline justify-between font-mono text-xs text-ink-600">
-            <span>
-              {formatEventDateShort(event.dateTime)}
-            </span>
-            <span className="font-medium text-berry-600">{event.price}</span>
-          </div>
-
-          <p className="mt-1 text-xs text-ink-600 line-clamp-1">{event.location.name}</p>
-
-          <p className="mt-2 text-sm font-semibold text-lavender-600">
-            {event.organizerName}
-          </p>
-
-          {event.promoted && (
-            <p className="ticket-label text-ink-600/70 pt-2">Promoted</p>
-          )}
-        </Link>
+        {instagramUrl ? (
+          <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+            <CardStub event={event} instagram />
+          </a>
+        ) : (
+          <Link href={`/events/${event.eventId}`} className={linkClass}>
+            <CardStub event={event} />
+          </Link>
+        )}
       </div>
     </div>
+  );
+}
+
+/** The printed half of the card: title, date, price, place, club. */
+function CardStub({ event, instagram = false }: { event: EventInstance; instagram?: boolean }) {
+  return (
+    <>
+      <h3 className="font-semibold text-[15px] leading-snug line-clamp-2 text-ink-900 group-hover:text-lavender-800">
+        {event.title}
+      </h3>
+
+      <div className="mt-2 flex items-baseline justify-between font-mono text-xs text-ink-600">
+        <span>
+          {formatEventDateShort(event.dateTime)}
+        </span>
+        <span className="font-medium text-berry-600">{event.price}</span>
+      </div>
+
+      <p className="mt-1 text-xs text-ink-600 line-clamp-1">{event.location.name}</p>
+
+      <p className="mt-2 text-sm font-semibold text-lavender-600">
+        {event.organizerName}
+      </p>
+
+      {event.promoted && (
+        <p className="ticket-label text-ink-600/70 pt-2">Promoted</p>
+      )}
+      {instagram && (
+        <p className="mt-2 text-xs font-semibold text-ink-600">View on Instagram ↗</p>
+      )}
+    </>
   );
 }
