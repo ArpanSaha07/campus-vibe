@@ -1,6 +1,6 @@
 # Connecting RDS PostgreSQL
 
-**Code as of:** `11c9993` · **Account read:** 2026-09-15, read-only
+**Code as of:** `0f4e1df` (scheduled refresh 2026-11-26: re-read `11c9993..0f4e1df` of the mapped paths; the only change is a MinIO-to-S3Mock word in a `_database.yml` comment, which nothing here describes) · **Account read:** 2026-09-15, read-only
 **Order:** 1 of 4 — before [`connecting-elastic-beanstalk.md`](connecting-elastic-beanstalk.md), whose first deploy is the first Flyway run against this database.
 **Related:** [`connecting-beanstalk-to-rds.md`](connecting-beanstalk-to-rds.md) (the security-group walkthrough, already done) · guide §5–§7, §14 in [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md)
 

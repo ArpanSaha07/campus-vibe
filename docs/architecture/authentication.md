@@ -1,16 +1,14 @@
 # Authentication
 
-**Code as of:** `01e3b30`, **plus the uncommitted V10 provider work of
-2026-08-15** — every claim below was read from the code, and the endpoint
-behaviours were measured against a running stack the same day. Re-stamp with the
-real sha once that work is committed.
+**Code as of:** `0f4e1df` — re-read against `git diff 01e3b30..0f4e1df` and the current files under `backend/.../auth/`, `jwt/`, `mail/`, `frontend/app/lib/auth-context.tsx`, `auth-errors.ts`, `user.tsx` and `components/auth-components/`, as a scheduled refresh on 2026-11-26.
 
-**Except the Google button**, whose section was re-read against `b0c5e63` plus
-the uncommitted BUG-057 fix on 2026-09-15 and rewritten
-([ADR-018](../decisions/ADR-018-google-renders-and-styles-its-own-button.md)).
-The whole-doc stamp above is deliberately **not** raised to that sha: the other
-114 commits it sits behind were not re-read, and a stamp claiming they were is
-worth less than one that is honest about its age.
+Files outside those paths (`security/`, `exception/`, `user/`, migrations,
+`api.tsx`, `authValidator.ts`, config) were checked only where this doc cites a
+line number, and those cites corrected; their prose was not re-read. The
+*Measured behaviour* tables are from the 2026-08-15 probes and were not re-run.
+The Google button section was last rewritten on 2026-09-15 for BUG-057
+([ADR-018](../decisions/ADR-018-google-renders-and-styles-its-own-button.md))
+and still matches the code.
 
 **Authors:** written by the agent that switched on Google sign-in and removed
 the old `/login` page. **No `security` agent has reviewed it.** The findings in
@@ -50,8 +48,8 @@ server log. Both are written up in the todo.
 ## Read this before you change anything here
 
 - **The token is the contract.** `JWTUtil.issueToken` (`JWTUtil.java:54`) is the
-  only place a session is created, and all three entry points funnel through
-  `AuthenticationService.respondWithToken` (`AuthenticationService.java:86`).
+  only place a session is created, and all three sign-in entry points funnel through
+  `AuthenticationService.respondWithToken` (`AuthenticationService.java:287`).
   Change the claim shape and you change `JWTAuthenticationFilter`,
   `user-roles.md` and the frontend at once.
 - **The JWT deliberately carries identity and roles only** — no club ids, no
@@ -80,7 +78,7 @@ server log. Both are written up in the todo.
   owns `apiFetch` and the rule that authenticated responses never enter the
   shared cache.
 - **The one invariant that is easy to break:** every user must have `ROLE_USER`.
-  `defaultRole()` (`AuthenticationService.java:92`) throws at runtime rather
+  `defaultRole()` (`AuthenticationService.java:293`) throws at runtime rather
   than creating it, because the row is seeded by Flyway V7.
 
 ---
@@ -117,27 +115,52 @@ revocation mechanism the system currently has.
 ### Backend
 
 #### `auth/AuthenticationController.java`
-Four public entry points under `api/v1/auth`: `login`, `register`, `google`, and
-`GET email-status`. All three POSTs are `@Valid` and strongly typed. Each
+Eight endpoints under `api/v1/auth`. Three sign in and return a session:
+`login`, `register`, `google` (`AuthenticationController.java:29-51`); each
 success returns the token both in the body and in an `Authorization` response
-header; the frontend reads the body and ignores the header.
+header, and the frontend reads the body and ignores the header. `GET
+email-status` (`:62`) answers the signup collision hint. Four serve the mail
+flows and all answer 204 with no body: `forgot-password` (`:77`, always 204 -
+the Javadoc at `:68-76` says why), `reset-password` (`:89`, 204 rather than a
+session), `verify-email` (`:97`, unauthenticated, the token is the proof) and
+`resend-verification` (`:108`, the only one that **requires** a session, so it
+cannot be aimed at a stranger's inbox). Every request body is `@Valid` and a
+typed record; the three mail-flow bodies live together in
+`PasswordResetRequests.java`, whose new password carries the same
+`@Size(min = 8, max = 72)` as registration (`:20`).
 
 The class carries `@Validated`, which is what makes the constraints on the
 `email-status` `@RequestParam` fire - `@Valid` alone covers request bodies only.
 The unused `GET /health` was removed; actuator already answers that.
 
 #### `auth/AuthenticationService.java`
-All three flows and the single token-issuing path.
+The three sign-in flows, the two mail flows and the single token-issuing path.
 
-- `login` (`:40`) delegates to Spring's `AuthenticationManager` and returns a
-  token for the authenticated principal.
-- `register` (`:52`) rejects a duplicate email with `DuplicateResourceException`
-  (→ 409), bcrypt-hashes the password, attaches `ROLE_USER`, and signs the user
-  straight in — there is no verification step between registering and having a
-  valid session.
-- `googleSignIn` (`:66`) verifies the ID token, then **finds or creates** a user
-  keyed on the email in the token.
-- `respondWithToken` (`:86`) is the only caller of `JWTUtil.issueToken`.
+- `login` (`:66`) refuses a locked account before any bcrypt (`:70`), delegates
+  to Spring's `AuthenticationManager`, records the failure or success with the
+  rate limiter (`:84`, `:88`), and — only when
+  `campusvibe.auth.require-verified-email` is on — throws
+  `EmailNotVerifiedException` for an unconfirmed address (`:94`).
+- `emailStatus` (`:113`) is the deliberate enumeration point; see *Design
+  decisions*.
+- `register` (`:120`) rejects a duplicate email with a provider-aware
+  `DuplicateResourceException` (→ 409, `:126-129`), bcrypt-hashes the password,
+  attaches `ROLE_USER`, mails a confirmation link (`:138`) and signs the user
+  straight in — the link does not gate the session unless the switch above is on.
+- `googleSignIn` (`:143`) verifies the ID token, refuses an unverified Google
+  email (`:153`), then **finds or creates** a user keyed on the email in the
+  token; a created account is `GOOGLE`, has no password and is marked verified
+  (`:165-168`).
+- `requestPasswordReset` (`:191`) mails a link only to a `LOCAL` account
+  (`:194`) and is silent about everything else. `resetPassword` (`:223`)
+  redeems the token, sets the new hash, marks the address verified and clears
+  the lockout counter (`:232-236`).
+- `sendVerificationEmail` (`:243`, a no-op for a verified account),
+  `verifyEmail` (`:261`) and `resendVerification` (`:274`) are the
+  confirmation flow. Both mails build their links as
+  `<appBaseUrl>/?auth=reset-password&token=…` and `?auth=verify-email&token=…`
+  (`:205`, `:253`), which is what `AuthModalUrlTrigger` reads.
+- `respondWithToken` (`:287`) is the only caller of `JWTUtil.issueToken`.
 
 #### `auth/GoogleTokenVerifier.java`
 Wraps Google's `GoogleIdTokenVerifier`, built once at startup with the audience
@@ -172,7 +195,10 @@ tokens defend credentials the *browser* attaches unprompted, and a cross-site
 form cannot set an `Authorization` header. **The condition under which this stops
 being true is written down**: moving the JWT into a cookie
 ([BUG-003](../bugs/bugs.md#bug-003)) must re-enable CSRF in the same change.
-Three POST endpoints are `permitAll`; `/actuator/**`,
+Six POST endpoints are `permitAll` — the three sign-ins plus
+`forgot-password`, `reset-password` and `verify-email`
+(`SecurityFilterChainConfig.java:61-70`); `resend-verification` is not, so it
+needs a session. `/actuator/**`,
 `/api/v1/auth/email-status` and public club/event reads are `permitAll` for
 GET; everything else requires authentication.
 
@@ -208,7 +234,7 @@ them. Verified: probes 3, 4 and 15 below.
 
 #### `security/CorsConfig.java`
 Origins from `cors.allowed-origins`, defaulting to `http://localhost:3000`
-(`application.yml:39`). Applied to `/api/**` only. `Authorization` is both an
+(`application.yml:44`). Applied to `/api/**` only. `Authorization` is both an
 allowed and an exposed header.
 
 #### `jwt/JWTUtil.java`
@@ -255,7 +281,19 @@ classes because `@ConditionalOnMissingBean` is only dependable that way.
 `AppMailProperties.appBaseUrl` is the **frontend** address, not the API — a
 reset link has to open a page a human can type into, and it cannot be derived
 from the request, which arrives from the frontend server rather than the
-browser.
+browser. The record (`campusvibe.mail.*`) also defaults the sender to
+`no-reply@campusvibe.local`, strips a trailing slash from the base URL, and sets
+the link lifetimes: one hour for a reset, 24 hours for a confirmation
+(`AppMailProperties.java:28-35`).
+
+`SmtpMailSender` sends a plain-text `SimpleMailMessage` and catches every
+exception (`SmtpMailSender.java:33-45`), logging the recipient and subject but
+never the body. `LoggingMailSender` logs the whole body, links included
+(`LoggingMailSender.java:31-39`) — correct locally, a credential leak in
+production, which is why it only exists when no SMTP host is set. Both scrub
+what they log through `common/Logs` (`safe`, and `safeBlock` for the body),
+because the recipient and the name in the body are caller-supplied text
+([BUG-033](../bugs/fixed_bugs.md#bug-033)).
 
 #### `user/User.java` · `user/AuthProvider.java`
 `User` is the JPA entity *and* the Spring Security principal. `password` is
@@ -309,37 +347,70 @@ Gated on `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (`:56`): unset, it renders *Google
 sign-in is not configured* (`:187`) instead of a dead button.
 
 #### `app/components/auth-components/AuthModal.tsx` and its views
-`LoginView`, `SignupChoiceView`, `EmailSignupView`, `RecoverPasswordView`, over
-`AuthTextField` and `AuthDivider`. `SignupChoiceView` and `LoginView` each mount
-a `GoogleAuthButton`.
+Six views, switched on `state.view` (`AuthModal.tsx:145-162`): `SignupChoiceView`,
+`EmailSignupView`, `LoginView`, `RecoverPasswordView`, `ResetPasswordView` and
+`VerifyEmailView`, over `AuthTextField` and `AuthDivider`. `SignupChoiceView`
+and `LoginView` each mount a `GoogleAuthButton`, with GIS `text` set to
+`continue_with` and `signin_with` respectively (`SignupChoiceView.tsx:29`,
+`LoginView.tsx:55`). `EmailSignupView` calls `checkEmailStatus` when the email
+field loses focus (`EmailSignupView.tsx:52`, `:106`), through the `onBlur` and
+`hint` props `AuthTextField` gained for it.
 
-**`RecoverPasswordView.tsx` is a deliberate stub and says so** (`:10-14`): it
-validates the address and shows *Check your email*, and sends nothing. The
-confirmation text it shows is a lie to the user today.
+**`RecoverPasswordView.tsx` is no longer a stub.** It POSTs `forgot-password`
+and shows *Check your email* whatever comes back, swallowing errors on purpose
+(`RecoverPasswordView.tsx:11-17`, `:36-43`): reporting a failure would turn the
+screen into the account oracle the 204 exists to prevent.
+
+**`ResetPasswordView.tsx`** is where a reset link lands. It checks length and
+that the two fields match before submitting (`:35-42`), refuses to submit
+without a token (`:45`), and on a dead link offers *Request a new link*, which
+goes back to `recover` (`:109-120`).
+
+**`VerifyEmailView.tsx`** redeems the token on mount, guarded by a ref so
+Strict Mode's double effect does not spend a single-use token twice
+(`:25-46`). Its failure text tells the user to *sign in and we will send you a
+fresh one* (`:88-89`) — see *Known gaps*, item 5c: nothing does that yet.
+
+Error text in these views, and in `GoogleAuthButton`, goes through
+`parseApiError` (`app/lib/auth-errors.ts:4`), which digs the backend's
+`ApiError.message` out of the JSON body `apiFetch` puts in `Error.message`, and
+falls back to a view-specific sentence. It is now used well beyond auth.
 
 #### `app/components/auth-components/GoogleProvider.tsx`
-Loads `https://accounts.google.com/gsi/client` once from the root layout. Note
-`GoogleAuthButton` also loads the same script defensively (`:160-174`), guarding
-on the existing tag — so the provider is not strictly required.
+Loads `https://accounts.google.com/gsi/client` once from the root layout, as a
+head start rather than a gate: it holds no loaded state and gates nothing
+(`GoogleProvider.tsx:4-12`). `GoogleAuthButton` owns readiness itself and also
+loads the same script defensively (`GoogleAuthButton.tsx:160-174`), guarding on
+the existing tag — so the provider is not strictly required.
 
 #### `app/components/auth-components/AuthModalUrlTrigger.tsx` · `AuthTrigger.tsx`
 Added 2026-08-14 with the `/login` removal. The first turns `?auth=<view>` into
-an open modal and strips the parameter; the second lets a Server Component
+an open modal and strips the parameter — and, since the mail flows, a `token`
+parameter too, handed to the view and deleted from the URL because it is a live
+single-use credential (`AuthModalUrlTrigger.tsx:35-52`); an unrecognised view
+falls back to `login` (`:40-42`). The second lets a Server Component
 parent raise the modal. Both exist because middleware and Server Components
 cannot call `useAuthModal`.
 
 #### `app/lib/api.tsx`
 `getToken` / `setToken` / `clearToken` over `localStorage['cv_jwt']` (`:42-57`),
-and `apiFetch`, which attaches the bearer token when `auth: true` (`:98-101`)
-and refuses to cache authenticated responses (`:87-92`).
+and `apiFetch`, which attaches the bearer token when `auth: true` (`:91-94`)
+and refuses to cache authenticated responses (`:107-115`).
 
 #### `app/lib/user.tsx` · `app/lib/auth-context.tsx`
-`login`, `register`, `googleSignIn` each POST and store the returned token;
-`checkEmailStatus` backs the signup collision hint; `me()` re-reads the user
-from the token on load.
+`login`, `register`, `googleSignIn` each POST and store the returned token
+(`user.tsx:4-29`); `checkEmailStatus` backs the signup collision hint (`:108`);
+`me()` re-reads the user from the token on load (`:31`). The mail flows have one
+wrapper each: `requestPasswordReset`, `resetPassword`, `verifyEmail` and
+`resendVerification` (`:61-90`); the first carries a warning not to add error
+handling that would let the two 204 cases be told apart. `updateMyName`
+(`:46`) PATCHes `/users/me` for the profile editor.
 `auth-context` holds `user`, `isAuthenticated`, `loading` and exposes the three
 sign-in calls plus `logout`, which **only clears localStorage** — the token
-stays valid server-side until it expires.
+stays valid server-side until it expires (`auth-context.tsx:71-74`). It also
+exposes `refreshUser` and `applyUser` (`:76-84`), because `user` is fetched
+once on mount and a rename from `/profile/edit` would otherwise leave the
+navbar stale until a reload; `applyUser` takes a response already in hand.
 
 #### `app/lib/validators/authValidator.ts`
 Client-side field checks, with the header comment stating the intent: name the
@@ -355,7 +426,7 @@ nonsense.
 ```
 Browser                          CampusVibe backend            Google
    │ click Continue with Google
-   │  → forwarded to the hidden GIS button
+   │  (Google's own GIS-rendered button, not ours)
    │────────────────────────────────────────────────────────────▶ popup
    │◀──────────────────────────────────────────── ID token (JWT, RS256)
    │ POST /api/v1/auth/google { idToken }
@@ -374,7 +445,7 @@ Browser                          CampusVibe backend            Google
 **Configuration, and why there are two variables for one value.** The same
 public client id is needed in two places for two different reasons:
 `GOOGLE_CLIENT_ID` is the audience the backend validates against
-(`application.yml:54`, passed through at `docker-compose.yml:69`), and
+(`application.yml:77`, passed through at `docker-compose.yml:111`), and
 `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is inlined into the browser bundle so GIS can
 start the flow. The second is a **build-time** inline, so changing it requires
 recreating the frontend container, not just a `compose watch` sync. Both blank
@@ -387,9 +458,9 @@ redirect. Origins are currently registered for localhost and the production
 domain.
 
 **What Google's token is checked for, and what it is not.** The library verifies
-signature, issuer, audience and expiry. The application then reads `email` and
-`name` (`AuthenticationService.java:73-74`) and **does not read
-`email_verified`** — see *Known gaps*.
+signature, issuer, audience and expiry. The application then refuses a payload whose
+`email_verified` is not true (`AuthenticationService.java:153`, BUG-031) and
+only then reads `email` and `name` (`:157-158`).
 
 ---
 
@@ -403,7 +474,7 @@ signature, issuer, audience and expiry. The application then reads `email` and
 | Identity + roles in the token, nothing else | A token outlives the state it describes; club ownership in a claim becomes an authorisation bug the moment ownership changes | Embedding permissions or club ids to save a query | Saves one DB read per request, buys stale-authorisation bugs. Explicitly reasoned at `JWTUtil.java:48-53` |
 | Load the user from the DB on every request | Deleted or altered users must stop working immediately; it is the only revocation the system has | Trusting the claims and skipping the read | Faster; a deleted user's token keeps working for 15 days |
 | bcrypt at library defaults | Standard, adaptive, well-understood; no tuning to get wrong | Argon2id — better, and another dependency plus parameter choices | See *Known gaps*: cost factor is undeclared |
-| ID-token flow, not the OAuth code flow | The backend verifies an ID token; `accounts.id` is the only GIS surface that issues one | `accounts.oauth2` code flow — allows a fully custom button, returns a code, would mean rewriting `GoogleTokenVerifier` and `AuthenticationService`. Reasoning at `GoogleAuthButton.tsx:18-20` | The hidden-button hack disappears; two backend classes change |
+| ID-token flow, not the OAuth code flow | The backend verifies an ID token; `accounts.id` is the only GIS surface that issues one | `accounts.oauth2` code flow — allows a fully custom button, returns a code, would mean rewriting `GoogleTokenVerifier` and `AuthenticationService`. Weighed as option C in [ADR-018](../decisions/ADR-018-google-renders-and-styles-its-own-button.md) | A design-owned button becomes possible again; two backend classes change |
 | Fail fast on a missing or short `JWT_SECRET` | A default secret in a committed file signs forgeable tokens in every environment that forgets to set it | Generating a random secret at boot — every restart silently logs everyone out | Reasoned at `JWTUtil.java:31-33` |
 
 ### Task-specific
@@ -424,7 +495,7 @@ sequenced after this migration rather than before.
 
 **Consequence of reverting:** `EmailPasswordAuthenticationProvider` would call
 `passwordEncoder.matches(raw, null)` for a Google account. The null guard at
-`:29` is what makes the nullable column safe, and it rejects with the same
+`:35` is what makes the nullable column safe, and it rejects with the same
 `Invalid credentials` as a wrong password — deliberately, so that login does not
 become a way to ask which provider owns an address.
 
@@ -463,7 +534,7 @@ full authentication bypass again.
 
 **Login does not distinguish unknown email from wrong password, but register
 does.** `UsernameNotFoundException` is deliberately remapped to `Invalid
-credentials` / 401 (`DefaultExceptionHandler.java:74-85`), closing enumeration
+credentials` / 401 (`DefaultExceptionHandler.java:110-122`), closing enumeration
 on login. `register` then reopens it by returning 409 *An account with this
 email already exists*. Both measured below. The trade is real — a signup form
 that cannot say *you already have an account* is worse UX — but it should be a
@@ -688,7 +759,29 @@ Ordered by how much they matter. Items 1, 2, 8, 9 and 12 were **fixed on
 
 5b. **Reset and verification mail is plain text only**, and delivery is
    fire-and-forget on the request thread. Fine at this volume; a slow SMTP
-   server will slow the `forgot-password` response.
+   server will slow the `forgot-password` response. That slowdown falls only on
+   a real `LOCAL` address (`AuthenticationService.java:193-210`), while an
+   unknown or Google address returns without touching the mail server — the
+   *noticeably different response time* the controller's own Javadoc names as
+   an account oracle (`AuthenticationController.java:71-75`). Invisible with the
+   logging sender; real once SMTP is configured. Not measured.
+
+5c. **Nothing in the UI can resend a confirmation link.** `resendVerification`
+   exists on both sides (`AuthenticationController.java:108`, `user.tsx:85`)
+   but no component calls it, and nothing renders `user.emailVerified`. Yet
+   `VerifyEmailView` tells a user whose link failed to *sign in and we will send
+   you a fresh one* (`VerifyEmailView.tsx:88-89`), and signing in sends nothing
+   (`AuthenticationService.java:66-100`). With the sign-in gate off it strands
+   nobody today: the club-invitation check that needs a verified address is
+   itself behind `campusvibe.auth.require-verified-email-for-invitations`, off
+   by default since `20b39bd` ([`club-administration.md`](club-administration.md)).
+   It matters again the moment either switch is turned on.
+
+5d. **`forgot-password`, `reset-password` and `verify-email` have no per-IP
+   budget.** `AuthRateLimitFilter` covers only `/login`, `/register`, `/google`
+   and `/email-status` (`AuthRateLimitFilter.java:31-34`), so each
+   `forgot-password` call mails a real address unthrottled. Already queued as a
+   P1 in [`todo.md`](../TODO/todo.md), to land before a real mail provider.
 
 6. **A token cannot be revoked, and logout is client-side only.**
    `auth-context.logout` clears `localStorage`; the token stays valid for the
