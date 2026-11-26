@@ -64,6 +64,7 @@ public class InstagramPublishService {
     private final MediaBucket mediaBucket;
     private final EventRepository eventRepository;
     private final SearchIndexService searchIndexService;
+    private final InstagramSourceRepository sources;
 
     public InstagramPublishService(InstagramEventCandidateRepository candidates,
                                    EventService eventService,
@@ -75,7 +76,8 @@ public class InstagramPublishService {
                                    S3Service s3Service,
                                    MediaBucket mediaBucket,
                                    EventRepository eventRepository,
-                                   SearchIndexService searchIndexService) {
+                                   SearchIndexService searchIndexService,
+                                   InstagramSourceRepository sources) {
         this.candidates = candidates;
         this.eventService = eventService;
         this.taxonomyService = taxonomyService;
@@ -87,6 +89,7 @@ public class InstagramPublishService {
         this.mediaBucket = mediaBucket;
         this.eventRepository = eventRepository;
         this.searchIndexService = searchIndexService;
+        this.sources = sources;
     }
 
     @Transactional
@@ -101,7 +104,7 @@ public class InstagramPublishService {
         }
         InstagramSource source = c.getSource();
         InstagramStory media = c.getStory();
-        Club club = clubFor(source);
+        Club club = c.getHostHandle() != null ? hostClub(c.getHostHandle(), c.getHostedBy(), source) : clubFor(source);
 
         Event event = new Event();
         event.setTitle(c.getTitle());
@@ -196,6 +199,70 @@ public class InstagramPublishService {
     }
 
     // ------------------------------------------------------------------ clubs
+
+    /**
+     * The club of the account hosting a reposted event (Arpan, 2026-11-26).
+     * Found the same way as a watched account's club; a host the import has
+     * never seen gets an account row, at the end of the ranked list, and a
+     * club of its own like any other imported account.
+     */
+    Club hostClub(String handle, String hostedBy, InstagramSource postedBy) {
+        InstagramSource host = sources.findByHandle(handle).orElseGet(() -> {
+            InstagramSource s = new InstagramSource();
+            s.setHandle(handle);
+            s.setDisplayName(hostNameFrom(hostedBy));
+            s.setPriority(sources.maxPriority() + 1);
+            s.setFoundOn("repost by @" + postedBy.getHandle());
+            s.setEnabled(true);
+            return sources.save(s);
+        });
+        return clubFor(host);
+    }
+
+    /** "The Factory (@thefactory_mcgill)" gives "The Factory"; a bare handle gives null. */
+    static String hostNameFrom(String hostedBy) {
+        if (hostedBy == null) return null;
+        String name = hostedBy.replaceAll("\\(?@[A-Za-z0-9._]+\\)?", "").replaceAll("\\s+", " ").strip();
+        if (name.isEmpty()) return null;
+        return name.length() > 120 ? name.substring(0, 120) : name;
+    }
+
+    /**
+     * Moves an event published before V44 from the club that reposted it to
+     * its host's club, once. Checks the host against the story the same way a
+     * new candidate is checked. Leaves alone an event someone already moved.
+     *
+     * @return true when the event moved
+     */
+    @Transactional
+    public boolean checkHost(Long candidateId) {
+        InstagramEventCandidate c = candidates.findByIdForUpdate(candidateId).orElse(null);
+        if (c == null || Boolean.TRUE.equals(c.getHostChecked())) return false;
+        InstagramSource source = c.getSource();
+        InstagramStory story = c.getStory();
+        String handle = CandidateRules.verifiedHostHandle(null, c.getHostedBy(), source.getHandle(),
+                story.getMentions(), story.getOcrText(), story.getCaption());
+        c.setHostHandle(handle);
+        boolean moved = false;
+        if (handle != null && c.getStatus() == InstagramEventCandidate.Status.PUBLISHED && c.getEventId() != null) {
+            Event event = eventRepository.findById(c.getEventId()).orElse(null);
+            Club posting = source.getClub();
+            if (event != null && posting != null && posting.getId().equals(event.getOrganizer().getId())) {
+                Club host = hostClub(handle, c.getHostedBy(), source);
+                if (!host.getId().equals(posting.getId())) {
+                    event.setOrganizer(host);
+                    // Flushed before indexing: the index write is JDBC (BUG-034), and
+                    // the event's embedded text names its organizer (BUG-006).
+                    Event saved = eventRepository.saveAndFlush(event);
+                    searchIndexService.indexEvent(saved);
+                    moved = true;
+                    log.info("Moved event {} from [{}] to its host [{}]", saved.getId(), posting.getId(), host.getId());
+                }
+            }
+        }
+        c.setHostChecked(true);
+        return moved;
+    }
 
     private Club clubFor(InstagramSource source) {
         if (source.getClub() != null) {

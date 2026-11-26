@@ -87,6 +87,24 @@ An event needs a club. `InstagramPublishService.clubFor` links the account to a
 club whose contact links already name it, else creates one named after the
 account and owned by the oldest platform admin (ADR-004: never ownerless).
 
+**A reposted event goes to its host's club, not the club that shared it**
+(Arpan, 2026-11-26). Clubs share each other's posters in their stories all the
+time; the 2026-11-26 local runs had 27 reposts among 68 candidates, every one
+filed under the sharing club. Claude returns the host's handle
+(`StoryExtraction.hostHandle`) as written on the reshared card, a mention sticker,
+the poster or the caption, and is given the story's mentions (stored since V43, so
+a retried story keeps them). `CandidateRules.verifiedHostHandle` accepts it only if
+the story itself shows it, as a mention or a whole token in the image text or
+caption, and never the posting account; otherwise the event stays with the poster.
+That check is what stops a guessed handle, or one planted in a caption, from moving
+an event to any club. A verified handle is kept on the candidate (`host_handle`,
+V44) and `publish` uses `hostClub`, which finds or creates the host's club the same
+way, adding the host to the end of the ranked list when it is new. The fetcher does
+not say who posted a reshared post (only its `media_code`), which is why the handle
+comes from what Claude reads. `InstagramHostBackfill` ran the same check once over
+candidates from before V44 and moved their published events (Arpan: move existing
+too); locally it moved 11 and created 10 host clubs.
+
 `events.source_url` (V39) is the permanent link: the post, or for a story the post
 it reshared or the account profile. A story also keeps its own link and expiry;
 `Event.currentSourceUrl` returns the story while it is up. `EventDTO.sourceUrl`

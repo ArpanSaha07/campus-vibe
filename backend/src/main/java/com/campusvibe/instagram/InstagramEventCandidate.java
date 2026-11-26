@@ -81,6 +81,17 @@ public class InstagramEventCandidate {
     @Column(name = "is_repost", nullable = false)
     private Boolean repost = false;
 
+    /**
+     * The hosting account when another club reposted the event, verified
+     * against the story itself (V44); the event is published to its club.
+     */
+    @Column(name = "host_handle")
+    private String hostHandle;
+
+    /** The host check has run for this candidate. False only on rows from before V44. */
+    @Column(name = "host_checked", nullable = false)
+    private Boolean hostChecked = false;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private List<String> topics = new ArrayList<>();

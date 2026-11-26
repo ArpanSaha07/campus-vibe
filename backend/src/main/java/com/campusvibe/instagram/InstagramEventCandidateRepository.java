@@ -15,6 +15,10 @@ import java.util.Optional;
 
 public interface InstagramEventCandidateRepository extends JpaRepository<InstagramEventCandidate, Long> {
 
+    /** Candidates from before V44 whose host has not been checked yet. */
+    @Query("SELECT c.id FROM InstagramEventCandidate c WHERE c.hostChecked = false ORDER BY c.id")
+    List<Long> findHostUncheckedIds();
+
     @EntityGraph(attributePaths = {"story", "source", "source.club"})
     List<InstagramEventCandidate> findByStatusInOrderByCreatedAtDesc(
             Collection<InstagramEventCandidate.Status> statuses, Limit limit);

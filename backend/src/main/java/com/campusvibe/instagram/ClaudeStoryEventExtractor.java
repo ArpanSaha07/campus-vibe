@@ -159,8 +159,12 @@ public class ClaudeStoryEventExtractor implements StoryEventExtractor {
                 shown, leave it empty. A wrong date is worse than a missing one.
                 - One story can announce several events; return each one. A countdown sticker \
                 usually ends when the event starts.
-                - A poster from another club, or a story that credits '@otherclub' as host, is a \
-                repost: set repost to true and name the host in hostedBy.
+                - Clubs often share other clubs' events in their stories. A poster from another \
+                club, a reshared post (Instagram shows the original account's username on the \
+                shared card), or a story that credits '@otherclub' as host, is a repost: set \
+                repost to true, name the host in hostedBy, and copy the host's handle into \
+                hostHandle exactly as written. Mentioned accounts listed below are often the \
+                host. A collaboration the posting account co-hosts is not a repost.
                 - Recaps, thank-yous and photo dumps of finished events are PAST_EVENT with no events.
                 - An event is something students can show up to at a stated date: workshops, \
                 socials, parties, talks, panels, games and sports matches, performances, \

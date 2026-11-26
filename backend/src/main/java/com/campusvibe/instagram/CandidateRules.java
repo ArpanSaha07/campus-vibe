@@ -16,6 +16,68 @@ import java.util.*;
  */
 final class CandidateRules {
 
+    private static final java.util.regex.Pattern HANDLE = java.util.regex.Pattern.compile("[a-z0-9._]{1,30}");
+    private static final java.util.regex.Pattern AT_HANDLE = java.util.regex.Pattern.compile("@([A-Za-z0-9._]{1,30})");
+
+    /**
+     * The handle of the account hosting a reposted event, or null.
+     *
+     * <p>Only a handle the story itself shows is accepted: one of its mentions
+     * or tags, or one written in the image text or the caption. Claude reads
+     * the handle off the poster, but a handle it inferred from a name, or one
+     * planted in a caption as an instruction, would otherwise move an event to
+     * any club; requiring it in the evidence keeps the choice to what the
+     * story says. The posting account is never its own host.
+     *
+     * @param claimed  the handle Claude returned, with or without @
+     * @param hostedBy the host's name as Claude wrote it; an @handle inside it
+     *                 is used when {@code claimed} is empty (rows from before V44)
+     */
+    static String verifiedHostHandle(String claimed, String hostedBy, String postingHandle,
+                                     java.util.Collection<String> mentions, String ocrText, String caption) {
+        String found = normaliseHandle(claimed);
+        if (found == null && hostedBy != null) {
+            java.util.regex.Matcher m = AT_HANDLE.matcher(hostedBy);
+            if (m.find()) found = normaliseHandle(m.group(1));
+        }
+        final String handle = found;
+        if (handle == null || handle.equals(postingHandle)) return null;
+        if (mentions != null && mentions.stream().anyMatch(x -> handle.equals(normaliseHandle(x)))) return handle;
+        if (writtenIn(ocrText, handle) || writtenIn(caption, handle)) return handle;
+        return null;
+    }
+
+    private static String normaliseHandle(String raw) {
+        if (raw == null) return null;
+        String h = raw.strip().toLowerCase(java.util.Locale.ROOT);
+        if (h.startsWith("@")) h = h.substring(1);
+        // A handle never ends in a dot; one does when a sentence ends after it.
+        while (h.endsWith(".")) h = h.substring(0, h.length() - 1);
+        return HANDLE.matcher(h).matches() ? h : null;
+    }
+
+    /** The handle as a whole token: not part of a longer handle on either side. */
+    private static boolean writtenIn(String text, String handle) {
+        if (text == null) return false;
+        String t = text.toLowerCase(java.util.Locale.ROOT);
+        int from = 0;
+        while (true) {
+            int i = t.indexOf(handle, from);
+            if (i < 0) return false;
+            int end = i + handle.length();
+            boolean before = i == 0 || !isHandleChar(t.charAt(i - 1));
+            // A trailing dot ends a sentence, not the handle.
+            boolean after = end == t.length() || !isHandleChar(t.charAt(end))
+                    || (t.charAt(end) == '.' && (end + 1 == t.length() || !isHandleChar(t.charAt(end + 1))));
+            if (before && after) return true;
+            from = i + 1;
+        }
+    }
+
+    private static boolean isHandleChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_';
+    }
+
     private CandidateRules() {}
 
     /** Events further out than this are held for review: usually a misread year. */

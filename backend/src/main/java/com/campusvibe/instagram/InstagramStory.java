@@ -8,6 +8,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /** One fetched story frame, our stored copy of it and what Claude read from it. */
 @Entity
@@ -68,6 +70,11 @@ public class InstagramStory {
 
     @Column(name = "ocr_text", columnDefinition = "text")
     private String ocrText;
+
+    /** Handles the story mentions or tags, lowercased, without @ (V43). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    private List<String> mentions = new ArrayList<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")

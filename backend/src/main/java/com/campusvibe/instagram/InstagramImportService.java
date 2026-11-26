@@ -437,6 +437,9 @@ public class InstagramImportService {
         story.setPermalink(truncate(fs.permalink(), 500));
         story.setLinkUrl(CandidateRules.cleanUrl(fs.linkUrl()));
         story.setFeedPostUrl(fs.feedPostUrl());
+        story.setMentions(fs.mentions() == null ? new ArrayList<>()
+                : fs.mentions().stream().map(m -> m.toLowerCase(Locale.ROOT)).distinct().limit(30)
+                        .collect(Collectors.toCollection(ArrayList::new)));
         try {
             return stories.save(story);
         } catch (DataIntegrityViolationException e) {
@@ -534,7 +537,7 @@ public class InstagramImportService {
                 f == null ? null : f.locationName(),
                 f != null && f.caption() != null ? f.caption() : story.getCaption(),
                 f == null ? List.of() : f.countdowns(),
-                f == null ? List.of() : f.mentions(),
+                f != null ? f.mentions() : story.getMentions(),
                 story.getMediaType() == InstagramStory.MediaType.VIDEO);
     }
 
@@ -577,6 +580,11 @@ public class InstagramImportService {
             c.setRegistrationUrl(url != null ? url : story.getLinkUrl());
             c.setHostedBy(CandidateRules.clean(e.hostedBy(), 200));
             c.setRepost(e.repost());
+            // Published to the host's club, not the reposting one, when the
+            // story itself shows the host's handle.
+            c.setHostHandle(CandidateRules.verifiedHostHandle(e.hostHandle(), e.hostedBy(), source.getHandle(),
+                    story.getMentions(), extraction.ocrText(), story.getCaption()));
+            c.setHostChecked(true);
             c.setTopics(filter(e.topics(), knownTopics));
             c.setFormats(filter(e.formats(), knownFormats));
             c.setClassification(cls.name());

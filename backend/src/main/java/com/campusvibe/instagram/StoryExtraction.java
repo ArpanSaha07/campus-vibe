@@ -74,8 +74,11 @@ public record StoryExtraction(
             @JsonPropertyDescription("A registration or ticket URL if one is written in the image or given as a link sticker. Otherwise empty.")
             String registrationUrl,
 
-            @JsonPropertyDescription("Who hosts the event if it is someone other than the posting account (e.g. a reposted event by another club). Empty if the posting account hosts it.")
+            @JsonPropertyDescription("Who hosts the event if it is someone other than the posting account (e.g. a reposted event by another club), as their name. Empty if the posting account hosts it.")
             String hostedBy,
+
+            @JsonPropertyDescription("The Instagram handle of the account hosting the event, without @, only when it is not the posting account and the handle is written somewhere you can see: the username on a reshared post's card, an @mention or tag sticker, the poster text, or the caption. Copy it exactly. Empty if the posting account hosts it or no handle is shown. Never guess a handle from a name.")
+            String hostHandle,
 
             @JsonPropertyDescription("True if this story reposts or shares another account's event rather than announcing the posting account's own.")
             boolean repost,
