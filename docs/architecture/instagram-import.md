@@ -107,10 +107,19 @@ image.
 ## Accounts
 
 `InstagramSourceSeeder` loads `instagram/mcgill-accounts.csv` once, when no
-accounts exist. `InstagramAccountRanker` orders them from the page each was found
-on and the handle: SSMU's club directory and central McGill accounts first,
-departments next, Montreal venues low, personal and other-university accounts
-never enabled. Only the top `max-accounts` eligible ones are watched.
+accounts exist, **in file order**: the CSV is ranked by hand (Arpan, 2026-11-25,
+461 accounts), so a row's position is its priority and the first `max-accounts`
+are watched. A `category` column records the grouping: computer science, cultural,
+sports, academic/professional, arts/media, hobbies/social, community/advocacy,
+faith/wellness, university/other, then accounts with SSMU in their handle. Clubs
+discovered through SSMU's directory still belong to their activity category. The
+seeder skips a handle outside Instagram's alphabet and a repeated one. No test
+asserts the list's order — it is Arpan's to edit. Editing this seed file does not
+update priorities for accounts already stored in the database.
+
+`InstagramAccountRanker` is kept but no longer called. It scored accounts at
+runtime from the source page and handle (with an optional `rank` column ahead of
+the score) and disagreed with the hand-ranked list.
 
 ## Security
 

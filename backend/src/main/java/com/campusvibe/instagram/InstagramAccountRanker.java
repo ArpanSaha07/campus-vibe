@@ -10,7 +10,11 @@ import java.util.*;
  * Ranks Instagram accounts from the discovery CSV ({@code username,profile_url,found_on})
  * from most to least worth watching for McGill student events.
  *
- * <p>The CSV has no follower counts, so the score is built from what it has:
+ * <p>An optional positive {@code rank} column sets the order (lower is first),
+ * ahead of the calculated score. Unranked accounts follow ranked accounts.
+ * Ineligible accounts always come last, regardless of their explicit rank.
+ *
+ * <p>The CSV has no follower counts, so the fallback score is built from what it has:
  * where the account was found and what its handle says. Student-run McGill
  * accounts (SSMU's club directory, faculty associations, athletics) rank first;
  * McGill departments next; Montreal venues low; other universities and
@@ -64,6 +68,7 @@ final class InstagramAccountRanker {
 
     static List<RankedAccount> rank(Reader csv) throws IOException {
         Map<String, RankedAccount> best = new LinkedHashMap<>();
+        Map<String, Integer> ranks = new HashMap<>();
         try (BufferedReader reader = new BufferedReader(csv)) {
             String header = reader.readLine();
             if (header == null) return List.of();
@@ -71,6 +76,7 @@ final class InstagramAccountRanker {
             int userCol = cols.indexOf("username");
             int foundCol = cols.indexOf("found_on");
             int urlCol = cols.indexOf("profile_url");
+            int rankCol = cols.indexOf("rank");
             if (userCol < 0 && urlCol < 0) {
                 throw new IllegalArgumentException("The CSV needs a username or profile_url column");
             }
@@ -83,13 +89,26 @@ final class InstagramAccountRanker {
                 String foundOn = at(row, foundCol);
                 RankedAccount scored = score(handle, foundOn);
                 best.merge(handle, scored, (a, b) -> a.score() >= b.score() ? a : b);
+                ranks.merge(handle, parseRank(at(row, rankCol)), Math::min);
             }
         }
         List<RankedAccount> out = new ArrayList<>(best.values());
         out.sort(Comparator.comparing(RankedAccount::eligible).reversed()
+                .thenComparingInt(account -> ranks.get(account.handle()))
                 .thenComparing(Comparator.comparingInt(RankedAccount::score).reversed())
                 .thenComparing(RankedAccount::handle));
         return out;
+    }
+
+    private static int parseRank(String value) {
+        if (value == null || value.isBlank()) return Integer.MAX_VALUE;
+        try {
+            int rank = Integer.parseInt(value);
+            if (rank > 0) return rank;
+        } catch (NumberFormatException ignored) {
+            // Report invalid explicit priorities rather than silently changing their order.
+        }
+        throw new IllegalArgumentException("CSV rank must be a positive integer: " + value);
     }
 
     static RankedAccount score(String handle, String foundOn) {

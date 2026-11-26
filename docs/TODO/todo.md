@@ -1,6 +1,6 @@
 # CampusVibe — TODO
 
-Last updated: **2026-09-17** · Branch: `style/event-card-and-page-ui`
+Last updated: **2026-11-25** · Branch: `arpan/feature/instagram-ingestion`
 
 **This is the full queue, not the orientation file.** Do not read it to find out
 where the project is — [`../STATUS.md`](../STATUS.md) answers that in forty
@@ -29,6 +29,7 @@ the start of every session, so orient from there and come here for the full
 queue. Every item that was in this section is filed under its topic below.
 
 - [ ] **P1** **Resolve the `/refresh-docs` spec** ([draft](../specs/2026-11-16-refresh-docs-command.md), 2026-11-16) — a command that ranks stale docs by the commits that touched their mapped code, then updates the ones Arpan picks. **Arpan answers its three open questions first:** whether the hooks' text report changes too, or the new `--json` mode is additive only (blocks the `check-docs.mjs` change); how old an `Account read` date must be to flag a runbook (proposed 30 days); and whether a doc with no relevant commits but an old stamp shows in the table (proposed: yes, at the bottom, verdict *re-stamp*). Then approve the spec and build it: `check-docs.mjs --json` with per-doc relevant commits and `product.md` / `docs/README.md` in scope, five new `docs-map.json` entries (not blocked by the questions), and `.claude/commands/refresh-docs.md`.
+- [ ] **P0** **Clean up the Instagram import before it reaches `develop`** (added 2026-11-25, branch `arpan/feature/instagram-ingestion`, Gabriel's work merged as `0c43fe4`) — the full checklist is [`todo-instagram-ingestion-cleanup.md`](todo-instagram-ingestion-cleanup.md): four correctness and security findings from `/code-review`, publishes that never retry, roughly 1,500 lines that can be cut while V38 is still editable, and the ADR, spec and docs it left open. Its *Demo state* section also lists what Arpan saw broken at the 2026-11-26 showcase: the UI, events on clubs that are not real club pages, and no dashboard import controls.
 
 ---
 
