@@ -18,8 +18,11 @@ idea is neither: raised, not decided, and listed under
 
 ## Public website
 
-**Shipped.** Homepage with a hero banner slider, category section, event card
-sections, a club promotion section and the AI planner card: a prompt box with
+**Shipped.** Homepage with a hero banner slider, six intent cards (*Meet new
+people*, *Find free food* and four more, each a `?q=` search on `/events`),
+single-row event sections (*Popular this week*, *Workshops*, and *Personalised
+for you* from a signed-in student's interests), a club promotion section and
+the AI planner card: a prompt box with
 suggestion chips, where a signed-out visitor's prompt is kept while they are
 asked to sign in. `/events` lists upcoming events and, with `?q=`, shows search
 results for events and clubs together; `/clubs` is a grid of every club. The

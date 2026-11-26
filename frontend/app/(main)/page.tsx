@@ -15,15 +15,15 @@ export default function Home() {
       <div className="fade-up" style={reveal(0)}>
         <BannerCarousel />
       </div>
-      <div className="fade-up" style={reveal(2)}>
+      <div className="fade-up" style={reveal(1)}>
         <Suspense fallback={null}>
           <LiveEventSection row="popular" />
         </Suspense>
       </div>
-      <div className="fade-up" style={reveal(3)}>
+      <div className="fade-up" style={reveal(2)}>
         <PlannerCard />
       </div>
-      <div className="fade-up" style={reveal(1)}>
+      <div className="fade-up" style={reveal(3)}>
         <CategoriesSection />
       </div>
       <div className="fade-up" style={reveal(4)}>

@@ -226,7 +226,10 @@ taxonomy is currently write-only. Ordered by how visible the gap is.
       homepage tiles on the explicit promise that *browsing by club category or
       by event tag is a real filter against a real foreign key, and it belongs on
       `/events` and `/clubs`* — the replacement was never built, so the delete
-      removed a bad filter and left none.
+      removed a bad filter and left none. **Since 2026-11-26 the homepage has
+      intent cards again** (`CategoriesSectionMainPage.tsx`), linking to
+      `/events?q=` by Arpan's choice with no superseding ADR; point each at the
+      tag filter once it exists.
 - [ ] **P2** **A profile never shows its own interests.** `/profile/edit/interests`
       writes them; `ProfileAboutCard` renders degree, faculty and subjects and
       stops. So `showInterests` — the toggle at `profile/edit/page.tsx:164` — is
