@@ -1,6 +1,6 @@
 # The local start script, `scripts/dev.mjs`
 
-**Code as of:** `bb49c9e` plus `scripts/dev.mjs` (committed after it), re-read against this doc 2026-11-25. Compose's object store is `s3mock` since the same day ([ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md)); nothing here names it
+**Code as of:** `0f4e1df` — scheduled refresh 2026-11-26: re-read `bb49c9e..0f4e1df` of `scripts/dev.mjs` (its first commit, `f83c7f3`) against every step, flag and constant here (Maven image, cache volume, ports, timeouts, `wx`, `ALTER USER`) and found nothing to change; compose's object store is `s3mock` since 2026-11-25 ([ADR-026](../decisions/ADR-026-s3mock-replaces-minio.md)) and nothing here names it.
 
 One command brings the whole local stack up from a fresh clone:
 

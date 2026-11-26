@@ -5,7 +5,12 @@ verified end-to-end against the running Docker stack.** Every claim below was
 read from the code or measured; the two places where a rationale could not be
 recovered say so.
 **Authors:** main session.
-**Code as of:** `0ff0759` plus the uncommitted planner agent unit — re-read
+**Code as of:** `0f4e1df` — re-read `0ff0759..0f4e1df` across every mapped path
+(`api.tsx`, `cache.ts`, `adapters.ts`, `club.tsx`, `event.tsx`,
+`followed-clubs-context.tsx`, `types/`, both contract tests,
+`api-dto-fields.json`, and the `event/`, `club/` and `exception/` packages) and
+re-checked every `file:line` citation, as a scheduled refresh on 2026-11-26.
+Before that, `0ff0759` plus the uncommitted planner agent unit — re-read
 2026-11-16: `PlannerActionDTO` joined `api-dto-fields.json` and both contract
 tests, and `actions` joined `PlannerMessageDTO` and `PlannerReplyDoneDTO`.
 **Nothing this document describes moved**: the planner is still fetched in the
@@ -342,10 +347,17 @@ button would mean twelve identical requests on a grid of twelve. The list is
 fetched once and every button reads from it.
 
 Two deliberate refusals, both documented at the top of the file: it does not
-fetch on mount (`requestLoad`, `context.tsx:62`, is called by the consuming hook
-at `context.tsx:193`, so a route with no Follow button never asks), and it keeps
+fetch on mount (`requestLoad`, `followed-clubs-context.tsx:67`, is called by the consuming hook
+at `followed-clubs-context.tsx:205`, so a route with no Follow button never asks), and it keeps
 whole `Club` objects rather than ids, so `/my-clubs` reads them instead of
 fetching the same endpoint a second time.
+
+**One way back in from outside the buttons** (2026-11-16): `refresh`
+(`followed-clubs-context.tsx:118`) re-reads the list after a follow made
+somewhere else — the planner agent following a club for the student
+([ADR-023](../decisions/ADR-023-planner-acts-through-server-validated-tool-calls.md)).
+It does nothing unless something has already asked for the list, so it keeps
+the no-fetch-on-mount refusal intact.
 
 Writes are optimistic and revert on failure. A *failed* load leaves every button
 reading `Follow`, which is the safe direction: following again is idempotent
@@ -367,14 +379,20 @@ on every write path, so the column holds six known keys or NULL — `email`,
 runs with `FAIL_ON_UNKNOWN_PROPERTIES` off, so a key the record does not name
 is accepted and silently dropped rather than refused.
 
-**Planner answers are joined here too** (`adapters.ts:205`). `toPlannerPicks`
+**Planner answers are joined here too** (`adapters.ts:208`). `toPlannerPicks`
 matches each pick to the `EventDTO` or `ClubDTO` hydrated beside it, drops a
 pick with no row, and keeps one kind, so a planner answer never has two card
 rows ([ADR-019](../decisions/ADR-019-planner-answer-is-intro-plus-typed-picks.md)).
 The planner `Api*` types mirror the `Planner*DTO` records in
 `com.campusvibe.ai.feature.planner` and are contracted like every other DTO;
 `ApiPlannerReplyDone` is the stream's closing `done` frame rather than a
-response body.
+response body. `toPlannerActions` (`adapters.ts:231`) maps what the agent did
+in a turn, `ApiPlannerAction` onto `PlannerAction`, adapting a calendar
+action's event through `toEventInstance` like any card's; it treats a missing
+`actions` as empty, because the backend and the Vercel frontend deploy
+separately and an older backend's `done` frame has no such field
+([`rules/contracts.md`](../../.claude/rules/contracts.md)). User messages get
+no actions (`adapters.ts:249`).
 
 **It is also where an S3 object key becomes a URL.** `clubs.logo` and
 `club_images.url` hold two different kinds of thing: absolute Unsplash URLs in
@@ -459,13 +477,14 @@ variable, so one user cannot read or change another's follows. The file also
 records a non-obvious security fact: the `permitAll` entry for
 `GET /api/v1/clubs/**` does not reach these routes, because they live under
 `/api/v1/users/me` and fall through to `.anyRequest().authenticated()`
-(`SecurityFilterChainConfig.java:45-51`).
+(`SecurityFilterChainConfig.java:114`, `:117`).
 
 ### `backend/.../DefaultExceptionHandler.java` — status mapping
 
-A `@ControllerAdvice` mapping thirteen exception types onto statuses, with a
-catch-all `Exception` handler returning 500. *(Re-read 2026-08-15; three
-handlers were added by the authentication work.)*
+A `@ControllerAdvice` mapping fourteen exception types onto statuses, with a
+catch-all `Exception` handler returning 500. *(Counted 2026-11-26: fifteen
+`@ExceptionHandler` methods. Three were added by the authentication work, and
+the 413 and 503 entries below since.)*
 
 The entries that carry reasoning worth preserving:
 
@@ -583,7 +602,7 @@ status — the real 404s would silently degrade to soft ones.
 **Demand-driven follow list.** Fetching on mount cost a `/users/me/clubs` request
 on every route a signed-in user opened, including the five of seven measured that
 have no Follow button on them. The `authLoading` guard
-(`followed-clubs-context.tsx:74`) is what prevents a 403 during the initial
+(`followed-clubs-context.tsx:79`) is what prevents a 403 during the initial
 `/users/me` round trip; removing it makes the request fire before the user
 resolves.
 
@@ -668,7 +687,7 @@ data is allowed to live.
 ## Known deviations, gaps and blockers
 
 **The JWT is in `localStorage`, and it is the structural constraint here.**
-`auth-context.tsx:26` reads it on mount and calls `/api/v1/users/me` before
+`auth-context.tsx:40` reads it on mount and calls `/api/v1/users/me` before
 anything else can proceed. Two consequences: authenticated pages cannot be server
 rendered at all, and every one of them pays a sequential round trip before its
 own data request starts. It is also an XSS token-theft path. Tracked as

@@ -1,6 +1,6 @@
 # Connecting Elastic Beanstalk
 
-**Code as of:** `11c9993` · **Account read:** 2026-09-15 · **Changed:** 2026-09-14/15 — §0 (partly), §1, §2, §4, §5 and §6 done; see the note below
+**Code as of:** `0f4e1df` (scheduled refresh 2026-11-26: re-read `11c9993..0f4e1df` of the mapped paths; only `docker/EB-DEPLOYMENT.md` changed, its runbook path and the planner `OPENAI_*` rows §4 already names) · **Account read:** 2026-09-15 · **Changed:** 2026-09-14/15 — §0 (partly), §1, §2, §4, §5 and §6 done; see the note below
 **Order:** 2 of 4 — after [`connecting-rds.md`](connecting-rds.md) §1–§5. The S3 and SES properties from [`connecting-s3.md`](connecting-s3.md) and [`connecting-ses.md`](connecting-ses.md) go in the same property pass.
 **Related:** guide §12–§19 in [`CampusVibe_AWS_Deployment_Guide.md`](CampusVibe_AWS_Deployment_Guide.md) · packaging in [`aws-deployment.md`](aws-deployment.md) · property reference in [`docker/EB-DEPLOYMENT.md`](../../docker/EB-DEPLOYMENT.md)
 
@@ -217,7 +217,7 @@ application.
 | `AWS_REGION` | `ca-central-1` | Already set; keep |
 | `CORS_ALLOWED_ORIGINS` | `https://www.campusvibe-mcgill.com` | Comma-separated. Add another origin only if it really serves the frontend |
 | `APP_BASE_URL` | `https://www.campusvibe-mcgill.com` | Links in mail point here |
-| `AUTH_RATE_LIMIT_TRUST_XFF` | `true` | Behind the load balancer every request arrives from its address; without this the whole internet shares one login budget |
+| `AUTH_RATE_LIMIT_TRUST_XFF` | `true` | Behind CloudFront and nginx every request arrives from a proxy address (the load balancer until 2026-11-07, ADR-017); without this the whole internet shares one login budget |
 
 **Optional:** `OPENAI_API_KEY` (**secret**; blank runs search keyword-only
 **and turns the AI planner off**, which then answers 503),
